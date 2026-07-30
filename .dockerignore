@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Data
+*.db
+*.db-journal
+*.db-wal
+
+# Environment (copy your own)
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests & Docs
+tests/
+docs/
+*.md
+
+# Streamlit
+.streamlit/
+
+# Temp
+*.tmp
+*.log

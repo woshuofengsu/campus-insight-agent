@@ -52,6 +52,7 @@
 cat > requirements.txt << 'EOF'
 streamlit>=1.28.0
 langchain>=0.3.0
+langchain-classic>=0.1.0
 langchain-openai>=0.2.0
 python-dotenv>=1.0.0
 altair>=5.0.0
@@ -268,6 +269,8 @@ git commit -m "feat: project scaffolding — config, retry, logger, dotenv, read
 ```python
 # tests/test_deepseek_compat.py
 """Verify DeepSeek API compatibility with OpenAI format + function calling."""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import json
 from openai import OpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
@@ -359,7 +362,8 @@ if __name__ == "__main__":
 ```bash
 cd c:/Users/wo'shuo'feng'su/Desktop/campus-insight-agent
 pip install -r requirements.txt
-python tests/test_deepseek_compat.py
+# Windows: set encoding to avoid GBK emoji errors
+PYTHONIOENCODING=utf-8 python tests/test_deepseek_compat.py
 ```
 
 Expected: All 3 tests pass with "🎉 All tests passed!"
@@ -527,7 +531,6 @@ class KnowledgeItem:
 # data/database.py
 import sqlite3
 import json
-from typing import Optional
 
 _DB_PATH: str = ""
 
@@ -2011,7 +2014,7 @@ git commit -m "feat: system prompt template with user context injection"
 """Memory system: working (session), long-term (SQLite), knowledge (SQLite)."""
 import json
 from typing import Any
-from langchain.memory import ConversationBufferMemory
+from langchain_classic.memory import ConversationBufferMemory
 from data.database import get_or_create_user, update_user_profile, set_onboarding_done
 
 
@@ -2127,8 +2130,8 @@ git commit -m "feat: memory manager — 3-tier memory (session + SQLite + knowle
 # agent/engine.py
 """Agent reasoning engine — LangChain OpenAI Functions Agent with DeepSeek."""
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_openai_functions_agent
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_classic.agents import AgentExecutor, create_openai_functions_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from config import (
     DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL,
@@ -2820,7 +2823,6 @@ git commit -m "feat: main app entry — dual-panel layout, onboarding gate, idle
 ```python
 # perception/monitor.py
 """Perception engine — monitors environment and proactively alerts the user."""
-import json
 from datetime import datetime
 from data.database import (
     get_exams, get_events, get_overdue_reminders,

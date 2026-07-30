@@ -1,0 +1,45 @@
+# CampusInsight Agent — Docker Compose 部署
+#
+# 启动:
+#   1. 复制 .env.example 为 .env 并填入 API Key
+#   2. docker-compose up -d
+#   3. 访问 http://localhost:8501
+#
+# 同时启动 FastAPI 服务（可选）:
+#   docker-compose --profile api up -d
+
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: campus-insight
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      # 持久化数据库（重启不丢数据）
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── 可选：FastAPI 服务（供外部系统调用） ──
+  api:
+    build: .
+    container_name: campus-insight-api
+    ports:
+      - "18800:18800"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    command: uvicorn api:app --host 0.0.0.0 --port 18800
+    restart: unless-stopped
+    profiles:
+      - api
