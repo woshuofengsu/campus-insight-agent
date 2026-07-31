@@ -66,6 +66,8 @@ def query_issues(category: str = "", status: str = "", limit: int = 10) -> str:
         )
         if issue.get("description"):
             lines.append(f"     💬 {issue['description'][:60]}")
+        if issue.get("processing_note"):
+            lines.append(f"     📝 处理回复：{issue['processing_note'][:80]}")
 
     return "\n".join(lines)
 

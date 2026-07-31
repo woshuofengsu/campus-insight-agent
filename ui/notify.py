@@ -15,15 +15,9 @@ Architecture:
 import logging
 import streamlit as st
 from ui.components import TOKEN
+from ui.session_state import SS
 
 _log = logging.getLogger(__name__)
-
-
-# ── Session state keys ──
-_SS_LAST_TOTAL = "_notify_last_total"
-_SS_LAST_URGENT = "_notify_last_urgent"
-_SS_LAST_PENDING = "_notify_last_pending"
-_SS_LAST_PROPOSAL = "_notify_last_proposal"
 
 
 def _fetch_counts():
@@ -47,7 +41,7 @@ def _fetch_counts():
             "proposal_total": p_stats["total"],
             "proposal_pending": p_stats["by_status"].get("讨论中", 0),
         }
-    except Exception:
+    except Exception:  # non-critical: graceful degradation
         return None
 
 
@@ -74,7 +68,7 @@ def check_and_notify():
 
     # ── Student: new issues since last check ──
     if role == "student":
-        last_total = st.session_state.get(_SS_LAST_TOTAL, 0)
+        last_total = st.session_state.get(SS.notif_last_total, 0)
         if counts["total"] > last_total and last_total > 0:
             new_count = counts["total"] - last_total
             try:
@@ -82,20 +76,20 @@ def check_and_notify():
                     f"📢 校园新增 {new_count} 件工单，点击左侧「🌊 校园脉搏」查看最新动态",
                     icon="📢",
                 )
-            except Exception:
+            except Exception:  # non-critical: logged and suppressed
                 _log.debug("st.toast failed for student notification (non-critical)")
-        st.session_state[_SS_LAST_TOTAL] = counts["total"]
+        st.session_state[SS.notif_last_total] = counts["total"]
 
     # ── Teacher: new urgent issues + new proposals ──
     else:
-        last_urgent = st.session_state.get(_SS_LAST_URGENT, -1)
-        last_proposal = st.session_state.get(_SS_LAST_PROPOSAL, -1)
+        last_urgent = st.session_state.get(SS.notif_last_urgent, -1)
+        last_proposal = st.session_state.get(SS.notif_last_proposal, -1)
 
         # First load — just cache, don't notify
         if last_urgent == -1:
-            st.session_state[_SS_LAST_URGENT] = counts["urgent"]
-            st.session_state[_SS_LAST_PROPOSAL] = counts["proposal_total"]
-            st.session_state[_SS_LAST_PENDING] = counts["pending"]
+            st.session_state[SS.notif_last_urgent] = counts["urgent"]
+            st.session_state[SS.notif_last_proposal] = counts["proposal_total"]
+            st.session_state[SS.notif_last_pending] = counts["pending"]
             return
 
         toasts = []
@@ -111,12 +105,12 @@ def check_and_notify():
         for msg in toasts:
             try:
                 st.toast(msg, icon="🔔")
-            except Exception:
+            except Exception:  # non-critical: logged and suppressed
                 _log.debug("st.toast failed for teacher notification (non-critical)")
 
-        st.session_state[_SS_LAST_URGENT] = counts["urgent"]
-        st.session_state[_SS_LAST_PROPOSAL] = counts["proposal_total"]
-        st.session_state[_SS_LAST_PENDING] = counts["pending"]
+        st.session_state[SS.notif_last_urgent] = counts["urgent"]
+        st.session_state[SS.notif_last_proposal] = counts["proposal_total"]
+        st.session_state[SS.notif_last_pending] = counts["pending"]
 
 
 def render_sidebar_badge():
@@ -135,7 +129,7 @@ def render_sidebar_badge():
     if role:
         try:
             role = role.get_user_profile().get("role", "student")
-        except Exception:
+        except Exception:  # non-critical: graceful degradation
             return
     else:
         return
@@ -147,7 +141,7 @@ def render_sidebar_badge():
     try:
         from data.db_notifications import get_unread_count
         unread_note = get_unread_count(user_id)
-    except Exception:
+    except Exception:  # non-critical: logged and suppressed
         _log.debug("get_unread_count failed for user #%d (non-critical)", user_id)
 
     if role == "teacher":

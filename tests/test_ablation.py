@@ -217,8 +217,9 @@ def test_reflector_components():
     """Test reflector sub-components in isolation."""
     from agent.reflector import (
         parse_intermediate_steps, compute_associations,
-        _parse_text_actions, build_reasoning_chain,
+        build_reasoning_chain,
     )
+    from agent.reflector._parser import parse_text_actions as _parse_text_actions
 
     # 1. Text-action parsing
     t0 = time.time()

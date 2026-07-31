@@ -44,20 +44,21 @@ try:
             f'{d["emoji"]} {d["condition"]} {d["temp_low"]}~{d["temp_high"]}°C '
             f'💧{d["rain_prob"]}%</span>'
         )
-except Exception:
+except Exception:  # non-critical: logged and suppressed
     _log.debug("Weather fetch failed", exc_info=True)
 
 st.markdown(
     f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.3em;font-weight:800;color:{TOKEN["text"]};">'
-    f'📊 {school} · 治理工作台</span>'
-    f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:12px;">'
+    f'<span style="font-size:{TOKEN["font_display"]};font-weight:{TOKEN["weight_bold"]};color:{TOKEN["text"]};">'
+    f'{school} &middot; 工作台</span>'
+    f'<span style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_muted"]};margin-left:12px;">'
     f'{_now_short()}</span>'
     f'{weather_html}'
     f'</div>',
     unsafe_allow_html=True,
 )
-st.caption(f"欢迎回来，{display_name or dept or '老师'}。以下是校园治理的最新动态。")
+st.caption(f"欢迎回来，{display_name or dept or '老师'}。")
+st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:8px 0 16px;"></div>', unsafe_allow_html=True)
 
 # ── KPI Row ──
 stats = cached_issues_stats()
@@ -69,19 +70,22 @@ in_progress_count = stats["by_status"].get("处理中", 0)
 resolved_count = stats["by_status"].get("已解决", 0)
 today_new = stats.get("today_new", 0)
 
+# ── KPI Strip (5 across, no card borders) ──
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
-    stat("⏳", "待处理", str(pending_count), TOKEN["warning"])
+    stat("待处理", str(pending_count), TOKEN["warning"])
 with c2:
-    stat("🔥", "紧急", str(len(urgent_issues)), TOKEN["danger"])
+    stat("今日新增", str(today_new), TOKEN["accent"])
 with c3:
-    stat("🔄", "处理中", str(in_progress_count), TOKEN["primary"])
+    stat("紧急", str(len(urgent_issues)), TOKEN["danger"])
 with c4:
-    stat("📝", "今日新增", str(today_new), TOKEN["primary"])
+    stat("处理中", str(in_progress_count), TOKEN["accent"])
 with c5:
-    grade = health.get("grade", "—")
-    stat("🏥", "健康度", f"{health.get('score', '—')}分 {grade}",
+    grade = health.get("grade", "-")
+    stat("健康度", f'{health.get("score", "-")} {grade}',
          TOKEN["success"] if grade == "优" else TOKEN["warning"] if grade == "良" else TOKEN["danger"])
+
+st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
 # ── 🧠 AI 智能洞察（Agent 主动发现）──
 try:
@@ -232,7 +236,7 @@ except Exception:
 st.markdown("---")
 
 # ── Urgent Issues (Actionable) ──
-section("⚠️ 需要立即处理", accent=TOKEN["danger"])
+section("⚠️ 需要立即处理")
 
 if not urgent_issues:
     st.info("🎉 暂无紧急工单，校园运转良好！")
@@ -266,30 +270,47 @@ else:
                     with st.expander("📄 详情"):
                         st.write(desc)
             with c_right:
-                st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top:4px;'></div>", unsafe_allow_html=True)
+                # Quick processing note
+                quick_note_key = f"_urgent_note_{iid}"
+                st.text_input("备注", key=quick_note_key, placeholder="可选备注…", label_visibility="collapsed")
                 if status == "待处理":
                     btn_cols = st.columns(2)
                     with btn_cols[0]:
                         if st.button("🔄 处理中", key=f"urgent_progress_{iid}", width="stretch"):
-                            update_issue_status(iid, "处理中")
+                            update_issue_status(iid, "处理中",
+                                              processing_note=st.session_state.get(quick_note_key, ""))
                             invalidate_issues()
                             st.rerun()
                     with btn_cols[1]:
                         if st.button("✅ 已解决", key=f"urgent_resolve_{iid}", width="stretch"):
-                            update_issue_status(iid, "已解决")
+                            update_issue_status(iid, "已解决",
+                                              processing_note=st.session_state.get(quick_note_key, ""))
                             invalidate_issues()
                             st.rerun()
                 elif status == "处理中":
-                    if st.button("✅ 标记已解决", key=f"urgent_resolve_{iid}", type="primary", width="stretch"):
-                        update_issue_status(iid, "已解决")
-                        invalidate_issues()
-                        st.rerun()
+                    btn_cols = st.columns(2)
+                    with btn_cols[0]:
+                        if st.button("✅ 已解决", key=f"urgent_resolve_{iid}", width="stretch"):
+                            update_issue_status(iid, "已解决",
+                                              processing_note=st.session_state.get(quick_note_key, ""))
+                            invalidate_issues()
+                            st.rerun()
+                    with btn_cols[1]:
+                        if st.button("↩️ 退回", key=f"urgent_return_{iid}", width="stretch"):
+                            update_issue_status(iid, "待处理",
+                                              processing_note=st.session_state.get(quick_note_key, ""))
+                            invalidate_issues()
+                            st.rerun()
                 else:  # 已解决
+                    proc_note = issue.get("processing_note", "")
                     st.markdown(
                         f'<span style="font-size:0.78em;color:{TOKEN["success"]};font-weight:600;">'
                         f'✅ 已于 {issue.get("resolved_at", "")[:10]} 解决</span>',
                         unsafe_allow_html=True,
                     )
+                    if proc_note:
+                        st.caption(f"📝 {proc_note[:30]}")
                     if st.button("🔄 重开", key=f"urgent_reopen_{iid}", width="stretch"):
                         update_issue_status(iid, "待处理")
                         invalidate_issues()
@@ -308,11 +329,11 @@ try:
             "ORDER BY days_open DESC LIMIT 8"
         ).fetchall()
         overdue_issues = [dict(r) for r in overdue_rows]
-except Exception:
+except Exception:  # non-critical: logged and suppressed
     _log.warning("SLA overdue query failed", exc_info=True)
 
 if overdue_issues:
-    section("⏰ SLA 超时预警", accent=TOKEN["danger"])
+    section("⏰ SLA 超时预警")
     st.caption("以下工单已超过 7 天未处理，可能影响治理健康度评分。")
 
     for oi in overdue_issues[:5]:
@@ -339,15 +360,18 @@ if overdue_issues:
                     f'{oi_days} 天</span> 未处理',
                     unsafe_allow_html=True,
                 )
+                sla_note_key = f"_sla_note_{oi_id}"
+                st.text_input("备注", key=sla_note_key, placeholder="可选…", label_visibility="collapsed")
                 if st.button("🔄 处理", key=f"sla_progress_{oi_id}", width="stretch"):
-                    update_issue_status(oi_id, "处理中")
+                    update_issue_status(oi_id, "处理中",
+                                      processing_note=st.session_state.get(sla_note_key, ""))
                     invalidate_issues()
                     st.rerun()
 
 st.markdown("---")
 
 # ── Recently Resolved (achievement visibility) ──
-section("✅ 最近已解决", accent=TOKEN["success"])
+section("✅ 最近已解决")
 recently_resolved = cached_issues(status="已解决", limit=8)
 if not recently_resolved:
     st.caption("暂无已解决的工单。")
@@ -405,7 +429,7 @@ else:
 st.markdown("---")
 
 # ── Activity Timeline (real activity_log) ──
-section("📡 校园动态时间线", accent=TOKEN["primary"])
+section("📡 校园动态时间线")
 
 try:
     from data.db_notifications import get_activity_feed, get_activity_summary
@@ -456,11 +480,11 @@ try:
                     st.caption("📡 系统感知（暂无用户活动数据）："
                                + f'新增 {live_events.get("new_issues", 0)} 件'
                                + f' · 解决 {live_events.get("resolved_issues", 0)} 件')
-            except Exception:
+            except Exception:  # non-critical: silent pass intended
                 pass
     else:
         st.caption("暂无校园动态。当学生上报问题或提交提案时，这里会实时更新。")
-except Exception:
+except Exception:  # non-critical: logged and suppressed
     _log.debug("Activity feed skipped", exc_info=True)
 
 # ── Top Proposals ──

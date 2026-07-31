@@ -5,15 +5,22 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 passed = 0; total = 0
 
 # ═══ 1. Module compilation ═══
-print('=== 1. Module Compilation (26 modules) ===')
+print('=== 1. Module Compilation (35 modules) ===')
 modules = [
     'config','agent.prompt','agent.engine','agent.reflector','agent.memory','agent.callbacks',
+    'agent.helpers','agent.weekly_report','agent.rag',
     'data.database','data.models','data.seed',
+    'data.db_core','data.db_user','data.db_academic','data.db_knowledge',
+    'data.db_governance','data.db_health','data.db_surveillance',
+    'data.db_notifications','data.db_perception','data.live_generator',
     'tools','tools.query_weather','tools.query_campus_pulse','tools.query_proposals',
     'tools.query_topics','tools.query_campus_issues','tools.action_report_issue',
     'tools.action_create_proposal','tools.action_support_proposal','tools.action_express_opinion',
+    'tools.query_knowledge','tools.query_my_issues',
     'ui.components','ui.thinking','ui.cache','ui.onboarding','ui.session','ui.theme','ui.notify',
-    'utils.logger','utils.retry','perception.monitor',
+    'ui.prefetch','ui.login',
+    'utils.logger','utils.retry','utils.text',
+    'perception.monitor',
 ]
 for m in modules:
     total += 1
@@ -61,7 +68,7 @@ print(f'  {p_ok}/{len(p_tests)} passed')
 
 # ═══ 3. Text-action parsing ═══
 print('\n=== 3. Text-Action Parsing ===')
-from agent.reflector import _parse_text_actions, _TEXT_ACTION_PATTERNS
+from agent.reflector._parser import parse_text_actions as _parse_text_actions, _TEXT_ACTION_PATTERNS
 t_tests = [
     ('已为你生成工单 #42，分类为设施维修',1),('校园脉搏显示本周有3个新工单',1),
     ('天气晴好，适合出行',1),('我已创建提案',1),('已上报工单 #15，请等待处理',1),
@@ -77,9 +84,9 @@ for txt, expected_min in t_tests:
 total += len(t_tests); passed += t_ok
 print(f'  {t_ok}/{len(t_tests)} passed')
 
-# ═══ 4. Step summarization (12 tools) ═══
-print('\n=== 4. Step Summarization (12 tools) ===')
-from agent.reflector import _summarize_step
+# ═══ 4. Step summarization (14 tools) ═══
+print('\n=== 4. Step Summarization (14 tools) ===')
+from agent.reflector._parser import summarize_step as _summarize_step
 s_tests = [
     ('report_issue',{'title':'灯坏了','category':'设施维修'}),
     ('query_issues',{'category':'设施维修','status':'待处理'}),
@@ -87,6 +94,8 @@ s_tests = [
     ('create_proposal',{'title':'延长图书馆时间'}),('support_proposal',{'proposal_id':5}),
     ('get_proposals',{}),('get_topics',{}),('get_topic_detail',{'topic_id':3}),
     ('express_opinion',{}),('collect_feedback',{}),
+    ('query_knowledge',{'query':'停水通知'}),('get_school_policy',{'topic':'宿舍管理'}),
+    ('query_my_issues',{}),('query_my_proposals',{}),
 ]
 s_ok = 0
 for tool_name, tool_input in s_tests:

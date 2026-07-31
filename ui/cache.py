@@ -113,7 +113,13 @@ def invalidate_proposals():
 
 
 def invalidate_opinions(topic_id: int = 0):
-    """Clear opinion caches (called after user submits an opinion)."""
+    """Clear opinion caches (called after user submits an opinion).
+
+    Note: currently clears the full opinion cache. The topic_id parameter is
+    accepted for API compatibility — a future optimization could clear only
+    the specific topic's cache entry.
+    """
+    # TODO: per-topic cache invalidation via cached_opinions_by_topic.clear(topic_id)
     cached_opinions_by_topic.clear()
 
 

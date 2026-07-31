@@ -45,7 +45,7 @@ def _get_active_user_id() -> int:
         uid = st.session_state.get("_login_user_id")
         if uid is not None:
             return int(uid)
-    except Exception:
+    except Exception:  # non-critical: silent pass intended
         pass
 
     raise RuntimeError(

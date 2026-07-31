@@ -70,7 +70,7 @@ Streamlit + LangChain + DeepSeek + SQLite + Altair，跑在 Streamlit Cloud 上�
 campus-insight-agent/
 ├── app.py              # 入口，路由 + 全局样式
 ├── agent/              # Agent 引擎（OODA 循环、提示词、反射器）
-├── tools/              # 14 个工具函数（自动发现）
+├── tools/              # 16 个工具函数（自动发现）
 ├── perception/         # 感知引擎（天气、热点监控）
 ├── data/               # 数据库层
 ├── ui/                 # 前端
@@ -83,7 +83,7 @@ campus-insight-agent/
 ## 🧪 测试
 
 ```bash
-# 全量验证（136 项）
+# 全量验证（158 项）
 python tests/test_verify_all.py
 
 # Ablation 评估（性能基准 + 组件对比）

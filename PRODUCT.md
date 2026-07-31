@@ -13,11 +13,11 @@ web
 
 ## Product Purpose
 
-校园先知（CampusInsight）是一个 AI 驱动的校园基层治理平台。学生自下而上发现问题并上报，AI Agent（14 个工具 + OODA 认知循环）自动分类、关联分析，教师自上而下高效处理，AI 每周自动生成治理周报。闭环：感知 → 上报 → 分析 → 处理 → 反馈。
+校园先知（CampusInsight）是一个 AI 驱动的校园基层治理平台。学生自下而上发现问题并上报，AI Agent（14 个工具 + OODA 治理工作流）自动分类、关联分析，教师自上而下高效处理，AI 每周自动生成治理周报。闭环：感知 → 上报 → 分析 → 处理 → 反馈。
 
 ## Positioning
 
-**不是 ChatGPT 套壳**。是一个拥有真实 Agent 架构的治理工具：14 个可被 AI 自主调用的工具、OODA（Observe-Orient-Decide-Act-Reflect）认知循环、TF-IDF 语义搜索、z-score 异常检测、跨周趋势对比。99% 的学生 AI 作品止步于聊天机器人——这是一个完整的工作流闭环。
+**不是 ChatGPT 套壳**。是一个拥有真实 Agent 架构的治理工具：14 个可被 AI 自主调用的工具、OODA（Observe-Orient-Decide-Act-Reflect）治理工作流、TF-IDF 语义搜索、z-score 异常检测、跨周趋势对比。99% 的学生 AI 作品止步于聊天机器人——这是一个完整的工作流闭环。
 
 ## Operating Context
 
@@ -29,9 +29,9 @@ web
 ## Capabilities and Constraints
 
 **能力：**
-- 双角色系统（学生 7 页 + 教师 5 页）
+- 双角色系统（学生 9 页 + 教师 6 页）
 - AI Agent 14 工具自动发现与调用
-- OODA 认知循环推理可视化
+- OODA 治理工作流推理可视化
 - 语义搜索（字符 n-gram TF-IDF，零依赖）
 - z-score 异常检测 + 跨周趋势分析
 - AI 治理周报一键生成
@@ -54,7 +54,8 @@ web
 - 名称：校园先知 · CampusInsight
 - 口号：知报议督（感知 · 上报 · 协商 · 监督）
 - 主色调：indigo (#4f46e5) / purple (#7c3aed)
-- 风格参考：Linear — 暗色专业、微妙渐变、工具感
+- 体验目标：专业严谨（企业级可靠性）+ 青春活力（校园生活气息），两者同等重要
+- 风格参考：Linear 的工具感 + 中国大学校园的美学元素
 - 语言：简体中文
 
 ## Evidence on Hand

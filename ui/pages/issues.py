@@ -137,8 +137,7 @@ except Exception as e:
 total = stats["total"]
 
 if total == 0:
-    info_card("🔧", "还没有人上报问题", "在上方输入框描述问题，成为第一个让校园变好的人！",
-              bg=TOKEN["warning_bg"], border=TOKEN["warning_border"])
+    info_card("在上方输入框描述问题，成为第一个让校园变好的人！")
     st.stop()
 
 by_status = stats.get("by_status", {})
@@ -148,13 +147,13 @@ resolved = by_status.get("已解决", 0)
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    stat("📝", "总数", str(total), TOKEN["primary"])
+    stat("总数", str(total), TOKEN["primary"])
 with c2:
-    stat("⏳", "待处理", str(pending), TOKEN["warning"])
+    stat("待处理", str(pending), TOKEN["warning"])
 with c3:
-    stat("🔄", "处理中", str(processing), TOKEN["primary"])
+    stat("处理中", str(processing), TOKEN["primary"])
 with c4:
-    stat("✅", "已解决", str(resolved), TOKEN["success"])
+    stat("已解决", str(resolved), TOKEN["success"])
 
 st.markdown("")
 
@@ -162,7 +161,7 @@ st.markdown("")
 # Status pipeline chart
 # ═══════════════════════════════════════════
 
-section("📊 工单状态分布", "报", TOKEN["warning"])
+section("工单状态分布")
 
 if by_status:
     status_order = ["待处理", "处理中", "已解决"]
@@ -195,7 +194,7 @@ st.markdown("---")
 # Category distribution
 # ═══════════════════════════════════════════
 
-section("🏷️ 问题类别分布", "报", TOKEN["warning"])
+section("问题类别分布")
 
 by_cat = stats.get("by_category", {})
 if by_cat:
@@ -229,7 +228,7 @@ st.markdown("---")
 # All issues — filterable
 # ═══════════════════════════════════════════
 
-section("📋 全部工单", "报", TOKEN["warning"])
+section("全部工单")
 
 # Accept cross-page filter from pulse (via session_state)
 cross_filter = st.session_state.pop("_filter_category", None)

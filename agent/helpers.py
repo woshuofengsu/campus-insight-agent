@@ -11,12 +11,37 @@ def get_author_identifier(memory) -> str:
     """Get the identifier used for filtering personal issues/proposals.
 
     Shared by both CampusAgent._check_closed_loop() and OfflineAgent._my_issues().
+
+    IMPORTANT: Must be consistent with _resolve_author() in db_governance.py
+    and _resolve_current_author() in tools/query_my_issues.py — all three
+    resolve the same identity so "report → query my issues" works end-to-end.
     """
     try:
         profile = memory.get_user_profile()
-        return profile.get("student_id", "") or profile.get("name", "") or ""
-    except Exception:
-        return ""
+        sid = (profile.get("student_id") or "").strip()
+        if sid:
+            return sid
+        school = (profile.get("school") or "").strip()
+        grade = (profile.get("grade") or "").strip()
+        if school:
+            return f"{school}{grade}" if grade else school
+        name = (profile.get("name") or "").strip()
+        if name:
+            return name
+        uid = profile.get("id")
+        if uid:
+            return f"user_{uid}"
+    except Exception:  # non-critical: silent pass intended
+        pass
+    # Final fallback: direct session_state read
+    try:
+        import streamlit as st
+        uid = st.session_state.get("_login_user_id")
+        if uid:
+            return f"user_{uid}"
+    except Exception:  # non-critical: silent pass intended
+        pass
+    return ""
 
 
 def get_user_name(memory) -> str:
@@ -24,7 +49,7 @@ def get_user_name(memory) -> str:
     try:
         profile = memory.get_user_profile()
         return profile.get("name", "") or profile.get("student_id", "") or ""
-    except Exception:
+    except Exception:  # non-critical: graceful degradation
         return ""
 
 

@@ -47,17 +47,17 @@ if profile:
 # ── Impact stats ──
 stats = cached_my_stats(author)
 
-section("📊 我的影响力", "", TOKEN["primary"])
+section("我的影响力")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    stat("📝", "上报问题", str(stats["total_issues"]), TOKEN["primary"])
+    stat("上报问题", str(stats["total_issues"]), TOKEN["primary"])
 with col2:
-    stat("✅", "已解决", str(stats["resolved_issues"]), TOKEN["success"])
+    stat("已解决", str(stats["resolved_issues"]), TOKEN["success"])
 with col3:
-    stat("💡", "提交提案", str(stats["total_proposals"]), TOKEN["purple_text"])
+    stat("提交提案", str(stats["total_proposals"]), TOKEN["purple_text"])
 with col4:
-    stat("🎉", "提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
+    stat("提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
 
 # Impact summary
 if stats["total_issues"] + stats["total_proposals"] > 0:
@@ -83,12 +83,12 @@ if stats["total_issues"] + stats["total_proposals"] > 0:
 st.markdown("---")
 
 # ── My issues ──
-section("📝 我上报的问题", "", TOKEN["primary"])
+section("我上报的问题")
 
 my_issues = cached_my_issues(author, limit=20)
 
 if not my_issues:
-    info_card("📝", "还没有上报过问题", "去「随手报修」页面提交第一个校园问题吧！")
+    info_card("去「随手报修」页面提交第一个校园问题吧！")
 else:
     # Status summary
     pending_count = len([i for i in my_issues if i.get("status") == "待处理"])
@@ -123,12 +123,12 @@ else:
 st.markdown("---")
 
 # ── My proposals ──
-section("💡 我提交的提案", "", TOKEN["purple_text"])
+section("我提交的提案")
 
 my_proposals = cached_my_proposals(author, limit=20)
 
 if not my_proposals:
-    info_card("💡", "还没有提交过提案", "去「有话说」页面创建你的第一个提案！")
+    info_card("去「有话说」页面创建你的第一个提案！")
 else:
     for p in my_proposals:
         s = p.get("status", "讨论中")

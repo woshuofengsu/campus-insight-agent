@@ -47,14 +47,14 @@ st.markdown(
 # ── KPI row ──
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    stat("🦠", "活跃疾病", str(len(h["diseases"])), TOKEN["warning"], sub="种")
+    stat("活跃疾病", str(len(h["diseases"])), TOKEN["warning"], sub="种")
 with c2:
-    stat("🔴", "高风险疾病", str(sum(1 for d in h["diseases"] if d["adjusted_risk"] >= 60)),
+    stat("高风险疾病", str(sum(1 for d in h["diseases"] if d["adjusted_risk"] >= 60)),
          TOKEN["danger"], sub="风险≥60分")
 with c3:
-    stat("🌡️", "天气影响", f"+{h.get('weather_mod_total', 0)}", TOKEN["warning"])
+    stat("天气影响", f"+{h.get('weather_mod_total', 0)}", TOKEN["warning"])
 with c4:
-    stat("🏫", "人员密度", f"+{h.get('campus_density', {}).get('score', 0)}",
+    stat("人员密度", f"+{h.get('campus_density', {}).get('score', 0)}",
          TOKEN["primary"])
 
 st.markdown("---")

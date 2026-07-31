@@ -1,161 +1,214 @@
 # ui/theme.py
-"""Theme system — light-first with dark mode toggle.
+"""Theme system — enterprise SaaS, cold gray + single indigo accent.
 
 Design:
-  - Light is the DEFAULT theme. Dark mode is available via sidebar toggle.
-  - The toggle stores theme in st.session_state (survives all reruns and
-    st.navigation() page switches) + URL query param for browser-refresh
-    persistence.
-  - Native theme: st._config.set_option (Streamlit private API) is used
-    in apply_native_theme() to set theme colors at the engine level — this
-    prevents white/black borders that CSS injection alone cannot fix.
-  - st.set_page_config() is called ONLY on the first run (not on every
-    rerun).  This prevents it from resetting the native theme to
-    config.toml on every st.navigation() page switch.
-  - CSS injection (inject_theme_css) handles component-level styling and
-    is a safety net for elements the native theme doesn't cover.
-  - On fresh app start (no query param), it's light.
-
-Usage:
-  from ui.theme import get_token, inject_theme_css, theme_toggle, apply_theme_at_startup
-
-  # In app.py, BEFORE st.set_page_config:
-  apply_theme_at_startup()
-
-  # After set_page_config, before content:
-  apply_native_theme()
-  inject_theme_css()
-
-  # In sidebar:
-  theme_toggle()
-
-  # Anywhere you need a color:
-  token = get_token()
+  - Light is DEFAULT. Dark available via toggle.
+  - ONE accent color (#4f46e5). Used only on primary buttons, selection,
+    active indicators. Never on card borders, dividers, or decoration.
+  - Semantic colors (green/amber/red) appear ONLY on status tags and KPI values.
+  - Cold grays throughout. No warm tones.
+  - 4 font sizes. 2 font weights. No micro-tuning.
 """
 
 import streamlit as st  # noqa: F401
 
 # ═══════════════════════════════════════════
-# Light tokens (fallback — kept functional)
+# Light tokens (DEFAULT)
 # ═══════════════════════════════════════════
 TOKEN_LIGHT = {
-    # Brand accent — indigo, clean
-    "primary":        "#5c6cf0",
-    "primary_hover":  "#4f46e5",
-    "primary_bg":     "#eef2ff",
-    "primary_border": "#c7d2fe",
-    "primary_light":  "#f5f7ff",
+    # ── Accent — single source, <8% surface ──
+    "accent":           "#4f46e5",
+    "accent_hover":     "#4338ca",
+    "accent_bg":        "#f0efff",
+    "accent_border":    "#d2d0f8",
 
-    # Semantic
-    "success":        "#059669",
-    "success_bg":     "#ecfdf5",
-    "success_border": "#a7f3d0",
-    "warning":        "#d97706",
-    "warning_bg":     "#fffbeb",
-    "warning_border": "#fde68a",
-    "danger":         "#dc2626",
-    "danger_bg":      "#fef2f2",
-    "danger_border":  "#fecaca",
+    # ── Semantic — only for status tags + KPI ──
+    "success":          "#059669",
+    "success_bg":       "#ecfdf5",
+    "success_border":   "#a7f3d0",
+    "warning":          "#d97706",
+    "warning_bg":       "#fffbeb",
+    "warning_border":   "#fde68a",
+    "danger":           "#dc2626",
+    "danger_bg":        "#fef2f2",
+    "danger_border":    "#fecaca",
+    "info":             "#0891b2",
+    "info_bg":          "#ecfeff",
+    "info_border":      "#a5f3fc",
 
-    # Purple (for bigscreen / special accents)
-    "purple_bg":      "#f5f3ff",
-    "purple_border":  "#ddd6fe",
-    "purple_text":    "#7c3aed",
+    # ── Surfaces — cold grays ──
+    "page_bg":          "#fafafa",
+    "sidebar_bg":       "#f5f5f5",
+    "surface":          "#f5f5f5",
+    "card_bg":          "#ffffff",
+    "card_hover":       "#fafafa",
+    "input_bg":         "#ffffff",
+    "border":           "#ebebeb",
+    "border_visible":   "#dcdcdc",
+    "border_focus":     "#d0d0f0",
+    "divider":          "#ebebeb",
 
-    # Surfaces — subtle elevation
-    "slate_bg":       "#f8fafc",    # page background
-    "slate_border":   "#e2e8f0",    # subtle border
-    "card_bg":        "#ffffff",    # card / container surface
+    # ── Text — near-black, never pure ──
+    "text":             "#1a1a1a",
+    "text_sec":         "#6e6e6e",
+    "text_muted":       "#a0a0a0",
+    "text_inverse":     "#ffffff",
 
-    # Text — high contrast on light
-    "text":           "#0f172a",
-    "text_sec":       "#475569",
-    "text_muted":     "#94a3b8",
+    # ── Typography — 4 sizes, 2 weights ──
+    "font_display":     "1.25em",
+    "font_body":        "0.875em",
+    "font_label":       "0.75em",
+    "font_micro":       "0.6875em",
+    "weight_bold":       "700",
+    "weight_medium":     "500",
+    "tracking_label":    "0.04em",
 
-    # Radius
-    "radius_xs":      "4px",
-    "radius_sm":      "6px",
-    "radius":         "8px",
-    "radius_lg":      "12px",
-    "radius_full":    "99px",
+    # ── Spacing — 4px grid ──
+    "space_2xs":        "4px",
+    "space_xs":         "8px",
+    "space_sm":         "12px",
+    "space_md":         "16px",
+    "space_lg":         "20px",
+    "space_xl":         "24px",
+    "space_2xl":        "32px",
 
-    # Shadows — very subtle on light
-    "shadow_none":    "none",
-    "shadow_xs":      "0 1px 2px rgba(0,0,0,0.04)",
-    "shadow_sm":      "0 1px 3px rgba(0,0,0,0.06)",
-    "shadow":         "0 2px 8px rgba(0,0,0,0.06)",
-    "shadow_md":      "0 4px 16px rgba(0,0,0,0.08)",
+    # ── Radius ──
+    "radius_input":     "4px",
+    "radius_card":      "6px",
+    "radius_full":      "99px",
 
-    "transition":     "0.15s ease",
+    # ── Shadows — minimal, just to float cards ──
+    "shadow_none":      "none",
+    "shadow_sm":        "0 1px 2px rgba(0,0,0,0.04)",
+    "shadow":           "0 1px 3px rgba(0,0,0,0.06)",
+    "shadow_md":        "0 4px 16px rgba(0,0,0,0.06)",
+
+    # ── Motion ──
+    "transition":       "0.15s ease",
+
+    # ── Charts ──
+    "chart_grid":       "rgba(0,0,0,0.05)",
 }
 
 # ═══════════════════════════════════════════
-# Dark tokens — Linear-inspired professional
+# Dark tokens
 # ═══════════════════════════════════════════
 TOKEN_DARK = {
-    # Brand accent — muted indigo, not neon
-    "primary":        "#7984f5",
-    "primary_hover":  "#8f98f7",
-    "primary_bg":     "rgba(121,132,245,0.10)",
-    "primary_border": "rgba(121,132,245,0.20)",
-    "primary_light":  "rgba(121,132,245,0.06)",
+    # ── Accent ──
+    "accent":           "#6d6bf5",
+    "accent_hover":     "#807ef7",
+    "accent_bg":        "rgba(109,107,245,0.10)",
+    "accent_border":    "rgba(109,107,245,0.18)",
 
-    # Semantic
-    "success":        "#4ade80",
-    "success_bg":     "rgba(74,222,128,0.08)",
-    "success_border": "rgba(74,222,128,0.18)",
-    "warning":        "#f59e0b",
-    "warning_bg":     "rgba(245,158,11,0.08)",
-    "warning_border": "rgba(245,158,11,0.18)",
-    "danger":         "#f87171",
-    "danger_bg":      "rgba(248,113,113,0.08)",
-    "danger_border":  "rgba(248,113,113,0.18)",
+    # ── Semantic ──
+    "success":          "#34d399",
+    "success_bg":       "rgba(52,211,153,0.08)",
+    "success_border":   "rgba(52,211,153,0.16)",
+    "warning":          "#fbbf24",
+    "warning_bg":       "rgba(251,191,36,0.08)",
+    "warning_border":   "rgba(251,191,36,0.16)",
+    "danger":           "#f87171",
+    "danger_bg":        "rgba(248,113,113,0.08)",
+    "danger_border":    "rgba(248,113,113,0.16)",
+    "info":             "#22d3ee",
+    "info_bg":          "rgba(34,211,238,0.08)",
+    "info_border":      "rgba(34,211,238,0.16)",
 
-    # Purple (for bigscreen / special accents)
-    "purple_bg":      "rgba(167,139,250,0.08)",
-    "purple_border":  "rgba(167,139,250,0.18)",
-    "purple_text":    "#a78bfa",
+    # ── Surfaces — dark cold grays ──
+    "page_bg":          "#0a0a0f",
+    "sidebar_bg":       "#0e0e14",
+    "surface":          "#111118",
+    "card_bg":          "#18181f",
+    "card_hover":       "#1e1e26",
+    "input_bg":         "#14141a",
+    "border":           "#25252e",
+    "border_visible":   "#2e2e38",
+    "border_focus":     "rgba(109,107,245,0.25)",
+    "divider":          "#25252e",
 
-    # Surfaces — subtle depth through brightness, not color
-    "slate_bg":       "#0b0f19",   # page background (deepest)
-    "slate_border":   "rgba(255,255,255,0.06)",  # barely visible
-    "card_bg":        "#141928",   # card / container surface
+    # ── Text ──
+    "text":             "#e8e8ed",
+    "text_sec":         "#9898a2",
+    "text_muted":       "#5e5e6a",
+    "text_inverse":     "#0a0a0f",
 
-    # Text — off-white, never pure white
-    "text":           "#e9ecf2",
-    "text_sec":       "#99a1b3",
-    "text_muted":     "#616a80",
+    # ── Typography ──
+    "font_display":     "1.25em",
+    "font_body":        "0.875em",
+    "font_label":       "0.75em",
+    "font_micro":       "0.6875em",
+    "weight_bold":       "700",
+    "weight_medium":     "500",
+    "tracking_label":    "0.04em",
 
-    # Radius — Linear uses small, consistent radius
-    "radius_xs":      "4px",
-    "radius_sm":      "6px",
-    "radius":         "8px",
-    "radius_lg":      "12px",
-    "radius_full":    "99px",
+    # ── Spacing ──
+    "space_2xs":        "4px",
+    "space_xs":         "8px",
+    "space_sm":         "12px",
+    "space_md":         "16px",
+    "space_lg":         "20px",
+    "space_xl":         "24px",
+    "space_2xl":        "32px",
 
-    # Shadows — offset + soft blur on dark (subtle)
-    "shadow_none":    "none",
-    "shadow_xs":      "0 1px 2px rgba(0,0,0,0.3)",
-    "shadow_sm":      "0 2px 4px rgba(0,0,0,0.4)",
-    "shadow":         "0 4px 12px rgba(0,0,0,0.5)",
-    "shadow_md":      "0 8px 24px rgba(0,0,0,0.6)",
+    # ── Radius ──
+    "radius_input":     "4px",
+    "radius_card":      "6px",
+    "radius_full":      "99px",
 
-    "transition":     "0.15s ease",
+    # ── Shadows — dark mode needs more depth ──
+    "shadow_none":      "none",
+    "shadow_sm":        "0 1px 2px rgba(0,0,0,0.4)",
+    "shadow":           "0 2px 8px rgba(0,0,0,0.5)",
+    "shadow_md":        "0 8px 24px rgba(0,0,0,0.6)",
+
+    # ── Motion ──
+    "transition":       "0.15s ease",
+
+    # ── Charts ──
+    "chart_grid":       "rgba(255,255,255,0.04)",
 }
 
-# Session-state key for the current theme
-# Bumped to v2 to invalidate old dark-mode sessions — default is now light
-_THEME_KEY = "_campus_theme_v2"
+# ═══════════════════════════════════════════
+# Backward-compat aliases
+# ═══════════════════════════════════════════
+_COMPAT_MAP = {
+    "primary":          "accent",
+    "primary_hover":    "accent_hover",
+    "primary_bg":       "accent_bg",
+    "primary_border":   "accent_border",
+    "primary_light":    "accent_bg",
+    "slate_bg":         "page_bg",
+    "slate_border":     "border",
+    "purple_bg":        "accent_bg",
+    "purple_border":    "accent_border",
+    "purple_text":      "accent",
+    "radius_xs":        "radius_input",
+    "radius_sm":        "radius_card",
+    "radius":           "radius_card",
+    "radius_lg":        "radius_card",
+    "shadow_xs":        "shadow_sm",
+}
+
+
+def _apply_compat(token_dict: dict) -> dict:
+    merged = dict(token_dict)
+    for old_key, new_key in _COMPAT_MAP.items():
+        if old_key not in merged and new_key in merged:
+            merged[old_key] = merged[new_key]
+    return merged
+
+
+TOKEN_LIGHT = _apply_compat(TOKEN_LIGHT)
+TOKEN_DARK = _apply_compat(TOKEN_DARK)
+
+# ═══════════════════════════════════════════
+# Theme state management
+# ═══════════════════════════════════════════
+_THEME_KEY = "_campus_theme_v4"
 
 
 def apply_theme_at_startup():
-    """Ensure theme is in session state BEFORE st.set_page_config.
-
-    Must be called at the top of main(), before st.set_page_config().
-    Currently hard-forced to light — dark mode toggle available in sidebar.
-    """
-    # Force light mode as the starting default, always.
-    # URL param can still override to dark if user explicitly toggles.
+    """Set default theme to light before st.set_page_config."""
     if _THEME_KEY not in st.session_state:
         mode = "light"
         try:
@@ -170,7 +223,6 @@ def apply_theme_at_startup():
 
 
 def get_theme() -> str:
-    """Return current theme: 'dark' or 'light'."""
     if _THEME_KEY in st.session_state:
         return st.session_state[_THEME_KEY]
     try:
@@ -185,46 +237,29 @@ def get_theme() -> str:
 
 
 def get_token() -> dict:
-    """Return the active theme's token dict."""
     return TOKEN_DARK if get_theme() == "dark" else TOKEN_LIGHT
 
 
 def apply_native_theme():
-    """Override Streamlit's native theme after set_page_config.
-
-    MUST be called AFTER st.set_page_config() in app.py.
-
-    Config.toml provides the dark-mode base (Linear style). We use
-    st._config.set_option to switch the native theme at runtime for BOTH
-    modes.  This is necessary because app.py skips st.set_page_config()
-    after the first run.
-
-    This changes colors at the Streamlit engine level, not via CSS,
-    so there are no white/black borders in either mode.
-    """
+    """Override Streamlit engine colors. Call AFTER st.set_page_config()."""
     theme = get_theme()
     try:
         if theme == "dark":
-            st._config.set_option("theme.backgroundColor", "#0b0f19")
-            st._config.set_option("theme.secondaryBackgroundColor", "#141928")
-            st._config.set_option("theme.textColor", "#e9ecf2")
+            st._config.set_option("theme.backgroundColor", "#0a0a0f")
+            st._config.set_option("theme.secondaryBackgroundColor", "#111118")
+            st._config.set_option("theme.textColor", "#e8e8ed")
         else:
-            st._config.set_option("theme.backgroundColor", "#f8fafc")
-            st._config.set_option("theme.secondaryBackgroundColor", "#f1f5f9")
-            st._config.set_option("theme.textColor", "#0f172a")
+            st._config.set_option("theme.backgroundColor", "#fafafa")
+            st._config.set_option("theme.secondaryBackgroundColor", "#f5f5f5")
+            st._config.set_option("theme.textColor", "#1a1a1a")
     except Exception:
-        pass  # Private API — fail silently, CSS injection is the fallback
+        pass
 
 
 def theme_toggle():
-    """Render a theme toggle button. Use in sidebar.
-
-    Session state is the source of truth — survives all st.navigation()
-    page switches. Query param synced for browser-refresh persistence.
-    """
     theme = get_theme()
     is_dark = theme == "dark"
-    label = "☀️ 亮色" if is_dark else "🌙 暗色"
+    label = "☀️ Light" if is_dark else "🌙 Dark"
     if st.button(label, key="_theme_toggle_btn", width="stretch"):
         new = "light" if is_dark else "dark"
         st.session_state[_THEME_KEY] = new
@@ -236,79 +271,46 @@ def theme_toggle():
 
 
 def inject_theme_css():
-    """Inject theme CSS with hardcoded color values.
-
-    Call once in app.py after set_page_config, before any page content.
-
-    Uses Python-level token values directly in the CSS rules — avoids
-    CSS variable resolution issues where Streamlit's baseweb (Styletron)
-    atomic CSS overrides everything.
-    """
+    """Inject theme CSS. Call once in app.py after set_page_config."""
     theme = get_theme()
-    manual = _THEME_KEY in st.session_state
     t = TOKEN_DARK if theme == "dark" else TOKEN_LIGHT
 
-    # ── :root CSS variables for app.py global CSS block (var(--c-*)) ──
-    if theme == "dark":
-        root_vars = f"""
+    # ── :root CSS variables ──
+    root_vars = f"""
 :root {{
-    --c-bg: #0b0f19;
-    --c-bg-secondary: #141928;
-    --c-bg-tertiary: #1c2233;
-    --c-surface: #141928;
-    --c-surface-hover: #1c2233;
-    --c-border: rgba(255,255,255,0.06);
-    --c-border-light: rgba(255,255,255,0.04);
-    --c-text: #e9ecf2;
-    --c-text-secondary: #99a1b3;
-    --c-text-muted: #616a80;
-    --c-primary: #7984f5;
-    --c-primary-bg: rgba(121,132,245,0.10);
-    --c-primary-border: rgba(121,132,245,0.20);
-    --c-success: #4ade80;
-    --c-success-bg: rgba(74,222,128,0.08);
-    --c-warning: #f59e0b;
-    --c-warning-bg: rgba(245,158,11,0.08);
-    --c-danger: #f87171;
-    --c-danger-bg: rgba(248,113,113,0.08);
-    --c-shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-    --c-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    --c-sidebar-bg: #0b0f19;
-}}"""
-    else:
-        root_vars = f"""
-:root {{
-    --c-bg: #f8fafc;
-    --c-bg-secondary: #f1f5f9;
-    --c-bg-tertiary: #e2e8f0;
-    --c-surface: #ffffff;
-    --c-surface-hover: #f8fafc;
-    --c-border: #e2e8f0;
-    --c-border-light: #f1f5f9;
-    --c-text: #0f172a;
-    --c-text-secondary: #475569;
-    --c-text-muted: #94a3b8;
-    --c-primary: #5c6cf0;
-    --c-primary-bg: #eef2ff;
-    --c-primary-border: #c7d2fe;
-    --c-success: #059669;
-    --c-success-bg: #ecfdf5;
-    --c-warning: #d97706;
-    --c-warning-bg: #fffbeb;
-    --c-danger: #dc2626;
-    --c-danger-bg: #fef2f2;
-    --c-shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-    --c-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    --c-sidebar-bg: #f8fafc;
+    --c-bg: {t["page_bg"]};
+    --c-bg-secondary: {t["surface"]};
+    --c-surface: {t["card_bg"]};
+    --c-surface-hover: {t["card_hover"]};
+    --c-border: {t["border"]};
+    --c-border-visible: {t["border_visible"]};
+    --c-text: {t["text"]};
+    --c-text-secondary: {t["text_sec"]};
+    --c-text-muted: {t["text_muted"]};
+    --c-accent: {t["accent"]};
+    --c-accent-bg: {t["accent_bg"]};
+    --c-accent-border: {t["accent_border"]};
+    --c-success: {t["success"]};
+    --c-success-bg: {t["success_bg"]};
+    --c-warning: {t["warning"]};
+    --c-warning-bg: {t["warning_bg"]};
+    --c-danger: {t["danger"]};
+    --c-danger-bg: {t["danger_bg"]};
+    --c-shadow-sm: {t["shadow_sm"]};
+    --c-shadow: {t["shadow"]};
+    --c-sidebar-bg: {t["sidebar_bg"]};
+    --c-input-bg: {t["input_bg"]};
 }}"""
 
-    # ── Element-level CSS with hardcoded values ──
     css = f"""<style>
 {root_vars}
 
+/* ═══════════════════════════════════════════
+   Foundation
+   ═══════════════════════════════════════════ */
 
 html, body, #root, [id="root"] {{
-    background: {t["slate_bg"]} !important;
+    background: {t["page_bg"]} !important;
     margin: 0 !important;
     padding: 0 !important;
     min-height: 100vh !important;
@@ -317,66 +319,55 @@ html, body, #root, [id="root"] {{
 }}
 
 .stApp {{
-    background: {t["slate_bg"]} !important;
+    background: {t["page_bg"]} !important;
     color: {t["text"]} !important;
     min-height: 100vh !important;
 }}
 .stApp > div {{
-    background: {t["slate_bg"]} !important;
+    background: {t["page_bg"]} !important;
 }}
 
-[data-testid="stMain"] {{
-    background: {t["slate_bg"]} !important;
-}}
-[data-testid="stMain"] > div {{
-    background: {t["slate_bg"]} !important;
-}}
-[data-testid="stMain"] > div > div {{
-    background: {t["slate_bg"]} !important;
-}}
-[data-testid="stAppViewContainer"] {{
-    background: {t["slate_bg"]} !important;
-}}
+[data-testid="stMain"],
+[data-testid="stMain"] > div,
+[data-testid="stMain"] > div > div,
+[data-testid="stAppViewContainer"],
 [data-testid="stAppViewContainer"] > div {{
-    background: {t["slate_bg"]} !important;
+    background: {t["page_bg"]} !important;
 }}
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {{
     min-width: 220px !important;
     max-width: 280px !important;
-    background: {t["slate_bg"]} !important;
-    border-right: 1px solid {t["slate_border"]} !important;
+    background: {t["sidebar_bg"]} !important;
+    border-right: 1px solid {t["border"]} !important;
 }}
 [data-testid="stSidebar"] * {{
     color: {t["text"]} !important;
 }}
 [data-testid="stSidebar"] hr {{
-    border-color: {t["slate_border"]} !important;
+    border-color: {t["border"]} !important;
 }}
 
-/* ── Containers — border cards → subtle elevation ── */
+/* ── Cards ── */
 [data-testid="stVerticalBlockBorderWrapper"] {{
     background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_sm"]} !important;
-    box-shadow: {t["shadow_xs"]} !important;
-}}
-.stHorizontalBlock > div {{
-    background: transparent !important;
+    border: 1px solid {t["border"]} !important;
+    border-radius: {t["radius_card"]} !important;
+    box-shadow: {t["shadow_sm"]} !important;
 }}
 
 /* ── Expanders ── */
 .stExpander {{
     background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_sm"]} !important;
+    border: 1px solid {t["border"]} !important;
+    border-radius: {t["radius_card"]} !important;
 }}
 .stExpander [data-testid="stExpanderDetails"] {{
     background: transparent !important;
 }}
 
-/* ── Text inputs, textareas, selects ── */
+/* ── Inputs ── */
 .stTextInput input,
 .stTextInput input:focus,
 .stTextArea textarea,
@@ -387,12 +378,12 @@ html, body, #root, [id="root"] {{
 [data-baseweb="input"] input,
 [data-baseweb="select"],
 [data-baseweb="select"] > div {{
-    background: {t["card_bg"]} !important;
+    background: {t["input_bg"]} !important;
     color: {t["text"]} !important;
-    border-color: {t["slate_border"]} !important;
-    caret-color: {t["text"]} !important;
-    border-radius: {t["radius_xs"]} !important;
-    font-size: 0.82em !important;
+    border-color: {t["border"]} !important;
+    caret-color: {t["accent"]} !important;
+    border-radius: {t["radius_input"]} !important;
+    font-size: {t["font_body"]} !important;
 }}
 .stTextInput input::placeholder,
 .stTextArea textarea::placeholder,
@@ -401,7 +392,7 @@ html, body, #root, [id="root"] {{
 }}
 .stTextInput input:hover,
 .stTextArea textarea:hover {{
-    border-color: {"rgba(255,255,255,0.14)" if theme == "dark" else "#cbd5e1"} !important;
+    border-color: {t["border_visible"]} !important;
 }}
 
 /* ── Chat input ── */
@@ -411,113 +402,79 @@ html, body, #root, [id="root"] {{
 [data-testid="stChatInput"] *::after,
 [data-testid="stChatInput"] [data-baseweb],
 [data-testid="stChatInput"] [data-baseweb] * {{
-    background: {t["slate_bg"]} !important;
-    border-color: {t["slate_border"]} !important;
-    outline-color: {t["slate_border"]} !important;
+    background: {t["page_bg"]} !important;
+    border-color: {t["border"]} !important;
+    outline-color: {t["border"]} !important;
     box-shadow: none !important;
 }}
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] [data-baseweb="input"] {{
-    background: {t["card_bg"]} !important;
+    background: {t["input_bg"]} !important;
     color: {t["text"]} !important;
-    caret-color: {t["text"]} !important;
-    border-color: {t["slate_border"]} !important;
-    border-radius: {t["radius_sm"]} !important;
+    caret-color: {t["accent"]} !important;
+    border-color: {t["border_visible"]} !important;
+    border-radius: {t["radius_card"]} !important;
 }}
 [data-testid="stChatInput"] textarea::placeholder {{
     color: {t["text_muted"]} !important;
 }}
 
-/* ── Radio buttons ── */
-.stRadio label {{
-    border-color: {t["slate_border"]} !important;
-    color: {t["text_sec"]} !important;
-    background: {t["card_bg"]} !important;
-    border-radius: {t["radius_xs"]} !important;
-    font-size: 0.8em !important;
-}}
-.stRadio label:hover {{
-    border-color: {t["primary_border"]} !important;
-    background: {t["primary_bg"]} !important;
-}}
-
-/* ── Tabs — subtle underline style ── */
-.stTabs [data-baseweb="tab"] {{
-    color: {t["text_muted"]} !important;
-    font-size: 0.82em !important;
-    font-weight: 500 !important;
-}}
-.stTabs [data-baseweb="tab"][aria-selected="true"] {{
-    color: {t["primary"]} !important;
-}}
-
-/* ── Metric cards ── */
-[data-testid="stMetric"] {{
-    background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_sm"]} !important;
-    box-shadow: {t["shadow_xs"]} !important;
-}}
-[data-testid="stMetric"] label {{
-    color: {t["text_muted"]} !important;
-    font-size: 0.72em !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.02em !important;
-    text-transform: uppercase !important;
-}}
-[data-testid="stMetric"] [data-testid="stMetricValue"] {{
-    color: {t["text"]} !important;
-    font-weight: 600 !important;
-}}
-
-/* ── Chat messages ── */
-[data-testid="stChatMessage"] {{
-    background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius"]} !important;
-}}
-[data-testid="stChatMessage"][aria-label*="user"] {{
-    background: {t["primary_bg"]} !important;
-    border-color: {t["primary_border"]} !important;
-}}
-[data-testid="stChatMessage"][aria-label*="assistant"] {{
-    background: {t["card_bg"]} !important;
-    border-color: {t["slate_border"]} !important;
-}}
-
-/* ── Buttons — ghost style, minimal ── */
+/* ── Buttons ── */
 .stButton > button {{
     background: {t["card_bg"]} !important;
     color: {t["text_sec"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_xs"]} !important;
-    font-size: 0.8em !important;
-    font-weight: 500 !important;
+    border: 1px solid {t["border_visible"]} !important;
+    border-radius: {t["radius_input"]} !important;
+    font-size: {t["font_label"]} !important;
+    font-weight: {t["weight_medium"]} !important;
     transition: all {t["transition"]} !important;
     min-height: 32px !important;
-    padding: 4px 12px !important;
+    padding: 4px 14px !important;
 }}
 .stButton > button:hover {{
-    border-color: {t["primary_border"]} !important;
-    background: {t["primary_bg"]} !important;
-    color: {t["text"]} !important;
+    border-color: {t["accent_border"]} !important;
+    background: {t["accent_bg"]} !important;
+    color: {t["accent"]} !important;
 }}
 .stButton > button[kind="primary"] {{
-    background: {t["primary"]} !important;
+    background: {t["accent"]} !important;
     color: #fff !important;
     border-color: transparent !important;
-    font-weight: 600 !important;
+    font-weight: {t["weight_bold"]} !important;
 }}
 .stButton > button[kind="primary"]:hover {{
-    background: {t["primary_hover"]} !important;
+    background: {t["accent_hover"]} !important;
     filter: none !important;
 }}
 
-/* ── Select dropdown popover ── */
+/* ── Tabs ── */
+.stTabs [data-baseweb="tab"] {{
+    color: {t["text_muted"]} !important;
+    font-size: {t["font_body"]} !important;
+    font-weight: {t["weight_medium"]} !important;
+}}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {{
+    color: {t["accent"]} !important;
+}}
+
+/* ── Radio ── */
+.stRadio label {{
+    border-color: {t["border"]} !important;
+    color: {t["text_sec"]} !important;
+    background: {t["card_bg"]} !important;
+    border-radius: {t["radius_card"]} !important;
+    font-size: {t["font_body"]} !important;
+}}
+.stRadio label:hover {{
+    border-color: {t["accent_border"]} !important;
+    background: {t["accent_bg"]} !important;
+}}
+
+/* ── Select popover ── */
 [data-baseweb="popover"] {{
     background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_sm"]} !important;
+    border: 1px solid {t["border_visible"]} !important;
+    border-radius: {t["radius_card"]} !important;
     box-shadow: {t["shadow_md"]} !important;
 }}
 [data-baseweb="popover"] li,
@@ -527,153 +484,172 @@ html, body, #root, [id="root"] {{
 }}
 [data-baseweb="popover"] li:hover,
 [data-baseweb="popover"] li[aria-selected="true"] {{
-    background: {t["primary_bg"]} !important;
-    border-radius: {t["radius_xs"]} !important;
+    background: {t["accent_bg"]} !important;
+    border-radius: {t["radius_input"]} !important;
 }}
 
 /* ── Toast ── */
 [data-testid="stToast"] {{
     background: {t["card_bg"]} !important;
     color: {t["text"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_sm"]} !important;
+    border: 1px solid {t["border_visible"]} !important;
+    border-radius: {t["radius_card"]} !important;
     box-shadow: {t["shadow_md"]} !important;
 }}
 
-/* ── Caption / small text ── */
+/* ── Caption ── */
 .stCaption, .stCaptionContainer, [data-testid="stCaptionContainer"] {{
     color: {t["text_muted"]} !important;
-    font-size: 0.78em !important;
+    font-size: {t["font_label"]} !important;
+}}
+
+/* ── Metric ── */
+[data-testid="stMetric"] {{
+    background: {t["card_bg"]} !important;
+    border: 1px solid {t["border"]} !important;
+    border-radius: {t["radius_card"]} !important;
+    box-shadow: {t["shadow_sm"]} !important;
+}}
+[data-testid="stMetric"] label {{
+    color: {t["text_muted"]} !important;
+    font-size: {t["font_label"]} !important;
+    font-weight: {t["weight_medium"]} !important;
+    letter-spacing: {t["tracking_label"]} !important;
+    text-transform: uppercase !important;
+}}
+[data-testid="stMetric"] [data-testid="stMetricValue"] {{
+    color: {t["text"]} !important;
+    font-weight: {t["weight_bold"]} !important;
+}}
+
+/* ── Chat messages ── */
+[data-testid="stChatMessage"] {{
+    background: {t["card_bg"]} !important;
+    border: 1px solid {t["border"]} !important;
+    border-radius: {t["radius_card"]} !important;
+}}
+[data-testid="stChatMessage"][aria-label*="user"] {{
+    background: {t["accent_bg"]} !important;
+    border-color: {t["accent_border"]} !important;
+}}
+[data-testid="stChatMessage"][aria-label*="assistant"] {{
+    background: {t["card_bg"]} !important;
+    border-color: {t["border"]} !important;
 }}
 
 /* ── Alerts ── */
 .stAlert {{
     background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
+    border: 1px solid {t["border_visible"]} !important;
     color: {t["text"]} !important;
-    border-radius: {t["radius_sm"]} !important;
+    border-radius: {t["radius_card"]} !important;
 }}
 .stAlert [data-testid="stMarkdownContainer"] {{
     color: {t["text"]} !important;
 }}
 
-/* ── Main content area ── */
-.block-container {{
-    color: {t["text"]};
-    background: transparent !important;
-}}
-
-/* ── Dividers — subtle, barely visible ── */
+/* ── Dividers ── */
 hr {{
-    border-color: {t["slate_border"]} !important;
+    border-color: {t["border"]} !important;
     margin: 20px 0 !important;
     border-width: 0.5px !important;
-    opacity: 0.6;
 }}
 
-/* ── Code blocks ── */
-code, pre {{
-    background: {t["slate_bg"]} !important;
-    color: {t["text"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_xs"]} !important;
-}}
-
-/* ── Tables / DataFrames ── */
-[data-testid="stTable"] table {{
-    background: transparent !important;
-    color: {t["text"]} !important;
-}}
+/* ── Tables ── */
+[data-testid="stTable"] table {{ background: transparent !important; color: {t["text"]} !important; }}
 [data-testid="stTable"] th {{
-    background: {t["slate_bg"]} !important;
+    background: {t["surface"]} !important;
     color: {t["text_muted"]} !important;
-    font-weight: 500 !important;
-    font-size: 0.75em !important;
+    font-weight: {t["weight_medium"]} !important;
+    font-size: {t["font_label"]} !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.03em !important;
+    letter-spacing: 0.05em !important;
 }}
 [data-testid="stTable"] td {{
     color: {t["text"]} !important;
-    border-color: {t["slate_border"]} !important;
-    font-size: 0.82em !important;
+    border-color: {t["border"]} !important;
+    font-size: {t["font_body"]} !important;
 }}
 
-/* ── Scrollbar — thin, subtle ── */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar {{ width: 5px; height: 5px; }}
 ::-webkit-scrollbar-thumb {{
-    background: {"rgba(255,255,255,0.08)" if theme == "dark" else "rgba(0,0,0,0.10)"} !important;
+    background: {"rgba(255,255,255,0.10)" if theme == "dark" else "rgba(0,0,0,0.12)"} !important;
     border-radius: 3px;
 }}
-::-webkit-scrollbar-track {{
-    background: transparent !important;
-}}
+::-webkit-scrollbar-track {{ background: transparent !important; }}
 ::-webkit-scrollbar-thumb:hover {{
-    background: {"rgba(255,255,255,0.14)" if theme == "dark" else "rgba(0,0,0,0.18)"} !important;
+    background: {"rgba(255,255,255,0.16)" if theme == "dark" else "rgba(0,0,0,0.20)"} !important;
 }}
 
 /* ── Charts ── */
-.vega-embed {{
-    background: transparent !important;
-}}
-.vega-embed canvas {{
-    background: transparent !important;
-}}
+.vega-embed {{ background: transparent !important; }}
+.vega-embed canvas {{ background: transparent !important; }}
 
-/* ── Markdown ── */
-[data-testid="stMarkdownContainer"] {{
-    color: {t["text"]};
-}}
-
-/* ── Spinner ── */
-.stSpinner {{
-    border-color: {t["slate_border"]} !important;
-    border-top-color: {t["primary"]} !important;
-}}
-
-/* ── Date / number inputs ── */
-.stDateInput input,
-.stNumberInput input,
-[data-baseweb="input"] {{
+/* ── Status indicator ── */
+[data-testid="stStatus"] {{
     background: {t["card_bg"]} !important;
+    border: 1px solid {t["border"]} !important;
     color: {t["text"]} !important;
-    border-color: {t["slate_border"]} !important;
-    border-radius: {t["radius_xs"]} !important;
+    border-radius: {t["radius_card"]} !important;
 }}
 
 /* ── Checkbox ── */
-[data-baseweb="checkbox"] {{
-    background: {t["card_bg"]} !important;
+[data-baseweb="checkbox"] {{ background: {t["input_bg"]} !important; }}
+
+/* ── Multiselect tags ── */
+[data-baseweb="tag"] {{
+    background: {t["accent_bg"]} !important;
+    color: {t["accent"]} !important;
+    border-radius: {t["radius_input"]} !important;
 }}
 
 /* ── Tooltip ── */
 [data-baseweb="tooltip"] {{
     background: {t["card_bg"]} !important;
     color: {t["text"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_xs"]} !important;
+    border: 1px solid {t["border_visible"]} !important;
+    border-radius: {t["radius_input"]} !important;
 }}
 
-/* ── Status indicator ── */
-[data-testid="stStatus"] {{
-    background: {t["card_bg"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    color: {t["text"]} !important;
-    border-radius: {t["radius_xs"]} !important;
+/* ── Spinner ── */
+.stSpinner {{
+    border-color: {t["border"]} !important;
+    border-top-color: {t["accent"]} !important;
 }}
+
+/* ── Block container ── */
+.block-container {{
+    color: {t["text"]};
+    background: transparent !important;
+}}
+
+/* ── Date / number inputs ── */
+.stDateInput input,
+.stNumberInput input {{
+    background: {t["input_bg"]} !important;
+    color: {t["text"]} !important;
+    border-color: {t["border"]} !important;
+    border-radius: {t["radius_input"]} !important;
+}}
+
+/* ── Code ── */
+code, pre {{
+    background: {t["surface"]} !important;
+    color: {t["text"]} !important;
+    border: 1px solid {t["border"]} !important;
+    border-radius: {t["radius_input"]} !important;
+}}
+
+/* ── Markdown ── */
+[data-testid="stMarkdownContainer"] {{ color: {t["text"]}; }}
 
 /* ── Download button ── */
 [data-testid="stDownloadButton"] button {{
     background: {t["card_bg"]} !important;
     color: {t["text"]} !important;
-    border: 1px solid {t["slate_border"]} !important;
-    border-radius: {t["radius_xs"]} !important;
-}}
-
-/* ── Multiselect tags ── */
-[data-baseweb="tag"] {{
-    background: {t["primary_bg"]} !important;
-    color: {t["primary"]} !important;
-    border-radius: {t["radius_xs"]} !important;
+    border: 1px solid {t["border_visible"]} !important;
+    border-radius: {t["radius_input"]} !important;
 }}
 </style>"""
     st.markdown(css, unsafe_allow_html=True)

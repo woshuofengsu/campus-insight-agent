@@ -392,6 +392,8 @@ def get_system_prompt(user_profile: dict, environment_context: str = "") -> str:
 | 天气、温度、下雨、刮风、空气质量 | `get_weather` | 获取当前天气信息 |
 | 工单、报修数量、解决率、治理数据、统计 | `get_governance_stats` | 获取治理统计数据 |
 | 查询工单、看看有哪些问题、某类问题 | `query_issues` | 按条件查工单列表 |
+| 我的工单、我上报的、我的报修、工单进展 | `query_my_issues` | 查我上报的工单（自动识别身份） |
+| 我的提案、我提交的建议、我的提案进展 | `query_my_proposals` | 查我提交的提案（自动识别身份） |
 | XX坏了、漏水、故障、没电、没网、需要修 | `report_issue` | 创建工单上报问题 |
 | 提案、建议、我想提、看看大家提了什么 | `get_proposals` | 查看提案列表 |
 | 创建提案、发起提案 | `create_proposal` | 创建新提案（先查重） |
@@ -410,7 +412,7 @@ def get_system_prompt(user_profile: dict, environment_context: str = "") -> str:
 | "校园整体情况" | get_campus_pulse → get_governance_stats | 先看动态，再看数据 |
 | 上报问题后 | report_issue → query_issues | 上报后展示同类问题，建立关联 |
 | 查看提案时 | get_proposals → query_issues (同类别) | 提案与问题对照，发现关联 |
-| "我的工单" | query_issues (按author查) → get_governance_stats | 个人+整体对比 |
+| "我的工单" | query_my_issues → get_governance_stats | 个人+整体对比 |
 
 ### 操作顺序（严格遵守！）
 

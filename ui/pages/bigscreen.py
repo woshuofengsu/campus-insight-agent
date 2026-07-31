@@ -347,7 +347,7 @@ try:
     recent_issues = cached_issues(limit=10)
     if issue_stats.get("total", 0) == 0:
         _using_mock = True
-except Exception:
+except Exception:  # non-critical: logged and suppressed
     _log.warning("Data loading failed, falling back to mock data", exc_info=True)
     _using_mock = True
 

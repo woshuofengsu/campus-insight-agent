@@ -32,7 +32,7 @@ def _resolve_author(author: str = "") -> str:
         uid = profile.get("id")
         if uid:
             return f"user_{uid}"
-    except Exception:
+    except Exception:  # non-critical: logged and suppressed
         _log.warning(
             "_resolve_author: failed to resolve user profile, using id-based fallback"
         )
@@ -42,7 +42,7 @@ def _resolve_author(author: str = "") -> str:
             uid = st.session_state.get("_login_user_id")
             if uid:
                 return f"user_{uid}"
-        except Exception:
+        except Exception:  # non-critical: silent pass intended
             pass
     return "匿名"
 
@@ -66,7 +66,7 @@ def report_issue(title: str, category: str, location: str = "",
         from data.db_notifications import log_activity
         log_activity(author, "上报问题", "issue", iid, title,
                      f"{category} · {location}" if location else category)
-    except Exception:
+    except Exception:  # non-critical: logged and suppressed
         _log.debug("log_activity failed for report_issue #%d (non-critical)", iid)
     return iid
 
@@ -156,8 +156,17 @@ def get_my_stats(author: str) -> dict:
         }
 
 
-def update_issue_status(issue_id: int, status: str, actor: str = "") -> None:
-    """Update the status of a campus issue. Notifies reporter + logs activity."""
+def update_issue_status(issue_id: int, status: str, actor: str = "",
+                       processing_note: str = "", assignee: str = "") -> None:
+    """Update the status of a campus issue. Notifies reporter + logs activity.
+
+    Args:
+        issue_id: the issue to update
+        status: new status (待处理/处理中/已解决)
+        actor: who performed the action (for activity log)
+        processing_note: optional note from the teacher about the resolution/action
+        assignee: optional assignee name (who is handling this issue)
+    """
     with get_db() as conn:
         # Fetch issue info before update for notification + activity
         issue = conn.execute(
@@ -167,13 +176,21 @@ def update_issue_status(issue_id: int, status: str, actor: str = "") -> None:
 
         if status == "已解决":
             conn.execute(
-                "UPDATE campus_issues SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (status, issue_id),
+                "UPDATE campus_issues SET status = ?, resolved_at = CURRENT_TIMESTAMP, "
+                "processing_note = CASE WHEN ? != '' THEN ? ELSE processing_note END, "
+                "assignee = CASE WHEN ? != '' THEN ? ELSE assignee END "
+                "WHERE id = ?",
+                (status, processing_note, processing_note,
+                 assignee, assignee, issue_id),
             )
         else:
             conn.execute(
-                "UPDATE campus_issues SET status = ?, resolved_at = NULL WHERE id = ?",
-                (status, issue_id),
+                "UPDATE campus_issues SET status = ?, resolved_at = NULL, "
+                "processing_note = CASE WHEN ? != '' THEN ? ELSE processing_note END, "
+                "assignee = CASE WHEN ? != '' THEN ? ELSE assignee END "
+                "WHERE id = ?",
+                (status, processing_note, processing_note,
+                 assignee, assignee, issue_id),
             )
         conn.commit()
 
@@ -192,7 +209,7 @@ def update_issue_status(issue_id: int, status: str, actor: str = "") -> None:
                 "issue", issue_id, issue_title,
                 f"{issue['category']} · {issue['location']}" if issue["location"] else issue["category"],
             )
-        except Exception:
+        except Exception:  # non-critical: logged and suppressed
             _log.debug("notify/log_activity failed for issue #%d status change (non-critical)", issue_id)
 
 
@@ -212,7 +229,7 @@ def create_proposal(title: str, description: str, category: str = "其他",
     try:
         from data.db_notifications import log_activity
         log_activity(author, "提交提案", "proposal", pid, title, category)
-    except Exception:
+    except Exception:  # non-critical: logged and suppressed
         _log.debug("log_activity failed for create_proposal #%d (non-critical)", pid)
     return pid
 
@@ -252,7 +269,7 @@ def support_proposal(proposal_id: int, actor: str = "") -> int:
         from data.db_notifications import log_activity
         log_activity(actor or "同学", "附议提案", "proposal", proposal_id,
                      row["title"] if row else "", f"共 {new_count} 人附议")
-    except Exception:
+    except Exception:  # non-critical: logged and suppressed
         _log.debug("log_activity failed for support_proposal #%d (non-critical)", proposal_id)
     return new_count
 
@@ -289,7 +306,7 @@ def update_proposal_status(proposal_id: int, status: str,
                 actor or "教师", action_map.get(status, "更新提案"),
                 "proposal", proposal_id, prop["title"], prop["category"],
             )
-        except Exception:
+        except Exception:  # non-critical: logged and suppressed
             _log.debug("notify/log_activity failed for proposal #%d status change (non-critical)", proposal_id)
 
 

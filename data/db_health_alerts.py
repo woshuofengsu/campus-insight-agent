@@ -145,7 +145,7 @@ def _get_weather_risk_modifiers() -> dict:
                 modifiers["空气污染→呼吸道疾病"] = 12
 
             details["modifier_reasons"] = list(modifiers.keys())
-    except Exception:
+    except Exception:  # non-critical: silent pass intended
         pass
 
     return {"details": details, "total_modifier": sum(modifiers.values()),

@@ -113,7 +113,7 @@ class CampusAgent:
                     f"> 错误：{e}\n\n"
                     f"请稍后重试，或通过页面顶部的「⚡ 快速报修」直接提交工单。"
                 )
-            except Exception:
+            except Exception:  # safety net: must not crash the app
                 pass
             return (
                 f"😅 抱歉，系统遇到了一点问题。\n\n"
@@ -191,7 +191,7 @@ class CampusAgent:
             fallback = f"😅 AI 服务暂时不可用，请稍后重试或使用页面顶部的「⚡ 快速报修」。"
         try:
             self.memory.add_message("assistant", fallback)
-        except Exception:
+        except Exception:  # non-critical: silent pass intended
             pass
         return fallback
 
@@ -872,7 +872,7 @@ class CampusAgent:
                     for e in events[:3]:
                         lines.append(f"- {e.get('title','')[:40]}")
                 return "\n".join(lines)
-            except Exception:
+            except Exception:  # non-critical: silent pass intended
                 pass
 
         if any(kw in txt for kw in ("天气", "温度", "下雨", "多少度")):
@@ -887,7 +887,7 @@ class CampusAgent:
                         f"💧 降水概率 {d['rain_prob']}% · {d['wind']}\n"
                         f"💡 {d['advice']}"
                     )
-            except Exception:
+            except Exception:  # non-critical: silent pass intended
                 pass
 
         if any(kw in txt for kw in ("报修", "上报", "坏了", "故障", "漏水", "不亮")):
@@ -918,7 +918,7 @@ class CampusAgent:
                     f"- 近7天新增 {health.get('new_recent', '?')} 件 · 解决 {health.get('resolved_recent', '?')} 件\n\n"
                     f"💡 如需更详细分析，请在 AI 恢复后重试。"
                 )
-            except Exception:
+            except Exception:  # non-critical: silent pass intended
                 pass
 
         # Generic fallback

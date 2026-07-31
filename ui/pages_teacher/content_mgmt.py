@@ -147,7 +147,7 @@ with col2:
                 "ORDER BY ended_at DESC LIMIT 5"
             ).fetchall()
             closed_topics = [dict(r) for r in rows]
-    except Exception:
+    except Exception:  # non-critical: silent pass intended
         pass
 
     all_topics = list(active_topics) + list(closed_topics)

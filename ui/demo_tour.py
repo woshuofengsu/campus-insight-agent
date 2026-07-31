@@ -122,7 +122,7 @@ Agent 会自动：
 
 | 环节 | 功能 | 技术 |
 |------|------|------|
-| 🧠 **认知引擎** | OODA 闭环 + 12个工具 | LangChain + DeepSeek |
+| 🧠 **认知引擎** | OODA 治理工作流 + 14个工具 | LangChain + DeepSeek |
 | 📊 **治理透明** | 多维健康度 + 趋势分析 | Altair + SQLite |
 | 🎨 **交互设计** | 双端分离 + 响应式 | Streamlit + CSS |
 

@@ -62,16 +62,16 @@ c1, c2, c3 = st.columns(3)
 with c1:
     wd = h.get("weather_details", {})
     temp_str = f'{wd.get("temp_low", "?")}~{wd.get("temp_high", "?")}°C'
-    stat("🌡️", "天气风险", f"+{h.get('weather_mod_total', 0)}",
+    stat("天气风险", f"+{h.get('weather_mod_total', 0)}",
          TOKEN["warning"] if h.get("weather_mod_total", 0) >= 10 else TOKEN["success"],
          sub=temp_str)
 with c2:
     cd = h.get("campus_density", {})
-    stat("🏫", "人员密度", f"+{cd.get('score', 0)}",
+    stat("人员密度", f"+{cd.get('score', 0)}",
          TOKEN["warning"] if cd.get("score", 0) >= 8 else TOKEN["success"],
          sub=" · ".join(cd.get("reasons", ["正常"])))
 with c3:
-    stat("📅", "更新时间", h.get("evaluated_at", "—"), TOKEN["primary"],
+    stat("更新时间", h.get("evaluated_at", "—"), TOKEN["primary"],
          sub=f'{h.get("weekday", "")}')
 
 # ── Weather breakdown ──
@@ -94,7 +94,7 @@ st.markdown("---")
 # Per-disease risk cards
 # ═══════════════════════════════════════════
 
-section("🦠 疾病风险明细", "防", TOKEN["success"])
+section("疾病风险明细")
 
 diseases_sorted = sorted(h["diseases"], key=lambda x: -x["adjusted_risk"])
 

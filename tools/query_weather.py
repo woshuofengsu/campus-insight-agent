@@ -127,7 +127,7 @@ def fetch_real_weather_days(api_key: str, city_id: str,
             parts = [p for p in (adm1, adm2, name) if p]
             if parts:
                 location_name = "".join(parts)
-    except Exception:
+    except Exception:  # non-critical: logged and suppressed
         _log.debug("GPS location lookup failed, using defaults from config")
 
     # ── Step 2: Fetch 3-day weather ──
@@ -243,7 +243,7 @@ def _real_weather() -> str:
         days, location_name = fetch_real_weather_days(
             HEFENG_API_KEY, CAMPUS_CITY_ID, CAMPUS_CITY,
         )
-    except Exception:
+    except Exception:  # non-critical: graceful degradation
         return _fallback_weather("天气API请求失败，已切换为模拟数据")
 
     # ── Format response string ──
@@ -309,7 +309,7 @@ def get_today_weather() -> tuple[list[dict] | None, str, bool]:
                 )
                 location_name = api_location
                 is_real = True
-            except Exception:
+            except Exception:  # non-critical: logged and suppressed
                 _log.debug("Hefeng API location lookup failed, falling back to mock data")
 
     if days is None:

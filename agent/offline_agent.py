@@ -172,7 +172,7 @@ class OfflineAgent:
                     from tools.query_campus_issues import query_issues
                     result = str(query_issues.invoke({"category": cn, "limit": 5}))
                     parts.append(f"\n🔍 **{cn}类工单详情**\n{self._reformat_issue_list(result)}")
-                except Exception:
+                except Exception:  # non-critical: silent pass intended
                     pass
                 break
 
@@ -277,7 +277,7 @@ class OfflineAgent:
                 from tools.query_topics import get_topics
                 raw = str(get_topics.invoke(""))
                 parts.append(f"\n💬 **活跃议题**\n{self._reformat_topic_list(raw)}")
-            except Exception:
+            except Exception:  # non-critical: silent pass intended
                 pass
 
         # ── 创建意图 ──

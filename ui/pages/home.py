@@ -1,19 +1,16 @@
 # ui/pages/home.py
-"""💬 对话 — AI 校园治理伙伴，自然语言交互."""
+"""Chat — AI campus governance assistant."""
 import time
 import streamlit as st
 from config import PERCEPTION_IDLE_SECONDS
-from ui.components import time_ago, TOKEN, reminder, ooda_nav, resolve_author
+from ui.components import TOKEN, time_ago, reminder, ooda_nav, resolve_author
+from ui.session_state import SS, session
 from utils.text import split_thinking
 from ui.thinking import render_reasoning_chain, render_thinking_fallback, render_tool_progress
 from ui.prefetch import try_prefetch as _try_prefetch
-from ui.cache import invalidate_issues
+from ui.cache import invalidate_issues, cached_issues_stats
 from tools.action_report_issue import _auto_classify, _auto_urgency, validate_location
 from data.database import report_issue as db_report_issue
-
-# ═══════════════════════════════════════════
-# Page render
-# ═══════════════════════════════════════════
 
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
@@ -28,211 +25,210 @@ if last_interaction and (now - last_interaction) > threshold and (now - last_che
     st.session_state.last_check_time = now
     alerts = agent.run_perception_check()
     for alert in alerts:
-        alert_msg = f"**{alert['emoji']} {alert['title']}**\n\n{alert['message']}"
+        alert_msg = f"**{alert['title']}**\n\n{alert['message']}"
         memory.add_message("assistant", alert_msg)
-        reminder(alert["title"], alert["message"], alert["emoji"])
+        reminder(alert["title"], alert["message"])
 
-# ── Brand header ──
-st.markdown(
-    f'<div style="margin-bottom:2px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">💬 校园先知</span>'
-    f'<span style="font-size:0.78em;color:{TOKEN["text_muted"]};margin-left:10px;">'
-    f'知校园事 · 报校园修 · 议校园政 · 督校园治</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("用自然语言上报问题、提建议、参与讨论 —— AI 会自动分类、去重、追踪。")
+# ── Split layout: chat (left 3) + panel (right 1) ──
+chat_col, panel_col = st.columns([3, 1])
 
-ooda_nav("home")
+with panel_col:
+    # ── Quick Report Panel ──
+    profile = memory.get_user_profile()
+    _author = resolve_author(profile)
 
-# ── Quick report — TOP of page, bypasses AI ──
-profile = memory.get_user_profile()
-_author = resolve_author(profile)
+    def _do_quick_report():
+        title = st.session_state.home_quick_title.strip()
+        loc = st.session_state.home_quick_loc.strip()
+        if not title:
+            st.session_state._home_report_error = "请填写问题描述"
+            return
+        loc_err = validate_location(title, loc)
+        if loc_err:
+            st.session_state._home_report_error = loc_err
+            return
+        cat = _auto_classify(title, "")
+        urgency = _auto_urgency(title, "")
+        try:
+            issue_id = db_report_issue(
+                title=title, category=cat, location=loc,
+                description="", urgency=urgency, author=_author,
+            )
+            st.session_state._home_report_ok = f"工单 #{issue_id} 已创建 · {cat} · {urgency}"
+            st.session_state._home_report_error = ""
+            st.session_state.home_quick_title = ""
+            st.session_state.home_quick_loc = ""
+            invalidate_issues()
+            st.toast(f"已提交 #{issue_id}")
+        except Exception as e:
+            st.session_state._home_report_error = f"上报失败：{e}"
+            st.session_state._home_report_ok = ""
 
+    st.markdown(
+        f'<div style="font-size:0.75em;font-weight:600;color:{TOKEN["text_muted"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">快速报修</div>',
+        unsafe_allow_html=True,
+    )
+    st.text_input("问题描述", placeholder="如：5号宿舍楼302空调坏了", key="home_quick_title", label_visibility="collapsed")
+    st.text_input("地点", placeholder="宿舍/教学楼/房间号", key="home_quick_loc", label_visibility="collapsed")
+    st.button("上报", type="primary", width="stretch", key="home_quick_btn", on_click=_do_quick_report)
 
+    if st.session_state.get("_home_report_error"):
+        st.error(st.session_state.pop("_home_report_error"))
+    if st.session_state.get("_home_report_ok"):
+        st.success(st.session_state.pop("_home_report_ok"))
 
-def _do_quick_report():
-    """Callback for quick report button — runs BEFORE page rerender."""
-    title = st.session_state.home_quick_title.strip()
-    loc = st.session_state.home_quick_loc.strip()
-    if not title:
-        st.session_state._home_report_error = "请填写问题描述"
-        return
-    loc_err = validate_location(title, loc)
-    if loc_err:
-        st.session_state._home_report_error = loc_err
-        return
-    cat = _auto_classify(title, "")
-    urgency = _auto_urgency(title, "")
-    try:
-        issue_id = db_report_issue(
-            title=title, category=cat, location=loc,
-            description="", urgency=urgency, author=_author,
-        )
-        st.session_state._home_report_ok = f"✅ 工单 #{issue_id} 已生成！分类：{cat} · {urgency} · 👉 切到「👤 我的」页面查看"
-        st.session_state._home_report_error = ""
-        st.session_state.home_quick_title = ""
-        st.session_state.home_quick_loc = ""
-        invalidate_issues()  # ensure "我的" page shows fresh data
-        st.toast(f"Submitted #{issue_id}", icon="✅")
-    except Exception as e:
-        st.session_state._home_report_error = f"上报失败：{e}"
-        st.session_state._home_report_ok = ""
-        import traceback
-        from utils.logger import get_logger
-        get_logger(__name__).error(f"Quick report failed:\n{traceback.format_exc()}")
+    st.markdown("---")
 
-
-st.markdown(
-    f'<div style="font-size:0.82em;font-weight:700;color:{TOKEN["text"]};margin:8px 0 4px;">'
-    f'⚡ 快速报修（直接写入，无需 AI）</div>',
-    unsafe_allow_html=True,
-)
-c_f1, c_f2, c_f3 = st.columns([3, 2, 1])
-with c_f1:
-    st.text_input("问题描述", placeholder="比如：5号宿舍楼302空调坏了", key="home_quick_title", label_visibility="collapsed")
-with c_f2:
-    st.text_input("地点", placeholder="宿舍/教室需填房间号", key="home_quick_loc", label_visibility="collapsed")
-with c_f3:
-    st.button("🚀 上报", type="primary", width="stretch", key="home_quick_btn", on_click=_do_quick_report)
-
-# Show result/error from callback (survives rerun)
-if st.session_state.get("_home_report_error"):
-    st.error(st.session_state.pop("_home_report_error"))
-if st.session_state.get("_home_report_ok"):
-    st.success(st.session_state.pop("_home_report_ok"))
-
-st.markdown("---")
-
-# ── Quick action chips ──
-st.markdown(
-    f'<div style="margin:10px 0 4px;font-size:0.78em;color:{TOKEN["text_muted"]};">'
-    f'💡 一键体验 AI 能力（点击自动调用真实数据）：</div>',
-    unsafe_allow_html=True,
-)
-c1, c2, c3, c4 = st.columns(4)
-
-_quick_actions = [
-    ("🌊 校园脉搏", "qp_pulse", "校园脉搏", "🤖 AI 正在感知校园动态..."),
-    ("🔧 我要报修", "qp_report", "我要报修一个问题，帮我上报", "🤖 AI 正在分析..."),
-    ("🗳️ 我有个建议", "qp_proposals", "我有个建议想提给学校", "🤖 AI 正在思考..."),
-    ("📊 治理数据", "qp_transparency", "帮我看看最近的校园治理数据怎么样", "🤖 AI 正在查询..."),
-]
-for i, (label, key, prompt, spinner_text) in enumerate(_quick_actions):
-    col = [c1, c2, c3, c4][i]
-    with col:
+    # ── Quick Actions ──
+    st.markdown(
+        f'<div style="font-size:0.75em;font-weight:600;color:{TOKEN["text_muted"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">快捷操作</div>',
+        unsafe_allow_html=True,
+    )
+    _quick_actions = [
+        ("校园脉搏", "qp_pulse", "校园脉搏"),
+        ("我要报修", "qp_report", "我要报修一个问题，帮我上报"),
+        ("我有个建议", "qp_proposals", "我有个建议想提给学校"),
+        ("治理数据", "qp_transparency", "帮我看看最近的校园治理数据怎么样"),
+    ]
+    for label, key, prompt in _quick_actions:
         if st.button(label, key=key, width="stretch"):
             st.session_state.last_interaction = time.time()
             memory.add_message("user", prompt)
-            with st.spinner(spinner_text):
-                agent.run(prompt)
-            invalidate_issues()  # ensure "我的" page shows fresh data
+            agent.run(prompt)
+            invalidate_issues()
             st.session_state["_home_last_chain"] = agent.get_last_chain()
             st.rerun()
 
-st.markdown("---")
+    st.markdown("---")
 
-# ── Chat messages ──
-chat_container = st.container(height=460, border=False)
-
-with chat_container:
-    messages = memory.get_working_memory()
-    if not messages:
-        profile = memory.get_user_profile()
-        st.info(
-            "👋 欢迎回来！我是校园先知——你的校园治理 AI 伙伴。\n\n"
-            "你可以这样使用我：\n"
-            "🌊 **知** · 输入'校园脉搏'看本周热点\n"
-            "🔧 **报** · 直接描述问题，比如'教三楼厕所水龙头漏水'\n"
-            "🗳️ **议** · '我有个建议'或'看看大家在讨论什么'\n"
-            "📊 **督** · 点击顶部导航查看治理看板"
+    # ── System Status ──
+    st.markdown(
+        f'<div style="font-size:0.75em;font-weight:600;color:{TOKEN["text_muted"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">系统状态</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        stats = cached_issues_stats()
+        pending = stats["by_status"].get("待处理", 0)
+        resolved = stats["by_status"].get("已解决", 0)
+        total = stats["total"]
+        st.markdown(
+            f'<div style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_sec"]};">'
+            f'<div>工单总数：{total}</div>'
+            f'<div style="color:{TOKEN["warning"]};">待处理：{pending}</div>'
+            f'<div style="color:{TOKEN["success"]};">已解决：{resolved}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
         )
-    else:
-        for i, msg in enumerate(messages[-40:]):
-            role = msg["role"]
-            content = msg["content"]
-            ts = msg.get("timestamp", "")
-            ago = time_ago(ts) if ts else ""
-            is_last = (i == len(messages[-40:]) - 1)
+    except Exception:
+        pass
 
-            with st.chat_message(role):
-                if role == "assistant":
-                    # ── Reasoning chain visualization ──
-                    # For the last assistant message, try structured chain first,
-                    # then fall back to raw <think> text.
-                    chain = None
-                    if is_last:
-                        chain = agent.get_last_chain() or st.session_state.get("_home_last_chain")
+    # ── Notification badge ──
+    try:
+        user_id = session.login_user_id
+        from data.db_notifications import get_unread_count, get_notifications, mark_all_read
+        unread = get_unread_count(user_id) if user_id else 0
+        if unread > 0:
+            recent = get_notifications(user_id, unread_only=True, limit=3)
+            st.markdown(
+                f'<div style="font-size:{TOKEN["font_micro"]};color:{TOKEN["accent"]};'
+                f'font-weight:600;margin-top:8px;">{unread} 条未读</div>',
+                unsafe_allow_html=True,
+            )
+    except Exception:
+        pass
 
-                    if chain and chain.get("steps"):
-                        # Structured: show OODA reasoning steps + association insights
-                        render_reasoning_chain(
-                            chain["steps"],
-                            chain.get("associations"),
-                        )
-                        # Clean content (no thinking tags needed — already stripped)
-                        clean, _ = split_thinking(content)
-                        st.markdown(clean)
+with chat_col:
+    # ── Header ──
+    st.markdown(
+        f'<div style="margin-bottom:2px;">'
+        f'<span style="font-size:{TOKEN["font_display"]};font-weight:{TOKEN["weight_bold"]};'
+        f'color:{TOKEN["text"]};">对话</span>'
+        f'<span style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_muted"]};'
+        f'margin-left:10px;">AI 校园助手</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("用自然语言上报问题、查看校园动态、参与提案讨论。")
+    ooda_nav("home")
+
+    # ── Chat messages ──
+    chat_container = st.container(height=440, border=False)
+
+    with chat_container:
+        messages = memory.get_working_memory()
+        if not messages:
+            st.info(
+                "欢迎。我是你的校园治理 AI 助手。\n\n"
+                "你可以这样使用我：\n"
+                "- 输入「校园脉搏」查看本周热点\n"
+                "- 描述问题：「三教二楼水龙头漏水」\n"
+                "- 「我有个建议」提交提案\n"
+                "- 「治理数据」查看透明统计"
+            )
+        else:
+            for i, msg in enumerate(messages[-40:]):
+                role = msg["role"]
+                content = msg["content"]
+                ts = msg.get("timestamp", "")
+                ago = time_ago(ts) if ts else ""
+                is_last = (i == len(messages[-40:]) - 1)
+
+                with st.chat_message(role):
+                    if role == "assistant":
+                        chain = None
+                        if is_last:
+                            chain = agent.get_last_chain() or st.session_state.get("_home_last_chain")
+
+                        if chain and chain.get("steps"):
+                            render_reasoning_chain(chain["steps"], chain.get("associations"))
+                            clean, _ = split_thinking(content)
+                            st.markdown(clean)
+                        else:
+                            clean, thinking = split_thinking(content)
+                            render_thinking_fallback(thinking)
+                            st.markdown(clean)
                     else:
-                        # Fallback: raw thinking text or plain content
-                        clean, thinking = split_thinking(content)
-                        render_thinking_fallback(thinking)
-                        st.markdown(clean)
-                else:
-                    st.markdown(content)
-                if ago:
-                    st.caption(ago)
+                        st.markdown(content)
+                    if ago:
+                        st.caption(ago)
 
-# ── Chat input ──
-user_input = st.chat_input("输入你的问题，比如'校园脉搏'、'三教二楼灯坏了'、'我有个建议'...")
+    # ── Chat input ──
+    user_input = st.chat_input("输入你的问题，如「校园脉搏」、「三教灯坏了」...")
 
-if user_input:
-    st.session_state.last_interaction = time.time()
+    if user_input:
+        st.session_state.last_interaction = time.time()
+        prefetch_context = _try_prefetch(user_input)
+        augmented_input = user_input
+        if prefetch_context:
+            augmented_input = (
+                user_input + "\n\n"
+                f"[Pre-fetched data for reference. Call tools for more detail.]\n\n"
+                f"{prefetch_context}"
+            )
 
-    # ── Pre-fetch context data as a helpful starting point ──
-    # The agent is ENCOURAGED (not forced) to use this data.
-    # It should STILL call tools whenever it needs more detail or fresher data.
-    prefetch_context = _try_prefetch(user_input)
+        with st.status("思考中...", expanded=True) as status:
+            st.write("分析意图...")
+            st.session_state["_stream_events"] = []
+            st.session_state["_stream_current_tool"] = ""
+            result = agent.run(augmented_input)
+            invalidate_issues()
 
-    augmented_input = user_input
+            stream_events = st.session_state.get("_stream_events", [])
+            if stream_events:
+                from ui.thinking import render_tool_progress
+                render_tool_progress(stream_events)
+            else:
+                st.write("调用工具...")
 
-    if prefetch_context:
-        augmented_input = (
-            user_input + "\n\n"
-            f"[📊 系统已预取以下数据作为参考。你可以直接使用这些数据快速回复，"
-            f"如需更详细或更新的信息，请调用相应工具获取。]\n\n"
-            f"{prefetch_context}"
-        )
+            chain = agent.get_last_chain()
+            if chain:
+                st.session_state["_home_last_chain"] = chain
+                st.write("分析关联数据...")
+            else:
+                st.session_state["_home_last_chain"] = None
 
-    # Show thinking indicator with real-time tool tracking
-    with st.status("🤖 校园先知正在思考...", expanded=True) as status:
-        st.write("🔍 感知校园环境...")
-        st.write("🧭 分析你的意图...")
-
-        # Reset callback events before running
-        st.session_state["_stream_events"] = []
-        st.session_state["_stream_current_tool"] = ""
-
-        result = agent.run(augmented_input)
-
-        # ── Invalidate caches so "我的" page shows fresh data ──
-        invalidate_issues()
-
-        # ── Show tool calls from streaming callback ──
-        stream_events = st.session_state.get("_stream_events", [])
-        if stream_events:
-            from ui.thinking import render_tool_progress
-            render_tool_progress(stream_events)
-        else:
-            st.write("🔧 调用工具执行操作...")
-
-        # ── Capture reasoning chain for UI visualization ──
-        chain = agent.get_last_chain()
-        if chain:
-            st.session_state["_home_last_chain"] = chain
-            st.write("💡 正在分析关联数据...")
-        else:
-            st.session_state["_home_last_chain"] = None
-
-        status.update(label="✅ 处理完成！", state="complete", expanded=False)
-    st.rerun()
+            status.update(label="完成", state="complete", expanded=False)
+        st.rerun()

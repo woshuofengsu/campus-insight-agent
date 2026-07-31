@@ -116,7 +116,7 @@ st.markdown("---")
 # Trend chart — 7-day activity
 # ═══════════════════════════════════════════
 
-section("📈 近 7 天治理活跃度", "督", TOKEN["success"])
+section("近7天治理活跃度")
 
 timeline = get_issues_timeline(7)
 if timeline:
@@ -146,7 +146,7 @@ if timeline:
     )
     st.altair_chart(chart, width="stretch")
 else:
-    info_card("📈", "暂无趋势数据", "治理活动开始后将展示 7 天内上报和解决的动态趋势。")
+    info_card("治理活动开始后将展示 7 天内上报和解决的动态趋势。")
 
 st.markdown("---")
 
@@ -154,7 +154,7 @@ st.markdown("---")
 # Core KPIs
 # ═══════════════════════════════════════════
 
-section("📊 核心指标总览", "督", TOKEN["success"])
+section("核心指标总览")
 
 total_i = issue_stats["total"]
 total_p = proposal_stats["total"]
@@ -166,15 +166,15 @@ total_participants = sum(t.get("participant_count", 0) for t in topics)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
-    stat("📝", "总上报", str(total_i), TOKEN["primary"])
+    stat("总上报", str(total_i), TOKEN["primary"])
 with c2:
-    stat("✅", "解决率", f"{health['resolution_rate']}%", TOKEN["success"])
+    stat("解决率", f"{health['resolution_rate']}%", TOKEN["success"])
 with c3:
-    stat("⏳", "待处理", str(pending), TOKEN["warning"] if pending > 0 else TOKEN["success"])
+    stat("待处理", str(pending), TOKEN["warning"] if pending > 0 else TOKEN["success"])
 with c4:
-    stat("💡", "提案", str(total_p), TOKEN["purple_text"])
+    stat("提案", str(total_p), TOKEN["purple_text"])
 with c5:
-    stat("👥", "参与人次", str(total_participants), TOKEN["primary"])
+    stat("参与人次", str(total_participants), TOKEN["primary"])
 
 st.markdown("---")
 
@@ -182,7 +182,7 @@ st.markdown("---")
 # Issue status pipeline
 # ═══════════════════════════════════════════
 
-section("🔄 工单流转", "督", TOKEN["success"])
+section("工单流转")
 
 if total_i > 0:
     pipeline_data = [
@@ -211,7 +211,7 @@ st.markdown("---")
 # Category breakdown
 # ═══════════════════════════════════════════
 
-section("🏷️ 问题类别明细", "督", TOKEN["success"])
+section("问题类别明细")
 
 by_cat = issue_stats.get("by_category", {})
 if by_cat:
@@ -246,7 +246,7 @@ st.markdown("---")
 # 📢 舆情情感分析 — from feedback_items
 # ═══════════════════════════════════════════
 
-section("📢 学生舆情分析", "督", TOKEN["success"])
+section("学生舆情分析")
 
 fb = get_feedback_stats()
 if fb["total"] > 0:
@@ -308,7 +308,7 @@ st.markdown("---")
 # ⚠️ 积压预警 — oldest unresolved issues
 # ═══════════════════════════════════════════
 
-section("⚠️ 积压预警", "督", TOKEN["success"])
+section("积压预警")
 
 stale_issues = sorted(
     get_issues(status="待处理", limit=50),
@@ -345,7 +345,7 @@ st.markdown("---")
 # 🔥 类别热力矩阵 — 类别 × 状态交叉透视
 # ═══════════════════════════════════════════
 
-section("🔥 类别热力矩阵", "督", TOKEN["success"])
+section("类别热力矩阵")
 
 issues_all = get_issues(limit=500)
 if issues_all and len(issues_all) >= 5:
@@ -405,7 +405,7 @@ st.markdown("---")
 # 🏆 贡献者排行榜 TOP 10
 # ═══════════════════════════════════════════
 
-section("🏆 社区贡献者 TOP 10", "督", TOKEN["success"])
+section("社区贡献者 TOP 10")
 
 if issues_all and len(issues_all) >= 3:
     from collections import Counter
@@ -504,7 +504,7 @@ st.markdown("---")
 # Recent activity feed
 # ═══════════════════════════════════════════
 
-section("📰 最近动态", "督", TOKEN["success"])
+section("最近动态")
 
 issues = get_issues(limit=5)
 proposals_list = get_proposals(sort_by="latest", limit=3)

@@ -244,6 +244,9 @@ def init_db(db_path: str):
         ("user_profile", "username TEXT UNIQUE NOT NULL DEFAULT ''"),
         ("user_profile", "password_hash TEXT DEFAULT ''"),
         ("user_profile", "is_active INTEGER DEFAULT 1"),
+        ("campus_issues", "processing_note TEXT DEFAULT ''"),
+        ("campus_issues", "assignee TEXT DEFAULT ''"),
+        ("campus_issues", "suggested_category TEXT DEFAULT ''"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")

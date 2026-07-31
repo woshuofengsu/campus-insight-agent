@@ -42,38 +42,20 @@ try:
         anomaly_count = perception.get("anomaly_count", 0)
         findings = perception.get("key_findings", [])
 
-        # Pulsing dot CSS
-        pulse_color = TOKEN["danger"] if anomaly_count > 0 else TOKEN["success"]
-        pulse_anim = (
-            "@keyframes perceptionPulse {"
-            "0%, 100% { opacity: 1; transform: scale(1); }"
-            "50% { opacity: 0.5; transform: scale(1.3); }"
-            "}"
-        )
-
-        # Inject pulsing animation CSS once
-        st.markdown(f"""
-<style>
-    {pulse_anim}
-    .perception-dot {{
-        display: inline-block; width: 10px; height: 10px;
-        background: {pulse_color}; border-radius: 50%;
-        animation: perceptionPulse 2s ease-in-out infinite;
-        margin-right: 6px; vertical-align: middle;
-    }}
-</style>
-""", unsafe_allow_html=True)
+        # Static status indicator
+        dot_color = TOKEN["danger"] if anomaly_count > 0 else TOKEN["success"]
 
         # Use container(border=True) for proper DOM enclosure
         with st.container(border=True):
             # Header row
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-                f'<span style="font-size:1.3em;">🧠</span>'
-                f'<span style="font-weight:700;color:{TOKEN["text"]};">AI 自主感知</span>'
-                f'<span class="perception-dot" title="感知引擎活跃"></span>'
-                f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:auto;">'
-                f'{time_label} 自动扫描</span>'
+                f'<span style="font-weight:700;color:{TOKEN["text"]};">AI Perception</span>'
+                f'<span style="display:inline-block;width:8px;height:8px;'
+                f'background:{dot_color};border-radius:50%;margin-left:6px;" '
+                f'title="perception active"></span>'
+                f'<span style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_muted"]};margin-left:auto;">'
+                f'{time_label}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -241,7 +223,7 @@ except Exception:
 # Upcoming events
 # ═══════════════════════════════════════════
 
-section("📅 即将发生", "知", TOKEN["primary"])
+section("即将发生")
 
 events = get_campus_events(limit=10)
 if events:
@@ -250,14 +232,14 @@ if events:
         with cols[i % 2]:
             event_card(e)
 else:
-    info_card("📅", "暂无待办事项", "添加校历信息后可在此查看即将发生的大事")
+    info_card("添加校历信息后可在此查看即将发生的大事")
 
 
 # ═══════════════════════════════════════════
 # 📡 校园动态时间线 — 实时活动
 # ═══════════════════════════════════════════
 
-section("📡 校园动态", "知", TOKEN["primary"])
+section("校园动态")
 
 try:
     from data.db_notifications import get_activity_feed
@@ -308,7 +290,7 @@ except Exception:
 # 📚 校园百科 — RAG 语义搜索 + quick access
 # ═══════════════════════════════════════════
 
-section("📚 校园百科", "知", TOKEN["primary"])
+section("校园百科")
 
 # ── Semantic search bar ──
 kb_search_query = st.text_input(
@@ -367,14 +349,14 @@ else:
                         unsafe_allow_html=True,
                     )
     else:
-        info_card("📚", "暂无百科内容", "添加校历、通知、常用电话等信息后展示")
+        info_card("添加校历、通知、常用电话等信息后展示")
 
 
 # ═══════════════════════════════════════════
 # Weekly hot spots
 # ═══════════════════════════════════════════
 
-section("📡 本周热点", "知", TOKEN["primary"])
+section("本周热点")
 
 issues = cached_issues(limit=100)
 if issues:
@@ -383,16 +365,17 @@ if issues:
     resolved = len([i for i in issues if i.get("status") == "已解决"])
     processing = len([i for i in issues if i.get("status") == "处理中"])
 
-    # KPI row
-    c1, c2, c3, c4 = st.columns(4)
+    # KPI row (2×2 grid: stacks to 4 rows on mobile)
+    c1, c2 = st.columns(2)
     with c1:
-        stat("📝", "总上报", str(total), TOKEN["primary"])
+        stat("总上报", str(total), TOKEN["primary"])
     with c2:
-        stat("⏳", "待处理", str(pending), TOKEN["warning"])
+        stat("待处理", str(pending), TOKEN["warning"])
+    c3, c4 = st.columns(2)
     with c3:
-        stat("🔄", "处理中", str(processing), TOKEN["primary"])
+        stat("处理中", str(processing), TOKEN["primary"])
     with c4:
-        stat("✅", "已解决", str(resolved), TOKEN["success"])
+        stat("已解决", str(resolved), TOKEN["success"])
 
     st.markdown("")
 
@@ -418,7 +401,7 @@ if issues:
                 st.caption(f'🕐 {datetime.now().strftime("%H:%M")} · AI Agent 自动分析')
     except ImportError:
         pass
-    except Exception:
+    except Exception:  # non-critical: silent pass intended
         pass
 
     # Category hotness

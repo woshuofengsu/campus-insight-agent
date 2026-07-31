@@ -115,16 +115,16 @@ total_p = pstats["total"]
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    stat("💡", "提案总数", str(total_p), TOKEN["purple_text"])
+    stat("提案总数", str(total_p), TOKEN["purple_text"])
 with c2:
     discussing = pstats.get("by_status", {}).get("讨论中", 0)
-    stat("💬", "讨论中", str(discussing), TOKEN["purple_text"])
+    stat("讨论中", str(discussing), TOKEN["purple_text"])
 with c3:
     adopted = sum(
         v for k, v in pstats.get("by_status", {}).items()
         if k in ("已采纳", "已实施")
     )
-    stat("✅", "已采纳/实施", str(adopted), TOKEN["success"])
+    stat("已采纳/实施", str(adopted), TOKEN["success"])
 
 st.markdown("")
 
@@ -132,7 +132,7 @@ st.markdown("")
 # Proposals — sortable + support inline
 # ═══════════════════════════════════════════
 
-section("💡 热门提案", "议", TOKEN["purple_text"])
+section("热门提案")
 
 sort_by = st.radio(
     "排序方式", ["附议最多", "最新发布"],
@@ -144,8 +144,7 @@ proposals = get_proposals(
 )
 
 if not proposals:
-    info_card("💡", "暂无提案", "在对话页说'我有个建议'来创建第一个提案！",
-              bg=TOKEN["purple_bg"], border=TOKEN["purple_border"])
+    info_card("在对话页说'我有个建议'来创建第一个提案！")
 else:
     # Track support button clicks
     support_feedback = st.session_state.get("_support_feedback", {})
@@ -205,13 +204,12 @@ st.markdown("---")
 # Discussion topics — express opinion inline
 # ═══════════════════════════════════════════
 
-section("🔥 正在热议", "议", TOKEN["purple_text"])
+section("正在热议")
 
 topics = get_active_topics(limit=20)
 
 if not topics:
-    info_card("🔥", "暂无活跃议题", "AI 会根据校园热点自动发起讨论",
-              bg=TOKEN["warning_bg"], border=TOKEN["warning_border"])
+    info_card("AI 会根据校园热点自动发起讨论")
 else:
     opinion_feedback = st.session_state.get("_opinion_feedback", {})
 

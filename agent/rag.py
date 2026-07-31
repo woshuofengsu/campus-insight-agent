@@ -208,7 +208,7 @@ def semantic_search(query: str, top_k: int = 5,
 
         return results
 
-    except Exception:
+    except Exception:  # non-critical: graceful degradation
         return _fallback_keyword_search(query, top_k, category)
 
 
