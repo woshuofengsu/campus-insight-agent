@@ -441,7 +441,7 @@ st.markdown(f"""
             title="系统在线"></span>
     </div>
     <div style="font-size:0.75em;color:{TEXT_MUTED};margin-top:2px;letter-spacing:0.05em;">
-        CAMPUSINSIGHT · OODA 认知闭环 · 知报议督
+        CAMPUSINSIGHT · 知报议督 · 治理闭环
     </div>
 </div>
 """, unsafe_allow_html=True)

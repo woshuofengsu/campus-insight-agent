@@ -180,7 +180,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
             memory.add_message(
                 "assistant",
                 f"👋 嗨！{school}的{grade or ''}{user_name or user_major or ''}同学，欢迎使用校园先知！\n\n"
-                "我是你的校园 AI 治理伙伴，基于 OODA 认知循环运行。\n\n"
+                "我是你的校园 AI 治理伙伴，围绕知·报·议·督四个板块运行。\n\n"
                 "🌊 **知** · 输入'校园脉搏'看本周热点\n"
                 "🔧 **报** · 发现校园问题，直接描述即可上报\n"
                 "🗳️ **议** · 有想法？'我有个提案'或参与讨论\n"

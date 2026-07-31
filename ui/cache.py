@@ -118,9 +118,11 @@ def invalidate_opinions(topic_id: int = 0):
 
 
 def invalidate_content():
-    """Clear knowledge-base and topic caches."""
+    """Clear knowledge-base, topic, and event caches (content publishing)."""
     cached_knowledge_base.clear()
     cached_active_topics.clear()
+    cached_campus_events.clear()       # 通知/事件类内容发布后需要刷新
+    cached_feedback_stats.clear()      # 反馈汇总可能关联新议题
 
 
 def invalidate_all():

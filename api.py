@@ -687,7 +687,7 @@ def _get_agent():
 
 @app.post("/api/chat", tags=["AI对话"])
 def agent_chat(req: ChatRequest):
-    """AI 对话 —— 完整 OODA 认知循环。
+    """AI 对话 —— 完整 OODA 治理工作流。
 
     扣子把用户消息传过来，Agent 自动判断意图、调用工具、返回回复。
     扣子 Bot 中把此端点配置为插件的 API 即可。

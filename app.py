@@ -642,7 +642,7 @@ def main():
                 st.rerun()
 
         st.caption(
-            "OODA 认知循环 · 基层治理" if role != "teacher" else "校园治理 · 管理后台"
+            "知·报·议·督 · 基层治理" if role != "teacher" else "校园治理 · 管理后台"
         )
 
     nav.run()

@@ -1,5 +1,5 @@
 # agent/engine.py
-"""Agent 推理引擎 —— OODA 循环：观察 → 定位 → 决策 → 反思 → 关联
+"""Agent 推理引擎 —— OODA 治理工作流：观察 → 定位 → 决策 → 反思 → 关联
 
 每个 run() 调用执行全部五个阶段，让 Agent 不仅回答问题，还能主动感知
 校园动态、自我纠错、发现关联模式。
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 
 class CampusAgent:
-    """校园先知主 Agent —— OODA 认知循环"""
+    """校园先知主 Agent —— OODA 治理工作流"""
 
     def __init__(self, session_state):
         self.memory = MemoryManager(session_state)
@@ -646,13 +646,18 @@ class CampusAgent:
                 stale_count = stale["cnt"] if stale else 0
 
                 # Issue management grade
+                # 权重设计参考：
+                # - 解决率基准 80%：参考 ISO 37120 城市治理指标"市政服务响应率≥80% 为优秀"
+                # - 紧急扣分 5/件：1 件紧急 ≈ 5% 健康度折损（紧急问题影响面远大于普通问题）
+                # - 积压扣分 3/件：超 7 天未处理表示流程阻塞，3 分/件 ≈ 7 件即触及上限
+                # - 上限 25/20 分：防止单一维度过度主导总分（单一维度不超过 25%）
                 issue_score = 100.0
                 if total_i > 0:
                     issue_score -= max(0, (1 - resolution_rate / 80) * 30)  # penalize low resolution
                 if urgent_unresolved > 0:
-                    issue_score -= min(urgent_unresolved * 5, 25)
+                    issue_score -= min(urgent_unresolved * 5, 25)           # max -25 for urgency
                 if stale_count > 0:
-                    issue_score -= min(stale_count * 3, 20)
+                    issue_score -= min(stale_count * 3, 20)                 # max -20 for staleness
                 issue_score = max(0, issue_score)
                 grades["📝 工单管理"] = {
                     "score": round(issue_score),
@@ -684,6 +689,8 @@ class CampusAgent:
 
                 prop_score = 100.0
                 if total_p > 0:
+                    # 待回复提案每件扣 8 分：未回应的提案比未处理的工单更影响信任
+                    # 采纳率加分：采纳率 ≥ 50% 时获得满分 20 分加成
                     if unresponded > 0:
                         prop_score -= min(unresponded * 8, 40)
                     prop_score += min(adoption_rate / 50 * 20, 20)
@@ -707,6 +714,10 @@ class CampusAgent:
                 ).fetchone()
                 unique_authors = unique_authors_row["cnt"] if unique_authors_row else 0
 
+                # 参与度评分：衡量治理的"群众基础"
+                # - 少于 3 个独立上报人：扣 30 分（核心用户群过小，未形成治理规模）
+                # - 3-4 人：扣 15 分（有初步参与，仍需扩大覆盖面）
+                # - 议题参与人次 < 10：扣 20 分（讨论活跃度不足）
                 eng_score = 100.0
                 if unique_authors < 3:
                     eng_score -= 30

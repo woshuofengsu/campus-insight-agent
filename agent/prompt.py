@@ -124,6 +124,45 @@ _SEMANTIC_FALLBACK_PROPOSAL = re.compile(
 )
 
 
+# ── Status-query patterns: user is asking about an EXISTING issue's progress ──
+# These override repair persona routing because "上报的xxx修好了吗" is a
+# data query, not a new issue report.
+_STATUS_QUERY_PATTERNS = [
+    r"修好了吗", r"修好没", r"修了没", r"解决了吗", r"解决了没",
+    r"处理了吗", r"处理了没", r"好了吗", r"好了没", r"怎么样了",
+    r"有进展吗", r"有结果吗", r"什么状态", r"进度如何", r"到哪了",
+    r"回复了吗", r"有回复吗", r"通过了吗", r"采纳了吗",
+    r"还在(?:处理|修|等|排队)", r"还没(?:修|处理|解决|回复|弄)好",
+]
+_STATUS_QUERY_RE = re.compile("|".join(_STATUS_QUERY_PATTERNS))
+
+# Strong ownership signals — user is talking about THEIR OWN stuff
+_OWNERSHIP_PREFIXES = [
+    "我的", "我上报的", "我报修的", "我提交的", "我那个", "我之前",
+    "我上次", "我前几天", "我刚刚", "我刚才", "我昨天", "我前天",
+    "帮我查一下", "帮我看看", "帮我查查",
+]
+_OWNERSHIP_RE = re.compile("|".join(_OWNERSHIP_PREFIXES))
+
+
+def _detect_status_query(txt: str) -> bool:
+    """Return True if the user is asking about status/progress of an existing item,
+    rather than reporting a new problem or creating something new.
+
+    Detects two signals:
+    1. Status-check keywords: "修好了吗" / "解决了吗" / "有进展吗" etc.
+    2. Ownership + query combo: "我的xxx" + check intent (weaker signal alone,
+       but combined with a repair-keyword hit, it flips the intent to query)
+    """
+    if _STATUS_QUERY_RE.search(txt):
+        return True
+    # Ownership signal alone is not enough — only flip if also short (likely
+    # a quick check, not a long problem description)
+    if _OWNERSHIP_RE.search(txt) and len(txt) <= 20:
+        return True
+    return False
+
+
 def _semantic_detect(txt: str) -> dict | None:
     """Regex-based semantic fallback when keyword matching finds nothing.
 
@@ -180,6 +219,29 @@ def detect_persona(user_input: str) -> dict | None:
     if not matches:
         # ── Semantic fallback: regex-based pattern matching ──
         return _semantic_detect(txt)
+
+    # ── Status-query override: "修好了吗" / "解决了吗" etc. ──
+    # When the user is asking about an existing item's progress, redirect
+    # from repair persona to data analyst — they need query_issues, not report_issue.
+    if _detect_status_query(txt):
+        repair_idx = 0  # 报修助手 is always index 0
+        data_idx = 2    # 数据分析师 is always index 2
+        matched_indices = {m[0] for m in matches}
+        if repair_idx in matched_indices:
+            # Flip: treat as data query instead of repair report
+            data_keywords, data_role, data_hint = _PERSONA_SIGNALS[data_idx]
+            # Re-count matches against data keywords for confidence
+            data_hits = sum(1 for kw in data_keywords if kw in txt)
+            conf = "medium" if data_hits >= 1 else "low"
+            return {
+                "role": data_role,
+                "focus_hint": "用户可能在查询已有工单/提案的进展状态（状态查询检测）。"
+                              "调用 query_issues 查询相关工单，不要创建新工单。",
+                "confidence": conf,
+                "matched_count": max(data_hits, 1),
+                "status_query_override": True,
+                "original_persona": "🔧 报修助手",
+            }
 
     # ── Confidence scoring ──
     total_matches = sum(m[3] for m in matches)
