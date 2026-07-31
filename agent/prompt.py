@@ -60,7 +60,10 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
          "制度", "规定", "规则", "政策", "流程", "手续",
          "体验", "方便", "麻烦", "折腾", "浪费", "效率",
          "图书馆时间", "快递柜", "校园网", "空调安装", "洗衣机",
-         "热水供应", "打印服务", "自习室", "选课", "课表", "考试安排"],
+         "热水供应", "打印服务", "自习室", "选课", "课表", "考试安排",
+         # ── v3: "看看大家提了xxx" pattern → proposal query intent ──
+         "大家提了", "大家有什么", "提了什么好",
+         "有什么好建议", "有什么好想法", "有什么好主意"],
         "🗳️ 议事顾问",
         "用户有想法或建议。你的任务是：帮TA把想法结构化（分类、可行性、预期效果），"
         "引导创建提案或参与议题讨论。先检查有没有类似提案避免重复。语气鼓励、开放。",
@@ -294,7 +297,19 @@ def detect_persona(user_input: str) -> dict | None:
 
     # ── Priority: 校园观察员 (idx=3) vs 议事顾问 (idx=1) ──
     if 3 in roles_by_idx and 1 in roles_by_idx:
-        proposal_kw = ["提案", "建议", "提议", "附议"]
+        # "看看有什么提案" / "看看大家提了xxx" → clear proposal-view intent
+        # Force 议事 routing when user is browsing proposals, even if
+        # generic observer keywords like "有什么"/"什么" have higher counts.
+        _view_proposal = ("看看有什么" in txt or "看看大家提了" in txt
+                          or "看看都有什么" in txt or "有什么好" in txt)
+        if _view_proposal:
+            role, hint, count = roles_by_idx[1]
+            return {"role": role, "focus_hint": hint, "confidence": "medium",
+                    "matched_count": max(count, 2),
+                    "view_proposal_override": True}
+        proposal_kw = ["提案", "建议", "提议", "附议", "想法", "好想法",
+                       "好主意", "意见", "诉求", "好建议", "大家提了",
+                       "大家有什么"]
         if not any(kw in txt for kw in proposal_kw):
             role, hint, count = roles_by_idx[3]
             conf = "high" if count >= 3 else "medium"
