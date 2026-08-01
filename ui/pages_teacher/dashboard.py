@@ -137,7 +137,7 @@ try:
     _he = _h["overall_emoji"]
     _hc = _h["overall_color"]
     _hs = _h["overall_score"]
-    _hcolor = TOKEN.get(_hc, TOKEN["primary"])
+    _hcolor = TOKEN.get(_hc, TOKEN["accent"])
 
     _hlabel = {"low": "低风险", "moderate": "注意", "high": "警示", "critical": "高危"}.get(_hl, "—")
 
@@ -406,7 +406,7 @@ if timeline:
     df_melt = df.melt(id_vars=["day"], value_vars=["new_count", "resolved_count"],
                        var_name="类型", value_name="数量")
     df_melt["类型"] = df_melt["类型"].map({"new_count": "新增", "resolved_count": "已解决"})
-    color_map = {"新增": TOKEN["primary"], "已解决": TOKEN["success"]}
+    color_map = {"新增": TOKEN["accent"], "已解决": TOKEN["success"]}
 
     chart = configure_altair(
         alt.Chart(df_melt)

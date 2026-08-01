@@ -292,7 +292,7 @@ if batch_mode and issues:
         n = len(selected_ids)
         with st.container(border=True):
             st.markdown(
-                f'<span style="font-weight:600;color:{TOKEN["primary"]};font-size:0.88em;">'
+                f'<span style="font-weight:600;color:{TOKEN["accent"]};font-size:0.88em;">'
                 f'✅ 已选 {n} 条</span>',
                 unsafe_allow_html=True,
             )
@@ -446,8 +446,8 @@ else:
                     suggested_cat = _suggest_category(title, desc)
                 if suggested_cat and suggested_cat != cat:
                     st.markdown(
-                        f'<span style="font-size:0.72em;background:{TOKEN["primary_bg"]};'
-                        f'color:{TOKEN["primary"]};padding:1px 6px;border-radius:4px;'
+                        f'<span style="font-size:0.72em;background:{TOKEN["accent_bg"]};'
+                        f'color:{TOKEN["accent"]};padding:1px 6px;border-radius:4px;'
                         f'font-weight:600;cursor:pointer;" title="AI建议将此类问题归类为「{suggested_cat}」">'
                         f'🤖 {suggested_cat}</span>',
                         unsafe_allow_html=True,

@@ -8,7 +8,6 @@ from ui.components import TOKEN, tag
 from ui.cache import cached_proposals, cached_proposals_stats, invalidate_proposals
 from data.database import update_proposal_status
 
-# ── Page Render ──
 st.markdown(
     f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
     f'💡 提案管理</span>',
@@ -16,7 +15,6 @@ st.markdown(
 )
 st.caption("查看学生提交的校园治理提案，回复并采纳可行建议。")
 
-# ── Filter tabs ──
 status_choice = st.radio(
     "状态筛选",
     ["全部", "💬 待回复", "✅ 已采纳", "🎉 已实施"],
@@ -25,7 +23,6 @@ status_choice = st.radio(
     key="_proposals_status_filter",
 )
 
-# ── Fetch data ──
 all_props = cached_proposals(sort_by="supporters", limit=200)
 
 if status_choice == "全部":
@@ -36,7 +33,6 @@ else:
     status_map = {"✅ 已采纳": "已采纳", "🎉 已实施": "已实施"}
     proposals = [p for p in all_props if p.get("status") == status_map.get(status_choice)]
 
-# ── Stats bar (reuse already-fetched all_props) ──
 pending_reply = sum(1 for p in all_props if p.get("status") in ("讨论中", "已回应"))
 adopted = sum(1 for p in all_props if p.get("status") == "已采纳")
 implemented = sum(1 for p in all_props if p.get("status") == "已实施")
@@ -68,7 +64,6 @@ with c_export:
 
 st.markdown("---")
 
-# ── Analytics Summary Banner ──
 total_props = len(all_props)
 if total_props > 0:
     discussing = sum(1 for p in all_props if p.get("status") == "讨论中")
@@ -100,7 +95,6 @@ if total_props > 0:
 
 st.markdown("---")
 
-# ── Reply handler ──
 if st.session_state.get("_prop_reply_pid"):
     pid = st.session_state["_prop_reply_pid"]
     prop_title = st.session_state.get("_prop_reply_title", "")
@@ -136,7 +130,6 @@ if st.session_state.get("_prop_reply_pid"):
             st.session_state.pop("_prop_reply_title", None)
             st.rerun()
 
-# ── Proposal cards ──
 if not proposals:
     st.info("暂无匹配的提案。")
 else:

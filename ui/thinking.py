@@ -21,19 +21,16 @@ def _esc(text: str) -> str:
     return _html.escape(str(text), quote=False)
 
 
-# ── Phase → left-border colour mapping ──
 PHASE_COLORS = {
-    "observe": TOKEN["primary"],
+    "observe": TOKEN["accent"],
     "act":     TOKEN["warning"],
     "reflect": TOKEN["success"],
-    "decide":  TOKEN["purple_text"],
+    "decide":  TOKEN["accent"],
     "orient":  TOKEN["text_sec"],
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════
 # Structured reasoning chain
-# ═══════════════════════════════════════════════════════════════════════
 
 def render_reasoning_chain(
     steps: list[dict] | None,
@@ -49,18 +46,16 @@ def render_reasoning_chain(
 
     n = len(steps)
 
-    # ── Collapsible reasoning chain — collapsed by default for clean chat ──
-    # Build a compact summary for the expander label (first step summary)
+        # Build a compact summary for the expander label (first step summary)
     first_summary = _esc(steps[0].get("summary", "")) if steps else ""
     label_summary = first_summary[:28] + ("…" if len(first_summary) > 28 else "")
     with st.expander(
         f"🧠 处理流程 · {n} 步 · {label_summary}",
         expanded=False,
     ):
-        # ── Step cards ──
-        for s in steps:
+                for s in steps:
             phase = s.get("phase", "")
-            border = PHASE_COLORS.get(phase, TOKEN["slate_border"])
+            border = PHASE_COLORS.get(phase, TOKEN["border"])
             icon = s.get("icon", "🔹")
 
             # Truncated tool-input string (JSON, max 80 chars)
@@ -91,11 +86,11 @@ def render_reasoning_chain(
                 details = f'<div style="margin-top:3px;">{" &nbsp;".join(detail_parts)}</div>'
 
             st.markdown(
-                f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-                f'border-left:3px solid {border};border-radius:{TOKEN["radius"]};'
+                f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+                f'border-left:3px solid {border};border-radius:{TOKEN["radius_card"]};'
                 f'padding:10px 14px;margin:5px 0;box-shadow:{TOKEN["shadow_sm"]};'
                 f'font-size:0.85em;line-height:1.5;transition:background 0.15s ease;"'
-                f'onmouseover="this.style.background=\'{TOKEN["slate_bg"]}\'" '
+                f'onmouseover="this.style.background=\'{TOKEN["page_bg"]}\'" '
                 f'onmouseout="this.style.background=\'{TOKEN["card_bg"]}\'">'
                 f'<strong style="color:{TOKEN["text"]};font-size:0.85em;">'
                 f'{icon} {summary_safe}</strong>'
@@ -103,30 +98,27 @@ def render_reasoning_chain(
                 unsafe_allow_html=True,
             )
 
-        # ── Association insight panel ──
-        if associations and associations.get("has_insight"):
+                if associations and associations.get("has_insight"):
             insight_text = associations.get("insight_text", "")
             spatial = associations.get("spatial")
             anomalies = associations.get("anomalies", [])
             linked_proposals = associations.get("linked_proposals", [])
             correlations = associations.get("correlations", [])
 
-            # ── Anomaly alert badges (red, urgent) ──
-            anomaly_html = ""
+                        anomaly_html = ""
             if anomalies:
                 for a in anomalies[:3]:
                     anomaly_html += (
                         f'<span style="display:inline-block;background:{TOKEN["danger_bg"]};'
                         f'border:1px solid {TOKEN["danger_border"]};'
-                        f'border-radius:{TOKEN["radius_sm"]};padding:5px 10px;'
+                        f'border-radius:{TOKEN["radius_card"]};padding:5px 10px;'
                         f'margin:3px 4px 3px 0;font-size:0.78em;'
                         f'color:{TOKEN["danger"]};">'
                         f'⚠️ {_esc(a.get("category",""))} 激增 +{a.get("spike","")}'
                         f'</span>'
                     )
 
-            # ── Spatial mini-cards ──
-            cards_html = ""
+                        cards_html = ""
             if spatial:
                 for item in spatial[:8]:
                     issue_id = item.get("id", "?")
@@ -134,22 +126,21 @@ def render_reasoning_chain(
                     status = item.get("status", "")
                     cards_html += (
                         f'<span style="display:inline-block;background:{TOKEN["card_bg"]};'
-                        f'border:1px solid {TOKEN["purple_border"]};'
-                        f'border-radius:{TOKEN["radius_sm"]};padding:5px 10px;'
+                        f'border:1px solid {TOKEN["accent_border"]};'
+                        f'border-radius:{TOKEN["radius_card"]};padding:5px 10px;'
                         f'margin:3px 4px 3px 0;font-size:0.78em;'
                         f'color:{TOKEN["text_sec"]};">'
-                        f'<strong style="color:{TOKEN["purple_text"]};">#{issue_id}</strong> '
+                        f'<strong style="color:{TOKEN["accent"]};">#{issue_id}</strong> '
                         f'{_esc(title)} · <span style="color:{TOKEN["text_muted"]};">{_esc(status)}</span></span>'
                     )
 
-            # ── Linked proposal cards ──
-            proposal_html = ""
+                        proposal_html = ""
             if linked_proposals:
                 for p in linked_proposals[:3]:
                     proposal_html += (
                         f'<span style="display:inline-block;background:{TOKEN["success_bg"]};'
                         f'border:1px solid {TOKEN["success_border"]};'
-                        f'border-radius:{TOKEN["radius_sm"]};padding:5px 10px;'
+                        f'border-radius:{TOKEN["radius_card"]};padding:5px 10px;'
                         f'margin:3px 4px 3px 0;font-size:0.78em;'
                         f'color:{TOKEN["success"]};">'
                         f'💡 #{p.get("id","?")} {_esc((p.get("title") or "")[:22])} '
@@ -157,22 +148,20 @@ def render_reasoning_chain(
                         f'</span>'
                     )
 
-            # ── Correlation tags ──
-            corr_html = ""
+                        corr_html = ""
             if correlations:
                 for c in correlations[:3]:
                     corr_html += (
                         f'<span style="display:inline-block;background:{TOKEN["warning_bg"]};'
                         f'border:1px solid {TOKEN["warning_border"]};'
-                        f'border-radius:{TOKEN["radius_sm"]};padding:5px 10px;'
+                        f'border-radius:{TOKEN["radius_card"]};padding:5px 10px;'
                         f'margin:3px 4px 3px 0;font-size:0.78em;'
                         f'color:{TOKEN["warning"]};">'
                         f'🔗 {_esc(c.get("cat_a",""))} ↔ {_esc(c.get("cat_b",""))}'
                         f'</span>'
                     )
 
-            # ── Assemble panel with sections ──
-            panel_sections = []
+                        panel_sections = []
             if anomaly_html:
                 panel_sections.append(
                     f'<div style="margin-bottom:6px;">'
@@ -182,7 +171,7 @@ def render_reasoning_chain(
             if cards_html:
                 panel_sections.append(
                     f'<div style="margin-bottom:6px;">'
-                    f'<span style="font-size:0.72em;color:{TOKEN["purple_text"]};font-weight:600;">📍 空间关联</span><br>'
+                    f'<span style="font-size:0.72em;color:{TOKEN["accent"]};font-weight:600;">📍 空间关联</span><br>'
                     f'{cards_html}</div>'
                 )
             if corr_html:
@@ -200,11 +189,11 @@ def render_reasoning_chain(
 
             if panel_sections:
                 st.markdown(
-                    f'<div style="background:{TOKEN["purple_bg"]};'
-                    f'border:1px solid {TOKEN["purple_border"]};'
-                    f'border-radius:{TOKEN["radius"]};padding:14px 16px 10px;'
+                    f'<div style="background:{TOKEN["accent_bg"]};'
+                    f'border:1px solid {TOKEN["accent_border"]};'
+                    f'border-radius:{TOKEN["radius_card"]};padding:14px 16px 10px;'
                     f'margin:10px 0 4px;box-shadow:{TOKEN["shadow_sm"]};">'
-                    f'<div style="font-weight:700;color:{TOKEN["purple_text"]};'
+                    f'<div style="font-weight:700;color:{TOKEN["accent"]};'
                     f'font-size:0.9em;margin-bottom:8px;">💡 关联发现</div>'
                     f'{"".join(panel_sections)}'
                     f'</div>',
@@ -215,13 +204,10 @@ def render_reasoning_chain(
             if insight_text:
                 st.markdown(insight_text)
 
-            # ── Proactive suggestion chips ──
-            _render_proactive_suggestions(associations, steps)
+                        _render_proactive_suggestions(associations, steps)
 
 
-# ═══════════════════════════════════════════════════════════════════════
 # Proactive suggestion engine
-# ═══════════════════════════════════════════════════════════════════════
 
 def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None:
     """Generate actionable "you might want to..." suggestions from association data.
@@ -298,8 +284,8 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
     items_html = ""
     for sug in suggestions[:4]:
         items_html += (
-            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-            f'border-radius:{TOKEN["radius_sm"]};padding:8px 12px;margin:4px 0;'
+            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+            f'border-radius:{TOKEN["radius_card"]};padding:8px 12px;margin:4px 0;'
             f'font-size:0.82em;line-height:1.5;box-shadow:{TOKEN["shadow_sm"]};">'
             f'<span style="font-weight:600;color:{TOKEN["text"]};">'
             f'{sug["icon"]} {sug["text"]}</span>'
@@ -316,9 +302,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════
 # Tool-call progress indicator (real-time)
-# ═══════════════════════════════════════════════════════════════════════
 
 # Icon mapping for tool → emoji
 TOOL_ICONS = {
@@ -382,12 +366,12 @@ def render_tool_progress(events: list[dict] | None) -> None:
         if status == "running":
             chips.append(
                 f'<span style="display:inline-flex;align-items:center;gap:4px;'
-                f'background:{TOKEN["primary_bg"]};border:1px solid {TOKEN["primary_border"]};'
+                f'background:{TOKEN["accent_bg"]};border:1px solid {TOKEN["accent_border"]};'
                 f'border-radius:99px;padding:3px 10px;font-size:0.78em;'
-                f'color:{TOKEN["primary"]};margin:2px 4px 2px 0;">'
+                f'color:{TOKEN["accent"]};margin:2px 4px 2px 0;">'
                 f'{icon} {label} '
                 f'<span style="display:inline-block;width:8px;height:8px;'
-                f'border-radius:50%;background:{TOKEN["primary"]};'
+                f'border-radius:50%;background:{TOKEN["accent"]};'
                 f'animation:pulse-warning 1.5s infinite;"></span>'
                 f'</span>'
             )
@@ -422,9 +406,7 @@ def render_tool_progress(events: list[dict] | None) -> None:
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════
 # Fallback: raw thinking text
-# ═══════════════════════════════════════════════════════════════════════
 
 def render_thinking_fallback(thinking_text: str | None) -> None:
     """Fallback for raw DeepSeek <think> text when no structured steps exist."""
@@ -436,14 +418,14 @@ def render_thinking_fallback(thinking_text: str | None) -> None:
         display += "\n\n*（内容较长，仅展示前 500 字）*"
 
     st.markdown(
-        f'<div style="background:{TOKEN["slate_bg"]};'
-        f'border:1px solid {TOKEN["slate_border"]};'
-        f'border-left:3px solid {TOKEN["primary"]};'
-        f'border-radius:{TOKEN["radius"]};padding:12px 16px;'
+        f'<div style="background:{TOKEN["page_bg"]};'
+        f'border:1px solid {TOKEN["border"]};'
+        f'border-left:3px solid {TOKEN["accent"]};'
+        f'border-radius:{TOKEN["radius_card"]};padding:12px 16px;'
         f'margin:10px 0;box-shadow:{TOKEN["shadow_sm"]};'
         f'font-size:0.82em;line-height:1.6;color:{TOKEN["text_sec"]};'
         f'white-space:pre-wrap;font-family:system-ui,-apple-system,sans-serif;">'
-        f'<div style="font-weight:700;color:{TOKEN["primary"]};'
+        f'<div style="font-weight:700;color:{TOKEN["accent"]};'
         f'font-size:0.88em;margin-bottom:6px;">🧠 分析过程</div>'
         f'{display}</div>',
         unsafe_allow_html=True,

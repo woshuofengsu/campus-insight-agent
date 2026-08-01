@@ -3,7 +3,6 @@
 import streamlit as st
 from ui.components import TOKEN
 
-# ── Tour configuration ──
 TOUR_STEPS = [
     {
         "id": "welcome",
@@ -137,10 +136,8 @@ Agent 会自动：
 
 
 def render_tour_guide():
-    """Render the demo tour UI — sidebar toggle + floating instruction panel."""
 
-    # ── Sidebar: start/reset button ──
-    tour_step = st.session_state.get("_tour_step", 0)
+        tour_step = st.session_state.get("_tour_step", 0)
 
     if tour_step == 0:
         if st.sidebar.button("🎬 开始演示导览", type="primary", width="stretch",
@@ -151,13 +148,12 @@ def render_tour_guide():
         # Tour is active
         step_data = TOUR_STEPS[tour_step - 1]
 
-        # ── Floating instruction panel ──
-        with st.sidebar:
+                with st.sidebar:
             st.markdown("---")
             st.markdown(
-                f'<div style="background:{TOKEN["primary_bg"]};border:2px solid {TOKEN["primary_border"]};'
+                f'<div style="background:{TOKEN["accent_bg"]};border:2px solid {TOKEN["accent_border"]};'
                 f'border-radius:12px;padding:12px;margin:8px 0;">'
-                f'<div style="font-size:0.7em;font-weight:700;color:{TOKEN["primary"]};'
+                f'<div style="font-size:0.7em;font-weight:700;color:{TOKEN["accent"]};'
                 f'margin-bottom:4px;">🎬 演示导览 · 第{tour_step}/{len(TOUR_STEPS)}步</div>'
                 f'<div style="font-size:0.8em;font-weight:600;color:{TOKEN["text"]};">'
                 f'{step_data["title"]}</div>'
@@ -169,23 +165,19 @@ def render_tour_guide():
                 st.session_state._tour_step = 0
                 st.rerun()
 
-        # ── Main area: instruction card ──
-        _render_step_card(step_data, tour_step)
+                _render_step_card(step_data, tour_step)
 
-        # ── Suggested input ──
-        if step_data.get("suggested_input"):
+                if step_data.get("suggested_input"):
             st.info(f"💡 **试试输入：** `{step_data['suggested_input']}`")
             # Quick copy button
             if st.button("📋 一键填入", key="_tour_copy_input"):
                 st.session_state._tour_copied = step_data["suggested_input"]
                 st.rerun()
 
-        # ── Demo hint ──
-        if step_data.get("show_demo_hint"):
+                if step_data.get("show_demo_hint"):
             st.info("💡 提示：在地址栏加 `?demo=1` 可启用全屏演示模式，加 `?offline=1` 离线运行。")
 
-        # ── Navigation ──
-        c_prev, c_next = st.columns(2)
+                c_prev, c_next = st.columns(2)
         with c_prev:
             if tour_step > 1:
                 if st.button("← 上一步", width="stretch", key="_tour_prev"):
@@ -197,8 +189,7 @@ def render_tour_guide():
                     st.session_state._tour_step += 1
                     st.rerun()
 
-        # ── Page shortcuts ──
-        target = step_data.get("target_page")
+                target = step_data.get("target_page")
         if target:
             st.markdown("---")
             if st.button(f"📌 直接跳转到「{step_data['title'][:20]}...」页面", width="stretch"):
@@ -206,14 +197,13 @@ def render_tour_guide():
 
 
 def _render_step_card(step: dict, step_num: int):
-    """Render the step instruction card in the main area."""
     progress = f"{'█' * step_num}{'░' * (len(TOUR_STEPS) - step_num)}"
     st.markdown(f"""
-<div style="background:linear-gradient(135deg,{TOKEN["primary_bg"]} 0%,#f5f3ff 100%);
-    border:2px solid {TOKEN["primary_border"]};
+<div style="background:linear-gradient(135deg,{TOKEN["accent_bg"]} 0%,#f5f3ff 100%);
+    border:2px solid {TOKEN["accent_border"]};
     border-radius:16px;padding:24px 28px;margin-bottom:16px;
     box-shadow:0 4px 16px rgba(79,70,229,0.1);">
-    <div style="font-size:0.7em;color:{TOKEN["primary"]};font-weight:700;letter-spacing:0.1em;
+    <div style="font-size:0.7em;color:{TOKEN["accent"]};font-weight:700;letter-spacing:0.1em;
         margin-bottom:4px;">{progress}</div>
     <div style="font-size:1.1em;font-weight:800;color:{TOKEN["text"]};margin-bottom:12px;">
         {step["title"]}

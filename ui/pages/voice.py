@@ -26,11 +26,10 @@ else:
 
 _author = resolve_author(profile)
 
-# ── Page header ──
 st.markdown(
     f'<div style="margin-bottom:4px;">'
     f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🗳️ 有话说</span>'
-    f'<span style="background:{TOKEN["purple_text"]};color:#fff;font-size:0.7em;font-weight:600;'
+    f'<span style="background:{TOKEN["accent"]};color:#fff;font-size:0.7em;font-weight:600;'
     f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">议</span>'
     f'</div>',
     unsafe_allow_html=True,
@@ -41,9 +40,7 @@ ooda_nav("voice")
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # ✍️ Create proposal form
-# ═══════════════════════════════════════════
 
 create_feedback = st.session_state.get("_create_proposal_feedback", "")
 create_error = st.session_state.get("_create_proposal_error", "")
@@ -106,19 +103,17 @@ if create_error:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Proposals stats
-# ═══════════════════════════════════════════
 
 pstats = get_proposals_stats()
 total_p = pstats["total"]
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    stat("提案总数", str(total_p), TOKEN["purple_text"])
+    stat("提案总数", str(total_p), TOKEN["accent"])
 with c2:
     discussing = pstats.get("by_status", {}).get("讨论中", 0)
-    stat("讨论中", str(discussing), TOKEN["purple_text"])
+    stat("讨论中", str(discussing), TOKEN["accent"])
 with c3:
     adopted = sum(
         v for k, v in pstats.get("by_status", {}).items()
@@ -128,9 +123,7 @@ with c3:
 
 st.markdown("")
 
-# ═══════════════════════════════════════════
 # Proposals — sortable + support inline
-# ═══════════════════════════════════════════
 
 section("热门提案")
 
@@ -159,16 +152,16 @@ else:
                 s = p.get("status", "讨论中")
                 emoji_map = {"讨论中": "💬", "已回应": "📝", "已采纳": "✅", "已实施": "🎉"}
                 emoji = emoji_map.get(s, "📌")
-                bg_color = {"讨论中": TOKEN["purple_bg"], "已回应": TOKEN["primary_bg"], "已采纳": TOKEN["success_bg"], "已实施": TOKEN["success_bg"]}.get(s, TOKEN["slate_bg"])
-                bd_color = {"讨论中": TOKEN["purple_border"], "已回应": TOKEN["primary_border"], "已采纳": TOKEN["success_border"], "已实施": TOKEN["success_border"]}.get(s, TOKEN["slate_border"])
+                bg_color = {"讨论中": TOKEN["accent_bg"], "已回应": TOKEN["accent_bg"], "已采纳": TOKEN["success_bg"], "已实施": TOKEN["success_bg"]}.get(s, TOKEN["page_bg"])
+                bd_color = {"讨论中": TOKEN["accent_border"], "已回应": TOKEN["accent_border"], "已采纳": TOKEN["success_border"], "已实施": TOKEN["success_border"]}.get(s, TOKEN["border"])
                 st.markdown(
                     f'<div style="background:{bg_color};border:1px solid {bd_color};'
-                    f'border-radius:{TOKEN["radius_sm"]};padding:10px 14px;'
+                    f'border-radius:{TOKEN["radius_card"]};padding:10px 14px;'
                     f'box-shadow:{TOKEN["shadow"]};font-size:0.88em;line-height:1.5;">'
                     f'{emoji} <strong style="color:{TOKEN["text"]};">{p.get("title","")[:40]}</strong><br>'
                     f'<span style="color:{TOKEN["text_sec"]};font-size:0.82em;">'
                     f'👍 {p.get("supporter_count",0)} 人附议 · {p.get("category","")} · '
-                    f'<span style="background:{TOKEN["purple_bg"]};color:{TOKEN["purple_text"]};'
+                    f'<span style="background:{TOKEN["accent_bg"]};color:{TOKEN["accent"]};'
                     f'padding:0 6px;border-radius:99px;font-size:0.85em;">{s}</span>'
                     f'</span>'
                     f'<div style="color:{TOKEN["text_sec"]};font-size:0.8em;margin-top:4px;">'
@@ -200,9 +193,7 @@ else:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Discussion topics — express opinion inline
-# ═══════════════════════════════════════════
 
 section("正在热议")
 
@@ -240,7 +231,7 @@ else:
                 )
                 for op in opinions[:4]:
                     st.markdown(
-                        f'<div style="background:{TOKEN["slate_bg"]};border-radius:{TOKEN["radius_sm"]};'
+                        f'<div style="background:{TOKEN["page_bg"]};border-radius:{TOKEN["radius_card"]};'
                         f'padding:6px 10px;margin:3px 0;font-size:0.82em;color:{TOKEN["text"]};">'
                         f'<span style="color:{TOKEN["text_muted"]};font-size:0.85em;">{op.get("participant_label","匿名")}：</span>'
                         f'{op.get("content","")[:100]}</div>',
@@ -279,9 +270,7 @@ else:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Status legend
-# ═══════════════════════════════════════════
 
 st.markdown(
     f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-top:12px;">'

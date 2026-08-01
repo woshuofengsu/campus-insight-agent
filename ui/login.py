@@ -5,7 +5,6 @@ from data.db_user import authenticate, create_user, get_user_by_username
 
 
 def render_login():
-    """Render the login page."""
     from ui.theme import get_theme
     is_dark = get_theme() == "dark"
 
@@ -31,8 +30,7 @@ def render_login():
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Demo quick access ──
-        st.markdown(
+                st.markdown(
             f'<div style="text-align:center;margin:8px 0 6px;font-size:0.75em;'
             f'color:{("#5e5e6a" if is_dark else "#a0a0a0")};">快速体验</div>',
             unsafe_allow_html=True,
@@ -56,7 +54,6 @@ def render_login():
 
 
 def _render_login_form(is_dark: bool):
-    """Login form."""
     muted_color = "#5e5e6a" if is_dark else "#a0a0a0"
 
     username = st.text_input("用户名", key="login_username", placeholder="请输入用户名")

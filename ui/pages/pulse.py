@@ -11,7 +11,7 @@ from ui.components import TOKEN, section, info_card, event_card, issue_card, sta
 st.markdown(
     f'<div style="margin-bottom:4px;">'
     f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🌊 校园脉搏</span>'
-    f'<span style="background:{TOKEN["primary"]};color:#fff;font-size:0.7em;font-weight:600;'
+    f'<span style="background:{TOKEN["accent"]};color:#fff;font-size:0.7em;font-weight:600;'
     f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">知</span>'
     f'</div>',
     unsafe_allow_html=True,
@@ -112,8 +112,8 @@ if days:
     col_w1, col_w2 = st.columns([1, 2])
     with col_w1:
         st.markdown(
-            f'<div style="background:{TOKEN["primary_bg"]};border:1px solid {TOKEN["primary_border"]};'
-            f'border-radius:{TOKEN["radius"]};padding:20px 16px;text-align:center;'
+            f'<div style="background:{TOKEN["accent_bg"]};border:1px solid {TOKEN["accent_border"]};'
+            f'border-radius:{TOKEN["radius_card"]};padding:20px 16px;text-align:center;'
             f'box-shadow:{TOKEN["shadow"]};">'
             f'<div style="font-size:3em;margin-bottom:8px;">{d["emoji"]}</div>'
             f'<div style="font-size:1.1em;font-weight:700;color:{TOKEN["text"]};">{d["condition"]}</div>'
@@ -124,8 +124,8 @@ if days:
         )
     with col_w2:
         st.markdown(
-            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-            f'border-radius:{TOKEN["radius"]};padding:16px;box-shadow:{TOKEN["shadow"]};">'
+            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+            f'border-radius:{TOKEN["radius_card"]};padding:16px;box-shadow:{TOKEN["shadow"]};">'
             f'<div style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};margin-bottom:8px;">📍 {location_name}</div>'
             f'<div style="font-size:0.88em;color:{TOKEN["text_sec"]};line-height:2;">'
             f'🌡️ 温度：{d["temp_low"]}°C ~ {d["temp_high"]}°C<br>'
@@ -151,7 +151,7 @@ try:
     level_label = {"low": "低风险 · 校园健康", "moderate": "注意防护", "high": "警示 · 加强预防", "critical": "高危 · 立即行动"}
     h_label = level_label.get(h_level, "—")
 
-    bar_color = TOKEN[h_color] if h_color in ("success", "warning", "danger") else TOKEN["primary"]
+    bar_color = TOKEN[h_color] if h_color in ("success", "warning", "danger") else TOKEN["accent"]
     risk_bar_pct = min(100, h_score)
 
     # Build alert rows HTML
@@ -180,7 +180,7 @@ try:
     st.markdown("---")
     st.markdown(
         f'<div style="background:{TOKEN["card_bg"]};border:1.5px solid {bar_color};'
-        f'border-radius:{TOKEN["radius"]};padding:16px 20px;box-shadow:{TOKEN["shadow"]};'
+        f'border-radius:{TOKEN["radius_card"]};padding:16px 20px;box-shadow:{TOKEN["shadow"]};'
         f'margin-bottom:8px;">'
 
         # Header row
@@ -196,7 +196,7 @@ try:
         f'</div>'
 
         # Risk bar
-        f'<div style="height:6px;background:{TOKEN["slate_border"]};border-radius:3px;margin:6px 0 10px;">'
+        f'<div style="height:6px;background:{TOKEN["border"]};border-radius:3px;margin:6px 0 10px;">'
         f'<div style="width:{risk_bar_pct}%;height:100%;background:linear-gradient(90deg,'
         f'#22c55e 0%, #eab308 35%, #f97316 65%, #ef4444 100%);border-radius:3px;'
         f'transition:width 0.5s ease;"></div></div>'
@@ -206,7 +206,7 @@ try:
 
         # Advice
         f'<div style="font-size:0.78em;color:{TOKEN["text_muted"]};margin-top:6px;'
-        f'padding:8px 12px;background:{TOKEN["primary_bg"]};border-radius:6px;">'
+        f'padding:8px 12px;background:{TOKEN["accent_bg"]};border-radius:6px;">'
         f'💡 {health["advice_summary"]}</div>'
 
         # Weather note
@@ -368,12 +368,12 @@ if issues:
     # KPI row (2×2 grid: stacks to 4 rows on mobile)
     c1, c2 = st.columns(2)
     with c1:
-        stat("总上报", str(total), TOKEN["primary"])
+        stat("总上报", str(total), TOKEN["accent"])
     with c2:
         stat("待处理", str(pending), TOKEN["warning"])
     c3, c4 = st.columns(2)
     with c3:
-        stat("处理中", str(processing), TOKEN["primary"])
+        stat("处理中", str(processing), TOKEN["accent"])
     with c4:
         stat("已解决", str(resolved), TOKEN["success"])
 
@@ -417,7 +417,7 @@ if issues:
         ])
         chart = configure_altair(
             alt.Chart(df)
-            .mark_bar(color=TOKEN["primary"], opacity=0.85, size=20)
+            .mark_bar(color=TOKEN["accent"], opacity=0.85, size=20)
             .encode(
                 x=alt.X("数量:Q"),
                 y=alt.Y("类别:N", title=None, sort="-x"),
@@ -432,7 +432,7 @@ if issues:
     with c_hot:
         st.markdown(
             f'<div style="background:{TOKEN["warning_bg"]};border:1px solid {TOKEN["warning_border"]};'
-            f'border-radius:{TOKEN["radius_sm"]};padding:10px 14px;margin-top:8px;">'
+            f'border-radius:{TOKEN["radius_card"]};padding:10px 14px;margin-top:8px;">'
             f'🔥 本周最热：<strong style="color:{TOKEN["warning"]};">{hot_cat}</strong> — '
             f'共 {cats[hot_cat]} 件上报，占总数的 {cats[hot_cat]/total*100:.0f}%</div>',
             unsafe_allow_html=True,

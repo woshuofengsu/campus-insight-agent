@@ -60,7 +60,7 @@ else:
 # Health hero card
 st.markdown(
     f'<div style="background:{TOKEN["card_bg"]};border:2px solid {health_color};'
-    f'border-radius:{TOKEN["radius"]};padding:20px 24px;text-align:center;'
+    f'border-radius:{TOKEN["radius_card"]};padding:20px 24px;text-align:center;'
     f'box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">'
     f'<div style="font-size:0.88em;color:{TOKEN["text_sec"]};margin-bottom:6px;">🏥 校园治理健康度</div>'
     f'<div style="font-size:3em;font-weight:800;color:{health_color};">'
@@ -74,11 +74,11 @@ st.markdown(
 c1, c2, c3 = st.columns(3)
 with c1:
     st.markdown(
-        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-        f'border-top:3px solid {TOKEN["primary"]};border-radius:{TOKEN["radius_sm"]};'
+        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+        f'border-top:3px solid {TOKEN["accent"]};border-radius:{TOKEN["radius_card"]};'
         f'padding:14px 10px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
         f'<div style="font-size:0.7em;color:{TOKEN["text_sec"]};margin-bottom:3px;">✅ 解决率（40%权重）</div>'
-        f'<div style="font-size:1.5em;font-weight:800;color:{TOKEN["primary"]};">{health["resolution_rate"]}%</div>'
+        f'<div style="font-size:1.5em;font-weight:800;color:{TOKEN["accent"]};">{health["resolution_rate"]}%</div>'
         f'<div style="font-size:0.7em;color:{TOKEN["text_muted"]};">{health["new_recent"]} 件新上报</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -87,8 +87,8 @@ with c2:
     avg_days = health.get("avg_days")
     days_text = f"{avg_days} 天" if avg_days else "暂无数据"
     st.markdown(
-        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-        f'border-top:3px solid {TOKEN["warning"]};border-radius:{TOKEN["radius_sm"]};'
+        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+        f'border-top:3px solid {TOKEN["warning"]};border-radius:{TOKEN["radius_card"]};'
         f'padding:14px 10px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
         f'<div style="font-size:0.7em;color:{TOKEN["text_sec"]};margin-bottom:3px;">⏱️ 平均解决周期（35%权重）</div>'
         f'<div style="font-size:1.5em;font-weight:800;color:{TOKEN["warning"]};">{days_text}</div>'
@@ -100,8 +100,8 @@ with c3:
     trend = health["trend"]
     trend_color = TOKEN["success"] if "↓" in trend else TOKEN["warning"] if "→" in trend else TOKEN["danger"]
     st.markdown(
-        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-        f'border-top:3px solid {trend_color};border-radius:{TOKEN["radius_sm"]};'
+        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+        f'border-top:3px solid {trend_color};border-radius:{TOKEN["radius_card"]};'
         f'padding:14px 10px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
         f'<div style="font-size:0.7em;color:{TOKEN["text_sec"]};margin-bottom:3px;">📉 积压趋势（25%权重）</div>'
         f'<div style="font-size:1.5em;font-weight:800;color:{trend_color};">{trend}</div>'
@@ -166,15 +166,15 @@ total_participants = sum(t.get("participant_count", 0) for t in topics)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
-    stat("总上报", str(total_i), TOKEN["primary"])
+    stat("总上报", str(total_i), TOKEN["accent"])
 with c2:
     stat("解决率", f"{health['resolution_rate']}%", TOKEN["success"])
 with c3:
     stat("待处理", str(pending), TOKEN["warning"] if pending > 0 else TOKEN["success"])
 with c4:
-    stat("提案", str(total_p), TOKEN["purple_text"])
+    stat("提案", str(total_p), TOKEN["accent"])
 with c5:
-    stat("参与人次", str(total_participants), TOKEN["primary"])
+    stat("参与人次", str(total_participants), TOKEN["accent"])
 
 st.markdown("---")
 
@@ -195,8 +195,8 @@ if total_i > 0:
         with cols[idx]:
             pct = f"{count/total_i*100:.0f}%" if total_i > 0 else "0%"
             st.markdown(
-                f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-                f'border-top:3px solid {color};border-radius:{TOKEN["radius_sm"]};'
+                f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+                f'border-top:3px solid {color};border-radius:{TOKEN["radius_card"]};'
                 f'padding:16px 10px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
                 f'<div style="font-size:1.5em;margin-bottom:4px;">{emoji}</div>'
                 f'<div style="font-size:1.6em;font-weight:800;color:{TOKEN["text"]};">{count}</div>'
@@ -257,8 +257,8 @@ if fb["total"] > 0:
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(
-            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-            f'border-top:3px solid {TOKEN["success"]};border-radius:{TOKEN["radius_sm"]};'
+            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+            f'border-top:3px solid {TOKEN["success"]};border-radius:{TOKEN["radius_card"]};'
             f'padding:12px 8px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
             f'<div style="font-size:0.7em;color:{TOKEN["text_sec"]};">😊 正面</div>'
             f'<div style="font-size:1.4em;font-weight:800;color:{TOKEN["success"]};">{pos}</div>'
@@ -268,8 +268,8 @@ if fb["total"] > 0:
         )
     with c2:
         st.markdown(
-            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-            f'border-top:3px solid {TOKEN["warning"]};border-radius:{TOKEN["radius_sm"]};'
+            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+            f'border-top:3px solid {TOKEN["warning"]};border-radius:{TOKEN["radius_card"]};'
             f'padding:12px 8px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
             f'<div style="font-size:0.7em;color:{TOKEN["text_sec"]};">😐 中性</div>'
             f'<div style="font-size:1.4em;font-weight:800;color:{TOKEN["warning"]};">{neu}</div>'
@@ -279,8 +279,8 @@ if fb["total"] > 0:
         )
     with c3:
         st.markdown(
-            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-            f'border-top:3px solid {TOKEN["danger"]};border-radius:{TOKEN["radius_sm"]};'
+            f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+            f'border-top:3px solid {TOKEN["danger"]};border-radius:{TOKEN["radius_card"]};'
             f'padding:12px 8px;text-align:center;box-shadow:{TOKEN["shadow"]};">'
             f'<div style="font-size:0.7em;color:{TOKEN["text_sec"]};">😟 负面</div>'
             f'<div style="font-size:1.4em;font-weight:800;color:{TOKEN["danger"]};">{neg}</div>'
@@ -327,7 +327,7 @@ if stale_issues:
             with cols[idx % 2]:
                 st.markdown(
                     f'<div style="background:{TOKEN["danger_bg"]};border:1px solid {TOKEN["danger_border"]};'
-                    f'border-radius:{TOKEN["radius_sm"]};padding:8px 12px;margin:3px 0;font-size:0.84em;">'
+                    f'border-radius:{TOKEN["radius_card"]};padding:8px 12px;margin:3px 0;font-size:0.84em;">'
                     f'🔴 <strong>#{issue["id"]}</strong> {issue.get("title","")[:30]}'
                     f'<br><span style="color:{TOKEN["text_muted"]};font-size:0.8em;">'
                     f'{issue.get("category","")} · {issue.get("reported_at","")[:10]} · {issue.get("urgency","")}</span>'
@@ -384,7 +384,7 @@ if issues_all and len(issues_all) >= 5:
 
         heat_chart = configure_altair(
             alt.Chart(df_melt)
-            .mark_rect(stroke=TOKEN["slate_border"], strokeWidth=1)
+            .mark_rect(stroke=TOKEN["border"], strokeWidth=1)
             .encode(
                 x=alt.X("状态:N", title=None, sort=status_list,
                         axis=alt.Axis(labelAngle=0)),
@@ -471,7 +471,7 @@ if issues_all and len(issues_all) >= 3:
             df_bar["贡献者"] = df_bar["排名"].apply(_medal) + " " + df_bar["贡献者"]
             bar_chart = configure_altair(
                 alt.Chart(df_bar)
-                .mark_bar(color=TOKEN["primary"], opacity=0.85, size=18)
+                .mark_bar(color=TOKEN["accent"], opacity=0.85, size=18)
                 .encode(
                     x=alt.X("影响力:Q", title=None),
                     y=alt.Y("贡献者:N", title=None, sort="-x"),
@@ -529,7 +529,7 @@ feed_items.sort(key=lambda x: x["time"], reverse=True)
 if feed_items:
     for item in feed_items[:12]:
         st.markdown(
-            f'<div style="font-size:0.88em;padding:4px 0;border-bottom:1px solid {TOKEN["slate_border"]};">'
+            f'<div style="font-size:0.88em;padding:4px 0;border-bottom:1px solid {TOKEN["border"]};">'
             f'{item["icon"]} {item["text"]} '
             f'<span style="color:{TOKEN["text_muted"]};font-size:0.78em;">{item["time"]}</span>'
             f'</div>',

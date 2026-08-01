@@ -20,9 +20,7 @@ from ui.components import TOKEN
 _log = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════
 # Mock data for demo mode
-# ═══════════════════════════════════════════
 
 def _mock_issue_stats():
     return {
@@ -69,9 +67,7 @@ def _mock_recent_issues():
 def _mock_feedback_stats():
     return {"total": 89, "positive": 52, "negative": 21, "neutral": 16}
 
-# ═══════════════════════════════════════════
 # THEME — Dark command center
-# ═══════════════════════════════════════════
 
 BG = "#0b0f19"          # page background
 SURFACE = "#141928"     # card background
@@ -92,7 +88,6 @@ TEXT = "#e9ecf2"
 TEXT_SEC = "#99a1b3"
 TEXT_MUTED = "#616a80"
 
-# ── Build the CSS ──
 st.markdown(f"""
 <style>
     /* ── Global overrides ── */
@@ -328,9 +323,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # Data loading — real data first, mock only for demo or empty DB
-# ═══════════════════════════════════════════
 
 _using_mock = False
 
@@ -370,7 +363,6 @@ score = health["score"]
 urgent_count = sum(1 for i in recent_issues if i.get("urgency") == "紧急" and i.get("status") != "已解决")
 has_anomaly = pending > 10
 
-# ── Live clock via st.components.v1.html (Streamlit strips <script> from st.markdown) ──
 now = datetime.now()
 
 # Determine theme-aware colors for the clock iframe
@@ -426,9 +418,7 @@ st.components.v1.html(f"""
 </html>
 """, height=52)
 
-# ═══════════════════════════════════════════
 # HEADER
-# ═══════════════════════════════════════════
 
 st.markdown(f"""
 <div class="fade-up" style="margin-bottom:8px;">
@@ -448,9 +438,7 @@ st.markdown(f"""
 
 st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{BORDER_GLOW},transparent);margin:12px 0;"></div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # KPI ROW — 6 glowing cards with animated numbers
-# ═══════════════════════════════════════════
 
 resolution_rate = health.get("resolution_rate", 0)
 avg_days = health.get("avg_days", 0) or 0
@@ -478,9 +466,7 @@ for idx, (label, value, suffix, color, style, sub) in enumerate(kpi_data):
 </div>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # MAIN GRID: trend chart + health ring + pipeline
-# ═══════════════════════════════════════════
 
 col_main, col_side = st.columns([3, 2])
 
@@ -578,9 +564,7 @@ with col_side:
 
 st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{BORDER_GLOW},transparent);margin:16px 0;"></div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # BOTTOM ROW: campus heatmap + recent issues
-# ═══════════════════════════════════════════
 
 col_heat, col_recent = st.columns([1, 1])
 
@@ -660,9 +644,7 @@ with col_recent:
 </div>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # ANOMALY ALERT BAR
-# ═══════════════════════════════════════════
 
 if has_anomaly or urgent_count > 0:
     alerts = []
@@ -682,9 +664,7 @@ if has_anomaly or urgent_count > 0:
 </div>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # BOTTOM TICKER — scrolling activity feed
-# ═══════════════════════════════════════════
 
 ticker_events = []
 for i in recent_issues[:6]:
@@ -714,9 +694,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════
 # FOOTER
-# ═══════════════════════════════════════════
 
 st.markdown(f"""
 <div style="text-align:center;font-size:0.65em;color:{TEXT_MUTED};margin-top:8px;">
@@ -725,7 +703,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Auto-refresh ──
 refresh_sec = int(st.query_params.get("refresh", "30"))
 st.markdown(f'<meta http-equiv="refresh" content="{refresh_sec}">', unsafe_allow_html=True)
 

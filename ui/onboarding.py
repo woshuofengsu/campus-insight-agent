@@ -50,8 +50,7 @@ def render_onboarding(memory: MemoryManager) -> bool:
 }}
 </style>""", unsafe_allow_html=True)
 
-    # ── Role check ──
-    profile = memory.get_user_profile()
+        profile = memory.get_user_profile()
     existing_role = profile.get("role", "")
     role = st.session_state.get("ob_role", None) or (existing_role if existing_role else None)
 
@@ -124,8 +123,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Form fields ──
-        user_name = ""
+                user_name = ""
         user_major = ""
 
         school = st.text_input("🏫 学校", placeholder="请输入你的大学名称", key="ob_school")
@@ -148,8 +146,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
             student_id = st.text_input("🔢 工号", placeholder="请输入你的工号", key="ob_student_id")
             user_name = st.text_input("👤 姓名", placeholder="请输入你的姓名（选填）", key="ob_name")
 
-        # ── Buttons ──
-        c_back, c_submit = st.columns([1, 2.2], gap="medium")
+                c_back, c_submit = st.columns([1, 2.2], gap="medium")
         with c_back:
             if st.button("← 返回", key="ob_back", type="secondary", use_container_width=True):
                 st.session_state.pop("ob_role", None)

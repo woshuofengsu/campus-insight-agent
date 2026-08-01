@@ -16,7 +16,6 @@ from data.database import (
 
 _logger = logging.getLogger("ui.prefetch")
 
-# ── Signal mapping: (keywords, method_name) ──
 PREFETCH_SIGNALS: list[tuple[list[str], str]] = [
     (["校园脉搏", "动态", "最近动态", "校园动态", "最近发生", "发生什么了", "最近有什么", "这周情况", "今天发生"], "_prefetch_pulse"),
     (["治理数据", "统计数据", "治理统计", "治理情况", "健康度", "解决率", "工单概览"], "_prefetch_stats"),
@@ -26,7 +25,6 @@ PREFETCH_SIGNALS: list[tuple[list[str], str]] = [
     (["工单", "报修", "上报了", "有哪些问题", "看看问题", "查一下问题"], "_prefetch_query_issues"),
 ]
 
-# ── Prefetch implementations ──
 
 def _prefetch_pulse() -> str:
     """Pre-fetch campus pulse data from DB."""

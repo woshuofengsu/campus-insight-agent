@@ -5,7 +5,6 @@ from ui.components import TOKEN
 from ui.cache import cached_knowledge_base, cached_active_topics, invalidate_content
 from data.database import get_db, create_topic, close_topic
 
-# ── Page Render ──
 st.markdown(
     f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
     f'📢 内容发布</span>',
@@ -13,7 +12,6 @@ st.markdown(
 )
 st.caption("发布校园通知和讨论议题，管理已发布的内容。")
 
-# ── Publish tabs ──
 pub_tab = st.radio(
     "发布类型",
     ["📝 发布通知", "💬 创建议题"],
@@ -80,11 +78,9 @@ else:
 
 st.markdown("---")
 
-# ── Recently published ──
 st.markdown("### 📋 最近发布")
 col1, col2 = st.columns(2)
 
-# ── Two-click delete: confirm state tracked in session ──
 _confirm_delete_key = "_content_confirm_delete"
 
 with col1:

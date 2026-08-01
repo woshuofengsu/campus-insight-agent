@@ -18,7 +18,6 @@ else:
 # Derive author identity from profile
 _author = resolve_author(profile)
 
-# ── Page header ──
 st.markdown(
     f'<div style="margin-bottom:4px;">'
     f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🔧 随手报修</span>'
@@ -33,9 +32,7 @@ ooda_nav("issues")
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # ⚡ Quick report — native form (no chat needed)
-# ═══════════════════════════════════════════
 
 def _do_issues_report():
     """Callback for quick report form — runs BEFORE page rerender."""
@@ -125,9 +122,7 @@ if st.session_state.get("_report_result"):
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Stats overview
-# ═══════════════════════════════════════════
 
 try:
     stats = get_issues_stats()
@@ -147,19 +142,17 @@ resolved = by_status.get("已解决", 0)
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    stat("总数", str(total), TOKEN["primary"])
+    stat("总数", str(total), TOKEN["accent"])
 with c2:
     stat("待处理", str(pending), TOKEN["warning"])
 with c3:
-    stat("处理中", str(processing), TOKEN["primary"])
+    stat("处理中", str(processing), TOKEN["accent"])
 with c4:
     stat("已解决", str(resolved), TOKEN["success"])
 
 st.markdown("")
 
-# ═══════════════════════════════════════════
 # Status pipeline chart
-# ═══════════════════════════════════════════
 
 section("工单状态分布")
 
@@ -169,7 +162,7 @@ if by_status:
         "待处理": TOKEN["danger"], "处理中": TOKEN["warning"], "已解决": TOKEN["success"],
     }
     df_status = pd.DataFrame([
-        {"状态": s, "数量": by_status.get(s, 0), "颜色": status_colors.get(s, TOKEN["primary"])}
+        {"状态": s, "数量": by_status.get(s, 0), "颜色": status_colors.get(s, TOKEN["accent"])}
         for s in status_order if by_status.get(s, 0) > 0
     ])
     if not df_status.empty:
@@ -190,9 +183,7 @@ if by_status:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Category distribution
-# ═══════════════════════════════════════════
 
 section("问题类别分布")
 
@@ -224,9 +215,7 @@ if by_cat:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # All issues — filterable
-# ═══════════════════════════════════════════
 
 section("全部工单")
 

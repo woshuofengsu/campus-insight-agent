@@ -26,7 +26,6 @@ ooda_nav("mine")
 
 st.markdown("---")
 
-# ── User identity card ──
 if profile:
     school = profile.get("school", "")
     grade = profile.get("grade", "")
@@ -34,8 +33,8 @@ if profile:
     name = profile.get("name", "")
     display_name = name or (f"{school}" if school else "同学")
     st.markdown(
-        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["slate_border"]};'
-        f'border-radius:{TOKEN["radius"]};padding:16px 20px;box-shadow:{TOKEN["shadow_sm"]};'
+        f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
+        f'border-radius:{TOKEN["radius_card"]};padding:16px 20px;box-shadow:{TOKEN["shadow_sm"]};'
         f'margin-bottom:12px;">'
         f'<div style="font-size:1.1em;font-weight:700;color:{TOKEN["text"]};margin-bottom:4px;">'
         f'{display_name}</div>'
@@ -44,18 +43,17 @@ if profile:
         unsafe_allow_html=True,
     )
 
-# ── Impact stats ──
 stats = cached_my_stats(author)
 
 section("我的影响力")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    stat("上报问题", str(stats["total_issues"]), TOKEN["primary"])
+    stat("上报问题", str(stats["total_issues"]), TOKEN["accent"])
 with col2:
     stat("已解决", str(stats["resolved_issues"]), TOKEN["success"])
 with col3:
-    stat("提交提案", str(stats["total_proposals"]), TOKEN["purple_text"])
+    stat("提交提案", str(stats["total_proposals"]), TOKEN["accent"])
 with col4:
     stat("提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
 
@@ -82,7 +80,6 @@ if stats["total_issues"] + stats["total_proposals"] > 0:
 
 st.markdown("---")
 
-# ── My issues ──
 section("我上报的问题")
 
 my_issues = cached_my_issues(author, limit=20)
@@ -122,7 +119,6 @@ else:
 
 st.markdown("---")
 
-# ── My proposals ──
 section("我提交的提案")
 
 my_proposals = cached_my_proposals(author, limit=20)
@@ -134,11 +130,11 @@ else:
         s = p.get("status", "讨论中")
         emoji_map = {"讨论中": "💬", "已回应": "📝", "已采纳": "✅", "已实施": "🎉"}
         emoji = emoji_map.get(s, "📌")
-        bg_color = {"讨论中": TOKEN["purple_bg"], "已回应": TOKEN["primary_bg"], "已采纳": TOKEN["success_bg"], "已实施": TOKEN["success_bg"]}.get(s, TOKEN["slate_bg"])
-        bd_color = {"讨论中": TOKEN["purple_border"], "已回应": TOKEN["primary_border"], "已采纳": TOKEN["success_border"], "已实施": TOKEN["success_border"]}.get(s, TOKEN["slate_border"])
+        bg_color = {"讨论中": TOKEN["accent_bg"], "已回应": TOKEN["accent_bg"], "已采纳": TOKEN["success_bg"], "已实施": TOKEN["success_bg"]}.get(s, TOKEN["page_bg"])
+        bd_color = {"讨论中": TOKEN["accent_border"], "已回应": TOKEN["accent_border"], "已采纳": TOKEN["success_border"], "已实施": TOKEN["success_border"]}.get(s, TOKEN["border"])
         st.markdown(
             f'<div style="background:{bg_color};border:1px solid {bd_color};'
-            f'border-radius:{TOKEN["radius"]};padding:12px 16px;margin:6px 0;'
+            f'border-radius:{TOKEN["radius_card"]};padding:12px 16px;margin:6px 0;'
             f'box-shadow:{TOKEN["shadow_sm"]};font-size:0.88em;line-height:1.5;">'
             f'{emoji} <strong style="color:{TOKEN["text"]};">{p.get("title","")[:40]}</strong>'
             f'&nbsp;{tag(s)}'
@@ -150,7 +146,6 @@ else:
 
 st.markdown("---")
 
-# ── Quick summary ──
 st.markdown(
     f'<div style="text-align:center;font-size:0.82em;color:{TOKEN["text_muted"]};margin-top:12px;">'
     f'每一次上报、每一个提案，都在让校园变得更好 🌱</div>',

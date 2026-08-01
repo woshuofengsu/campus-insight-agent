@@ -5,7 +5,6 @@ import altair as alt
 import pandas as pd
 from ui.components import TOKEN, section, stat, tag, configure_altair
 
-# ── Page Header ──
 st.markdown(
     f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
     f'🏥 健康管理</span>',
@@ -13,7 +12,6 @@ st.markdown(
 )
 st.caption("校园健康风险监测 · 疾病预警推送 · 防护措施建议。")
 
-# ── Load health data ──
 try:
     from data.db_health_alerts import cached_health_risk
     h = cached_health_risk()
@@ -25,16 +23,14 @@ hl = h["overall_level"]
 he = h["overall_emoji"]
 hc = h["overall_color"]
 hs = h["overall_score"]
-hcolor = TOKEN[hc] if hc in ("success", "warning", "danger") else TOKEN["primary"]
+hcolor = TOKEN[hc] if hc in ("success", "warning", "danger") else TOKEN["accent"]
 
-# ═══════════════════════════════════════════
 # Overview banner
-# ═══════════════════════════════════════════
 
 level_label = {"low": "🟢 低风险", "moderate": "🟡 注意防护", "high": "🟠 警示", "critical": "🔴 高危预警"}
 st.markdown(
     f'<div style="background:{TOKEN["card_bg"]};border:2px solid {hcolor};'
-    f'border-radius:{TOKEN["radius"]};padding:20px 24px;text-align:center;'
+    f'border-radius:{TOKEN["radius_card"]};padding:20px 24px;text-align:center;'
     f'box-shadow:{TOKEN["shadow"]};margin-bottom:16px;">'
     f'<div style="font-size:2.5em;">{he}</div>'
     f'<div style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
@@ -44,7 +40,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── KPI row ──
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     stat("活跃疾病", str(len(h["diseases"])), TOKEN["warning"], sub="种")
@@ -55,13 +50,11 @@ with c3:
     stat("天气影响", f"+{h.get('weather_mod_total', 0)}", TOKEN["warning"])
 with c4:
     stat("人员密度", f"+{h.get('campus_density', {}).get('score', 0)}",
-         TOKEN["primary"])
+         TOKEN["accent"])
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Disease risk table
-# ═══════════════════════════════════════════
 
 section("🦠 疾病风险明细表")
 
@@ -109,9 +102,7 @@ st.altair_chart(bar_chart, width="stretch")
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════
 # Detailed disease cards with action buttons
-# ═══════════════════════════════════════════
 
 section("📋 详细防护建议")
 
@@ -130,7 +121,7 @@ for d in diseases_sorted:
             st.caption(f'🤒 {d["symptoms"]}')
             st.markdown(
                 f'<div style="font-size:0.82em;color:{TOKEN["text_sec"]};'
-                f'background:{TOKEN["primary_bg"]};padding:8px 12px;border-radius:6px;">'
+                f'background:{TOKEN["accent_bg"]};padding:8px 12px;border-radius:6px;">'
                 f'💡 <strong>预防建议：</strong>{d["advice"]}</div>',
                 unsafe_allow_html=True,
             )
@@ -147,9 +138,7 @@ for d in diseases_sorted:
                 if st.button("📢 推送提醒", key=f"health_push_{d['name']}", width="stretch"):
                     st.toast(f"已推送「{d['name']}」防护提醒到全校通知", icon="📢")
 
-# ═══════════════════════════════════════════
 # Campus density section
-# ═══════════════════════════════════════════
 
 st.markdown("---")
 section("🏫 校园人员密度评估")
@@ -174,9 +163,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ═══════════════════════════════════════════
 # Weather factors
-# ═══════════════════════════════════════════
 
 st.markdown("---")
 section("🌡️ 天气风险因子")
@@ -204,7 +191,6 @@ if weather_breakdown:
 else:
     st.caption("当前天气条件良好，无显著健康风险因子。")
 
-# ── Footer ──
 st.markdown("---")
 st.markdown(
     f'<div style="text-align:center;font-size:0.78em;color:{TOKEN["text_muted"]};">'

@@ -55,10 +55,10 @@ if report:
     # ── Executive summary card ──
     if report.get("exec_summary"):
         st.markdown(
-            f'<div style="background:linear-gradient(135deg,{TOKEN["primary_bg"]},'
-            f'{TOKEN["purple_bg"]});border:1px solid {TOKEN["primary_border"]};'
-            f'border-radius:{TOKEN["radius_lg"]};padding:16px 20px;margin:8px 0;">'
-            f'<div style="font-size:0.78em;font-weight:700;color:{TOKEN["primary"]};'
+            f'<div style="background:linear-gradient(135deg,{TOKEN["accent_bg"]},'
+            f'{TOKEN["accent_bg"]});border:1px solid {TOKEN["accent_border"]};'
+            f'border-radius:{TOKEN["radius_card"]};padding:16px 20px;margin:8px 0;">'
+            f'<div style="font-size:0.78em;font-weight:700;color:{TOKEN["accent"]};'
             f'margin-bottom:6px;">🧠 分析摘要</div>'
             f'<div style="font-size:0.88em;color:{TOKEN["text"]};line-height:1.7;">'
             f'{report["exec_summary"]}</div>'
@@ -303,7 +303,7 @@ with chart_col1:
                     "状态:N",
                     scale=alt.Scale(
                         domain=["待处理", "处理中", "已解决"],
-                        range=[TOKEN["warning"], TOKEN["primary"], TOKEN["success"]],
+                        range=[TOKEN["warning"], TOKEN["accent"], TOKEN["success"]],
                     ),
                 ),
                 tooltip=["category", "状态", "数量"],
@@ -329,7 +329,7 @@ with chart_col2:
                 f'<span style="font-size:0.85em;font-weight:600;">{loc}</span>'
                 f'<span style="float:right;font-size:0.85em;color:{TOKEN["text_sec"]};">'
                 f'{cnt} 件待处理{urg_str}</span>'
-                f'<div style="background:{TOKEN["slate_border"]};border-radius:4px;height:6px;margin-top:2px;">'
+                f'<div style="background:{TOKEN["border"]};border-radius:4px;height:6px;margin-top:2px;">'
                 f'<div style="background:{TOKEN["warning"]};border-radius:4px;height:6px;width:{bar_width}%;">'
                 f'</div></div></div>',
                 unsafe_allow_html=True,

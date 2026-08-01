@@ -18,74 +18,59 @@ For dynamic keys (those that embed an id), use the `key()` method:
 import streamlit as st
 
 
-# ═══════════════════════════════════════════
 # Key Constants — single source of truth
-# ═══════════════════════════════════════════
 
 class _Keys:
     """Namespace for all session_state key constants."""
 
-    # ── Core (set during init_session) ──
-    agent: str = "_agent"
+        agent: str = "_agent"
     memory: str = "_memory"
     login_user_id: str = "_login_user_id"
     ob_role: str = "_ob_role"
     agent_version: str = "_agent_version"
 
-    # ── Theme ──
-    campus_theme: str = "_campus_theme"
+        campus_theme: str = "_campus_theme"
 
-    # ── Onboarding ──
-    tour_step: str = "_tour_step"
+        tour_step: str = "_tour_step"
     force_offline: str = "_force_offline"
 
-    # ── Chat / OODA flow ──
-    home_last_chain: str = "_home_last_chain"
+        home_last_chain: str = "_home_last_chain"
     stream_events: str = "_stream_events"
     stream_current_tool: str = "_stream_current_tool"
     last_interaction: str = "_last_interaction"
     last_check_time: str = "_last_check_time"
 
-    # ── Quick report ──
-    home_report_ok: str = "_home_report_ok"
+        home_report_ok: str = "_home_report_ok"
     home_report_error: str = "_home_report_error"
     home_quick_title: str = "_home_quick_title"
     home_quick_loc: str = "_home_quick_loc"
 
-    # ── Agent reporting (action_report_issue) ──
-    report_trace: str = "_report_trace"
+        report_trace: str = "_report_trace"
     report_result: str = "_report_result"
     report_error: str = "_report_error"
 
-    # ── Quick action chips ──
-    quick_tpl: str = "_quick_tpl"
+        quick_tpl: str = "_quick_tpl"
     quick_tpl_label: str = "_quick_tpl_label"
 
-    # ── Create proposal ──
-    create_proposal_error: str = "_create_proposal_error"
+        create_proposal_error: str = "_create_proposal_error"
     create_proposal_feedback: str = "_create_proposal_feedback"
 
-    # ── Support proposal ──
-    support_error: str = "_support_error"
+        support_error: str = "_support_error"
     support_feedback: str = "_support_feedback"
 
-    # ── Express opinion ──
-    opinion_feedback: str = "_opinion_feedback"
+        opinion_feedback: str = "_opinion_feedback"
 
-    # ── Dashboard / Issues quick actions ──
-    prop_reply_pid: str = "_prop_reply_pid"
+        prop_reply_pid: str = "_prop_reply_pid"
     prop_reply_title: str = "_prop_reply_title"
     dash_reply_pid: str = "_dash_reply_pid"
     batch_note: str = "_batch_note"
 
-    # ── Notification tracking (ui/notify.py) ──
-    notif_last_total: str = "_ss_last_total"
+        notif_last_total: str = "_ss_last_total"
     notif_last_urgent: str = "_ss_last_urgent"
     notif_last_pending: str = "_ss_last_pending"
     notif_last_proposal: str = "_ss_last_proposal"
 
-    # ── Dynamic keys (embed entity id) ──
-    @staticmethod
+        @staticmethod
     def key(prefix: str, entity_id: int) -> str:
         """Generic dynamic key: SS.key('_batch', 42) → '_batch_42'."""
         return f"{prefix}_{entity_id}"
@@ -127,9 +112,7 @@ class _Keys:
 SS = _Keys()
 
 
-# ═══════════════════════════════════════════
 # Typed Accessor
-# ═══════════════════════════════════════════
 
 class _Session:
     """Typed property access to frequently-used session_state values.

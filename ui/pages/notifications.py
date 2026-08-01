@@ -6,7 +6,6 @@ from ui.components import TOKEN
 from data.db_notifications import get_notifications, mark_read, mark_all_read, get_unread_count
 
 
-# ── Page Header ──
 try:
     unread = get_unread_count(st.session_state.get(SS.login_user_id, 0))
 except Exception:
@@ -23,7 +22,6 @@ st.markdown(
 )
 st.caption("教师处理反馈、提案进展、系统提醒 — 全部在这里。")
 
-# ── Mark all read ──
 if unread:
     c1, c2 = st.columns([1, 4])
     with c1:
@@ -34,7 +32,6 @@ if unread:
 
 st.markdown("---")
 
-# ── Notification list ──
 user_id = st.session_state.get(SS.login_user_id, 0)
 if not user_id:
     st.info("请先登录。")
@@ -55,10 +52,9 @@ if not notifications:
     )
     st.stop()
 
-# ── Type icons ──
 type_config = {
-    "issue_update":   ("📋", TOKEN["primary"]),
-    "proposal_update": ("💡", TOKEN["purple_text"]),
+    "issue_update":   ("📋", TOKEN["accent"]),
+    "proposal_update": ("💡", TOKEN["accent"]),
     "health_alert":   ("🏥", TOKEN["danger"]),
     "system":         ("🔔", TOKEN["text_muted"]),
 }
@@ -72,7 +68,7 @@ for n in notifications:
 
     # Card with left border accent for unread
     border_style = (
-        f'border-left:3px solid {TOKEN["primary"]};'
+        f'border-left:3px solid {TOKEN["accent"]};'
         if is_unread else
         f'border-left:3px solid transparent;'
     )
@@ -90,7 +86,7 @@ for n in notifications:
             f'<div style="font-size:0.7em;color:{TOKEN["text_muted"]};margin-top:4px;">'
             f'{created}</div>'
             f'</div>'
-            + (f'<span style="background:{TOKEN["primary"]};width:8px;height:8px;'
+            + (f'<span style="background:{TOKEN["accent"]};width:8px;height:8px;'
                f'border-radius:50%;flex-shrink:0;margin-top:4px;" title="未读"></span>'
                if is_unread else '')
             + '</div></div>',

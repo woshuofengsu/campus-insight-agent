@@ -6,51 +6,27 @@ from datetime import datetime
 from utils.text import split_thinking  # re-export
 
 
-# ═══════════════════════════════════════════
-# Theme-aware token proxy
-# ═══════════════════════════════════════════
-
-def _fallback_tokens() -> dict:
-    """Hardcoded fallback — guaranteed to work even if theme import fails."""
-    from ui.theme import TOKEN_LIGHT
-    return TOKEN_LIGHT
-
-
 class _ThemeAwareToken:
     def __init__(self):
-        self._cache_theme = None
-        self._cache_dict = None
+        self._theme = None
+        self._dict = None
 
-    def _resolve(self) -> dict:
-        try:
-            from ui.theme import get_token, get_theme
-            theme = get_theme()
-            if self._cache_theme != theme or self._cache_dict is None:
-                self._cache_theme = theme
-                self._cache_dict = get_token()
-            return self._cache_dict if self._cache_dict else _fallback_tokens()
-        except Exception:
-            return _fallback_tokens()
+    def _resolve(self):
+        from ui.theme import get_token, get_theme
+        t = get_theme()
+        if self._theme != t:
+            self._theme = t
+            self._dict = get_token()
+        return self._dict
 
     def __getitem__(self, key):
-        try:
-            return self._resolve()[key]
-        except KeyError:
-            # Fallback to light tokens for robustness
-            from ui.theme import TOKEN_LIGHT as _FALLBACK
-            return _FALLBACK.get(key, "#cccccc")
+        return self._resolve()[key]
 
     def get(self, key, default=None):
         return self._resolve().get(key, default)
 
     def __contains__(self, key):
         return key in self._resolve()
-
-    def __iter__(self):
-        return iter(self._resolve())
-
-    def __len__(self):
-        return len(self._resolve())
 
     def keys(self):
         return self._resolve().keys()
@@ -71,9 +47,7 @@ CAT_LABEL = {
 }
 
 
-# ═══════════════════════════════════════════
 # Status tag
-# ═══════════════════════════════════════════
 
 _STATUS_TOKEN_KEYS = {
     "待处理": ("danger_bg", "danger_border", "danger"),
@@ -102,9 +76,7 @@ def tag(status: str) -> str:
     )
 
 
-# ═══════════════════════════════════════════
 # KPI — Horizontal strip (no card border)
-# ═══════════════════════════════════════════
 
 def stat(label: str, value: str, accent: str = "", sub: str = ""):
     """KPI strip. Label muted, value bold. No card box. Accent only for semantic KPIs."""
@@ -127,9 +99,7 @@ def stat(label: str, value: str, accent: str = "", sub: str = ""):
     )
 
 
-# ═══════════════════════════════════════════
 # Row-style cards (compact, not boxes)
-# ═══════════════════════════════════════════
 
 def issue_row(issue: dict, show_checkbox: bool = False, checked: bool = False,
               checkbox_key: str = ""):
@@ -188,9 +158,7 @@ def proposal_row(proposal: dict):
     )
 
 
-# ═══════════════════════════════════════════
 # Card system (for detail views, not lists)
-# ═══════════════════════════════════════════
 
 def _card(inner: str, bg: str = "", border: str = "",
           pad: str = "", shadow: str = "", hover: bool = True) -> str:
@@ -273,9 +241,7 @@ def reminder(title: str, message: str):
     )
 
 
-# ═══════════════════════════════════════════
 # Section & Page Header
-# ═══════════════════════════════════════════
 
 def section(title: str):
     st.markdown(
@@ -308,9 +274,7 @@ def page_header(title: str, subtitle: str = "", badge: str = ""):
     )
 
 
-# ═══════════════════════════════════════════
 # Navigation — step indicator (minimal)
-# ═══════════════════════════════════════════
 
 _OODA_STEPS = [
     {"key": "home",          "label": "对话",      "pillar": ""},
@@ -390,9 +354,7 @@ def ooda_nav(current: str):
                     st.switch_page(_OODA_PAGE_MAP[step["key"]])
 
 
-# ═══════════════════════════════════════════
 # Altair chart theming
-# ═══════════════════════════════════════════
 
 def configure_altair(chart):
     return (
@@ -413,9 +375,7 @@ def configure_altair(chart):
     )
 
 
-# ═══════════════════════════════════════════
 # Utilities
-# ═══════════════════════════════════════════
 
 @contextmanager
 def loading(message: str = "Loading..."):

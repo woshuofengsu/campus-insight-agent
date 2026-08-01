@@ -12,18 +12,14 @@ Design:
 
 import streamlit as st  # noqa: F401
 
-# ═══════════════════════════════════════════
 # Light tokens (DEFAULT)
-# ═══════════════════════════════════════════
 TOKEN_LIGHT = {
-    # ── Accent — single source, <8% surface ──
-    "accent":           "#4f46e5",
+        "accent":           "#4f46e5",
     "accent_hover":     "#4338ca",
     "accent_bg":        "#f0efff",
     "accent_border":    "#d2d0f8",
 
-    # ── Semantic — only for status tags + KPI ──
-    "success":          "#059669",
+        "success":          "#059669",
     "success_bg":       "#ecfdf5",
     "success_border":   "#a7f3d0",
     "warning":          "#d97706",
@@ -36,8 +32,7 @@ TOKEN_LIGHT = {
     "info_bg":          "#ecfeff",
     "info_border":      "#a5f3fc",
 
-    # ── Surfaces — cold grays ──
-    "page_bg":          "#fafafa",
+        "page_bg":          "#fafafa",
     "sidebar_bg":       "#f5f5f5",
     "surface":          "#f5f5f5",
     "card_bg":          "#ffffff",
@@ -48,14 +43,12 @@ TOKEN_LIGHT = {
     "border_focus":     "#d0d0f0",
     "divider":          "#ebebeb",
 
-    # ── Text — near-black, never pure ──
-    "text":             "#1a1a1a",
+        "text":             "#1a1a1a",
     "text_sec":         "#6e6e6e",
     "text_muted":       "#a0a0a0",
     "text_inverse":     "#ffffff",
 
-    # ── Typography — 4 sizes, 2 weights ──
-    "font_display":     "1.25em",
+        "font_display":     "1.25em",
     "font_body":        "0.875em",
     "font_label":       "0.75em",
     "font_micro":       "0.6875em",
@@ -63,8 +56,7 @@ TOKEN_LIGHT = {
     "weight_medium":     "500",
     "tracking_label":    "0.04em",
 
-    # ── Spacing — 4px grid ──
-    "space_2xs":        "4px",
+        "space_2xs":        "4px",
     "space_xs":         "8px",
     "space_sm":         "12px",
     "space_md":         "16px",
@@ -72,36 +64,28 @@ TOKEN_LIGHT = {
     "space_xl":         "24px",
     "space_2xl":        "32px",
 
-    # ── Radius ──
-    "radius_input":     "4px",
+        "radius_input":     "4px",
     "radius_card":      "6px",
     "radius_full":      "99px",
 
-    # ── Shadows — minimal, just to float cards ──
-    "shadow_none":      "none",
+        "shadow_none":      "none",
     "shadow_sm":        "0 1px 2px rgba(0,0,0,0.04)",
     "shadow":           "0 1px 3px rgba(0,0,0,0.06)",
     "shadow_md":        "0 4px 16px rgba(0,0,0,0.06)",
 
-    # ── Motion ──
-    "transition":       "0.15s ease",
+        "transition":       "0.15s ease",
 
-    # ── Charts ──
-    "chart_grid":       "rgba(0,0,0,0.05)",
+        "chart_grid":       "rgba(0,0,0,0.05)",
 }
 
-# ═══════════════════════════════════════════
 # Dark tokens
-# ═══════════════════════════════════════════
 TOKEN_DARK = {
-    # ── Accent ──
-    "accent":           "#6d6bf5",
+        "accent":           "#6d6bf5",
     "accent_hover":     "#807ef7",
     "accent_bg":        "rgba(109,107,245,0.10)",
     "accent_border":    "rgba(109,107,245,0.18)",
 
-    # ── Semantic ──
-    "success":          "#34d399",
+        "success":          "#34d399",
     "success_bg":       "rgba(52,211,153,0.08)",
     "success_border":   "rgba(52,211,153,0.16)",
     "warning":          "#fbbf24",
@@ -114,8 +98,7 @@ TOKEN_DARK = {
     "info_bg":          "rgba(34,211,238,0.08)",
     "info_border":      "rgba(34,211,238,0.16)",
 
-    # ── Surfaces — dark cold grays ──
-    "page_bg":          "#0a0a0f",
+        "page_bg":          "#0a0a0f",
     "sidebar_bg":       "#0e0e14",
     "surface":          "#111118",
     "card_bg":          "#18181f",
@@ -126,14 +109,12 @@ TOKEN_DARK = {
     "border_focus":     "rgba(109,107,245,0.25)",
     "divider":          "#25252e",
 
-    # ── Text ──
-    "text":             "#e8e8ed",
+        "text":             "#e8e8ed",
     "text_sec":         "#9898a2",
     "text_muted":       "#5e5e6a",
     "text_inverse":     "#0a0a0f",
 
-    # ── Typography ──
-    "font_display":     "1.25em",
+        "font_display":     "1.25em",
     "font_body":        "0.875em",
     "font_label":       "0.75em",
     "font_micro":       "0.6875em",
@@ -141,8 +122,7 @@ TOKEN_DARK = {
     "weight_medium":     "500",
     "tracking_label":    "0.04em",
 
-    # ── Spacing ──
-    "space_2xs":        "4px",
+        "space_2xs":        "4px",
     "space_xs":         "8px",
     "space_sm":         "12px",
     "space_md":         "16px",
@@ -150,60 +130,21 @@ TOKEN_DARK = {
     "space_xl":         "24px",
     "space_2xl":        "32px",
 
-    # ── Radius ──
-    "radius_input":     "4px",
+        "radius_input":     "4px",
     "radius_card":      "6px",
     "radius_full":      "99px",
 
-    # ── Shadows — dark mode needs more depth ──
-    "shadow_none":      "none",
+        "shadow_none":      "none",
     "shadow_sm":        "0 1px 2px rgba(0,0,0,0.4)",
     "shadow":           "0 2px 8px rgba(0,0,0,0.5)",
     "shadow_md":        "0 8px 24px rgba(0,0,0,0.6)",
 
-    # ── Motion ──
-    "transition":       "0.15s ease",
+        "transition":       "0.15s ease",
 
-    # ── Charts ──
-    "chart_grid":       "rgba(255,255,255,0.04)",
+        "chart_grid":       "rgba(255,255,255,0.04)",
 }
 
-# ═══════════════════════════════════════════
-# Backward-compat aliases
-# ═══════════════════════════════════════════
-_COMPAT_MAP = {
-    "primary":          "accent",
-    "primary_hover":    "accent_hover",
-    "primary_bg":       "accent_bg",
-    "primary_border":   "accent_border",
-    "primary_light":    "accent_bg",
-    "slate_bg":         "page_bg",
-    "slate_border":     "border",
-    "purple_bg":        "accent_bg",
-    "purple_border":    "accent_border",
-    "purple_text":      "accent",
-    "radius_xs":        "radius_input",
-    "radius_sm":        "radius_card",
-    "radius":           "radius_card",
-    "radius_lg":        "radius_card",
-    "shadow_xs":        "shadow_sm",
-}
-
-
-def _apply_compat(token_dict: dict) -> dict:
-    merged = dict(token_dict)
-    for old_key, new_key in _COMPAT_MAP.items():
-        if old_key not in merged and new_key in merged:
-            merged[old_key] = merged[new_key]
-    return merged
-
-
-TOKEN_LIGHT = _apply_compat(TOKEN_LIGHT)
-TOKEN_DARK = _apply_compat(TOKEN_DARK)
-
-# ═══════════════════════════════════════════
 # Theme state management
-# ═══════════════════════════════════════════
 _THEME_KEY = "_campus_theme_v4"
 
 
@@ -275,7 +216,6 @@ def inject_theme_css():
     theme = get_theme()
     t = TOKEN_DARK if theme == "dark" else TOKEN_LIGHT
 
-    # ── :root CSS variables ──
     root_vars = f"""
 :root {{
     --c-bg: {t["page_bg"]};

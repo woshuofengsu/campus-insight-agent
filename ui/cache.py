@@ -90,7 +90,6 @@ def cached_my_stats(author: str):
     return get_my_stats(author)
 
 
-# ── Targeted cache invalidation ──
 # Use these instead of st.cache_data.clear() so only affected
 # queries are refreshed, leaving unrelated caches warm.
 
