@@ -109,7 +109,8 @@ GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale
         [data-testid="stChatMessage"][aria-label*="assistant"] { max-width: 98% !important; }
         .stSelectbox > div > div, .stTextInput > div > div > input { min-height: 40px !important; }
         .stCaption, caption, [data-testid="stCaptionContainer"] { font-size: 0.82em !important; }
-        [data-testid="stSidebar"] { min-width: 0 !important; max-width: 0 !important; width: 0 !important; overflow: hidden !important; }
+        /* Mobile: let Streamlit natively collapse sidebar to hamburger.
+           Expanded sidebar overlays full screen for easy reading. */
         [data-testid="stSidebar"][aria-expanded="true"] { min-width: 100vw !important; max-width: 100vw !important; width: 100vw !important; z-index: 9999 !important; }
     }
 
