@@ -354,6 +354,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                 detail=f"发现 {len(anomalies)} 项异常 · {today_new} 件新增工单",
             )
         except Exception:  # non-critical: silent pass intended
+            _log.debug("Failed to log activity for perception scan", exc_info=True)
             pass
 
     result = {

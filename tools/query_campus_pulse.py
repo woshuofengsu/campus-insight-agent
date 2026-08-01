@@ -1,8 +1,11 @@
 # tools/query_campus_pulse.py
 """校园脉搏 — 本周热点 + 即将发生的大事."""
+import logging
 from datetime import datetime, timedelta
 from langchain.tools import tool
 from data.database import get_campus_events, get_issues, get_proposals, get_active_topics
+
+_log = logging.getLogger(__name__)
 
 
 def _generate_pulse_text() -> str:
@@ -102,4 +105,5 @@ def get_campus_pulse() -> str:
     try:
         return _generate_pulse_text()
     except Exception as e:
+        _log.debug("get_campus_pulse failed: %s", e, exc_info=True)
         return f"⚠️ 校园脉搏数据暂不可用：{e}\n请稍后重试。"

@@ -129,6 +129,7 @@ def build_index(force: bool = False):
 
         return {"indexed": len(row_data), "updated": updated}
     except Exception as e:
+        _log.debug("build_index failed: %s", e, exc_info=True)
         return {"error": str(e)}
 
 

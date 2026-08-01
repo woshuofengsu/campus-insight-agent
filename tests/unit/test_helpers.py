@@ -7,7 +7,7 @@ Covers all location patterns, edge cases, and encouragement contexts.
 import sys
 import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
@@ -183,77 +183,65 @@ class TestRandomEncouragement(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 4. get_author_identifier
+# 4. get_author_identifier — delegates to _resolve_author
 # ═══════════════════════════════════════════════════════════════
 
 class TestGetAuthorIdentifier(unittest.TestCase):
 
     def test_returns_student_id_first(self):
         from agent.helpers import get_author_identifier
-        mock_memory = MagicMock()
-        mock_memory.get_user_profile.return_value = {
-            "student_id": "2024001",
-            "name": "张三",
-            "school": "测试大学",
-        }
-        result = get_author_identifier(mock_memory)
-        self.assertEqual(result, "2024001")
+        with patch("data.db_user.get_current_user") as mock_user:
+            mock_user.return_value = {
+                "student_id": "2024001", "name": "张三",
+                "school": "测试大学", "grade": "大三",
+            }
+            result = get_author_identifier(MagicMock())
+            self.assertEqual(result, "2024001")
 
     def test_falls_back_to_school_grade(self):
         from agent.helpers import get_author_identifier
-        mock_memory = MagicMock()
-        mock_memory.get_user_profile.return_value = {
-            "student_id": "",
-            "school": "测试大学",
-            "grade": "大三",
-        }
-        result = get_author_identifier(mock_memory)
-        self.assertEqual(result, "测试大学大三")
+        with patch("data.db_user.get_current_user") as mock_user:
+            mock_user.return_value = {
+                "student_id": "", "school": "测试大学", "grade": "大三",
+            }
+            result = get_author_identifier(MagicMock())
+            self.assertEqual(result, "测试大学大三")
 
     def test_falls_back_to_school_only(self):
         from agent.helpers import get_author_identifier
-        mock_memory = MagicMock()
-        mock_memory.get_user_profile.return_value = {
-            "student_id": "",
-            "school": "测试大学",
-            "grade": "",
-        }
-        result = get_author_identifier(mock_memory)
-        self.assertEqual(result, "测试大学")
+        with patch("data.db_user.get_current_user") as mock_user:
+            mock_user.return_value = {
+                "student_id": "", "school": "测试大学", "grade": "",
+            }
+            result = get_author_identifier(MagicMock())
+            self.assertEqual(result, "测试大学")
 
     def test_falls_back_to_name(self):
         from agent.helpers import get_author_identifier
-        mock_memory = MagicMock()
-        mock_memory.get_user_profile.return_value = {
-            "student_id": "",
-            "school": "",
-            "grade": "",
-            "name": "李四",
-        }
-        result = get_author_identifier(mock_memory)
-        self.assertEqual(result, "李四")
+        with patch("data.db_user.get_current_user") as mock_user:
+            mock_user.return_value = {
+                "student_id": "", "school": "", "grade": "", "name": "李四",
+            }
+            result = get_author_identifier(MagicMock())
+            self.assertEqual(result, "李四")
 
     def test_falls_back_to_user_id(self):
         from agent.helpers import get_author_identifier
-        mock_memory = MagicMock()
-        mock_memory.get_user_profile.return_value = {
-            "student_id": "",
-            "school": "",
-            "grade": "",
-            "name": "",
-            "id": 42,
-        }
-        result = get_author_identifier(mock_memory)
-        self.assertEqual(result, "user_42")
+        with patch("data.db_user.get_current_user") as mock_user:
+            mock_user.return_value = {
+                "student_id": "", "school": "", "grade": "", "name": "", "id": 42,
+            }
+            result = get_author_identifier(MagicMock())
+            self.assertEqual(result, "user_42")
 
     def test_profile_exception_graceful(self):
         from agent.helpers import get_author_identifier
-        mock_memory = MagicMock()
-        mock_memory.get_user_profile.side_effect = Exception("DB error")
-        # Should not raise; returns None
-        result = get_author_identifier(mock_memory)
-        # After exception, falls through to session_state fallback
-        self.assertIsNone(result)
+        with patch("data.db_user.get_current_user") as mock_user:
+            mock_user.side_effect = Exception("DB error")
+            # Should not raise; _resolve_author catches and returns "匿名"
+            # which get_author_identifier maps to None
+            result = get_author_identifier(MagicMock())
+            self.assertIsNone(result)
 
 
 # ═══════════════════════════════════════════════════════════════

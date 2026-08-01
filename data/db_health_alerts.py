@@ -31,8 +31,11 @@ Usage:
   alerts = engine.active_alerts()   # only alerts above threshold
 """
 import json
+import logging
 from datetime import datetime
 from data.database import get_db
+
+_log = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -163,6 +166,7 @@ def _get_weather_risk_modifiers() -> dict:
 
             details["modifier_reasons"] = list(modifiers.keys())
     except Exception:  # non-critical: silent pass intended
+        _log.debug("Weather risk modifier query failed", exc_info=True)
         pass
 
     return {"details": details, "total_modifier": sum(modifiers.values()),
@@ -347,6 +351,7 @@ class HealthRiskEngine:
             _seed_surv()  # idempotent — only seeds if empty
             _use_surveillance = True
         except Exception:
+            _log.debug("Failed to load surveillance module, using season-only model", exc_info=True)
             _use_surveillance = False
 
         diseases = []
@@ -421,6 +426,7 @@ class HealthRiskEngine:
             if surv_summary.get("available") and not advice_parts:
                 pass  # low risk, no extra advice needed
         except Exception:
+            _log.debug("Failed to load surveillance summary", exc_info=True)
             surv_summary = {"available": False}
 
         return {

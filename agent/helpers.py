@@ -10,41 +10,16 @@ import re
 _log = logging.getLogger(__name__)
 
 
-def get_author_identifier(memory) -> str:
+def get_author_identifier(memory) -> str | None:
     """Get the identifier used for filtering personal issues/proposals.
 
-    Shared by both CampusAgent._check_closed_loop() and OfflineAgent._my_issues().
-
-    IMPORTANT: Must be consistent with _resolve_author() in db_governance.py
-    and _resolve_current_author() in tools/query_my_issues.py — all three
-    resolve the same identity so "report → query my issues" works end-to-end.
+    Delegates to _resolve_author() in db_governance.py — the single source of
+    truth for author identity resolution.  Returns None when the resolved
+    author is the generic "匿名" fallback (no identifiable user).
     """
-    try:
-        profile = memory.get_user_profile()
-        sid = (profile.get("student_id") or "").strip()
-        if sid:
-            return sid
-        school = (profile.get("school") or "").strip()
-        grade = (profile.get("grade") or "").strip()
-        if school:
-            return f"{school}{grade}" if grade else school
-        name = (profile.get("name") or "").strip()
-        if name:
-            return name
-        uid = profile.get("id")
-        if uid:
-            return f"user_{uid}"
-    except Exception:  # non-critical: silent pass intended
-        _log.debug("Failed to resolve author from profile", exc_info=True)
-        pass
-    try:
-        import streamlit as st
-        uid = st.session_state.get("_login_user_id")
-        if uid:
-            return f"user_{uid}"
-    except Exception:  # non-critical: silent pass intended
-        _log.debug("Failed to resolve author from session_state fallback", exc_info=True)
-        pass
+    from data.db_governance import _resolve_author
+    author = _resolve_author("")
+    return author if author != "匿名" else None
 
 
 def get_user_name(memory) -> str:

@@ -159,6 +159,7 @@ def fetch_real_weather_days(api_key: str, city_id: str,
             dt = datetime.strptime(date_str, "%Y-%m-%d")
             wd = weekday_map[dt.weekday()]
         except Exception:
+            _log.debug("Failed to parse weather date string", exc_info=True)
             wd = ""
 
         cond = d.get("textDay", "未知")
@@ -244,6 +245,7 @@ def _real_weather() -> str:
             HEFENG_API_KEY, CAMPUS_CITY_ID, CAMPUS_CITY,
         )
     except Exception:  # non-critical: graceful degradation
+        _log.debug("Real weather API request failed, falling back to mock data", exc_info=True)
         return _fallback_weather("天气API请求失败，已切换为模拟数据")
 
     # ── Format response string ──
@@ -316,6 +318,7 @@ def get_today_weather() -> tuple[list[dict] | None, str, bool]:
         try:
             days = _mock_weather()
         except Exception:
+            _log.debug("Mock weather generation failed", exc_info=True)
             days = None
 
     return days, location_name, is_real

@@ -10,7 +10,10 @@ the current user from:
 Raises RuntimeError if no user can be resolved.
 """
 import json
+import logging
 from data.db_core import get_db, _hash_password, _verify_password
+
+_log = logging.getLogger(__name__)
 
 # Module-level override for non-Streamlit contexts (e.g., FastAPI)
 _explicit_user_id: int | None = None
@@ -46,6 +49,7 @@ def _get_active_user_id() -> int:
         if uid is not None:
             return int(uid)
     except Exception:  # non-critical: silent pass intended
+        _log.debug("Failed to resolve user from session_state", exc_info=True)
         pass
 
     raise RuntimeError(

@@ -164,6 +164,7 @@ class OfflineAgent:
                 stats = get_issues_stats()
                 parts.append(self._build_stats_from_db(stats))
             except Exception as e:
+                _log.debug("DB stats fallback failed: %s", e, exc_info=True)
                 parts.append(f"*统计数据暂时无法加载（{e}）*")
 
         # ── 针对性查询 ──
@@ -278,6 +279,7 @@ class OfflineAgent:
                             f"[{p.get('status','讨论中')}]"
                         )
             except Exception as e:
+                _log.debug("DB proposals fallback failed: %s", e, exc_info=True)
                 parts.append(f"*提案数据暂不可用（{e}）*")
 
         # ── 议题 ──
@@ -403,6 +405,7 @@ class OfflineAgent:
                 lines.append(f"\n💡 有 {len(pending)} 件还在处理中，我会持续追踪~")
             return "\n".join(lines)
         except Exception as e:
+            _log.debug("my_issues query failed: %s", e, exc_info=True)
             return f"📋 工单查询暂时不可用（{e}），请稍后重试。"
 
     def _my_proposals(self) -> str:
@@ -431,6 +434,7 @@ class OfflineAgent:
                     lines.append(f"  💬 回复：{p['response_text'][:100]}")
             return "\n".join(lines)
         except Exception as e:
+            _log.debug("my_proposals query failed: %s", e, exc_info=True)
             return f"💡 提案查询暂时不可用（{e}），请稍后重试。"
 
     # ═══════════════════════════════════════════

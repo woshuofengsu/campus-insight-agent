@@ -30,7 +30,7 @@ def render_login():
         </div>
         """, unsafe_allow_html=True)
 
-                st.markdown(
+        st.markdown(
             f'<div style="text-align:center;margin:8px 0 6px;font-size:0.75em;'
             f'color:{("#5e5e6a" if is_dark else "#a0a0a0")};">快速体验</div>',
             unsafe_allow_html=True,

@@ -319,6 +319,7 @@ def _run_optional_query(conn, query_fn) -> list[dict]:
     try:
         return query_fn(conn)
     except Exception:  # non-critical: graceful degradation
+        _logger.debug("Optional query failed, returning empty result", exc_info=True)
         return []
 
 
@@ -433,6 +434,7 @@ def get_proactive_insights(db_path: str = "") -> dict:
                 ).fetchone()
                 urgent_count = row["cnt"] if row else 0
             except Exception:  # non-critical: silent pass intended
+                _logger.debug("Failed to query urgent count for proactive insights", exc_info=True)
                 pass
             try:
                 row = conn.execute(
@@ -441,6 +443,7 @@ def get_proactive_insights(db_path: str = "") -> dict:
                 ).fetchone()
                 stale_count = row["cnt"] if row else 0
             except Exception:  # non-critical: silent pass intended
+                _logger.debug("Failed to query stale count for proactive insights", exc_info=True)
                 pass
 
         has_insight = bool(z_anomalies or cross_time or upgrade_paths or resolution_efficiency)

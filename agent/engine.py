@@ -18,7 +18,6 @@ from config import (
 )
 from agent.prompt import get_system_prompt, detect_persona
 from agent.memory import MemoryManager
-from agent.helpers import get_author_identifier
 from tools import discover_tools
 from utils.logger import get_logger
 
@@ -439,187 +438,20 @@ class CampusAgent:
 
     def _enforce_tool_call(self, response: str, user_input: str,
                            intermediate_steps: list | None) -> str:
-        """Safety net: guarantee report_issue is called AND succeeds for repair intents.
+        """Safety net: guarantee report_issue is called for repair intents.
 
-        Handles TWO failure modes:
-        1. LLM didn't call report_issue at all (hallucinated a fake response)
-        2. LLM called report_issue but it returned an error (e.g. validate_location
-           blocked it) — the LLM may still respond as if it succeeded
-
-        In both cases we force a real, successful tool call.
+        Delegates to agent/enforce.py.  See enforce_tool_call() for details.
         """
-        if not intermediate_steps:
-            intermediate_steps = []
-
-        # ── Check if report_issue was called AND succeeded ──
-        report_called = False
-        report_succeeded = False
-        for step in intermediate_steps:
-            if len(step) >= 2:
-                tool = step[0]  # (AgentAction, observation) tuple
-                tool_name = getattr(tool, 'tool', '')
-                if tool_name == "report_issue":
-                    report_called = True
-                    observation = step[1]  # tool return value
-                    # Check if the tool returned an error
-                    if not any(observation.startswith(p) for p in ("⚠️", "❌")):
-                        report_succeeded = True
-                    break
-
-        if report_succeeded:
-            return response  # Tool was called and succeeded — nothing to do
-
-        # ── Check if user input looks like a problem report ──
-        from agent.prompt import detect_persona
-        persona = detect_persona(user_input)
-        is_repair_intent = bool(persona and "报修助手" in persona.get("role", ""))
-
-        if not is_repair_intent:
-            return response
-
-        # ── Force the real tool call ──
-        if report_called:
-            logger.warning(
-                "Safety net: report_issue was called but FAILED. Retrying. "
-                "user_input=%r", user_input[:80]
-            )
-        else:
-            logger.warning(
-                "Safety net: report_issue NOT called for repair intent. "
-                "Enforcing real tool call. user_input=%r, response_preview=%r",
-                user_input[:80], response[:80]
-            )
-
-        try:
-            from tools.action_report_issue import report_issue, _keyword_classify, _keyword_urgency
-            from agent.helpers import extract_location
-
-            # Strip prefetch context from title
-            clean_input = user_input.split("\n\n[📊")[0].strip()
-            title = clean_input[:80]
-            location = extract_location(clean_input)
-
-            # Pre-compute category + urgency with fast keyword methods
-            # (no LLM API call — instant, and good enough for safety net)
-            cat = _keyword_classify(title, clean_input)
-            urg = _keyword_urgency(title, clean_input)
-
-            # If location is still empty, try extracting from full user_input
-            if not location:
-                location = extract_location(user_input)
-
-            result = report_issue.invoke({
-                "title": title,
-                "category": cat,
-                "location": location,
-                "description": clean_input,
-                "urgency": urg,       # fast path: skips _llm_classify
-            })
-
-            # If result is STILL an error, validate_location blocked us.
-            # Retry with the full input as location fallback.
-            if result.startswith("⚠️") or result.startswith("❌"):
-                logger.warning(
-                    "Safety net retry also blocked by validation. "
-                    "Falling back with full-input location. error=%r", str(result)[:80]
-                )
-                result = report_issue.invoke({
-                    "title": title,
-                    "category": cat,
-                    "location": location or clean_input[:60],
-                    "description": clean_input,
-                    "urgency": urg,
-                })
-
-            logger.info("Safety net: report_issue result=%r", str(result)[:120])
-            return str(result)
-        except Exception as e:
-            logger.error("Safety net report_issue also failed: %s", e)
-            # DON'T return the LLM's hallucinated response with a fake ticket number.
-            # Give the user an honest error message instead.
-            return (
-                "很抱歉，自动上报没有成功 😥\n\n"
-                "你可以试试页面顶部的「⚡ 快速报修」——它不走 AI，直接写入数据库，"
-                "不会出现这种问题。\n\n"
-                f"（错误信息：{str(e)[:100]}）"
-            )
+        from agent.enforce import enforce_tool_call
+        return enforce_tool_call(response, user_input, intermediate_steps)
 
     def _check_closed_loop(self, user_input: str, response: str) -> str:
-        """Check for open governance loops and return a gentle reminder note."""
-        try:
-            from data.database import get_issues, get_proposals, get_db
+        """Check for open governance loops and return a gentle reminder note.
 
-            author = get_author_identifier(self.memory)
-            if not author:
-                return ""
-
-            all_issues = get_issues(limit=200)
-            my_pending = [
-                i for i in all_issues
-                if i.get("author") == author and i.get("status") in ("待处理", "处理中")
-            ]
-            my_resolved = [
-                i for i in all_issues
-                if i.get("author") == author and i.get("status") == "已解决"
-            ]
-
-            notes: list[str] = []
-
-            if my_pending:
-                pending_titles = "、".join(
-                    f"#{i['id']}「{i['title'][:15]}」({i['status']})"
-                    for i in my_pending[:3]
-                )
-                extra = f"等 {len(my_pending)} 件" if len(my_pending) > 3 else ""
-                notes.append(
-                    f"📋 你还有 {len(my_pending)} 件待处理工单：{pending_titles}{extra}。"
-                    f"输入「查看我的工单」追踪进度"
-                )
-
-            if my_resolved and not my_pending:
-                today = datetime.now().strftime("%Y-%m-%d")
-                recent_resolved = [
-                    i for i in my_resolved
-                    if (i.get("resolved_at") or "")[:10] == today
-                ]
-                if recent_resolved:
-                    notes.append(
-                        f"✅ 你上报的 {len(recent_resolved)} 个问题今天已解决！"
-                        f"感谢你的参与 ✨"
-                    )
-
-            all_props = get_proposals(limit=200)
-            my_props_unresponded = [
-                p for p in all_props
-                if p.get("author") == author
-                and p.get("status") in ("讨论中",)
-                and p.get("supporter_count", 0) >= 5
-            ]
-            if my_props_unresponded:
-                prop = my_props_unresponded[0]
-                notes.append(
-                    f"💡 你的提案 #{prop['id']}「{prop['title'][:20]}」已有 "
-                    f"{prop['supporter_count']} 人附议，输入「查看我的提案」了解进展"
-                )
-
-            with get_db() as conn:
-                stale = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
-                    "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-                ).fetchone()
-            if stale and stale["cnt"] >= 3:
-                notes.append(
-                    f"⚠️ 全校有 {stale['cnt']} 件工单超过 7 天未处理，建议关注积压问题"
-                )
-
-            if not notes:
-                return ""
-
-            return "\n\n---\n\n🔄 **闭环追踪**\n\n" + "\n\n".join(notes)
-
-        except Exception as e:
-            logger.warning(f"Closed-loop check failed (non-fatal): {e}")
-            return ""
+        Delegates to agent/closed_loop.py.  See check_closed_loop() for details.
+        """
+        from agent.closed_loop import check_closed_loop
+        return check_closed_loop(self.memory, user_input, response)
 
     def _governance_audit(self) -> str:
         """Run a comprehensive governance audit — delegates to governance_audit module.
@@ -690,102 +522,10 @@ class CampusAgent:
     def _graceful_fallback(self, user_input: str, error: Exception | None = None) -> str:
         """Provide a graceful fallback response when the agent fails after retries.
 
-        Tries to produce a context-aware response based on the user's input intent
-        and available DB data, rather than showing a raw error message.
+        Delegates to agent/fallback.py.  See graceful_fallback() for details.
         """
-        error_msg = str(error) if error else "未知错误"
-
-        # Try to match common intents and provide helpful guidance
-        txt = user_input.strip()
-
-        if any(kw in txt for kw in ("校园脉搏", "动态", "最近发生")):
-            try:
-                from data.database import get_issues, get_proposals, get_campus_events, get_issues_stats
-                stats = get_issues_stats()
-                issues = get_issues(status="待处理", limit=5)
-                proposals = get_proposals(sort_by="supporters", limit=3)
-                events = get_campus_events(limit=3)
-                lines = [
-                    "🤖 AI 服务暂时繁忙，以下是从数据库直接查询的最新数据：\n",
-                    f"📊 **校园脉搏快照**",
-                    f"- 工单总数：{stats['total']} 件",
-                ]
-                by_status = stats.get("by_status", {})
-                lines.append(f"- ⏳ 待处理 {by_status.get('待处理',0)} · 🔄 处理中 {by_status.get('处理中',0)} · ✅ 已解决 {by_status.get('已解决',0)}")
-                if issues:
-                    lines.append("\n🔧 **待处理问题**：")
-                    for i in issues[:3]:
-                        lines.append(f"- #{i['id']} {i.get('title','')[:30]} [{i.get('category','')}]")
-                if proposals:
-                    lines.append("\n💡 **热门提案**：")
-                    for p in proposals[:3]:
-                        lines.append(f"- {p.get('title','')[:30]} · 👍{p.get('supporter_count',0)}")
-                if events:
-                    lines.append("\n📅 **近期事件**：")
-                    for e in events[:3]:
-                        lines.append(f"- {e.get('title','')[:40]}")
-                return "\n".join(lines)
-            except Exception:  # non-critical: silent pass intended
-                logger.debug("Pulse fallback query failed", exc_info=True)
-                pass
-
-        if any(kw in txt for kw in ("天气", "温度", "下雨", "多少度")):
-            try:
-                from tools.query_weather import get_today_weather
-                days, location, is_real = get_today_weather()
-                if days:
-                    d = days[0]
-                    return (
-                        f"🌤️ **{location}** 今日天气（本地查询）\n\n"
-                        f"{d['emoji']} {d['condition']} · {d['temp_low']}°C~{d['temp_high']}°C\n"
-                        f"💧 降水概率 {d['rain_prob']}% · {d['wind']}\n"
-                        f"💡 {d['advice']}"
-                    )
-            except Exception:  # non-critical: silent pass intended
-                logger.debug("Weather fallback query failed", exc_info=True)
-                pass
-
-        if any(kw in txt for kw in ("报修", "上报", "坏了", "故障", "漏水", "不亮")):
-            return (
-                "🔧 看起来你想报修一个问题。\n\n"
-                "AI 服务暂时不可用，但你可以使用页面顶部的 **快速报修** 功能直接提交工单——"
-                "填写问题描述和地点，点击「🚀 上报」即可，系统会自动分类。\n\n"
-                "或者稍后重试对话，AI 恢复后会帮你处理。"
-            )
-
-        if any(kw in txt for kw in ("提案", "建议", "提议")):
-            return (
-                "💡 看起来你想提交建议或查看提案。\n\n"
-                "AI 服务暂时不可用，但你可以在左侧导航中切换到 **🗳️ 有话说** 页面，"
-                "那里可以直接查看热门提案和提交新建议。\n\n"
-                "稍后重试对话也可以获得 AI 的智能分析。"
-            )
-
-        if any(kw in txt for kw in ("治理", "统计", "数据", "健康度")):
-            try:
-                from data.database import compute_health_score
-                health = compute_health_score()
-                return (
-                    f"🏥 **治理健康度**（本地查询）\n\n"
-                    f"- 综合评分：{health['score']} 分（{health['grade']}）\n"
-                    f"- 解决率：{health['resolution_rate']}%\n"
-                    f"- 趋势：{health['trend']}\n"
-                    f"- 近7天新增 {health.get('new_recent', '?')} 件 · 解决 {health.get('resolved_recent', '?')} 件\n\n"
-                    f"💡 如需更详细分析，请在 AI 恢复后重试。"
-                )
-            except Exception:  # non-critical: silent pass intended
-                logger.debug("Health score fallback query failed", exc_info=True)
-                pass
-
-        # Generic fallback
-        return (
-            f"😅 AI 服务暂时不可用（{error_msg[:80]}）。\n\n"
-            "你可以尝试以下操作：\n"
-            "- 使用页面顶部的 **快速报修** 直接提交工单\n"
-            "- 通过左侧导航浏览各功能页面\n"
-            "- 稍后重试对话，系统会自动恢复\n\n"
-            "如需帮助，请联系管理员。"
-        )
+        from agent.fallback import graceful_fallback
+        return graceful_fallback(user_input, error)
 
     def get_last_chain(self) -> dict | None:
         """Return the structured reasoning chain from the most recent run().

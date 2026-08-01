@@ -9,43 +9,22 @@
 此工具自动从 session 解析当前用户身份，直接调用 get_my_issues，
 让学生侧 AI 对话能准确返回"我的工单"。
 """
+import logging
 from langchain.tools import tool
 from data.database import get_my_issues, get_my_proposals, get_my_stats
+
+_log = logging.getLogger(__name__)
 
 
 def _resolve_current_author() -> str:
     """Auto-resolve the current user's author identifier from session state.
 
-    Mirrors _resolve_author() in data/db_governance.py so that issues
-    reported via Agent and queried via Agent use the same identity.
+    Delegates to _resolve_author() in data/db_governance.py — the single
+    source of truth for author identity resolution.
     """
-    try:
-        from data.db_user import get_current_user
-        profile = get_current_user()
-        sid = (profile.get("student_id") or "").strip()
-        if sid:
-            return sid
-        school = (profile.get("school") or "").strip()
-        grade = (profile.get("grade") or "").strip()
-        if school:
-            return f"{school}{grade}" if grade else school
-        name = (profile.get("name") or "").strip()
-        if name:
-            return name
-        uid = profile.get("id")
-        if uid:
-            return f"user_{uid}"
-    except Exception:  # non-critical: silent pass intended
-        pass
-    # Final fallback: direct session_state read
-    try:
-        import streamlit as st
-        uid = st.session_state.get("_login_user_id")
-        if uid:
-            return f"user_{uid}"
-    except Exception:  # non-critical: silent pass intended
-        pass
-    return ""
+    from data.db_governance import _resolve_author
+    author = _resolve_author("")
+    return "" if author == "匿名" else author
 
 
 _STATUS_LABELS = {

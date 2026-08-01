@@ -7,8 +7,11 @@
 例如："食堂几点关门" 能匹配到 "食堂营业时间" 条目，
 即使"关门"和"营业时间"没有共同关键词。
 """
+import logging
 from langchain.tools import tool
 from agent.rag import semantic_search, rag_search, get_rag_context
+
+_log = logging.getLogger(__name__)
 
 
 @tool
@@ -26,6 +29,7 @@ def query_knowledge(query: str) -> str:
     try:
         return rag_search(query, top_k=5)
     except Exception as e:
+        _log.debug("rag_search failed: %s", e, exc_info=True)
         return f"⚠️ 校园百科搜索暂不可用：{e}\n请稍后重试。"
 
 
@@ -52,4 +56,5 @@ def get_school_policy(topic: str) -> str:
             lines.append(f"**{i}. {r['title']}** `相关度 {r.get('score', 0):.2f}`\n{r['content']}\n")
         return "\n".join(lines)
     except Exception as e:
+        _log.debug("semantic_search (get_school_policy) failed: %s", e, exc_info=True)
         return f"⚠️ 校规检索暂不可用：{e}"

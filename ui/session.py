@@ -14,10 +14,9 @@ _AGENT_VERSION = 4
 
 def init_session():
     """Initialize database, agent, and memory. Idempotent — runs once per session."""
-        #     preserves session_state but resets module-level _DB_PATH) ──
     init_db(DB_PATH)
 
-        # Streamlit hot-reload preserves session_state but reloads Python modules,
+    # Streamlit hot-reload preserves session_state but reloads Python modules,
     # so the agent instance in session_state runs OLD code after a file edit.
     # Comparing a version stamp detects this and rebuilds the agent.
     cached_version = st.session_state.get(SS.agent_version, 0)
@@ -32,18 +31,18 @@ def init_session():
         return st.session_state.agent, st.session_state.memory
 
     seed_all(DB_PATH)
-        try:
+    try:
         from data.live_generator import generate_today_events
         generate_today_events()
     except Exception:
         pass  # non-critical — demo still works with seed data alone
-        try:
+    try:
         from data.db_perception import run_perception_scan
         run_perception_scan()
     except Exception:
         pass  # non-critical — perception is optional
 
-        is_offline = OFFLINE_MODE
+    is_offline = OFFLINE_MODE
     try:
         qp = st.query_params.get("offline")
         if qp and str(qp).lower() in ("1", "true", "yes"):
@@ -54,7 +53,7 @@ def init_session():
     if st.session_state.get(SS.force_offline, False):
         is_offline = True
 
-        if "agent" not in st.session_state:
+    if "agent" not in st.session_state:
         if is_offline:
             from agent.offline_agent import OfflineAgent
             st.session_state.agent = OfflineAgent(st.session_state)

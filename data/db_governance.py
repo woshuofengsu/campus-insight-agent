@@ -43,6 +43,7 @@ def _resolve_author(author: str = "") -> str:
             if uid:
                 return f"user_{uid}"
         except Exception:  # non-critical: silent pass intended
+            _log.debug("Failed to resolve author from session_state fallback", exc_info=True)
             pass
     return "匿名"
 

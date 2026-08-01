@@ -181,6 +181,7 @@ def _get_llm():
         )
         return _EXEC_LLM
     except Exception:
+        _logger.debug("Failed to initialize executive summary LLM client", exc_info=True)
         _EXEC_LLM = False
         return None
 

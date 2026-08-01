@@ -40,6 +40,7 @@ def _get_insight_llm():
         )
         return _INSIGHT_LLM
     except Exception:
+        _logger.debug("Failed to initialize insight LLM client", exc_info=True)
         _INSIGHT_LLM = False
         return None
 
@@ -215,6 +216,7 @@ def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
             return text
     except Exception:
         # Silent fallback — LLM insight is a bonus, not critical
+        _logger.debug("LLM insight generation failed", exc_info=True)
         pass
 
     return None

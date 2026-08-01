@@ -123,7 +123,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
         </div>
         """, unsafe_allow_html=True)
 
-                user_name = ""
+        user_name = ""
         user_major = ""
 
         school = st.text_input("🏫 学校", placeholder="请输入你的大学名称", key="ob_school")
@@ -146,7 +146,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
             student_id = st.text_input("🔢 工号", placeholder="请输入你的工号", key="ob_student_id")
             user_name = st.text_input("👤 姓名", placeholder="请输入你的姓名（选填）", key="ob_name")
 
-                c_back, c_submit = st.columns([1, 2.2], gap="medium")
+        c_back, c_submit = st.columns([1, 2.2], gap="medium")
         with c_back:
             if st.button("← 返回", key="ob_back", type="secondary", use_container_width=True):
                 st.session_state.pop("ob_role", None)
