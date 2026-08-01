@@ -5,6 +5,8 @@ from config import DB_PATH, OFFLINE_MODE
 from data.database import init_db
 from data.seed import seed_all
 from ui.session_state import SS
+import logging
+_log = logging.getLogger(__name__)
 
 # Bump this when agent code changes to force recreation on hot-reload.
 # The agent instance is cached in session_state and Streamlit's hot-reload
@@ -35,11 +37,13 @@ def init_session():
         from data.live_generator import generate_today_events
         generate_today_events()
     except Exception:
+        _log.debug("non-critical failure", exc_info=True)
         pass  # non-critical — demo still works with seed data alone
     try:
         from data.db_perception import run_perception_scan
         run_perception_scan()
     except Exception:
+        _log.debug("non-critical failure", exc_info=True)
         pass  # non-critical — perception is optional
 
     is_offline = OFFLINE_MODE
@@ -48,6 +52,7 @@ def init_session():
         if qp and str(qp).lower() in ("1", "true", "yes"):
             is_offline = True
     except Exception:  # non-critical: silent pass intended
+        _log.debug("non-critical failure", exc_info=True)
         pass
     # Check for forced offline (auto-detected when no API key)
     if st.session_state.get(SS.force_offline, False):

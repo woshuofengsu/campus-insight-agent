@@ -514,6 +514,7 @@ else:
                             else:
                                 st.caption("暂无处理记录")
                     except Exception:
+                        _log.debug("non-critical failure", exc_info=True)
                         st.caption("处理记录暂不可用")
 
                     # ── Action buttons in detail view ──

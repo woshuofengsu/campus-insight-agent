@@ -4,6 +4,8 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 from ui.components import TOKEN, section, stat, tag, configure_altair
+import logging
+_log = logging.getLogger(__name__)
 
 st.markdown(
     f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'

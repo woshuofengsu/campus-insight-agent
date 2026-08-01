@@ -10,7 +10,10 @@ Design:
   - 4 font sizes. 2 font weights. No micro-tuning.
 """
 
+import logging
 import streamlit as st  # noqa: F401
+
+_log = logging.getLogger(__name__)
 
 # Light tokens (DEFAULT)
 TOKEN_LIGHT = {
@@ -159,6 +162,7 @@ def apply_theme_at_startup():
             if qp in ("light", "dark"):
                 mode = qp
         except Exception:
+            _log.debug("Failed to read theme from query params at startup", exc_info=True)
             pass
         st.session_state[_THEME_KEY] = mode
 
@@ -173,6 +177,7 @@ def get_theme() -> str:
         if qp in ("light", "dark"):
             return qp
     except Exception:
+        _log.debug("Failed to read theme from query params in get_theme", exc_info=True)
         pass
     return "light"
 
@@ -194,6 +199,7 @@ def apply_native_theme():
             st._config.set_option("theme.secondaryBackgroundColor", "#f5f5f5")
             st._config.set_option("theme.textColor", "#1a1a1a")
     except Exception:
+        _log.debug("Failed to set native theme config options", exc_info=True)
         pass
 
 
@@ -207,6 +213,7 @@ def theme_toggle():
         try:
             st.query_params["theme"] = new
         except Exception:
+            _log.debug("non-critical failure", exc_info=True)
             pass
         st.rerun()
 

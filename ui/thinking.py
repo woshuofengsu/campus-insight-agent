@@ -12,6 +12,8 @@ import html as _html
 import json
 import streamlit as st
 from ui.components import TOKEN
+import logging
+_log = logging.getLogger(__name__)
 
 
 def _esc(text: str) -> str:
@@ -64,6 +66,7 @@ def render_reasoning_chain(
             try:
                 inp = json.dumps(s.get("tool_input", {}), ensure_ascii=False)
             except Exception:
+                _log.debug("non-critical failure", exc_info=True)
                 inp = str(s.get("tool_input", ""))
             inp = (inp[:77] + "...") if len(inp) > 80 else inp
 

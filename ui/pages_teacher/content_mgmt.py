@@ -4,6 +4,8 @@ import streamlit as st
 from ui.components import TOKEN
 from ui.cache import cached_knowledge_base, cached_active_topics, invalidate_content
 from data.database import get_db, create_topic, close_topic
+import logging
+_log = logging.getLogger(__name__)
 
 st.markdown(
     f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
@@ -144,6 +146,7 @@ with col2:
             ).fetchall()
             closed_topics = [dict(r) for r in rows]
     except Exception:  # non-critical: silent pass intended
+        _log.debug("non-critical failure", exc_info=True)
         pass
 
     all_topics = list(active_topics) + list(closed_topics)

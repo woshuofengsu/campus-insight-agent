@@ -7,6 +7,8 @@ from data.database import get_issues, report_issue as db_report_issue
 from ui.cache import cached_issues_stats as get_issues_stats, invalidate_issues
 from tools.action_report_issue import _auto_classify, _auto_urgency, validate_location
 from ui.components import TOKEN, section, stat, issue_card, info_card, ooda_nav, CAT_LABEL, resolve_author, configure_altair
+import logging
+_log = logging.getLogger(__name__)
 
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
@@ -84,6 +86,7 @@ def _do_issues_report():
         st.session_state.quick_report_title = ""
         st.session_state.quick_report_location = ""
     except Exception as e:
+        _log.debug("non-critical failure", exc_info=True)
         st.session_state._report_error = f"上报失败：{e}"
         st.session_state._report_result = ""
         import traceback

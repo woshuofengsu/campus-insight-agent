@@ -88,6 +88,7 @@ try:
                             else:
                                 st.toast("扫描完成", icon="✅")
                         except Exception as e:
+                            _log.debug("non-critical failure", exc_info=True)
                             st.toast(f"扫描失败: {e}", icon="❌")
                     st.rerun()
     else:
@@ -213,6 +214,7 @@ try:
             else:
                 st.caption("暂无校园动态。当同学们开始上报问题和提交提案时，这里会实时更新。")
         except Exception:
+            _log.debug("non-critical failure", exc_info=True)
             st.caption("暂无校园动态。")
 except Exception:
     _log.warning("Activity feed unavailable", exc_info=True)

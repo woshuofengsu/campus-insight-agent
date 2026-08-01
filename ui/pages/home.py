@@ -64,6 +64,7 @@ with panel_col:
             invalidate_issues()
             st.toast(f"已提交 #{issue_id}")
         except Exception as e:
+            _log.debug("non-critical failure", exc_info=True)
             st.session_state._home_report_error = f"上报失败：{e}"
             st.session_state._home_report_ok = ""
 

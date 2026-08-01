@@ -15,6 +15,8 @@ from ui.cache import (
     cached_knowledge_base as get_knowledge_base,
 )
 from ui.components import TOKEN, section, stat, info_card, ooda_nav, CAT_LABEL, configure_altair
+import logging
+_log = logging.getLogger(__name__)
 
 # ── Page header ──
 st.markdown(

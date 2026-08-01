@@ -1,9 +1,12 @@
 # ui/components.py
 """Design system — enterprise SaaS components for CampusInsight."""
+import logging
 import streamlit as st
 from contextlib import contextmanager
 from datetime import datetime
 from utils.text import split_thinking  # re-export
+
+_log = logging.getLogger(__name__)
 
 
 class _ThemeAwareToken:
@@ -392,6 +395,7 @@ def time_ago(ts: str) -> str:
         if secs < 86400:    return f"{int(secs // 3600)}h ago"
         return f"{diff.days}d ago"
     except Exception:
+        _log.debug("time_ago parsing failed for ts=%r", ts, exc_info=True)
         return ""
 
 

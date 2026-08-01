@@ -87,6 +87,8 @@ st.markdown("---")
 # Per-disease risk cards — delegated to shared component
 
 from ui.health_card import render_disease_detail_cards
+import logging
+_log = logging.getLogger(__name__)
 render_disease_detail_cards(h)
 
 st.markdown("---")

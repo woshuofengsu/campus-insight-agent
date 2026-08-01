@@ -16,6 +16,8 @@ from ui.cache import (
     invalidate_opinions,
 )
 from ui.components import TOKEN, section, stat, info_card, proposal_card, topic_card, ooda_nav, resolve_author
+import logging
+_log = logging.getLogger(__name__)
 
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
@@ -90,6 +92,7 @@ with st.container(border=True):
                 st.session_state.create_proposal_desc = ""
                 st.session_state.create_proposal_cat = "自动推断"
             except Exception as e:
+                _log.debug("non-critical failure", exc_info=True)
                 st.session_state._create_proposal_error = f"发布失败：{e}"
                 st.session_state._create_proposal_feedback = ""
         st.rerun()
@@ -178,6 +181,7 @@ else:
                             st.session_state._support_feedback = {str(pid): f"附议成功！{p['title'][:20]} → {new_count} 人"}
                             st.session_state._support_error = {}
                         except Exception as e:
+                            _log.debug("non-critical failure", exc_info=True)
                             st.session_state._support_error = {str(pid): str(e)}
                             st.session_state._support_feedback = {}
                         st.rerun()
@@ -260,6 +264,7 @@ else:
                             # Clear the input
                             st.session_state[f"opinion_input_{tid}"] = ""
                         except Exception as e:
+                            _log.debug("non-critical failure", exc_info=True)
                             st.session_state._opinion_feedback = {str(tid): f"❌ 发表失败：{e}"}
                         st.rerun()
 

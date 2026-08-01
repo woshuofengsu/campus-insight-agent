@@ -32,6 +32,7 @@ def _fetch_counts():
             urgent_issues = get_issues(urgency="紧急", limit=100)
             urgent = len([i for i in urgent_issues if i.get("status") != "已解决"])
         except Exception:
+            _log.debug("Failed to query urgent issues for notification count", exc_info=True)
             urgent = 0
 
         return {
@@ -42,6 +43,7 @@ def _fetch_counts():
             "proposal_pending": p_stats["by_status"].get("讨论中", 0),
         }
     except Exception:  # non-critical: graceful degradation
+        _log.debug("_fetch_counts failed", exc_info=True)
         return None
 
 
@@ -62,6 +64,7 @@ def check_and_notify():
         try:
             role = role.get_user_profile().get("role", "student")
         except Exception:
+            _log.debug("Failed to resolve user role from memory profile", exc_info=True)
             role = "student"
     else:
         role = "student"
@@ -128,6 +131,7 @@ def render_sidebar_badge():
         try:
             role = role.get_user_profile().get("role", "student")
         except Exception:  # non-critical: graceful degradation
+            _log.debug("Failed to resolve user role in render_sidebar_badge", exc_info=True)
             return
     else:
         return

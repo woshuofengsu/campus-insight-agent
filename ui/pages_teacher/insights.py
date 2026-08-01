@@ -8,6 +8,8 @@ from data.database import get_db
 
 # ── Reuse reflector's battle-tested analysis functions ──
 from agent.reflector import (
+import logging
+_log = logging.getLogger(__name__)
     _z_score_anomalies,
     _cross_time_comparison,
     _detect_upgrade_paths,
