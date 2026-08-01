@@ -50,7 +50,7 @@ try:
             # Header row
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-                f'<span style="font-weight:700;color:{TOKEN["text"]};">AI Perception</span>'
+                f'<span style="font-weight:700;color:{TOKEN["text"]};">校园感知</span>'
                 f'<span style="display:inline-block;width:8px;height:8px;'
                 f'background:{dot_color};border-radius:50%;margin-left:6px;" '
                 f'title="perception active"></span>'
@@ -64,7 +64,7 @@ try:
 
             # Findings in expander
             if findings:
-                with st.expander(f"📋 {len(findings)} 项感知发现", expanded=(anomaly_count > 0)):
+                with st.expander(f"📋 {len(findings)} 项发现", expanded=(anomaly_count > 0)):
                     for f_text in findings:
                         st.markdown(
                             f'<div style="font-size:0.82em;color:{TOKEN["text_sec"]};'
@@ -75,9 +75,9 @@ try:
             # Manual refresh
             c_refresh, _ = st.columns([1, 4])
             with c_refresh:
-                if st.button("🔄 立即感知", key="force_perception", width="stretch",
+                if st.button("🔄 立即扫描", key="force_perception", width="stretch",
                              help="手动触发 AI 感知引擎扫描校园数据"):
-                    with st.spinner("🧠 AI 感知引擎正在扫描校园数据..."):
+                    with st.spinner("🧠 正在扫描校园数据..."):
                         try:
                             result = force_perception_scan()
                             if result:
@@ -89,7 +89,7 @@ try:
                     st.rerun()
     else:
         # No perception data yet — show initial scan prompt
-        st.info("🧠 AI 感知引擎就绪 · 正在初始化首次校园扫描...")
+        st.info("🧠 感知引擎就绪 · 正在初始化首次校园扫描...")
 
 except Exception:
     pass  # Perception engine is optional — don't break the pulse page
@@ -379,7 +379,7 @@ if issues:
 
     st.markdown("")
 
-    # ── 🧠 AI 智能洞察（Agent 主动发现）──
+    # ── 🧠 智能洞察（Agent 主动发现）──
     try:
         from agent.reflector import get_proactive_insights as _get_insights
         _insights = _get_insights()
@@ -387,9 +387,9 @@ if issues:
             with st.container(border=True):
                 st.markdown(
                     f'<span style="font-size:0.9em;font-weight:700;color:{TOKEN["text"]};">'
-                    f'🧠 AI 智能洞察</span>'
+                    f'🧠 智能洞察</span>'
                     f'<span style="font-size:0.68em;color:{TOKEN["text_muted"]};margin-left:6px;">'
-                    f'Agent 自动发现</span>',
+                    f'系统自动发现</span>',
                     unsafe_allow_html=True,
                 )
                 for part in _insights.get("summary_parts", [])[:3]:
@@ -398,7 +398,7 @@ if issues:
                         unsafe_allow_html=True,
                     )
                 from datetime import datetime
-                st.caption(f'🕐 {datetime.now().strftime("%H:%M")} · AI Agent 自动分析')
+                st.caption(f'🕐 {datetime.now().strftime("%H:%M")} · 系统自动分析')
     except ImportError:
         pass
     except Exception:  # non-critical: silent pass intended

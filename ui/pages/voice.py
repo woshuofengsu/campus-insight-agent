@@ -35,7 +35,7 @@ st.markdown(
     f'</div>',
     unsafe_allow_html=True,
 )
-st.caption("提建议、附议别人、参与 AI 发起的民意议题——你的声音，校园听得见。")
+st.caption("提建议、附议别人、参与 系统发起的民意议题——你的声音，校园听得见。")
 
 ooda_nav("voice")
 
@@ -209,14 +209,14 @@ section("正在热议")
 topics = get_active_topics(limit=20)
 
 if not topics:
-    info_card("AI 会根据校园热点自动发起讨论")
+    info_card("系统会根据校园热点自动发起讨论")
 else:
     opinion_feedback = st.session_state.get("_opinion_feedback", {})
 
     for t in topics:
         tid = t["id"]
         with st.container(border=True):
-            source = "🤖 AI发起" if t.get("created_by_agent") else "👤 管理员"
+            source = "🤖 系统发起" if t.get("created_by_agent") else "👤 管理员"
             st.markdown(
                 f'<div style="font-size:0.92em;font-weight:700;color:{TOKEN["text"]};'
                 f'margin-bottom:2px;">🔥 {t.get("title","")[:50]}</div>',

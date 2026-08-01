@@ -54,7 +54,7 @@ def render_reasoning_chain(
     first_summary = _esc(steps[0].get("summary", "")) if steps else ""
     label_summary = first_summary[:28] + ("…" if len(first_summary) > 28 else "")
     with st.expander(
-        f"🧠 AI 推理链 · {n} 步 · {label_summary}",
+        f"🧠 处理流程 · {n} 步 · {label_summary}",
         expanded=False,
     ):
         # ── Step cards ──
@@ -205,7 +205,7 @@ def render_reasoning_chain(
                     f'border-radius:{TOKEN["radius"]};padding:14px 16px 10px;'
                     f'margin:10px 0 4px;box-shadow:{TOKEN["shadow_sm"]};">'
                     f'<div style="font-weight:700;color:{TOKEN["purple_text"]};'
-                    f'font-size:0.9em;margin-bottom:8px;">💡 智能关联发现</div>'
+                    f'font-size:0.9em;margin-bottom:8px;">💡 关联发现</div>'
                     f'{"".join(panel_sections)}'
                     f'</div>',
                     unsafe_allow_html=True,
@@ -444,7 +444,7 @@ def render_thinking_fallback(thinking_text: str | None) -> None:
         f'font-size:0.82em;line-height:1.6;color:{TOKEN["text_sec"]};'
         f'white-space:pre-wrap;font-family:system-ui,-apple-system,sans-serif;">'
         f'<div style="font-weight:700;color:{TOKEN["primary"]};'
-        f'font-size:0.88em;margin-bottom:6px;">🧠 AI 思考过程</div>'
+        f'font-size:0.88em;margin-bottom:6px;">🧠 分析过程</div>'
         f'{display}</div>',
         unsafe_allow_html=True,
     )

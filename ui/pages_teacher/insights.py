@@ -22,7 +22,7 @@ st.markdown(
 st.caption("基于 OODA 反射器的 7 维关联分析，自动发现校园治理中的隐藏模式和趋势。")
 
 # ═══════════════════════════════════════════════════
-# 🤖 AI 治理周报 — 一键生成
+# 🤖 治理周报 — 一键生成
 # ═══════════════════════════════════════════════════
 st.markdown("---")
 
@@ -30,7 +30,7 @@ c_rpt, c_btn = st.columns([3, 1])
 with c_rpt:
     st.markdown(
         f'<span style="font-size:1.05em;font-weight:700;color:{TOKEN["text"]};">'
-        f'🤖 AI 治理周报</span>',
+        f'🤖 治理周报</span>',
         unsafe_allow_html=True,
     )
     st.caption("自动分析校园治理数据，生成包含执行摘要、异常预警、趋势分析的结构化周报。")
@@ -41,7 +41,7 @@ with c_btn:
     )
 
 if generate_btn:
-    with st.spinner("🤖 AI 正在分析校园治理数据并生成周报..."):
+    with st.spinner("🤖 正在分析校园治理数据并生成周报..."):
         from agent.weekly_report import generate_weekly_report
         report = generate_weekly_report(include_llm_summary=True)
         st.session_state._weekly_report = report
@@ -59,14 +59,14 @@ if report:
             f'{TOKEN["purple_bg"]});border:1px solid {TOKEN["primary_border"]};'
             f'border-radius:{TOKEN["radius_lg"]};padding:16px 20px;margin:8px 0;">'
             f'<div style="font-size:0.78em;font-weight:700;color:{TOKEN["primary"]};'
-            f'margin-bottom:6px;">🧠 AI 执行摘要</div>'
+            f'margin-bottom:6px;">🧠 分析摘要</div>'
             f'<div style="font-size:0.88em;color:{TOKEN["text"]};line-height:1.7;">'
             f'{report["exec_summary"]}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
     elif not generate_btn:
-        st.info("👆 点击「生成周报」按钮，AI 将自动分析数据并生成完整报告。")
+        st.info("👆 点击「生成周报」按钮，系统将自动分析数据并生成完整报告。")
 
     # ── Report sections in expandable cards ──
     data = report.get("data", {})

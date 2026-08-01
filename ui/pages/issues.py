@@ -27,7 +27,7 @@ st.markdown(
     f'</div>',
     unsafe_allow_html=True,
 )
-st.caption("发现校园问题？一句话上报，AI 自动分类定级。")
+st.caption("发现校园问题？一句话上报，自动分类定级。")
 
 ooda_nav("issues")
 

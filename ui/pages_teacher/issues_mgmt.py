@@ -68,7 +68,7 @@ issues.sort(key=lambda x: (
 
 
 # ═══════════════════════════════════════════════════════════════
-# AI Category Suggestion (keyword-based, no LLM)
+# Auto Category Suggestion (keyword-based, no LLM)
 # ═══════════════════════════════════════════════════════════════
 _CATEGORY_KEYWORDS = {
     "设施维修": ["灯", "水龙头", "空调", "门", "窗", "电梯", "厕所", "卫生间", "漏水", "坏了", "故障", "不亮", "不漏", "关不上", "打不开", "墙", "地板", "天花板", "管道", "暖气"],
@@ -176,7 +176,7 @@ with c_export:
     if issues:
         csv_buffer = io.StringIO()
         writer = csv.writer(csv_buffer)
-        writer.writerow(["ID", "标题", "分类", "AI建议分类", "位置", "状态", "紧急度",
+        writer.writerow(["ID", "标题", "分类", "建议分类", "位置", "状态", "紧急度",
                          "上报人", "指派人", "上报时间", "解决时间", "处理耗时(天)",
                          "处理备注", "问题描述"])
         for i in issues:
@@ -360,7 +360,7 @@ else:
     with col_hdr[2]:
         st.caption("⏱️ 时效")
     with col_hdr[3]:
-        st.caption("🏷️ AI建议分类")
+        st.caption("🏷️ 建议分类")
     with col_hdr[4]:
         st.caption("🔧 操作")
 
@@ -440,7 +440,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-            # ── Column 4: AI suggested category ──
+            # ── Column 4: Suggested category ──
             with c_suggest:
                 if not suggested_cat:
                     suggested_cat = _suggest_category(title, desc)
@@ -472,7 +472,7 @@ else:
                     st.write(f"**标题**：{title}")
                     st.write(f"**分类**：{cat}")
                     if suggested_cat and suggested_cat != cat:
-                        st.info(f"🤖 AI建议分类：**{suggested_cat}**")
+                        st.info(f"🤖 建议分类：**{suggested_cat}**")
                     st.write(f"**位置**：{loc or '未指定'}")
                     st.write(f"**状态**：{status} · **紧急度**：{urgency}")
                     st.write(f"**上报人**：{_resolve_author_display(author)}")

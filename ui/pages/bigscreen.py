@@ -720,7 +720,7 @@ st.markdown(f"""
 
 st.markdown(f"""
 <div style="text-align:center;font-size:0.65em;color:{TEXT_MUTED};margin-top:8px;">
-    CampusInsight Agent · OODA Cognitive Loop · Real-time Monitoring
+    CampusInsight · Campus Monitor · Real-time Monitoring
     · {now.strftime("%Y-%m-%d %H:%M:%S")}
 </div>
 """, unsafe_allow_html=True)

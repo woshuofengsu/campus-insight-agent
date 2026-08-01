@@ -1,5 +1,5 @@
 # ui/pages/home.py
-"""Chat — AI campus governance assistant."""
+"""Chat — campus governance assistant."""
 import time
 import streamlit as st
 from config import PERCEPTION_IDLE_SECONDS
@@ -147,7 +147,7 @@ with chat_col:
         f'<span style="font-size:{TOKEN["font_display"]};font-weight:{TOKEN["weight_bold"]};'
         f'color:{TOKEN["text"]};">对话</span>'
         f'<span style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_muted"]};'
-        f'margin-left:10px;">AI 校园助手</span>'
+        f'margin-left:10px;">校园助手</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -161,7 +161,7 @@ with chat_col:
         messages = memory.get_working_memory()
         if not messages:
             st.info(
-                "欢迎。我是你的校园治理 AI 助手。\n\n"
+                "欢迎。我是你的校园治理助手。\n\n"
                 "你可以这样使用我：\n"
                 "- 输入「校园脉搏」查看本周热点\n"
                 "- 描述问题：「三教二楼水龙头漏水」\n"

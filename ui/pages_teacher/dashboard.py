@@ -87,7 +87,7 @@ with c5:
 
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
-# ── 🧠 AI 智能洞察（Agent 主动发现）──
+# ── 🧠 智能洞察（Agent 主动发现）──
 try:
     from agent.reflector import get_proactive_insights as _get_insights
     _insights = _get_insights()
@@ -95,9 +95,9 @@ try:
         with st.container(border=True):
             st.markdown(
                 f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">'
-                f'🧠 AI 智能洞察</span>'
+                f'🧠 智能洞察</span>'
                 f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:8px;">'
-                f'Agent 自动分析 · 实时更新</span>',
+                f'系统自动分析 · 实时更新</span>',
                 unsafe_allow_html=True,
             )
             # ── Anomaly alerts ──
@@ -123,7 +123,7 @@ try:
                 st.markdown(
                     f'🚀 **{u["category"]}** 类 {u["issue_count"]} 件待处理，建议发起治理提案'
                 )
-            st.caption(f'🕐 基于 {datetime.now().strftime("%H:%M")} 数据 · 由 AI Agent 自动生成')
+            st.caption(f'🕐 基于 {datetime.now().strftime("%H:%M")} 数据 · 由系统自动生成')
 except ImportError:
     pass  # Reflector module not available
 except Exception:
@@ -173,7 +173,7 @@ except Exception:
 
 st.markdown("---")
 
-# ── 🧠 AI Perception Insights (background engine) ──
+# ── 🧠 校园感知 Insights (background engine) ──
 try:
     from data.db_perception import get_latest_perception, get_perception_status
     perception = get_latest_perception()
@@ -198,7 +198,7 @@ try:
             with c1:
                 st.markdown(
                     f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">'
-                    f'🧠 AI 感知洞察</span>'
+                    f'🧠 校园感知</span>'
                     f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:10px;">'
                     f'{time_label} 自动扫描</span>'
                     f'<span style="font-size:0.85em;color:{alert_color};margin-left:8px;font-weight:600;">'
