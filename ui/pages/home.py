@@ -1,6 +1,7 @@
 # ui/pages/home.py
 """Chat — campus governance assistant."""
 import time
+import logging
 import streamlit as st
 from config import PERCEPTION_IDLE_SECONDS
 from ui.components import TOKEN, time_ago, reminder, ooda_nav, resolve_author
@@ -11,6 +12,8 @@ from ui.prefetch import try_prefetch as _try_prefetch
 from ui.cache import invalidate_issues, cached_issues_stats
 from tools.action_report_issue import _auto_classify, _auto_urgency, validate_location
 from data.database import report_issue as db_report_issue
+
+_log = logging.getLogger(__name__)
 
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
@@ -123,7 +126,7 @@ with panel_col:
             unsafe_allow_html=True,
         )
     except Exception:
-        pass
+        _log.warning("Failed to load stats for system status panel", exc_info=True)
 
     # ── Notification badge ──
     try:
@@ -138,7 +141,7 @@ with panel_col:
                 unsafe_allow_html=True,
             )
     except Exception:
-        pass
+        _log.warning("Failed to load notification badge", exc_info=True)
 
 with chat_col:
     # ── Header ──

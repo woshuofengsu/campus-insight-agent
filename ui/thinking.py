@@ -30,7 +30,9 @@ PHASE_COLORS = {
 }
 
 
+# ---------------------------------------------------------------------------
 # Structured reasoning chain
+# ---------------------------------------------------------------------------
 
 def render_reasoning_chain(
     steps: list[dict] | None,
@@ -46,14 +48,14 @@ def render_reasoning_chain(
 
     n = len(steps)
 
-        # Build a compact summary for the expander label (first step summary)
+    # Build a compact summary for the expander label (first step summary)
     first_summary = _esc(steps[0].get("summary", "")) if steps else ""
     label_summary = first_summary[:28] + ("…" if len(first_summary) > 28 else "")
     with st.expander(
         f"🧠 处理流程 · {n} 步 · {label_summary}",
         expanded=False,
     ):
-                for s in steps:
+        for s in steps:
             phase = s.get("phase", "")
             border = PHASE_COLORS.get(phase, TOKEN["border"])
             icon = s.get("icon", "🔹")
@@ -98,14 +100,14 @@ def render_reasoning_chain(
                 unsafe_allow_html=True,
             )
 
-                if associations and associations.get("has_insight"):
+        if associations and associations.get("has_insight"):
             insight_text = associations.get("insight_text", "")
             spatial = associations.get("spatial")
             anomalies = associations.get("anomalies", [])
             linked_proposals = associations.get("linked_proposals", [])
             correlations = associations.get("correlations", [])
 
-                        anomaly_html = ""
+            anomaly_html = ""
             if anomalies:
                 for a in anomalies[:3]:
                     anomaly_html += (
@@ -118,7 +120,7 @@ def render_reasoning_chain(
                         f'</span>'
                     )
 
-                        cards_html = ""
+            cards_html = ""
             if spatial:
                 for item in spatial[:8]:
                     issue_id = item.get("id", "?")
@@ -134,7 +136,7 @@ def render_reasoning_chain(
                         f'{_esc(title)} · <span style="color:{TOKEN["text_muted"]};">{_esc(status)}</span></span>'
                     )
 
-                        proposal_html = ""
+            proposal_html = ""
             if linked_proposals:
                 for p in linked_proposals[:3]:
                     proposal_html += (
@@ -148,7 +150,7 @@ def render_reasoning_chain(
                         f'</span>'
                     )
 
-                        corr_html = ""
+            corr_html = ""
             if correlations:
                 for c in correlations[:3]:
                     corr_html += (
@@ -161,7 +163,7 @@ def render_reasoning_chain(
                         f'</span>'
                     )
 
-                        panel_sections = []
+            panel_sections = []
             if anomaly_html:
                 panel_sections.append(
                     f'<div style="margin-bottom:6px;">'
@@ -204,10 +206,12 @@ def render_reasoning_chain(
             if insight_text:
                 st.markdown(insight_text)
 
-                        _render_proactive_suggestions(associations, steps)
+            _render_proactive_suggestions(associations, steps)
 
 
+# ---------------------------------------------------------------------------
 # Proactive suggestion engine
+# ---------------------------------------------------------------------------
 
 def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None:
     """Generate actionable "you might want to..." suggestions from association data.
@@ -302,9 +306,10 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
     )
 
 
+# ---------------------------------------------------------------------------
 # Tool-call progress indicator (real-time)
+# ---------------------------------------------------------------------------
 
-# Icon mapping for tool → emoji
 TOOL_ICONS = {
     "report_issue": "🔧", "query_issues": "🔍", "get_campus_pulse": "🌊",
     "get_governance_stats": "📊", "get_weather": "🌤️", "create_proposal": "💡",
@@ -312,7 +317,6 @@ TOOL_ICONS = {
     "get_topic_detail": "📖", "express_opinion": "💬", "collect_feedback": "📥",
 }
 
-# Human-readable Chinese names for tools
 TOOL_LABELS = {
     "report_issue": "上报问题", "query_issues": "查询工单", "get_campus_pulse": "校园脉搏",
     "get_governance_stats": "治理统计", "get_weather": "天气查询", "create_proposal": "创建提案",
@@ -406,7 +410,9 @@ def render_tool_progress(events: list[dict] | None) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
 # Fallback: raw thinking text
+# ---------------------------------------------------------------------------
 
 def render_thinking_fallback(thinking_text: str | None) -> None:
     """Fallback for raw DeepSeek <think> text when no structured steps exist."""

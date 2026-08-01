@@ -66,7 +66,7 @@ def check_and_notify():
     else:
         role = "student"
 
-        if role == "student":
+    if role == "student":
         last_total = st.session_state.get(SS.notif_last_total, 0)
         if counts["total"] > last_total and last_total > 0:
             new_count = counts["total"] - last_total
@@ -79,7 +79,7 @@ def check_and_notify():
                 _log.debug("st.toast failed for student notification (non-critical)")
         st.session_state[SS.notif_last_total] = counts["total"]
 
-        else:
+    else:
         last_urgent = st.session_state.get(SS.notif_last_urgent, -1)
         last_proposal = st.session_state.get(SS.notif_last_proposal, -1)
 
@@ -134,7 +134,7 @@ def render_sidebar_badge():
 
     user_id = st.session_state.get(SS.login_user_id, 0)
 
-        unread_note = 0
+    unread_note = 0
     try:
         from data.db_notifications import get_unread_count
         unread_note = get_unread_count(user_id)

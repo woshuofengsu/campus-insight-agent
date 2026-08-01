@@ -3,8 +3,11 @@
 
 Extracted to eliminate duplication across the two agent implementations.
 """
+import logging
 import random
 import re
+
+_log = logging.getLogger(__name__)
 
 
 def get_author_identifier(memory) -> str:
@@ -32,16 +35,16 @@ def get_author_identifier(memory) -> str:
         if uid:
             return f"user_{uid}"
     except Exception:  # non-critical: silent pass intended
+        _log.debug("Failed to resolve author from profile", exc_info=True)
         pass
-    # Final fallback: direct session_state read
     try:
         import streamlit as st
         uid = st.session_state.get("_login_user_id")
         if uid:
             return f"user_{uid}"
     except Exception:  # non-critical: silent pass intended
+        _log.debug("Failed to resolve author from session_state fallback", exc_info=True)
         pass
-    return ""
 
 
 def get_user_name(memory) -> str:
@@ -50,6 +53,7 @@ def get_user_name(memory) -> str:
         profile = memory.get_user_profile()
         return profile.get("name", "") or profile.get("student_id", "") or ""
     except Exception:  # non-critical: graceful degradation
+        _log.debug("Failed to get user name from profile", exc_info=True)
         return ""
 
 

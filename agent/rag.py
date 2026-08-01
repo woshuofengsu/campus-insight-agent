@@ -20,9 +20,12 @@ import math
 import re
 import sqlite3
 import time
+import logging
 from collections import Counter
 
 from data.db_core import get_db
+
+_log = logging.getLogger(__name__)
 
 # ── Character n-gram extraction ──
 
@@ -182,6 +185,7 @@ def semantic_search(query: str, top_k: int = 5,
             try:
                 doc_ngrams = json_mod.loads(row["ngrams_json"]) if row["ngrams_json"] else []
             except Exception:
+                _log.debug("Failed to parse ngrams JSON, computing from text", exc_info=True)
                 doc_ngrams = _text_to_ngrams(
                     f"{row['title']} {row['content']} {row.get('keywords', '')}"
                 )
@@ -209,6 +213,7 @@ def semantic_search(query: str, top_k: int = 5,
         return results
 
     except Exception:  # non-critical: graceful degradation
+        _log.debug("Semantic search failed, falling back to keyword search", exc_info=True)
         return _fallback_keyword_search(query, top_k, category)
 
 

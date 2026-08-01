@@ -2,11 +2,14 @@
 """📋 工单管理 — 表格视图、筛选、批量操作、指派、时效统计."""
 import csv
 import io
+import logging
 from datetime import datetime
 import streamlit as st
 from ui.components import TOKEN, tag
 from ui.cache import cached_issues, cached_issues_stats, invalidate_issues
 from data.database import update_issue_status, get_db
+
+_log = logging.getLogger(__name__)
 
 # ── Page Render ──
 st.markdown(
@@ -125,6 +128,7 @@ with st.expander("📊 我的处理统计", expanded=False):
             ).fetchone()
             avg_days = avg_days_row["avg_days"] if avg_days_row and avg_days_row["avg_days"] else None
     except Exception:
+        _log.warning("Failed to load teacher processing stats", exc_info=True)
         today_processed, week_processed, avg_days = 0, 0, None
 
     mc1, mc2, mc3 = st.columns(3)
@@ -156,8 +160,8 @@ try:
             "WHERE urgency='紧急' AND status != '已解决'"
         ).fetchone()
         urgent_unresolved = urgent_row["cnt"] if urgent_row else 0
-except Exception:  # non-critical: silent pass intended
-    pass
+except Exception:
+    _log.warning("Failed to load SLA/urgent counts", exc_info=True)
 
 c_stats, c_export = st.columns([5, 1])
 with c_stats:

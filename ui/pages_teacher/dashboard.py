@@ -70,18 +70,16 @@ in_progress_count = stats["by_status"].get("处理中", 0)
 resolved_count = stats["by_status"].get("已解决", 0)
 today_new = stats.get("today_new", 0)
 
-# ── KPI Strip (5 across, no card borders) ──
-c1, c2, c3, c4, c5 = st.columns(5)
+# ── KPI Strip (3-col nested: 2+2+1, stacks to 3 rows on mobile) ──
+grade = health.get("grade", "-")
+c1, c2, c3 = st.columns(3)
 with c1:
     stat("待处理", str(pending_count), TOKEN["warning"])
-with c2:
     stat("今日新增", str(today_new), TOKEN["accent"])
-with c3:
+with c2:
     stat("紧急", str(len(urgent_issues)), TOKEN["danger"])
-with c4:
     stat("处理中", str(in_progress_count), TOKEN["accent"])
-with c5:
-    grade = health.get("grade", "-")
+with c3:
     stat("健康度", f'{health.get("score", "-")} {grade}',
          TOKEN["success"] if grade == "优" else TOKEN["warning"] if grade == "良" else TOKEN["danger"])
 
@@ -125,51 +123,18 @@ try:
                 )
             st.caption(f'🕐 基于 {datetime.now().strftime("%H:%M")} 数据 · 由系统自动生成')
 except ImportError:
-    pass  # Reflector module not available
+    _log.warning("Reflector module not available for proactive insights", exc_info=True)
 except Exception:
-    pass  # Non-critical — don't block dashboard for insight errors
+    _log.warning("Failed to load proactive insights", exc_info=True)
 
-# ── 🏥 Health Risk Overview (compact) ──
+# ── 🏥 Health Risk Overview (compact) — shared component ──
 try:
     from data.db_health_alerts import cached_health_risk as _cached_health
+    from ui.health_card import render_health_risk_overview
     _h = _cached_health()
-    _hl = _h["overall_level"]
-    _he = _h["overall_emoji"]
-    _hc = _h["overall_color"]
-    _hs = _h["overall_score"]
-    _hcolor = TOKEN.get(_hc, TOKEN["accent"])
-
-    _hlabel = {"low": "低风险", "moderate": "注意", "high": "警示", "critical": "高危"}.get(_hl, "—")
-
-    with st.container(border=True):
-        c_hh, c_hs = st.columns([4, 1])
-        with c_hh:
-            st.markdown(
-                f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">'
-                f'🏥 校园健康风险</span>'
-                f'<span style="font-size:0.78em;color:{_hcolor};margin-left:10px;font-weight:600;">'
-                f'{_he} {_hlabel} · {_hs}分</span>',
-                unsafe_allow_html=True,
-            )
-            # Top disease alerts
-            for _a in _h.get("top_alerts", [])[:2]:
-                st.markdown(
-                    f'<span style="font-size:0.78em;color:{TOKEN["text_sec"]};">'
-                    f'{_a["emoji"]} {_a["title"]}</span>',
-                    unsafe_allow_html=True,
-                )
-            st.caption(_h.get("advice_summary", ""))
-        with c_hs:
-            st.markdown(
-                f'<div style="text-align:center;padding-top:8px;">'
-                f'<div style="font-size:2.5em;">{_he}</div>'
-                f'<div style="font-size:1.6em;font-weight:800;color:{_hcolor};">{_hs}</div>'
-                f'<div style="font-size:0.7em;color:{TOKEN["text_muted"]};">风险分</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+    render_health_risk_overview(_h)
 except Exception:
-    pass  # Health module is optional
+    _log.warning("Health risk module unavailable", exc_info=True)
 
 st.markdown("---")
 
@@ -231,7 +196,7 @@ try:
                         unsafe_allow_html=True,
                     )
 except Exception:
-    pass  # Perception is optional
+    _log.warning("Perception engine unavailable", exc_info=True)
 
 st.markdown("---")
 
@@ -480,8 +445,8 @@ try:
                     st.caption("📡 系统感知（暂无用户活动数据）："
                                + f'新增 {live_events.get("new_issues", 0)} 件'
                                + f' · 解决 {live_events.get("resolved_issues", 0)} 件')
-            except Exception:  # non-critical: silent pass intended
-                pass
+            except Exception:
+                _log.warning("Live generator events unavailable", exc_info=True)
     else:
         st.caption("暂无校园动态。当学生上报问题或提交提案时，这里会实时更新。")
 except Exception:  # non-critical: logged and suppressed

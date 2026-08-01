@@ -1,14 +1,17 @@
 # ui/pages/notifications.py
 """🔔 消息中心 — 查看所有通知，标记已读."""
+import logging
 import streamlit as st
 from ui.session_state import SS
 from ui.components import TOKEN
 from data.db_notifications import get_notifications, mark_read, mark_all_read, get_unread_count
 
+_log = logging.getLogger(__name__)
 
 try:
     unread = get_unread_count(st.session_state.get(SS.login_user_id, 0))
 except Exception:
+    _log.warning("Failed to get unread notification count", exc_info=True)
     unread = 0
 
 st.markdown(

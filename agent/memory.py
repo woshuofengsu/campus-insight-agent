@@ -103,6 +103,7 @@ class MemoryManager:
                 _logger.debug("Pruned %d old messages from LangChain memory (now %d)",
                               excess, len(lc_memory.chat_memory.messages))
         except Exception:
+            _logger.debug("Failed to prune LangChain memory messages", exc_info=True)
             pass  # non-critical — if pruning fails, memory just grows
 
     # ── Long-Term Memory (SQLite user_profile) ──

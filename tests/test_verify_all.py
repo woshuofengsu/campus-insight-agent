@@ -461,7 +461,7 @@ else:
 
 # Radius tokens unchanged between themes
 total += 1
-radius_keys = ['radius_xs', 'radius_sm', 'radius', 'radius_lg', 'radius_full']
+radius_keys = ['radius_input', 'radius_card', 'radius_full']
 all_same = all(TOKEN_LIGHT[k] == TOKEN_DARK[k] for k in radius_keys)
 if all_same:
     passed += 1; print(f'  [OK] Radius tokens identical across themes')

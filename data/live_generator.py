@@ -1,6 +1,11 @@
 # data/live_generator.py
 """Time-driven data generator — makes demo data feel "alive".
 
+⚠️  SYNTHETIC DATA — FOR DEMO / DEVELOPMENT USE ONLY:
+    本模块生成的所有事件（问题上报、工单解决、附议增加、反馈条目）
+    均为合成数据 (synthetic / simulated)，用于演示和开发环境。
+    生产环境应使用真实用户活动数据替代。
+
 Each day, based on date hash, generates:
   - 1-3 new campus issues (random but deterministic per date)
   - 0-2 auto-resolved old issues (with detailed resolution notes)
@@ -129,6 +134,9 @@ def generate_today_events() -> dict:
     Called during init_session() — safe to call every page load because
     it checks if today's events have already been generated (by title+date
     dedup for issues, and by checking if any were already resolved today).
+
+    Returns dict includes a ``generated`` boolean flag so consumers can
+    distinguish synthetic data from real user activity.
     """
     seed = _daily_seed()
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -138,6 +146,7 @@ def generate_today_events() -> dict:
         "supporter_bumps": 0,
         "new_feedback": 0,
         "day": today_str,
+        "generated": True,  # synthetic data — set to False when real user data is available
     }
 
     with get_db() as conn:

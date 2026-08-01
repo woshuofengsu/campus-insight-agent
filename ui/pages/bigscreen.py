@@ -15,12 +15,42 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 from datetime import datetime, timedelta
-from ui.components import TOKEN
 
 _log = logging.getLogger(__name__)
 
+from ui.theme import get_theme
 
-# Mock data for demo mode
+# Dual theme colors — dark command-center vs light enterprise dashboard
+_is_dark = get_theme() == "dark"
+
+if _is_dark:
+    C = {
+        "bg": "#0b0f19", "surface": "#141928", "surface_raised": "#1c2233",
+        "border": "rgba(255,255,255,0.06)", "border_glow": "rgba(121,132,245,0.15)",
+        "accent": "#7984f5", "accent_glow": "#8f98f7",
+        "success": "#4ade80", "success_glow": "#6ee7b7",
+        "warning": "#f59e0b", "warning_glow": "#fbbf24",
+        "danger": "#f87171", "danger_glow": "#fca5a5",
+        "purple": "#a78bfa", "purple_glow": "#c4b5fd",
+        "text": "#e9ecf2", "text_sec": "#99a1b3", "text_muted": "#616a80",
+        "chart_grid": "rgba(255,255,255,0.04)",
+        "show_glow": True, "show_grid": True,
+    }
+else:
+    C = {
+        "bg": "#f8f9fb", "surface": "#ffffff", "surface_raised": "#f1f3f6",
+        "border": "rgba(0,0,0,0.06)", "border_glow": "rgba(79,70,229,0.08)",
+        "accent": "#4f46e5", "accent_glow": "#6d6bf5",
+        "success": "#059669", "success_glow": "#34d399",
+        "warning": "#d97706", "warning_glow": "#f59e0b",
+        "danger": "#dc2626", "danger_glow": "#ef4444",
+        "purple": "#7c3aed", "purple_glow": "#8b5cf6",
+        "text": "#1a1a1a", "text_sec": "#6e6e6e", "text_muted": "#a0a0a0",
+        "chart_grid": "rgba(0,0,0,0.05)",
+        "show_glow": False, "show_grid": False,
+    }
+
+# ── Mock data for demo mode ──
 
 def _mock_issue_stats():
     return {
@@ -67,170 +97,97 @@ def _mock_recent_issues():
 def _mock_feedback_stats():
     return {"total": 89, "positive": 52, "negative": 21, "neutral": 16}
 
-# THEME — Dark command center
+# ── CSS — Theme-aware command center / enterprise dashboard ──
 
-BG = "#0b0f19"          # page background
-SURFACE = "#141928"     # card background
-SURFACE_RAISED = "#1c2233"
-BORDER = "rgba(255,255,255,0.06)"   # subtle border
-BORDER_GLOW = "rgba(121,132,245,0.15)"
-ACCENT = "#7984f5"      # indigo accent
-ACCENT_GLOW = "#8f98f7"
-SUCCESS = "#4ade80"
-SUCCESS_GLOW = "#6ee7b7"
-WARNING = "#f59e0b"
-WARNING_GLOW = "#fbbf24"
-DANGER = "#f87171"
-DANGER_GLOW = "#fca5a5"
-PURPLE = "#a78bfa"
-PURPLE_GLOW = "#c4b5fd"
-TEXT = "#e9ecf2"
-TEXT_SEC = "#99a1b3"
-TEXT_MUTED = "#616a80"
+def _inject_bigscreen_css(c: dict) -> None:
+    """Inject theme-aware bigscreen CSS stylesheet.
 
-st.markdown(f"""
-<style>
-    /* ── Global overrides ── */
-    .stApp {{
-        background: {BG} !important;
-    }}
-    html, body, #root {{
-        background: {BG} !important;
-    }}
-    .block-container {{
-        padding: 1rem 1.8rem !important;
-        max-width: 100% !important;
-    }}
-    header, footer, #MainMenu, .stDeployButton {{
-        display: none !important;
-    }}
+    Extracted from inline st.markdown for readability and maintainability.
+    All color values are resolved from the ``c`` dict before injection.
+    """
+    _grid_bg = (
+        ".stApp::before {"
+        "content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;"
+        f"background-image: radial-gradient(circle, {c['border']} 1px, transparent 1px);"
+        "background-size: 40px 40px; opacity: 0.4; }"
+        ".stApp > * { position: relative; z-index: 1; }"
+    ) if c["show_grid"] else ""
 
-    /* ── Grid dot background ── */
-    .stApp::before {{
-        content: '';
-        position: fixed; inset: 0; z-index: 0; pointer-events: none;
-        background-image:
-            radial-gradient(circle, {BORDER} 1px, transparent 1px);
-        background-size: 40px 40px;
-        opacity: 0.4;
-    }}
-    .stApp > * {{ position: relative; z-index: 1; }}
+    _glow_opacity = "opacity: 0.7;" if c["show_glow"] else "opacity: 0.35;"
+    _kpi_shadow = (
+        "box-shadow: 0 0 20px rgba(59,130,246,0.15), inset 0 1px 0 rgba(255,255,255,0.03);"
+        if c["show_glow"] else
+        "box-shadow: 0 1px 3px rgba(0,0,0,0.06);"
+    )
+    _pulse = "animation: pulse-ring 2s ease-out infinite;" if c["show_glow"] else ""
+    _glow_breath = "animation: glow-breath 3s ease-in-out infinite;" if c["show_glow"] else ""
+    _ticker_dot_shadow = f"box-shadow: 0 0 6px {c['accent_glow']};" if c["show_glow"] else ""
 
-    /* ── Glowing KPI card ── */
+    st.markdown(f"""<style>
+    .stApp {{ background: {c["bg"]} !important; }}
+    html, body, #root {{ background: {c["bg"]} !important; }}
+    .block-container {{ padding: 1rem 1.8rem !important; max-width: 100% !important; }}
+    header, footer, #MainMenu, .stDeployButton {{ display: none !important; }}
+    {_grid_bg}
     .kpi-card {{
-        background: {SURFACE};
-        border: 1px solid {BORDER};
-        border-radius: 12px;
-        padding: 18px 14px;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
+        background: {c["surface"]}; border: 1px solid {c["border"]};
+        border-radius: 12px; padding: 18px 14px; text-align: center;
+        position: relative; overflow: hidden; transition: all 0.3s ease;
     }}
     .kpi-card::before {{
-        content: '';
-        position: absolute; top: 0; left: 0; right: 0;
-        height: 2px;
-        border-radius: 2px;
-        opacity: 0.7;
+        content: ''; position: absolute; top: 0; left: 0; right: 0;
+        height: 2px; border-radius: 2px; {_glow_opacity}
     }}
-    .kpi-card.warn::before {{
-        background: linear-gradient(90deg, transparent, {WARNING_GLOW}, transparent);
-    }}
-    .kpi-card.danger::before {{
-        background: linear-gradient(90deg, transparent, {DANGER_GLOW}, transparent);
-    }}
-    .kpi-card.success::before {{
-        background: linear-gradient(90deg, transparent, {SUCCESS_GLOW}, transparent);
-    }}
-    .kpi-card.info::before {{
-        background: linear-gradient(90deg, transparent, {ACCENT_GLOW}, transparent);
-    }}
-    .kpi-card.purple::before {{
-        background: linear-gradient(90deg, transparent, {PURPLE_GLOW}, transparent);
-    }}
-    .kpi-card.glow {{
-        box-shadow: 0 0 20px rgba(59,130,246,0.15), inset 0 1px 0 rgba(255,255,255,0.03);
-    }}
-
-    /* ── Number counter ── */
+    .kpi-card.warn::before {{ background: linear-gradient(90deg, transparent, {c["warning_glow"]}, transparent); }}
+    .kpi-card.danger::before {{ background: linear-gradient(90deg, transparent, {c["danger_glow"]}, transparent); }}
+    .kpi-card.success::before {{ background: linear-gradient(90deg, transparent, {c["success_glow"]}, transparent); }}
+    .kpi-card.info::before {{ background: linear-gradient(90deg, transparent, {c["accent_glow"]}, transparent); }}
+    .kpi-card.purple::before {{ background: linear-gradient(90deg, transparent, {c["purple_glow"]}, transparent); }}
+    .kpi-card.glow {{ {_kpi_shadow} }}
     .kpi-value {{
-        font-size: 2.2em;
-        font-weight: 800;
-        font-variant-numeric: tabular-nums;
+        font-size: 2.2em; font-weight: 800; font-variant-numeric: tabular-nums;
         font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-        letter-spacing: -0.02em;
-        line-height: 1.2;
+        letter-spacing: -0.02em; line-height: 1.2;
     }}
     .kpi-label {{
-        font-size: 0.68em;
-        color: {TEXT_MUTED};
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 6px;
+        font-size: 0.68em; color: {c["text_muted"]}; font-weight: 500;
+        text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
     }}
-
-    /* ── Anomaly pulse ── */
     @keyframes pulse-ring {{
-        0% {{ box-shadow: 0 0 0 0 {DANGER}66; }}
-        70% {{ box-shadow: 0 0 0 12px {DANGER}00; }}
-        100% {{ box-shadow: 0 0 0 0 {DANGER}00; }}
+        0% {{ box-shadow: 0 0 0 0 {c["danger"]}66; }}
+        70% {{ box-shadow: 0 0 0 12px {c["danger"]}00; }}
+        100% {{ box-shadow: 0 0 0 0 {c["danger"]}00; }}
     }}
     @keyframes glow-breath {{
-        0%, 100% {{ box-shadow: 0 0 8px {ACCENT}33, 0 0 20px {ACCENT}11; }}
-        50% {{ box-shadow: 0 0 16px {ACCENT}55, 0 0 35px {ACCENT}22; }}
+        0%, 100% {{ box-shadow: 0 0 8px {c["accent"]}33, 0 0 20px {c["accent"]}11; }}
+        50% {{ box-shadow: 0 0 16px {c["accent"]}55, 0 0 35px {c["accent"]}22; }}
     }}
     @keyframes fadeInUp {{
         from {{ opacity: 0; transform: translateY(16px); }}
         to   {{ opacity: 1; transform: translateY(0); }}
     }}
-    @keyframes slideRight {{
-        from {{ opacity: 0; transform: translateX(-24px); }}
-        to   {{ opacity: 1; transform: translateX(0); }}
-    }}
     @keyframes ticker {{
         0%   {{ transform: translateX(0); }}
         100% {{ transform: translateX(-50%); }}
     }}
-
-    .pulse-anomaly {{ animation: pulse-ring 2s ease-out infinite; }}
-    .glow-breathe {{ animation: glow-breath 3s ease-in-out infinite; }}
+    .pulse-anomaly {{ {_pulse} }}
+    .glow-breathe {{ {_glow_breath} }}
     .fade-up {{ animation: fadeInUp 0.6s ease-out both; }}
-
-    /* ── Health ring ── */
     .health-ring {{
         display: inline-flex; align-items: center; justify-content: center;
-        width: 90px; height: 90px; border-radius: 50%;
-        border: 4px solid;
+        width: 90px; height: 90px; border-radius: 50%; border: 4px solid;
         position: relative;
     }}
-    .health-ring::after {{
-        content: '';
-        position: absolute; inset: -8px; border-radius: 50%;
-        opacity: 0.3;
-    }}
-
-    /* ── Surface card ── */
     .surface-card {{
-        background: {SURFACE};
-        border: 1px solid {BORDER};
-        border-radius: 12px;
-        padding: 16px;
+        background: {c["surface"]}; border: 1px solid {c["border"]};
+        border-radius: 12px; padding: 16px;
     }}
-
-    /* ── Section title ── */
     .section-title {{
-        font-size: 0.78em; font-weight: 600;
-        color: {TEXT_SEC};
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        margin-bottom: 10px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid {BORDER};
+        font-size: 0.78em; font-weight: 600; color: {c["text_sec"]};
+        text-transform: uppercase; letter-spacing: 0.1em;
+        margin-bottom: 10px; padding-bottom: 8px;
+        border-bottom: 1px solid {c["border"]};
     }}
-
-    /* ── Demo badge ── */
     .demo-badge {{
         position: fixed; top: 16px; right: 28px; z-index: 9999;
         background: linear-gradient(135deg, #f59e0b, #d97706);
@@ -239,89 +196,60 @@ st.markdown(f"""
         box-shadow: 0 0 20px rgba(245,158,11,0.4);
         letter-spacing: 0.05em;
     }}
-
-    /* ── Ticker ── */
     .ticker-wrap {{
-        background: {SURFACE_RAISED};
-        border: 1px solid {BORDER};
-        border-radius: 8px;
-        overflow: hidden;
-        height: 32px;
-        position: relative;
+        background: {c["surface_raised"]}; border: 1px solid {c["border"]};
+        border-radius: 8px; overflow: hidden; height: 32px; position: relative;
     }}
     .ticker-track {{
-        display: flex;
-        animation: ticker 30s linear infinite;
-        white-space: nowrap;
-        height: 100%;
-        align-items: center;
+        display: flex; animation: ticker 30s linear infinite;
+        white-space: nowrap; height: 100%; align-items: center;
     }}
     .ticker-item {{
         display: inline-flex; align-items: center; gap: 6px;
-        padding: 0 24px;
-        font-size: 0.78em;
-        color: {TEXT_SEC};
+        padding: 0 24px; font-size: 0.78em; color: {c["text_sec"]};
         white-space: nowrap;
     }}
     .ticker-dot {{
         width: 6px; height: 6px; border-radius: 50%;
-        background: {ACCENT};
-        box-shadow: 0 0 6px {ACCENT_GLOW};
+        background: {c["accent"]}; {_ticker_dot_shadow}
     }}
-    .ticker-wrap:hover .ticker-track {{
-        animation-play-state: paused;
-    }}
-
-    /* ── Campus heatmap grid ── */
+    .ticker-wrap:hover .ticker-track {{ animation-play-state: paused; }}
     .heat-grid {{
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        grid-template-rows: repeat(3, 1fr);
-        gap: 6px;
-        height: 200px;
+        display: grid; grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(3, 1fr); gap: 6px; height: 200px;
     }}
     .heat-cell {{
-        border-radius: 8px;
-        display: flex; align-items: center; justify-content: center;
-        flex-direction: column;
-        font-size: 0.7em;
-        font-weight: 600;
-        color: {TEXT};
-        border: 1px solid transparent;
-        transition: all 0.3s ease;
-        cursor: default;
+        border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        flex-direction: column; font-size: 0.7em; font-weight: 600;
+        color: {c["text"]}; border: 1px solid transparent;
+        transition: all 0.3s ease; cursor: default;
     }}
     .heat-cell:hover {{
-        transform: scale(1.03);
-        border-color: {ACCENT_GLOW};
-        box-shadow: 0 0 16px rgba(59,130,246,0.2);
-        z-index: 2;
+        transform: scale(1.03); border-color: {c["accent_glow"]};
+        box-shadow: 0 0 16px rgba(59,130,246,0.2); z-index: 2;
     }}
-
-    /* ── Recent issue feed ── */
     .issue-row {{
         display: flex; align-items: center; gap: 10px;
-        padding: 6px 10px;
-        font-size: 0.8em;
-        border-radius: 6px;
-        margin: 2px 0;
-        transition: background 0.2s;
+        padding: 6px 10px; font-size: 0.8em; border-radius: 6px;
+        margin: 2px 0; transition: background 0.2s;
     }}
-    .issue-row:hover {{ background: {SURFACE_RAISED}; }}
+    .issue-row:hover {{ background: {c["surface_raised"]}; }}
     .issue-row.urgent {{
-        border-left: 3px solid {DANGER};
-        background: linear-gradient(90deg, {DANGER}18 0%, transparent 100%);
+        border-left: 3px solid {c["danger"]};
+        background: linear-gradient(90deg, {c["danger"]}18 0%, transparent 100%);
     }}
-
-    /* ── Chart overrides for dark theme ── */
     .vega-embed {{ background: transparent !important; }}
-
-    /* ── Scrollbar ── */
     ::-webkit-scrollbar {{ width: 5px; }}
-    ::-webkit-scrollbar-track {{ background: {BG}; }}
-    ::-webkit-scrollbar-thumb {{ background: {BORDER}; border-radius: 3px; }}
-</style>
-""", unsafe_allow_html=True)
+    ::-webkit-scrollbar-track {{ background: {c["bg"]}; }}
+    ::-webkit-scrollbar-thumb {{ background: {c["border"]}; border-radius: 3px; }}
+    @media (max-width: 480px) {{
+        .heat-grid {{ grid-template-columns: repeat(2, 1fr); grid-template-rows: auto; height: auto; }}
+        .kpi-value {{ font-size: 1.5em; }}
+        .block-container {{ padding: 0.5rem !important; }}
+    }}
+</style>""", unsafe_allow_html=True)
+
+_inject_bigscreen_css(C)
 
 # Data loading — real data first, mock only for demo or empty DB
 
@@ -365,9 +293,9 @@ has_anomaly = pending > 10
 
 now = datetime.now()
 
-# Determine theme-aware colors for the clock iframe
-_clock_text = "#e2e8f0" if st.session_state.get("_campus_theme") == "dark" else "#1e293b"
-_clock_muted = "#94a3b8" if st.session_state.get("_campus_theme") == "dark" else "#64748b"
+# Clock colors — theme-aware
+_clock_text = C["text"]
+_clock_muted = C["text_muted"]
 _clock_bg = "transparent"
 
 st.components.v1.html(f"""
@@ -418,25 +346,33 @@ st.components.v1.html(f"""
 </html>
 """, height=52)
 
+# DEMO MODE BADGE
+
+if _using_mock:
+    st.markdown(
+        '<div class="demo-badge">🎬 演示模式 · 模拟数据</div>',
+        unsafe_allow_html=True,
+    )
+
 # HEADER
 
 st.markdown(f"""
 <div class="fade-up" style="margin-bottom:8px;">
-    <div style="font-size:1.8em;font-weight:800;color:{TEXT};letter-spacing:-0.02em;
+    <div style="font-size:1.8em;font-weight:800;color:{C["text"]};letter-spacing:-0.02em;
         display:flex;align-items:center;gap:12px;">
         <span style="font-size:1.3em;">🏛️</span>
         校园治理实时指挥中心
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;
-            background:{SUCCESS};box-shadow:0 0 8px {SUCCESS_GLOW};margin-left:4px;"
+            background:{C["success"]};box-shadow:0 0 8px {C["success_glow"]};margin-left:4px;"
             title="系统在线"></span>
     </div>
-    <div style="font-size:0.75em;color:{TEXT_MUTED};margin-top:2px;letter-spacing:0.05em;">
+    <div style="font-size:0.75em;color:{C["text_muted"]};margin-top:2px;letter-spacing:0.05em;">
         CAMPUSINSIGHT · 知报议督 · 治理闭环
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{BORDER_GLOW},transparent);margin:12px 0;"></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{C["border_glow"]},transparent);margin:12px 0;"></div>', unsafe_allow_html=True)
 
 # KPI ROW — 6 glowing cards with animated numbers
 
@@ -445,13 +381,13 @@ avg_days = health.get("avg_days", 0) or 0
 pos_pct = feedback["positive"] / feedback["total"] * 100 if feedback["total"] > 0 else 0
 
 kpi_data = [
-    ("🏥 治理健康度", f"{score}", "分", PURPLE, "purple", f"{grade}"),
-    ("📝 累计上报", str(total_i), "", ACCENT, "info", ""),
-    ("✅ 已解决", f"{resolved}", f" ({resolution_rate}%)", SUCCESS, "success", ""),
-    ("⏳ 待处理", str(pending), " 件", DANGER if has_anomaly else WARNING,
+    ("🏥 治理健康度", f"{score}", "分", C["purple"], "purple", f"{grade}"),
+    ("📝 累计上报", str(total_i), "", C["accent"], "info", ""),
+    ("✅ 已解决", f"{resolved}", f" ({resolution_rate}%)", C["success"], "success", ""),
+    ("⏳ 待处理", str(pending), " 件", C["danger"] if has_anomaly else C["warning"],
      "danger" if has_anomaly else "warn", f"🔥 {urgent_count} 紧急" if urgent_count > 0 else ""),
-    ("💡 总提案", str(total_p), "", PURPLE, "purple", ""),
-    ("😊 正面舆情", f"{pos_pct:.0f}", "%", SUCCESS, "success", f"共 {feedback['total']} 条"),
+    ("💡 总提案", str(total_p), "", C["purple"], "purple", ""),
+    ("😊 正面舆情", f"{pos_pct:.0f}", "%", C["success"], "success", f"共 {feedback['total']} 条"),
 ]
 
 cols = st.columns(6)
@@ -462,7 +398,7 @@ for idx, (label, value, suffix, color, style, sub) in enumerate(kpi_data):
 <div class="kpi-card {style} {extra_class} fade-up" style="animation-delay:{idx*0.06}s;">
     <div class="kpi-label">{label}</div>
     <div class="kpi-value" style="color:{color};">{value}{suffix}</div>
-    {"<div style='font-size:0.68em;color:" + TEXT_MUTED + ";margin-top:2px;'>" + sub + "</div>" if sub else ""}
+    {"<div style='font-size:0.68em;color:" + C["text_muted"] + ";margin-top:2px;'>" + sub + "</div>" if sub else ""}
 </div>
 """, unsafe_allow_html=True)
 
@@ -485,14 +421,14 @@ with col_main:
 
         base = alt.Chart(df_melted).encode(
             x=alt.X("日期:N", title=None, sort=df_timeline["day"].str[5:].tolist(),
-                    axis=alt.Axis(labelColor=TEXT_MUTED, gridColor=BORDER, titleColor=TEXT_MUTED)),
-            y=alt.Y("数量:Q", title=None, axis=alt.Axis(labelColor=TEXT_MUTED, gridColor=BORDER)),
+                    axis=alt.Axis(labelColor=C["text_muted"], gridColor=C["border"], titleColor=C["text_muted"])),
+            y=alt.Y("数量:Q", title=None, axis=alt.Axis(labelColor=C["text_muted"], gridColor=C["border"])),
         )
         line = base.mark_line(strokeWidth=3, point={"size": 70, "filled": True}).encode(
             color=alt.Color("类型:N", scale=alt.Scale(
                 domain=["新增上报", "已解决"],
-                range=[DANGER, SUCCESS],
-            ), legend=alt.Legend(orient="top", title=None, labelColor=TEXT_SEC)),
+                range=[C["danger"], C["success"]],
+            ), legend=alt.Legend(orient="top", title=None, labelColor=C["text_sec"])),
         )
         chart = line.properties(height=220).configure(background="transparent").configure_view(strokeWidth=0)
         st.altair_chart(chart, width="stretch")
@@ -516,37 +452,37 @@ with col_side:
     c_ring, c_pipe = st.columns([1, 1.5])
 
     with c_ring:
-        ring_color = SUCCESS if grade == "优" else WARNING if grade == "良" else DANGER
-        ring_glow = SUCCESS_GLOW if grade == "优" else WARNING_GLOW if grade == "良" else DANGER_GLOW
+        ring_color = C["success"] if grade == "优" else C["warning"] if grade == "良" else C["danger"]
+        ring_glow = C["success_glow"] if grade == "优" else C["warning_glow"] if grade == "良" else C["danger_glow"]
         st.markdown(f"""
 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;">
     <div class="health-ring glow-breathe" style="border-color:{ring_color};
         box-shadow:0 0 20px {ring_glow}44;">
         <div style="text-align:center;">
             <div style="font-size:1.8em;font-weight:800;color:{ring_color};line-height:1;">{score}</div>
-            <div style="font-size:0.65em;color:{TEXT_MUTED};">分</div>
+            <div style="font-size:0.65em;color:{C["text_muted"]};">分</div>
         </div>
     </div>
     <div style="font-size:1em;font-weight:700;color:{ring_color};margin-top:6px;">{grade}</div>
-    <div style="font-size:0.65em;color:{TEXT_MUTED};">治理健康度</div>
+    <div style="font-size:0.65em;color:{C["text_muted"]};">治理健康度</div>
 </div>
 """, unsafe_allow_html=True)
 
     with c_pipe:
         if total_i > 0:
             pipeline = [
-                ("⏳ 待处理", pending, DANGER),
-                ("🔄 处理中", processing, WARNING),
-                ("✅ 已解决", resolved, SUCCESS),
+                ("⏳ 待处理", pending, C["danger"]),
+                ("🔄 处理中", processing, C["warning"]),
+                ("✅ 已解决", resolved, C["success"]),
             ]
             for label, count, color in pipeline:
                 pct = count / total_i * 100 if total_i > 0 else 0
                 st.markdown(f"""
 <div style="margin:6px 0;">
-    <div style="display:flex;justify-content:space-between;font-size:0.72em;color:{TEXT_SEC};margin-bottom:1px;">
+    <div style="display:flex;justify-content:space-between;font-size:0.72em;color:{C["text_sec"]};margin-bottom:1px;">
         <span>{label}</span><span style="color:{color};">{count} · {pct:.0f}%</span>
     </div>
-    <div style="height:6px;background:{SURFACE_RAISED};border-radius:3px;overflow:hidden;">
+    <div style="height:6px;background:{C["surface_raised"]};border-radius:3px;overflow:hidden;">
         <div style="height:100%;width:{pct}%;background:{color};border-radius:3px;
             box-shadow:0 0 6px {color}44;transition:width 0.6s ease;"></div>
     </div>
@@ -555,14 +491,14 @@ with col_side:
 
     # Avg resolution speed
     st.markdown(f"""
-<div style="margin-top:8px;font-size:0.72em;color:{TEXT_MUTED};text-align:center;">
-    ⏱️ 平均解决周期：<strong style="color:{WARNING if avg_days > 3 else SUCCESS};">{avg_days} 天</strong>
+<div style="margin-top:8px;font-size:0.72em;color:{C["text_muted"]};text-align:center;">
+    ⏱️ 平均解决周期：<strong style="color:{C["warning"] if avg_days > 3 else C["success"]};">{avg_days} 天</strong>
     &nbsp;·&nbsp;
-    🏃 解决速度：<strong style="color:{SUCCESS};">{health.get('speed_score', '—')} 分</strong>
+    🏃 解决速度：<strong style="color:{C["success"]};">{health.get('speed_score', '—')} 分</strong>
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{BORDER_GLOW},transparent);margin:16px 0;"></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{C["border_glow"]},transparent);margin:16px 0;"></div>', unsafe_allow_html=True)
 
 # BOTTOM ROW: campus heatmap + recent issues
 
@@ -590,7 +526,7 @@ with col_heat:
     max_heat = max(campus_areas.values()) if any(campus_areas.values()) else 1
 
     def heat_color(count, max_val):
-        if max_val == 0: return (SURFACE_RAISED, TEXT_MUTED)
+        if max_val == 0: return (C["surface_raised"], C["text_muted"])
         intensity = count / max_val
         if intensity >= 0.7:
             r, g, b = 239, 68, 68  # red
@@ -602,8 +538,8 @@ with col_heat:
             r, g, b = 59, 130, 246  # blue
             alpha = 0.15 + intensity * 0.35
         else:
-            return (SURFACE_RAISED, TEXT_MUTED)
-        return (f"rgba({r},{g},{b},{alpha:.2f})", TEXT if intensity >= 0.4 else TEXT_SEC)
+            return (C["surface_raised"], C["text_muted"])
+        return (f"rgba({r},{g},{b},{alpha:.2f})", C["text"] if intensity >= 0.4 else C["text_sec"])
 
     heat_cells = "".join(
         f'<div class="heat-cell" style="background:{heat_color(v, max_heat)[0]};color:{heat_color(v, max_heat)[1]};">'
@@ -618,7 +554,7 @@ with col_heat:
         top_cat = max(by_cat, key=by_cat.get)
         top_count = by_cat[top_cat]
         st.markdown(f"""
-<div style="font-size:0.72em;color:{TEXT_MUTED};margin-top:8px;">
+<div style="font-size:0.72em;color:{C["text_muted"]};margin-top:8px;">
     🔥 最高发：「{top_cat}」— {top_count} 件，占 {top_count/total_i*100:.0f}%
 </div>
 """, unsafe_allow_html=True)
@@ -634,11 +570,11 @@ with col_recent:
             st.markdown(f"""
 <div class="issue-row {"urgent" if is_urgent else ""} fade-up" style="animation-delay:{idx*0.03}s;">
     <span style="font-size:1.2em;">{icon}</span>
-    <span style="flex:1;color:{TEXT};">
-        <strong style="color:{DANGER if is_urgent else TEXT};">#{issue["id"]}</strong>
+    <span style="flex:1;color:{C["text"]};">
+        <strong style="color:{C["danger"] if is_urgent else C["text"]};">#{issue["id"]}</strong>
         {issue.get("title","")[:26]}
     </span>
-    <span style="color:{TEXT_MUTED};font-size:0.85em;white-space:nowrap;">
+    <span style="color:{C["text_muted"]};font-size:0.85em;white-space:nowrap;">
         {issue.get("reported_at","")[:10]}
     </span>
 </div>
@@ -656,11 +592,11 @@ if has_anomaly or urgent_count > 0:
         alerts.append(f"⏱️ 平均解决周期 {health['avg_days']} 天，效率偏低")
     alert_text = "　|　".join(alerts)
     st.markdown(f"""
-<div class="pulse-anomaly" style="background:{SURFACE_RAISED};border:1px solid {DANGER}44;
+<div class="pulse-anomaly" style="background:{C["surface_raised"]};border:1px solid {C["danger"]}44;
     border-radius:10px;padding:10px 18px;margin-top:12px;
     display:flex;align-items:center;gap:10px;">
     <span style="font-size:1.3em;">🚨</span>
-    <span style="color:{DANGER};font-weight:700;font-size:0.82em;">{alert_text}</span>
+    <span style="color:{C["danger"]};font-weight:700;font-size:0.82em;">{alert_text}</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -697,9 +633,10 @@ st.markdown(f"""
 # FOOTER
 
 st.markdown(f"""
-<div style="text-align:center;font-size:0.65em;color:{TEXT_MUTED};margin-top:8px;">
+<div style="text-align:center;font-size:0.65em;color:{C["text_muted"]};margin-top:8px;">
     CampusInsight · Campus Monitor · Real-time Monitoring
     · {now.strftime("%Y-%m-%d %H:%M:%S")}
+    {'''<br/><span style="color:#f59e0b;font-weight:600;">演示模式 · 模拟数据</span>''' if _using_mock else ""}
 </div>
 """, unsafe_allow_html=True)
 

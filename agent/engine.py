@@ -114,6 +114,7 @@ class CampusAgent:
                     f"请稍后重试，或通过页面顶部的「⚡ 快速报修」直接提交工单。"
                 )
             except Exception:  # safety net: must not crash the app
+                logger.debug("Failed to add fallback message to memory", exc_info=True)
                 pass
             return (
                 f"😅 抱歉，系统遇到了一点问题。\n\n"
@@ -181,17 +182,33 @@ class CampusAgent:
                     )
                     break
 
-        # ── All retries exhausted — graceful degradation ──
+        # ── All retries exhausted — delegate to OfflineAgent ──
         self._last_chain = None
 
-        # Try to provide a cached/db-based fallback instead of raw error
+        # OfflineAgent calls real tools with rule-based routing — far richer
+        # than keyword-based fallback. Bypass offline.run() to avoid adding a
+        # duplicate user message (already saved above in _run_impl).
         try:
-            fallback = self._graceful_fallback(user_input, last_error)
+            from agent.offline_agent import OfflineAgent
+            from agent.prompt import detect_persona
+            offline = OfflineAgent(st.session_state)
+            offline.memory = self.memory
+            persona = detect_persona(user_input)
+            fallback = offline._route(persona, user_input)
+            if not fallback:
+                fallback = offline._handle_general(user_input)
+            logger.info("Delegated to OfflineAgent after LLM failure — %d chars", len(fallback))
         except Exception:
-            fallback = f"😅 AI 服务暂时不可用，请稍后重试或使用页面顶部的「⚡ 快速报修」。"
+            logger.warning("OfflineAgent delegation failed, using static fallback", exc_info=True)
+            try:
+                fallback = self._graceful_fallback(user_input, last_error)
+            except Exception:
+                logger.debug("Static fallback also failed", exc_info=True)
+                fallback = f"😅 AI 服务暂时不可用，请稍后重试或使用页面顶部的「⚡ 快速报修」。"
         try:
             self.memory.add_message("assistant", fallback)
         except Exception:  # non-critical: silent pass intended
+            logger.debug("Failed to save fallback message to memory", exc_info=True)
             pass
         return fallback
 
@@ -243,6 +260,7 @@ class CampusAgent:
                 for cat, count in sorted(pending_by_cat.items(), key=lambda x: -x[1])[:3]
             ]
         except Exception:
+            logger.debug("Failed to load hot categories for Observe phase", exc_info=True)
             hot_categories = []
 
         return {
@@ -604,179 +622,14 @@ class CampusAgent:
             return ""
 
     def _governance_audit(self) -> str:
-        """Run a comprehensive governance audit across all tables.
+        """Run a comprehensive governance audit — delegates to governance_audit module.
 
-        Enhanced v2: structured report card with per-dimension grades (A+ through F),
-        trend arrows, and prioritized action items.
+        Extracted from engine.py (v2 report card with per-dimension grades,
+        trend arrows, and prioritized action items). See agent/governance_audit.py
+        for the full implementation and scoring methodology.
         """
-        try:
-            from data.database import get_db, compute_health_score
-
-            # ── Use authoritative health score (single source of truth from db_health) ──
-            health = compute_health_score()
-            resolution_rate = health["resolution_rate"]
-            avg_resolution_days = health["avg_days"]
-
-            lines: list[str] = []
-            grades: dict[str, dict] = {}  # dimension → {score, grade, detail}
-
-            with get_db() as conn:
-                # ── 1. Issue Management (工单管理维度) ──
-                issue_summary = conn.execute(
-                    "SELECT status, COUNT(*) as cnt FROM campus_issues GROUP BY status"
-                ).fetchall()
-                total_i = sum(r["cnt"] for r in issue_summary)
-                by_status = {r["status"]: r["cnt"] for r in issue_summary}
-                pending = by_status.get("待处理", 0)
-                processing = by_status.get("处理中", 0)
-                resolved = by_status.get("已解决", 0)
-
-                # Urgency breakdown
-                urgent = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
-                    "WHERE urgency='紧急' AND status != '已解决'"
-                ).fetchone()
-                urgent_unresolved = urgent["cnt"] if urgent else 0
-
-                # Stale detection
-                stale = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
-                    "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-                ).fetchone()
-                stale_count = stale["cnt"] if stale else 0
-
-                # Issue management grade
-                # 权重设计参考：
-                # - 解决率基准 80%：参考 ISO 37120 城市治理指标"市政服务响应率≥80% 为优秀"
-                # - 紧急扣分 5/件：1 件紧急 ≈ 5% 健康度折损（紧急问题影响面远大于普通问题）
-                # - 积压扣分 3/件：超 7 天未处理表示流程阻塞，3 分/件 ≈ 7 件即触及上限
-                # - 上限 25/20 分：防止单一维度过度主导总分（单一维度不超过 25%）
-                issue_score = 100.0
-                if total_i > 0:
-                    issue_score -= max(0, (1 - resolution_rate / 80) * 30)  # penalize low resolution
-                if urgent_unresolved > 0:
-                    issue_score -= min(urgent_unresolved * 5, 25)           # max -25 for urgency
-                if stale_count > 0:
-                    issue_score -= min(stale_count * 3, 20)                 # max -20 for staleness
-                issue_score = max(0, issue_score)
-                grades["📝 工单管理"] = {
-                    "score": round(issue_score),
-                    "detail": f"解决率 {resolution_rate:.0f}% · 紧急未处理 {urgent_unresolved} · 积压 {stale_count}",
-                    "trend": "↑" if resolution_rate >= 70 else "↓",
-                }
-                lines.append(f"**📝 工单管理**：{total_i} 件 · 待处理 {pending} · 处理中 {processing} · 已解决 {resolved}")
-                if avg_resolution_days is not None:
-                    lines.append(f"   ⏱️ 平均解决时间：{avg_resolution_days} 天")
-                if stale_count > 0:
-                    lines.append(f"   ⚠️ 积压 {stale_count} 件超过7天未处理")
-
-                # ── 2. Proposal Engagement (提案参与维度) ──
-                prop_summary = conn.execute(
-                    "SELECT status, COUNT(*) as cnt FROM proposals GROUP BY status"
-                ).fetchall()
-                total_p = sum(r["cnt"] for r in prop_summary)
-                by_pstatus = {r["status"]: r["cnt"] for r in prop_summary}
-                unresponded = by_pstatus.get("讨论中", 0)
-                responded = by_pstatus.get("已回应", 0)
-                adopted = by_pstatus.get("已采纳", 0) + by_pstatus.get("已实施", 0)
-                adoption_rate = adopted / total_p * 100 if total_p > 0 else 0
-
-                # Avg supporters
-                avg_sup_row = conn.execute(
-                    "SELECT ROUND(AVG(supporter_count), 1) as avg_sup FROM proposals"
-                ).fetchone()
-                avg_supporters = avg_sup_row["avg_sup"] if avg_sup_row else 0
-
-                prop_score = 100.0
-                if total_p > 0:
-                    # 待回复提案每件扣 8 分：未回应的提案比未处理的工单更影响信任
-                    # 采纳率加分：采纳率 ≥ 50% 时获得满分 20 分加成
-                    if unresponded > 0:
-                        prop_score -= min(unresponded * 8, 40)
-                    prop_score += min(adoption_rate / 50 * 20, 20)
-                prop_score = max(0, min(100, prop_score))
-                grades["💡 提案参与"] = {
-                    "score": round(prop_score),
-                    "detail": f"采纳率 {adoption_rate:.0f}% · 待回复 {unresponded} · 人均附议 {avg_supporters}",
-                    "trend": "↑" if adoption_rate >= 30 else "↓",
-                }
-                lines.append(f"\n**💡 提案参与**：{total_p} 件 · 待回复 {unresponded} · 已采纳/实施 {adopted}")
-                lines.append(f"   人均附议：{avg_supporters} 人")
-
-                # ── 3. Citizen Engagement (公民参与维度) ──
-                topic_rows = conn.execute(
-                    "SELECT COUNT(*) as cnt, SUM(participant_count) as total_parts FROM discussion_topics"
-                ).fetchone()
-                total_topics = topic_rows["cnt"] if topic_rows else 0
-                total_participants = topic_rows["total_parts"] if topic_rows else 0
-                unique_authors_row = conn.execute(
-                    "SELECT COUNT(DISTINCT author) as cnt FROM campus_issues"
-                ).fetchone()
-                unique_authors = unique_authors_row["cnt"] if unique_authors_row else 0
-
-                # 参与度评分：衡量治理的"群众基础"
-                # - 少于 3 个独立上报人：扣 30 分（核心用户群过小，未形成治理规模）
-                # - 3-4 人：扣 15 分（有初步参与，仍需扩大覆盖面）
-                # - 议题参与人次 < 10：扣 20 分（讨论活跃度不足）
-                eng_score = 100.0
-                if unique_authors < 3:
-                    eng_score -= 30
-                elif unique_authors < 5:
-                    eng_score -= 15
-                if total_participants < 10:
-                    eng_score -= 20
-                eng_score = max(0, eng_score)
-                grades["🗣️ 公民参与"] = {
-                    "score": round(eng_score),
-                    "detail": f"{unique_authors} 人上报 · {total_participants} 人次参与讨论 · {total_topics} 个议题",
-                    "trend": "↑" if unique_authors >= 5 else "→",
-                }
-                lines.append(f"\n**🗣️ 公民参与**：{unique_authors} 位用户上报问题 · {total_participants} 人次参与议题讨论")
-
-                # ── 4. Hotspot & Risk Indicators ──
-                cat_rows = conn.execute(
-                    "SELECT category, COUNT(*) as cnt FROM campus_issues "
-                    "WHERE status != '已解决' GROUP BY category ORDER BY cnt DESC LIMIT 3"
-                ).fetchall()
-                if cat_rows:
-                    cat_strs = [f"{r['category']}({r['cnt']}件)" for r in cat_rows]
-                    lines.append(f"\n**🔥 热点类别**：{'、'.join(cat_strs)}")
-
-            # ── 5. Overall Health ──
-            lines.append(f"\n**🏥 治理健康度**：{health['grade']}（{health['score']} 分）")
-
-            # ── 5.5 Report Card Summary ──
-            lines.append("\n### 📊 分维度评分")
-            for dim, g in grades.items():
-                letter = "A" if g["score"] >= 85 else "B" if g["score"] >= 70 else "C" if g["score"] >= 50 else "D"
-                lines.append(
-                    f"- {dim}：{letter} ({g['score']}分) {g['trend']} — {g['detail']}"
-                )
-
-            # ── 6. Action Items (prioritized) ──
-            actions: list[tuple[int, str]] = []
-            if urgent_unresolved > 0:
-                actions.append((10, f"🔴 处理 {urgent_unresolved} 件紧急工单（最高优先）"))
-            if unresponded > 0:
-                actions.append((8, f"💬 回复 {unresponded} 件待回复提案"))
-            if stale_count >= 3:
-                actions.append((7, f"⚠️ 清理 {stale_count} 件超7天积压工单"))
-            if resolution_rate < 50 and total_i > 5:
-                actions.append((5, f"📈 提升解决率（当前仅 {resolution_rate:.0f}%）"))
-            if cat_rows and cat_rows[0]["cnt"] >= 5:
-                actions.append((4, f"🚀 建议为「{cat_rows[0]['category']}」类问题发起系统性治理提案"))
-
-            if actions:
-                actions.sort(key=lambda x: -x[0])
-                lines.append("\n### 🎯 优先行动建议")
-                for _, action_text in actions[:3]:
-                    lines.append(f"- {action_text}")
-
-            return "\n".join(lines)
-
-        except Exception as e:
-            logger.warning(f"Governance audit failed (non-fatal): {e}")
-            return f"*治理体检暂时不可用：{e}*"
+        from agent.governance_audit import run_governance_audit
+        return run_governance_audit()
 
     def _format_environment_for_prompt(self, environment: dict) -> str:
         """Format environment context as a compact string for the system prompt."""
@@ -873,6 +726,7 @@ class CampusAgent:
                         lines.append(f"- {e.get('title','')[:40]}")
                 return "\n".join(lines)
             except Exception:  # non-critical: silent pass intended
+                logger.debug("Pulse fallback query failed", exc_info=True)
                 pass
 
         if any(kw in txt for kw in ("天气", "温度", "下雨", "多少度")):
@@ -888,6 +742,7 @@ class CampusAgent:
                         f"💡 {d['advice']}"
                     )
             except Exception:  # non-critical: silent pass intended
+                logger.debug("Weather fallback query failed", exc_info=True)
                 pass
 
         if any(kw in txt for kw in ("报修", "上报", "坏了", "故障", "漏水", "不亮")):
@@ -919,6 +774,7 @@ class CampusAgent:
                     f"💡 如需更详细分析，请在 AI 恢复后重试。"
                 )
             except Exception:  # non-critical: silent pass intended
+                logger.debug("Health score fallback query failed", exc_info=True)
                 pass
 
         # Generic fallback

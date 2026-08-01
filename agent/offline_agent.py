@@ -4,12 +4,15 @@
 用于 OFFLINE_MODE=true 或 ?offline=1 场景。所有回复基于数据库真实数据，
 通过模板引擎包装成接近 AI 对话体验的自然语言响应。
 """
+import logging
 import random
 from agent.memory import MemoryManager
 from agent.prompt import detect_persona
 from agent.helpers import (
     get_author_identifier, get_user_name, extract_location, random_encouragement,
 )
+
+_log = logging.getLogger(__name__)
 
 
 class OfflineAgent:
@@ -75,6 +78,7 @@ class OfflineAgent:
             # Extract key weather facts
             parts.append(f"🌤️ {self._extract_weather_line(w)}")
         except Exception:
+            _log.debug("get_weather.invoke() failed, trying get_today_weather fallback", exc_info=True)
             from tools.query_weather import get_today_weather
             try:
                 days, loc, _ = get_today_weather()
@@ -86,7 +90,8 @@ class OfflineAgent:
                         f"降水概率 {d['rain_prob']}%"
                     )
             except Exception:
-                parts.append("🌤️ 今日天气晴好，适合校园活动~")
+                    _log.debug("get_today_weather fallback also failed", exc_info=True)
+                    parts.append("🌤️ 今日天气晴好，适合校园活动~")
 
         # ── 本周数据 ──
         try:
@@ -133,6 +138,7 @@ class OfflineAgent:
                     )
 
         except Exception as e:
+            _log.debug("Failed to load stats for _respond_pulse: %s", e)
             parts.append(f"\n📡 *本周数据加载中...（{e}）*")
 
         parts.append("")
@@ -152,6 +158,7 @@ class OfflineAgent:
             raw = str(get_governance_stats.invoke(""))
             parts.append(self._reformat_stats(raw))
         except Exception:
+            _log.debug("get_governance_stats failed, falling back to DB stats", exc_info=True)
             try:
                 from data.database import get_issues_stats
                 stats = get_issues_stats()
@@ -173,6 +180,7 @@ class OfflineAgent:
                     result = str(query_issues.invoke({"category": cn, "limit": 5}))
                     parts.append(f"\n🔍 **{cn}类工单详情**\n{self._reformat_issue_list(result)}")
                 except Exception:  # non-critical: silent pass intended
+                    _log.debug("query_issues for category=%r failed", cn, exc_info=True)
                     pass
                 break
 
@@ -256,6 +264,7 @@ class OfflineAgent:
             raw = str(get_proposals.invoke({"sort_by": "supporters", "limit": 5}))
             parts.append(self._reformat_proposal_list(raw))
         except Exception:
+            _log.debug("get_proposals tool failed, trying DB fallback", exc_info=True)
             try:
                 from data.database import get_proposals as db_props
                 props = db_props(sort_by="supporters", limit=5)
@@ -278,6 +287,7 @@ class OfflineAgent:
                 raw = str(get_topics.invoke(""))
                 parts.append(f"\n💬 **活跃议题**\n{self._reformat_topic_list(raw)}")
             except Exception:  # non-critical: silent pass intended
+                _log.debug("get_topics failed", exc_info=True)
                 pass
 
         # ── 创建意图 ──

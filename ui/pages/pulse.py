@@ -1,11 +1,14 @@
 # ui/pages/pulse.py
 """🌊 校园脉搏 · 知 — 正在发生什么？即将发生什么？"""
+import logging
 import streamlit as st
 import altair as alt
 import pandas as pd
 from ui.cache import cached_issues, cached_campus_events as get_campus_events, cached_knowledge_base as get_knowledge_base
 from tools.query_weather import get_today_weather, _get_data_source_note as _weather_source_note
 from ui.components import TOKEN, section, info_card, event_card, issue_card, stat, ooda_nav, CAT_LABEL, configure_altair
+
+_log = logging.getLogger(__name__)
 
 # ── Page header ──
 st.markdown(
@@ -92,7 +95,7 @@ try:
         st.info("🧠 感知引擎就绪 · 正在初始化首次校园扫描...")
 
 except Exception:
-    pass  # Perception engine is optional — don't break the pulse page
+    _log.warning("Perception engine unavailable", exc_info=True)
 
 # ═══════════════════════════════════════════
 # Weather — full card (not compact)
@@ -142,82 +145,11 @@ if days:
 
 try:
     from data.db_health_alerts import cached_health_risk
+    from ui.health_card import render_health_risk_overview
     health = cached_health_risk()
-    h_level = health["overall_level"]
-    h_emoji = health["overall_emoji"]
-    h_color = health["overall_color"]
-    h_score = health["overall_score"]
-
-    level_label = {"low": "低风险 · 校园健康", "moderate": "注意防护", "high": "警示 · 加强预防", "critical": "高危 · 立即行动"}
-    h_label = level_label.get(h_level, "—")
-
-    bar_color = TOKEN[h_color] if h_color in ("success", "warning", "danger") else TOKEN["accent"]
-    risk_bar_pct = min(100, h_score)
-
-    # Build alert rows HTML
-    alerts_html = ""
-    for alert in health.get("top_alerts", [])[:2]:
-        alert_emoji = alert.get("emoji", "💊")
-        alerts_html += (
-            f'<div style="font-size:0.82em;color:{TOKEN["text_sec"]};'
-            f'padding:4px 0;line-height:1.5;">'
-            f'{alert_emoji} <strong>{alert["title"]}</strong> — {alert["message"][:100]}'
-            f'</div>'
-        )
-
-    # Weather reasons
-    weather_note = ""
-    if health.get("weather_mod_total", 0) >= 10:
-        reasons = health.get("weather_breakdown", {})
-        if reasons:
-            reason_str = " · ".join(list(reasons.keys())[:2])
-            weather_note = (
-                f'<div style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-top:6px;">'
-                f'🌡️ 天气关联：{reason_str}</div>'
-            )
-
-    # ── Single HTML block — NO cross-st.markdown div spanning ──
-    st.markdown("---")
-    st.markdown(
-        f'<div style="background:{TOKEN["card_bg"]};border:1.5px solid {bar_color};'
-        f'border-radius:{TOKEN["radius_card"]};padding:16px 20px;box-shadow:{TOKEN["shadow"]};'
-        f'margin-bottom:8px;">'
-
-        # Header row
-        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
-        f'<span style="font-size:2em;">🏥</span>'
-        f'<div style="flex:1;">'
-        f'<span style="font-size:1.05em;font-weight:700;color:{TOKEN["text"]};">校园健康风险</span>'
-        f'<span style="font-size:0.78em;color:{bar_color};margin-left:10px;font-weight:600;">'
-        f'{h_emoji} {h_label}</span>'
-        f'</div>'
-        f'<span style="font-size:1.6em;font-weight:800;color:{bar_color};">{h_score}</span>'
-        f'<span style="font-size:0.7em;color:{TOKEN["text_muted"]};">分</span>'
-        f'</div>'
-
-        # Risk bar
-        f'<div style="height:6px;background:{TOKEN["border"]};border-radius:3px;margin:6px 0 10px;">'
-        f'<div style="width:{risk_bar_pct}%;height:100%;background:linear-gradient(90deg,'
-        f'#22c55e 0%, #eab308 35%, #f97316 65%, #ef4444 100%);border-radius:3px;'
-        f'transition:width 0.5s ease;"></div></div>'
-
-        # Alerts
-        f'{alerts_html}'
-
-        # Advice
-        f'<div style="font-size:0.78em;color:{TOKEN["text_muted"]};margin-top:6px;'
-        f'padding:8px 12px;background:{TOKEN["accent_bg"]};border-radius:6px;">'
-        f'💡 {health["advice_summary"]}</div>'
-
-        # Weather note
-        f'{weather_note}'
-
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
+    render_health_risk_overview(health)
 except Exception:
-    pass  # Health module is optional — don't break the pulse page
+    _log.warning("Health risk module unavailable", exc_info=True)
 
 # ═══════════════════════════════════════════
 # Upcoming events
@@ -283,7 +215,7 @@ try:
         except Exception:
             st.caption("暂无校园动态。")
 except Exception:
-    pass  # activity feed is optional
+    _log.warning("Activity feed unavailable", exc_info=True)
 
 
 # ═══════════════════════════════════════════
@@ -400,9 +332,9 @@ if issues:
                 from datetime import datetime
                 st.caption(f'🕐 {datetime.now().strftime("%H:%M")} · 系统自动分析')
     except ImportError:
-        pass
-    except Exception:  # non-critical: silent pass intended
-        pass
+        _log.warning("Reflector module not available for proactive insights", exc_info=True)
+    except Exception:
+        _log.warning("Failed to load proactive insights", exc_info=True)
 
     # Category hotness
     cats: dict[str, int] = {}

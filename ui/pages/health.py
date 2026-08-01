@@ -84,69 +84,10 @@ if h.get("weather_breakdown"):
 
 st.markdown("---")
 
-# Per-disease risk cards
+# Per-disease risk cards — delegated to shared component
 
-section("疾病风险明细")
-
-diseases_sorted = sorted(h["diseases"], key=lambda x: -x["adjusted_risk"])
-
-for d in diseases_sorted:
-    ar = d["adjusted_risk"]
-    if ar >= 60:
-        badge, badge_color = "🔴 高风险", TOKEN["danger"]
-    elif ar >= 40:
-        badge, badge_color = "🟠 注意", TOKEN["warning"]
-    elif ar >= 20:
-        badge, badge_color = "🟡 低风险", TOKEN["accent"]
-    else:
-        badge, badge_color = "🟢 安全", TOKEN["success"]
-
-        surv = d.get("surveillance", {})
-    surv_note = ""
-    if surv.get("surveillance_available"):
-        direction_cn = {"rising": "全国上升", "peak": "全国高发", "falling": "全国下降",
-                       "trough": "全国低谷", "stable": "全国平稳"}
-        dir_label = direction_cn.get(surv.get("trend_direction", ""), "")
-        surv_note = (
-            f'<span style="font-size:0.68em;color:{TOKEN["success"]};margin-left:6px;'
-            f'font-weight:600;">📡 {dir_label}</span>'
-        )
-
-    with st.container(border=True):
-        c_left, c_right = st.columns([3, 1])
-        with c_left:
-            st.markdown(
-                f'<span style="font-size:1em;font-weight:700;color:{TOKEN["text"]};">'
-                f'{d["name"]}</span>'
-                f'<span style="font-size:0.72em;color:{badge_color};margin-left:10px;'
-                f'font-weight:600;">{badge}</span>'
-                f'{surv_note}',
-                unsafe_allow_html=True,
-            )
-            st.caption(f'🤒 症状：{d["symptoms"]}')
-            st.markdown(
-                f'<div style="font-size:0.82em;color:{TOKEN["text_sec"]};'
-                f'background:{TOKEN["accent_bg"]};padding:8px 12px;border-radius:6px;'
-                f'margin-top:4px;">💡 {d["advice"]}</div>',
-                unsafe_allow_html=True,
-            )
-        with c_right:
-            # Risk gauge bar
-            pct = min(100, ar)
-            gauge_color = TOKEN["success"] if ar < 30 else TOKEN["warning"] if ar < 50 else "#f97316" if ar < 70 else TOKEN["danger"]
-            st.markdown(
-                f'<div style="text-align:center;padding-top:12px;">'
-                f'<div style="font-size:2em;font-weight:800;color:{gauge_color};">{ar}</div>'
-                f'<div style="font-size:0.7em;color:{TOKEN["text_muted"]};">风险分</div>'
-                f'<div style="height:4px;background:{TOKEN["border"]};border-radius:2px;'
-                f'margin-top:4px;width:80px;margin-left:auto;margin-right:auto;">'
-                f'<div style="width:{pct}%;height:100%;background:{gauge_color};border-radius:2px;"></div>'
-                f'</div>'
-                f'<div style="font-size:0.65em;color:{TOKEN["text_muted"]};margin-top:2px;">'
-                f'基础 {d["base_risk"]} · 天气 +{h.get("weather_mod_total", 0)}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+from ui.health_card import render_disease_detail_cards
+render_disease_detail_cards(h)
 
 st.markdown("---")
 st.markdown(

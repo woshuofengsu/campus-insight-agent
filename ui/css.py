@@ -121,6 +121,7 @@ GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale
         .stat-card { padding: 10px 8px !important; }
         .stat-value { font-size: 1.3em !important; }
         .stat-label { font-size: 0.75em !important; }
+        input, select, textarea, [data-baseweb="select"] { font-size: 16px !important; }
     }
 
     @supports (padding-bottom: env(safe-area-inset-bottom)) {

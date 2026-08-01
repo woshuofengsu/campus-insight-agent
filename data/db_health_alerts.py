@@ -1,6 +1,23 @@
 # data/db_health_alerts.py
 """🏥 疾病防治引擎 — 季节模型 + 天气关联 + 校园密度 + 风险评分.
 
+  数据来源与模拟说明 / Data Provenance:
+  ─────────────────────────────────────────────────────────────────
+  本模块生成的是模拟/估计数据 (simulated/estimated data)，不是真实流行病学报告。
+  风险评分基于三层模型叠加：
+    1. 季节先验 — 基于国家疾控局月度公报 (CDC monthly bulletins) 中公布的
+       中国北方地区季节性传染病流行趋势，提取各月份疾病基线风险。
+    2. 天气关联 — 温度骤降、湿度变化、空气质量事件与呼吸道/胃肠道疾病
+       发病率的已知统计相关性。
+    3. 校园密度 — 考试周、开学季等人员聚集场景下的传播风险推断。
+  综合风险评分 = 季节基线 × 天气修正 + 密度修正 → 4级风险等级。
+
+  ⚠️ 重要提示：本模块输出仅供参考，不构成医疗建议。
+  ⚠️ IMPORTANT: This module produces simulated risk estimates based on
+     public health bulletins + seasonal models + weather correlation.
+     It is NOT real epidemiological surveillance data and must NOT be
+     used for clinical or public-health decision-making.
+
 Architecture:
   SeasonModel       — month-based disease risk priors (northern China)
   WeatherCorrelator — temperature-drop / humidity triggers
@@ -419,6 +436,7 @@ class HealthRiskEngine:
             "campus_density": density,
             "advice_summary": advice_summary,
             "surveillance": surv_summary,       # CDC data status
+            "source_note": "基于国家疾控局月度公报 × 季节模型 × 实时天气模拟 · 仅供参考，不构成医疗建议",
             "evaluated_at": self.now.strftime("%Y-%m-%d %H:%M"),
             "weekday": self.weekday,
         }
