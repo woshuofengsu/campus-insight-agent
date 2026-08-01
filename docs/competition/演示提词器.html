@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园先知 · 演示提词器</title>
+<style>
+  :root {
+    --bg: #0f0f14;
+    --card: #1a1a24;
+    --text: #e8e8ed;
+    --muted: #8888a0;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --border: #2a2a3a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; height: 100vh; overflow: hidden;
+  }
+
+  /* ── Left: Script ── */
+  #script-panel {
+    flex: 1; overflow-y: auto; padding: 32px 28px;
+    border-right: 1px solid var(--border);
+  }
+  #script-panel h1 {
+    font-size: 1.5em; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;
+  }
+  #script-panel .sub {
+    font-size: 0.78em; color: var(--muted); margin-bottom: 28px;
+  }
+  .scene {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 14px;
+    border-left: 3px solid var(--accent);
+    transition: all 0.2s;
+  }
+  .scene.active {
+    border-left-color: var(--green);
+    box-shadow: 0 0 0 1px rgba(34,197,94,0.15);
+  }
+  .scene h2 {
+    font-size: 1em; font-weight: 700; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .scene .time {
+    font-size: 0.7em; color: var(--muted); font-weight: 400;
+    background: var(--border); padding: 2px 8px; border-radius: 99px;
+  }
+  .scene .action {
+    font-size: 0.78em; color: var(--amber); margin: 6px 0;
+    font-style: italic;
+  }
+  .scene .line {
+    font-size: 0.92em; line-height: 1.65; color: var(--text);
+    margin: 4px 0;
+  }
+  .scene .line .pause {
+    color: var(--muted); font-size: 0.75em;
+  }
+
+  /* ── Right: Teleprompter ── */
+  #teleprompter {
+    flex: 1; display: flex; flex-direction: column;
+    background: #000; position: relative; overflow: hidden;
+  }
+  #tele-header {
+    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid #1a1a1a; flex-shrink: 0;
+  }
+  #tele-header .dot { width:10px; height:10px; border-radius:50%; }
+  #tele-text {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 40px; text-align: center; overflow-y: auto;
+  }
+  #tele-text .big {
+    font-size: 2.4em; font-weight: 700; line-height: 1.5;
+    letter-spacing: 0.02em; color: #fff;
+  }
+  #tele-text .big .highlight { color: var(--accent); }
+  #tele-controls {
+    padding: 12px 20px; display: flex; gap: 10px; justify-content: center;
+    border-top: 1px solid #1a1a1a; flex-shrink: 0;
+  }
+  #tele-controls button {
+    padding: 8px 20px; border-radius: 6px; border: 1px solid #333;
+    background: #111; color: #ccc; cursor: pointer; font-size: 0.85em;
+    font-family: inherit; transition: all 0.15s;
+  }
+  #tele-controls button:hover { background: #222; color: #fff; }
+  #tele-controls button.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #tele-controls button.pri:hover { background: #2563eb; }
+  #scene-indicator {
+    position: absolute; top: 12px; right: 20px;
+    font-size: 0.7em; color: #555;
+  }
+
+  /* ── Footer bar ── */
+  #status-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 32px;
+    background: #000; border-top: 1px solid #1a1a1a;
+    display: flex; align-items: center; padding: 0 16px; gap: 16px;
+    font-size: 0.7em; color: #555;
+  }
+  #status-bar span { display: flex; align-items: center; gap: 4px; }
+  #status-bar .val { color: var(--green); }
+  #status-bar .val.warn { color: var(--amber); }
+
+  @media (max-width: 900px) {
+    body { flex-direction: column; }
+    #script-panel { flex: none; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #tele-text .big { font-size: 1.6em; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LEFT: Script Scenes ═══════════════ -->
+<div id="script-panel">
+  <h1>🏛️ 校园先知 · CampusInsight</h1>
+  <div class="sub">演示提词器 — 按键盘 1-7 切换场景，空格键开始/暂停自动滚动</div>
+
+  <div class="scene" data-scene="1">
+    <h2>🎬 开场 <span class="time">~20s</span></h2>
+    <div class="action">画面：Streamlit 首页全景</div>
+    <div class="line">大家好，我是校园先知的开发者。</div>
+    <div class="line">在大学里，灯坏了不知道找谁修、提了建议石沉大海、不知道校园在发生什么——<span class="pause">（停顿）</span>这是每个学生都经历过的事。</div>
+    <div class="line">校园先知要解决的问题很简单：<b>让每个学生都能参与校园治理</b>。四个字——知、报、议、督。</div>
+  </div>
+
+  <div class="scene" data-scene="2">
+    <h2>🌊 知 + 🔧 报 <span class="time">~50s</span></h2>
+    <div class="action">点击「🌊 校园脉搏」页面</div>
+    <div class="line">打开应用，第一眼看到的是「校园脉搏」。不需要任何操作——天气、本周热点、治理数据快照，一目了然。天气数据来自和风 API，热点分布基于数据库里的真实工单。<span class="pause">（停顿）</span>这就是「知」——知情是参与的前提。</div>
+    <div class="action">切换到 💬 对话页面，输入问题并发送</div>
+    <div class="line">发现问题怎么办？直接对着聊天框说。不需要选分类、不需要填表单。</div>
+    <div class="action">等待 Agent 回复，展示生成的工单号</div>
+    <div class="line">Agent 自动识别设施维修、自动判断紧急程度、自动生成工单。上报→分类→追踪，一个闭环。<span class="pause">（停顿）</span>这就是「报」。</div>
+  </div>
+
+  <div class="scene" data-scene="3">
+    <h2>🗳️ 议 <span class="time">~70s</span></h2>
+    <div class="action">输入：看看大家提了什么好建议</div>
+    <div class="line">除了报修，学生还可以提建议。</div>
+    <div class="action">展示提案列表</div>
+    <div class="line"><b>19 条提案</b>，按附议数排序。最高 89 人附议的实验楼安全排查已经被学校采纳。学生用附议表达诉求，学校用行动回应。</div>
+    <div class="action">输入：我也有个提案——建议在每栋宿舍楼下增设快递柜</div>
+    <div class="line">当我想创建提案时，Agent 会自动查重。如果已有类似提案，它会提醒我去附议已有的，避免力量分散。</div>
+    <div class="line">AI 还能根据校园热点自动发起议题讨论——学生对着聊天框自然表达意见，系统自动汇总。不需要问卷调查。<span class="pause">（停顿）</span>从个人吐槽到集体声音——这就是「议」。</div>
+  </div>
+
+  <div class="scene" data-scene="4">
+    <h2>📊 督 <span class="time">~50s</span></h2>
+    <div class="action">点击「📊 治理透明窗」页面</div>
+    <div class="line">最后是「督」——治理透明窗。</div>
+    <div class="line">三维加权算法实时计算治理健康度：<b>解决率 40%、解决速度 35%、积压趋势 25%</b>。基于 ISO 37120 市政治理指标的评分方法论。</div>
+    <div class="action">点击「📺 治理大屏」</div>
+    <div class="line">治理大屏——为管理者设计的全屏仪表盘。30 秒自动刷新，异常告警脉冲闪烁。</div>
+    <div class="line">透明本身就是最好的信任机制。</div>
+  </div>
+
+  <div class="scene" data-scene="5">
+    <h2>⚙️ 技术亮点 <span class="time">~30s</span></h2>
+    <div class="action">切换到终端/代码画面</div>
+    <div class="line">简单说一下技术亮点。</div>
+    <div class="line"><b>OODA 五阶段治理引擎</b>——感知、定位、决策、执行、反思。不是简单的"用户问 → AI 答"。</div>
+    <div class="line"><b>三层回退链</b>——LLM 不可用时自动降级到规则引擎，规则引擎不可用时降级到数据库直查。服务永远在线。</div>
+    <div class="line"><b>Anti-Hallucination 安全网</b>——当 LLM 编造假工单号时，安全网检测到工具没被真正调用，强制执行真实上报。</div>
+    <div class="line"><b>309 个自动化测试</b>，CI 绿标，GitHub 开源。</div>
+  </div>
+
+  <div class="scene" data-scene="6">
+    <h2>🏁 结尾 <span class="time">~10s</span></h2>
+    <div class="action">回到首页全景</div>
+    <div class="line"><b>知</b>校园事、<b>报</b>校园修、<b>议</b>校园政、<b>督</b>校园治。</div>
+    <div class="line">让每个学生都成为校园治理的参与者，而不仅仅是旁观者。</div>
+    <div class="line">谢谢评委！</div>
+  </div>
+
+  <div class="scene" data-scene="7">
+    <h2>🛡️ 备用：容灾演示 <span class="time">~30s</span></h2>
+    <div class="action">模拟 LLM 不可用场景</div>
+    <div class="line">如果现场网络不稳定——不用担心。</div>
+    <div class="line">校园先知有三层回退。LLM 挂了，OfflineAgent 用规则引擎接管——关键词匹配 + 真实数据库查询 + 模板化回复。90% 的体验接近 AI。</div>
+    <div class="line">规则引擎也挂了？还有第三层——数据库直查，按意图返回硬编码但数据驱动的回复。</div>
+    <div class="line"><b>服务永远在线。</b></div>
+  </div>
+</div>
+
+<!-- ═══════════════ RIGHT: Teleprompter ═══════════════ -->
+<div id="teleprompter">
+  <div id="tele-header">
+    <div class="dot" style="background:#ef4444"></div>
+    <div class="dot" style="background:#f59e0b"></div>
+    <div class="dot" style="background:#22c55e"></div>
+    <span style="font-size:0.78em;color:#888;margin-left:8px;">提词器</span>
+  </div>
+  <div id="scene-indicator">场景 1 / 7</div>
+  <div id="tele-text">
+    <div class="big" id="prompter-text">
+      点击左侧场景<br>或按 <span class="highlight">数字键 1-7</span><br>开始演示
+    </div>
+  </div>
+  <div id="tele-controls">
+    <button onclick="prevScene()" title="上一个场景">◀ 上一个</button>
+    <button class="pri" id="btn-autoplay" onclick="toggleAutoplay()" title="空格键">▶ 自动播放</button>
+    <button onclick="nextScene()" title="下一个场景">下一个 ▶</button>
+    <button onclick="resetAll()">↺ 重置</button>
+  </div>
+</div>
+
+<!-- ═══════════════ Status Bar ═══════════════ -->
+<div id="status-bar">
+  <span>场景: <span class="val" id="sb-scene">1</span>/7</span>
+  <span>自动播放: <span class="val" id="sb-autoplay">关闭</span></span>
+  <span>总时长: <span class="val">~3分30秒</span></span>
+  <span style="margin-left:auto;">空格键 = 开始/暂停 | ← → = 切换场景 | R = 重置</span>
+</div>
+
+<script>
+const scenes = document.querySelectorAll('.scene');
+const prompter = document.getElementById('prompter-text');
+const indicator = document.getElementById('scene-indicator');
+const btnAuto = document.getElementById('btn-autoplay');
+const sbScene = document.getElementById('sb-scene');
+const sbAuto = document.getElementById('sb-autoplay');
+
+let currentScene = 0;
+let autoplayTimer = null;
+let autoplayIndex = 0;
+
+// ── Scene data for teleprompter ──
+const sceneData = [
+  null, // 0 = unused
+  { title:'开场', time:'~20s', lines:[
+    '大家好，我是校园先知的开发者。',
+    '在大学里，灯坏了不知道找谁修、提了建议石沉大海、不知道校园在发生什么——这是每个学生都经历过的事。',
+    '校园先知要解决的问题很简单：让每个学生都能参与校园治理。四个字——知、报、议、督。'
+  ]},
+  { title:'知 + 报', time:'~50s', lines:[
+    '打开应用，第一眼看到的是「校园脉搏」。不需要任何操作——天气、本周热点、治理数据快照，一目了然。',
+    '这就是「知」——知情是参与的前提。',
+    '发现问题怎么办？直接对着聊天框说。不需要选分类、不需要填表单。',
+    'Agent 自动识别设施维修、自动判断紧急程度、自动生成工单。上报→分类→追踪，一个闭环。这就是「报」。'
+  ]},
+  { title:'议', time:'~70s', lines:[
+    '19 条提案，按附议数排序。最高 89 人附议的实验楼安全排查已经被学校采纳。',
+    '学生用附议表达诉求，学校用行动回应。',
+    '当我想创建提案时，Agent 会自动查重。如果已有类似提案，提醒我去附议已有的，避免力量分散。',
+    'AI 还能根据校园热点自动发起议题讨论。不需要问卷调查。',
+    '从个人吐槽到集体声音——这就是「议」。'
+  ]},
+  { title:'督', time:'~50s', lines:[
+    '三维加权算法实时计算治理健康度：解决率 40%、解决速度 35%、积压趋势 25%。',
+    '基于 ISO 37120 市政治理指标的评分方法论。',
+    '治理大屏——30 秒自动刷新，异常告警脉冲闪烁。',
+    '透明本身就是最好的信任机制。'
+  ]},
+  { title:'技术亮点', time:'~30s', lines:[
+    'OODA 五阶段治理引擎——感知、定位、决策、执行、反思。',
+    '三层回退链——LLM 不可用时自动降级到规则引擎，再降级到数据库直查。服务永远在线。',
+    'Anti-Hallucination 安全网——当LLM编造假工单号时，强制执行真实上报。',
+    '309 个自动化测试，CI 绿标，GitHub 开源。'
+  ]},
+  { title:'结尾', time:'~10s', lines:[
+    '知校园事、报校园修、议校园政、督校园治。',
+    '让每个学生都成为校园治理的参与者，而不仅仅是旁观者。',
+    '谢谢评委！'
+  ]},
+  { title:'容灾演示', time:'~30s', lines:[
+    '如果现场网络不稳定——不用担心。',
+    '校园先知有三层回退。LLM挂了，OfflineAgent用规则引擎接管。',
+    '规则引擎也挂了？还有第三层——数据库直查。',
+    '服务永远在线。'
+  ]}
+];
+
+function selectScene(n) {
+  currentScene = n;
+  scenes.forEach(s => s.classList.remove('active'));
+  const el = document.querySelector(`[data-scene="${n}"]`);
+  if (el) el.classList.add('active');
+  indicator.textContent = `场景 ${n} / 7`;
+  sbScene.textContent = n;
+  // Show first line in prompter
+  if (sceneData[n]) {
+    prompter.innerHTML = sceneData[n].lines.map(l =>
+      `<div style="margin-bottom:20px;">${l}</div>`
+    ).join('');
+    prompter.parentElement.scrollTop = 0;
+  }
+}
+
+function nextScene() {
+  const n = currentScene >= 7 ? 1 : currentScene + 1;
+  selectScene(n);
+}
+
+function prevScene() {
+  const n = currentScene <= 1 ? 7 : currentScene - 1;
+  selectScene(n);
+}
+
+function toggleAutoplay() {
+  if (autoplayTimer) {
+    clearInterval(autoplayTimer);
+    autoplayTimer = null;
+    btnAuto.textContent = '▶ 自动播放';
+    btnAuto.classList.remove('pri'); btnAuto.classList.add('pri');
+    sbAuto.textContent = '关闭';
+  } else {
+    autoplayIndex = 0;
+    if (currentScene === 0) selectScene(1);
+    btnAuto.textContent = '⏸ 暂停';
+    sbAuto.textContent = '运行中';
+    advanceAutoplay();
+    autoplayTimer = setInterval(advanceAutoplay, 12000);
+  }
+}
+
+function advanceAutoplay() {
+  if (currentScene === 0) { selectScene(1); return; }
+  const data = sceneData[currentScene];
+  if (!data) return;
+  if (autoplayIndex >= data.lines.length) {
+    // Move to next scene
+    autoplayIndex = 0;
+    if (currentScene >= 7) {
+      clearInterval(autoplayTimer); autoplayTimer = null;
+      btnAuto.textContent = '▶ 自动播放';
+      sbAuto.textContent = '完成';
+      return;
+    }
+    selectScene(currentScene + 1);
+    return;
+  }
+  // Highlight current line
+  const html = data.lines.map((l, i) =>
+    i === autoplayIndex
+      ? `<div style="margin-bottom:20px;color:#fff;font-size:1.1em;">${l}</div>`
+      : `<div style="margin-bottom:20px;color:#555;">${l}</div>`
+  ).join('');
+  prompter.innerHTML = html;
+  autoplayIndex++;
+}
+
+function resetAll() {
+  if (autoplayTimer) { clearInterval(autoplayTimer); autoplayTimer = null; }
+  autoplayIndex = 0;
+  currentScene = 0;
+  scenes.forEach(s => s.classList.remove('active'));
+  btnAuto.textContent = '▶ 自动播放';
+  sbAuto.textContent = '关闭';
+  sbScene.textContent = '—';
+  indicator.textContent = '场景 — / 7';
+  prompter.innerHTML = '点击左侧场景<br>或按 <span class="highlight">数字键 1-7</span><br>开始演示';
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const key = e.key;
+  if (key >= '1' && key <= '7') { e.preventDefault(); selectScene(parseInt(key)); }
+  else if (key === 'ArrowRight' || key === 'ArrowDown') { e.preventDefault(); nextScene(); }
+  else if (key === 'ArrowLeft' || key === 'ArrowUp') { e.preventDefault(); prevScene(); }
+  else if (key === ' ') { e.preventDefault(); toggleAutoplay(); }
+  else if (key === 'r' || key === 'R') { e.preventDefault(); resetAll(); }
+});
+
+// Init
+selectScene(1);
+</script>
+</body>
+</html>
