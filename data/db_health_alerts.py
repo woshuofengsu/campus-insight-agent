@@ -356,7 +356,7 @@ class HealthRiskEngine:
         #     Falls back to pure season model if surveillance table is empty.
         try:
             from data.db_surveillance import blend_risk as _blend, seed_surveillance as _seed_surv
-            _seed_surv()  # idempotent — only seeds if empty
+            _seed_surv(force=True)  # force re-seed to pick up new disease names
             _use_surveillance = True
         except Exception:
             _log.debug("Failed to load surveillance module, using season-only model", exc_info=True)
