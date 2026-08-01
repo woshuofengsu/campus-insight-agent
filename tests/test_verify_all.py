@@ -4,11 +4,9 @@ Compatible with both pytest collection and direct execution:
     pytest tests/test_verify_all.py -s
     python tests/test_verify_all.py
 """
-import sys, io, os, tempfile
+import sys, os, tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-if 'pytest' not in sys.modules:
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
 # ══════════════════════════════════════════════════════════════════════════════
