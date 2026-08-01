@@ -477,11 +477,7 @@ class HealthRiskEngine:
 # 5. Cached convenience
 # ═══════════════════════════════════════════════════════════
 
-import streamlit as st
-
-
-@st.cache_data(ttl=1800)  # 30 min cache — bump _V when data changes
-def cached_health_risk(_cache_version: int = 2) -> dict:
-    """Cached health risk evaluation — recomputes every 30 minutes."""
+def cached_health_risk() -> dict:
+    """Health risk evaluation.  Name preserved for backward compat — no longer cached."""
     engine = HealthRiskEngine()
     return engine.evaluate()
