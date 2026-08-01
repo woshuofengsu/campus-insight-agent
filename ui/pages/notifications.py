@@ -1,13 +1,14 @@
 # ui/pages/notifications.py
 """🔔 消息中心 — 查看所有通知，标记已读."""
 import streamlit as st
+from ui.session_state import SS
 from ui.components import TOKEN
 from data.db_notifications import get_notifications, mark_read, mark_all_read, get_unread_count
 
 
 # ── Page Header ──
 try:
-    unread = get_unread_count(st.session_state.get("_login_user_id", 0))
+    unread = get_unread_count(st.session_state.get(SS.login_user_id, 0))
 except Exception:
     unread = 0
 
@@ -27,14 +28,14 @@ if unread:
     c1, c2 = st.columns([1, 4])
     with c1:
         if st.button("✅ 全部标为已读", width="stretch", type="primary"):
-            n = mark_all_read(st.session_state.get("_login_user_id", 0))
+            n = mark_all_read(st.session_state.get(SS.login_user_id, 0))
             st.toast(f"已标记 {n} 条为已读", icon="✅")
             st.rerun()
 
 st.markdown("---")
 
 # ── Notification list ──
-user_id = st.session_state.get("_login_user_id", 0)
+user_id = st.session_state.get(SS.login_user_id, 0)
 if not user_id:
     st.info("请先登录。")
     st.stop()

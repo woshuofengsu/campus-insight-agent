@@ -134,7 +134,7 @@ def render_sidebar_badge():
     else:
         return
 
-    user_id = st.session_state.get("_login_user_id", 0)
+    user_id = st.session_state.get(SS.login_user_id, 0)
 
     # ── Unread notification count (both roles) ──
     unread_note = 0

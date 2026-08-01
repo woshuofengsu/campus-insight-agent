@@ -1,6 +1,7 @@
 # ui/sidebar.py
 """Sidebar — brand, user card, governance stats, account controls."""
 import streamlit as st
+from ui.session_state import SS
 from ui.theme import get_theme, theme_toggle
 from ui.notify import render_sidebar_badge
 from ui.cache import invalidate_all
@@ -110,7 +111,7 @@ def render_sidebar(profile: dict, role: str):
 
     all_users = list_users()
     if len(all_users) > 1:
-        current_uid = st.session_state.get("_login_user_id", 1)
+        current_uid = st.session_state.get(SS.login_user_id, 1)
         user_options = {
             f'{u["role"].replace("student","[学生]").replace("teacher","[教师]")} '
             f'{u.get("name","") or u["username"]}'
@@ -139,7 +140,7 @@ def render_sidebar(profile: dict, role: str):
         theme_toggle()
     with c_l:
         if st.button("退出", key="_logout", width="stretch"):
-            for k in ["_login_user_id", "user_profile", "messages",
+            for k in [SS.login_user_id, "user_profile", "messages",
                       "langchain_memory", "session_ready", "agent", "memory",
                       "ob_role", "ob_school", "ob_grade", "ob_student_id",
                       "ob_major", "ob_name"]:

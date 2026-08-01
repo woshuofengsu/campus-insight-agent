@@ -63,13 +63,13 @@ with col4:
 if stats["total_issues"] + stats["total_proposals"] > 0:
     impact_score = stats["resolved_issues"] * 10 + stats["adopted_proposals"] * 20 + stats["total_proposals"] * 5
     if impact_score >= 200:
-        level, level_emoji, level_color = "钻石治理者", "💎", "#7c3aed"
+        level, level_emoji, level_color = "钻石治理者", "💎", TOKEN["accent"]
     elif impact_score >= 100:
         level, level_emoji, level_color = "黄金守卫者", "🥇", TOKEN["warning"]
     elif impact_score >= 50:
         level, level_emoji, level_color = "白银参与者", "🥈", TOKEN["text_sec"]
     elif impact_score >= 20:
-        level, level_emoji, level_color = "青铜新星", "🥉", "#b45309"
+        level, level_emoji, level_color = "青铜新星", "🥉", TOKEN["warning"]
     else:
         level, level_emoji, level_color = "萌芽观察者", "🌱", TOKEN["success"]
     st.markdown(

@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+from ui.session_state import SS
 import altair as alt
 from config import DEEPSEEK_API_KEY, OFFLINE_MODE
 
@@ -89,7 +90,7 @@ def main():
         pass  # RAG is optional — don't block startup
 
     # ── Login Gate ──
-    if "_login_user_id" not in st.session_state:
+    if SS.login_user_id not in st.session_state:
         render_login()
         return
 

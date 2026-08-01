@@ -142,7 +142,7 @@ for d in diseases_sorted:
         with c_right:
             # Risk gauge bar
             pct = min(100, ar)
-            gauge_color = "#22c55e" if ar < 30 else "#eab308" if ar < 50 else "#f97316" if ar < 70 else "#ef4444"
+            gauge_color = TOKEN["success"] if ar < 30 else TOKEN["warning"] if ar < 50 else "#f97316" if ar < 70 else TOKEN["danger"]
             st.markdown(
                 f'<div style="text-align:center;padding-top:12px;">'
                 f'<div style="font-size:2em;font-weight:800;color:{gauge_color};">{ar}</div>'
