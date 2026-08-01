@@ -118,7 +118,7 @@ def run_governance_audit() -> str:
                 "SELECT COUNT(*) as cnt, SUM(participant_count) as total_parts FROM discussion_topics"
             ).fetchone()
             total_topics = topic_rows["cnt"] if topic_rows else 0
-            total_participants = topic_rows["total_parts"] if topic_rows else 0
+            total_participants = (topic_rows["total_parts"] or 0) if topic_rows else 0
             unique_authors_row = conn.execute(
                 "SELECT COUNT(DISTINCT author) as cnt FROM campus_issues"
             ).fetchone()

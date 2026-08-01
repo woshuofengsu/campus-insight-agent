@@ -129,7 +129,7 @@ def compute_health_score() -> dict:
         "score": round(composite, 1),
         "grade": grade,
         "resolution_rate": round(resolution_rate, 1),
-        "avg_days": avg_days if avg_days else None,
+        "avg_days": avg_days if avg_days is not None else None,
         "trend": trend,
         "speed_score": round(speed_score, 1),
         "backlog_score": round(backlog_score, 1),
