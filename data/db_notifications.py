@@ -26,6 +26,25 @@ def create_notification(user_id: int, type_: str, title: str,
         return cur.lastrowid
 
 
+def broadcast_notification(type_: str, title: str,
+                           content: str = "", related_id: int | None = None) -> int:
+    """Broadcast a notification to all active student users. Returns count of recipients."""
+    with get_db() as conn:
+        students = conn.execute(
+            "SELECT id FROM user_profile WHERE role = 'student' AND is_active = 1"
+        ).fetchall()
+        count = 0
+        for s in students:
+            conn.execute(
+                "INSERT INTO notifications (user_id, type, title, content, related_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (s["id"], type_, title, content, related_id),
+            )
+            count += 1
+        conn.commit()
+    return count
+
+
 def notify_issue_status_change(issue_id: int, new_status: str,
                                 reporter_username: str = "") -> None:
     """When teacher changes issue status, notify the reporter.

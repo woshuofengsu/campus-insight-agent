@@ -4,6 +4,7 @@ import streamlit as st
 from ui.components import TOKEN
 from ui.cache import cached_knowledge_base, cached_active_topics, invalidate_content
 from data.database import get_db, create_topic, close_topic
+from data.db_notifications import broadcast_notification
 import logging
 _log = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ if pub_tab == "📝 发布通知":
                 )
                 conn.commit()
             invalidate_content()
+            broadcast_notification("notice", f"📢 {notice_title}", notice_content[:150])
             st.toast(f"通知「{notice_title}」已发布", icon="✅")
             for k in ["_notice_title", "_notice_content", "_notice_keywords", "_notice_cat"]:
                 st.session_state.pop(k, None)
@@ -73,6 +75,7 @@ else:
         else:
             tid = create_topic(topic_title, topic_desc, topic_cat, created_by_agent=False)
             invalidate_content()
+            broadcast_notification("topic", f"💬 新议题：{topic_title}", topic_desc[:150])
             st.toast(f"议题「{topic_title}」已创建（#{tid}）", icon="✅")
             for k in ["_topic_title", "_topic_desc", "_topic_cat"]:
                 st.session_state.pop(k, None)
