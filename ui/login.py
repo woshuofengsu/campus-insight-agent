@@ -67,6 +67,7 @@ def _render_login_form(is_dark: bool):
         if uid:
             st.session_state["_login_user_id"] = uid
             st.session_state["_ob_role"] = ""
+            st.session_state.pop("user_profile", None)
             st.rerun()
         else:
             st.error("用户名或密码错误")
@@ -101,6 +102,7 @@ def _render_register_form(is_dark: bool):
         if uid:
             st.session_state["_login_user_id"] = uid
             st.session_state["_ob_role"] = ""
+            st.session_state.pop("user_profile", None)
             st.rerun()
         else:
             st.error("注册失败")
@@ -121,4 +123,6 @@ def _login_demo(role: str):
         uid = target[0].get("id")
         st.session_state["_login_user_id"] = uid
         st.session_state["_ob_role"] = role
+        # Clear cached profile so get_user_profile() re-reads from DB
+        st.session_state.pop("user_profile", None)
         st.rerun()
