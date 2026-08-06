@@ -29,6 +29,12 @@
 - **学生端**（9 页）：对话、校园脉搏、随手报修、有话说、治理透明窗、健康防护、消息、我的、治理大屏
 - **教师端**（6 页）：工作台、工单管理、提案管理、内容发布、数据洞察、健康管理
 
+## 🌐 在线访问
+
+**Streamlit Cloud 部署：** [campus-insight-agent.streamlit.app](https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/)
+
+> 💡 免费版会休眠，评委检查前 5 分钟先访问一次预热即可。
+
 ## 🚀 快速启动
 
 **推荐方式：双击 [`start.bat`](start.bat)**（自动杀旧进程、检查依赖、打开浏览器）
