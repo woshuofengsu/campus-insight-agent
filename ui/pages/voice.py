@@ -261,8 +261,8 @@ else:
                             st.session_state._opinion_feedback = {
                                 str(tid): f"✅ 已发表！当前 {summary['total_opinions']} 条意见"
                             }
-                            # Clear the input
-                            st.session_state[f"opinion_input_{tid}"] = ""
+                            # Clear the input (del avoids Streamlit's widget-ownership guard)
+                            del st.session_state[f"opinion_input_{tid}"]
                         except Exception as e:
                             _log.debug("non-critical failure", exc_info=True)
                             st.session_state._opinion_feedback = {str(tid): f"❌ 发表失败：{e}"}
