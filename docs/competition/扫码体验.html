@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园先知 · 扫码体验</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+  }
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 48px 40px 36px;
+    text-align: center; max-width: 420px; width: 90%;
+    backdrop-filter: blur(20px);
+  }
+  .card h1 { font-size: 1.5em; color: #e8e8f0; font-weight: 700; margin-bottom: 6px; }
+  .card .sub { font-size: 0.8em; color: #7a7a90; margin-bottom: 28px; }
+  #qrcode {
+    display: inline-block; padding: 16px; background: #fff;
+    border-radius: 12px; margin-bottom: 20px;
+  }
+  #qrcode img { display: block; width: 200px; height: 200px; }
+  .url {
+    font-size: 0.75em; color: #5b9cf5; word-break: break-all;
+    background: rgba(91,156,245,0.08); padding: 10px 16px;
+    border-radius: 8px; margin-top: 16px;
+  }
+  .hint { font-size: 0.75em; color: #5e5e6a; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🏛️ 校园先知</h1>
+  <div class="sub">CampusInsight · 校园治理平台</div>
+  <div id="qrcode"></div>
+  <div class="hint">📱 手机扫码即可体验</div>
+  <div class="url" id="urlText"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">
+</script>
+<script>
+const URL = "https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/";
+document.getElementById("urlText").textContent = URL;
+new QRCode(document.getElementById("qrcode"), {
+  text: URL,
+  width: 200, height: 200,
+  colorDark: "#1a1a2e",
+  colorLight: "#ffffff",
+});
+</script>
+</body>
+</html>
