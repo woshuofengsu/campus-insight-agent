@@ -15,6 +15,12 @@ st.markdown(
 )
 st.caption("发布校园通知和讨论议题，管理已发布的内容。")
 
+# ── Persistent success feedback (survives st.rerun) ──
+feedback = st.session_state.pop("_content_pub_feedback", None)
+if feedback:
+    st.success(feedback)
+    st.balloons()
+
 pub_tab = st.radio(
     "发布类型",
     ["📝 发布通知", "💬 创建议题"],
@@ -50,8 +56,9 @@ if pub_tab == "📝 发布通知":
                 )
                 conn.commit()
             invalidate_content()
-            broadcast_notification("notice", f"📢 {notice_title}", notice_content[:150])
-            st.toast(f"通知「{notice_title}」已发布", icon="✅")
+            n = broadcast_notification("notice", f"📢 {notice_title}", notice_content[:150])
+            st.session_state["_content_pub_feedback"] = \
+                f"✅ 通知「{notice_title}」已发布，已推送给 {n} 名学生"
             for k in ["_notice_title", "_notice_content", "_notice_keywords", "_notice_cat"]:
                 st.session_state.pop(k, None)
             st.rerun()
@@ -75,8 +82,9 @@ else:
         else:
             tid = create_topic(topic_title, topic_desc, topic_cat, created_by_agent=False)
             invalidate_content()
-            broadcast_notification("topic", f"💬 新议题：{topic_title}", topic_desc[:150])
-            st.toast(f"议题「{topic_title}」已创建（#{tid}）", icon="✅")
+            n = broadcast_notification("topic", f"💬 新议题：{topic_title}", topic_desc[:150])
+            st.session_state["_content_pub_feedback"] = \
+                f"✅ 议题「{topic_title}」已创建（#{tid}），已推送给 {n} 名学生"
             for k in ["_topic_title", "_topic_desc", "_topic_cat"]:
                 st.session_state.pop(k, None)
             st.rerun()
