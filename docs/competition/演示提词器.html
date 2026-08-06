@@ -101,7 +101,7 @@
     <h2>六、技术架构 <span class="time">30s</span></h2>
     <div class="action">切换到 IDE/终端，展示项目结构或 pytest 结果</div>
     <div class="line">简要说明技术实现。系统基于 OODA 循环设计治理工作流引擎，每个用户请求经过五个阶段。</div>
-    <div class="line">Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 100 余个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 14 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。</div>
+    <div class="line">Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 368 个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 16 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。</div>
     <div class="line">系统设计了三层容错回退链：LLM 不可用时切换至规则引擎，规则引擎不可用时降级至数据库直查，确保服务持续可用。</div>
     <div class="line">项目包含 309 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。</div>
   </div>
@@ -188,7 +188,7 @@ const S={
 6:{title:'六 · 技术架构',lines:[
 {a:'切换到 IDE/终端，展示项目结构或 pytest 结果'},
 {t:'简要说明技术实现。系统基于 OODA 循环设计治理工作流引擎，每个用户请求经过五个阶段。'},
-{t:'Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 100 余个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 14 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。'},
+{t:'Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 368 个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 16 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。'},
 {t:'系统设计了三层容错回退链：LLM 不可用时切换至规则引擎，规则引擎不可用时降级至数据库直查，确保服务持续可用。'},
 {t:'项目包含 309 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。'},
 ]},
