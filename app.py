@@ -72,7 +72,7 @@ def main():
             "⚠️ 未检测到 DeepSeek API Key，已自动切换到**离线演示模式**。\n\n"
             "部分功能（自动分类、反思分析）将使用离线规则替代。"
         )
-        st.caption("复制 `.env.example` 为 `.env` 并填入 API Key 即可启用完整 AI 能力。")
+        st.caption("复制 `.env.example` 为 `.env` 并填入 API Key 即可启用完整智能对话能力。")
         is_offline = True
         st.session_state._force_offline = True
 

@@ -1,5 +1,5 @@
 # agent/weekly_report.py
-"""AI 治理周报生成器 — 自动分析校园治理数据并生成结构化周报。
+"""治理周报生成器 — 自动分析校园治理数据并生成结构化周报。
 
 Design:
   - Reuses reflector.py's analysis functions (z-score, cross-time, upgrade paths)

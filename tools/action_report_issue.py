@@ -189,12 +189,12 @@ def report_issue(title: str, category: str = "", location: str = "",
                  description: str = "", urgency: str = "") -> str:
     """上报校园问题 — 发现设施损坏、环境卫生、安全隐患等问题时使用。
 
-    学生可以快速提交校园中发现的各类问题。Agent 使用 AI（DeepSeek）自动分析和分类，
+    学生可以快速提交校园中发现的各类问题。Agent 使用 DeepSeek 自动分析和分类，
     根据语义理解（而非关键词匹配）判断问题类别和紧急程度。LLM 不可用时自动降级为
     关键词匹配。
     参数：
     - title: 问题标题（如"三教二楼男厕水龙头漏水"）
-    - category: 可选，问题分类。留空则 AI 自动分类
+    - category: 可选，问题分类。留空则自动分类
     - location: 问题地点
     - description: 问题详细描述
     - urgency: 可选，紧急程度。与 category 同时提供时跳过 LLM 分类（快速路径）

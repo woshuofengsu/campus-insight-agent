@@ -246,7 +246,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
     # ── Layer 1: LLM interpretation (the "why") ──
     llm_insight = _generate_llm_insight(associations, user_input)
     if llm_insight:
-        parts.append(f"🧠 **AI 深度解读**：{llm_insight}")
+        parts.append(f"🧠 **深度解读**：{llm_insight}")
 
     # ── Layer 2: Z-score anomaly detection ──
     if za:

@@ -92,7 +92,7 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
             "💡 看起来你想提交建议或查看提案。\n\n"
             "智能服务暂时不可用，但你可以在左侧导航中切换到 **🗳️ 有话说** 页面，"
             "那里可以直接查看热门提案和提交新建议。\n\n"
-            "稍后重试对话也可以获得 AI 的智能分析。"
+            "稍后重试对话也可以获得完整的智能分析。"
         )
 
     # ── Health/stats intent ──

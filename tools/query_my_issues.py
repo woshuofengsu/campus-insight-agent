@@ -7,7 +7,7 @@
 - 学生问"我的工单怎么样了"→ AI 只能返回全部工单或说"没有"
 
 此工具自动从 session 解析当前用户身份，直接调用 get_my_issues，
-让学生侧 AI 对话能准确返回"我的工单"。
+让学生侧对话能准确返回"我的工单"。
 """
 import logging
 from langchain.tools import tool

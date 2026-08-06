@@ -1,5 +1,5 @@
 # ui/prefetch.py
-"""Intent-based data prefetch — provides real DB data as context to the AI agent.
+"""Intent-based data prefetch — provides real DB data as context to the agent.
 
 Each prefetch function detects a user intent from keywords and returns
 pre-formatted context data. This ensures the AI has real data to work with

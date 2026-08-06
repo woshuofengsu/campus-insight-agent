@@ -94,7 +94,7 @@ https://你的域名/openapi.json
 2. 左侧菜单 → **插件** → **新建插件**
 3. 选择 **导入 OpenAPI** → 粘贴 `/openapi.json` 的 URL（公网可访问的那个）
 4. 扣子会自动识别所有端点：
-   - `POST /api/chat` — AI 对话（核心）
+   - `POST /api/chat` — 智能对话（核心）
    - `GET /api/campus-pulse` — 校园脉搏
    - `GET /api/weather` — 天气
    - `GET/POST /api/issues` — 工单查询/上报
@@ -111,7 +111,7 @@ https://你的域名/openapi.json
 扣子 Bot 的「人设与回复逻辑」中配置提示词，把插件工具加进去。例如：
 
 ```
-你是「校园先知」，一个校园治理 AI 助手。
+你是「校园先知」，一个校园治理智能助手。
 
 当学生问你工单/报修/提案/天气/校园脉搏等问题时，
 必须调用 CampusInsight 插件获取真实数据，不得编造。
@@ -123,7 +123,7 @@ https://你的域名/openapi.json
 - list_proposals: 查提案
 - create_proposal: 创建提案
 - get_campus_pulse: 校园脉搏
-- agent_chat: AI 综合对话（兜底）
+- agent_chat: 智能综合对话（兜底）
 ```
 
 **方式二：用工作流编排**
@@ -139,7 +139,7 @@ https://你的域名/openapi.json
   ├─ "天气" → get_weather 插件 → 格式化回复
   ├─ "报修" → report_issue 插件 → 回复工单号
   ├─ "提案" → list_proposals 插件 → 展示列表
-  └─ "其他" → agent_chat 插件 → AI 综合回复
+  └─ "其他" → agent_chat 插件 → 智能综合回复
 ```
 
 ---
@@ -155,7 +155,7 @@ curl http://localhost:18800/api/health
 # 测试天气
 curl http://localhost:18800/api/weather
 
-# 测试 AI 对话
+# 测试智能对话
 curl -X POST http://localhost:18800/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "最近校园有什么新鲜事？"}'
@@ -197,7 +197,7 @@ curl -X POST http://localhost:18800/api/issues \
 **Q: 扣子报 "插件调用失败"？**
 A: 检查公网 URL 是否可达（用浏览器打开 /api/health 验证），检查扣子插件配置中的 URL 是否正确。
 
-**Q: AI 对话返回很慢？**
+**Q: 智能对话返回很慢？**
 A: DeepSeek API 首包延迟 ~2-5 秒。扣子工作流有 30s 超时，足够。如想更快，用 `/api/chat/offline`。
 
 **Q: 没有 DeepSeek API Key？**

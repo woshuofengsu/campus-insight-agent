@@ -1,6 +1,6 @@
 # api.py — CampusInsight Agent REST API
 """FastAPI 后端，把所有 Agent 工具暴露为 REST 端点。
-扣子 AI 通过 OpenAPI 插件调用这些接口 → 读取校园治理数据 + AI 对话。
+扣子 AI 通过 OpenAPI 插件调用这些接口 → 读取校园治理数据 + 智能对话。
 
 启动方式：
   pip install fastapi uvicorn
@@ -685,9 +685,9 @@ def _get_agent():
     return _agent
 
 
-@app.post("/api/chat", tags=["AI对话"])
+@app.post("/api/chat", tags=["智能对话"])
 def agent_chat(req: ChatRequest):
-    """AI 对话 —— 完整 OODA 治理工作流。
+    """智能对话 —— 完整 OODA 治理工作流。
 
     扣子把用户消息传过来，Agent 自动判断意图、调用工具、返回回复。
     扣子 Bot 中把此端点配置为插件的 API 即可。
@@ -715,7 +715,7 @@ def agent_chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/chat/offline", tags=["AI对话"])
+@app.post("/api/chat/offline", tags=["智能对话"])
 def agent_chat_offline(req: ChatRequest):
     """离线模式 —— 不依赖 DeepSeek API，规则匹配。"""
     try:
