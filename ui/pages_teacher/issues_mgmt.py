@@ -348,7 +348,8 @@ def _clear_batch():
     for k in list(st.session_state.keys()):
         if k.startswith("_batch_") and k != "_batch_note":
             st.session_state[k] = False
-    st.session_state["_batch_note"] = ""
+    if "_batch_note" in st.session_state:
+        del st.session_state["_batch_note"]
 
 
 # ── Table ──
@@ -539,16 +540,20 @@ else:
                                 _set_status(iid, "处理中",
                                            note=st.session_state.get(detail_note_key, ""),
                                            assignee=st.session_state.get(detail_assignee_key, ""))
-                                st.session_state[detail_note_key] = ""
-                                st.session_state[detail_assignee_key] = ""
+                                if detail_note_key in st.session_state:
+                                    del st.session_state[detail_note_key]
+                                if detail_assignee_key in st.session_state:
+                                    del st.session_state[detail_assignee_key]
                                 st.rerun()
                         with dbtn2:
                             if st.button("✅ 已解决", key=f"detail_resolve_{iid}", width="stretch"):
                                 _set_status(iid, "已解决",
                                            note=st.session_state.get(detail_note_key, ""),
                                            assignee=st.session_state.get(detail_assignee_key, ""))
-                                st.session_state[detail_note_key] = ""
-                                st.session_state[detail_assignee_key] = ""
+                                if detail_note_key in st.session_state:
+                                    del st.session_state[detail_note_key]
+                                if detail_assignee_key in st.session_state:
+                                    del st.session_state[detail_assignee_key]
                                 st.rerun()
                     elif status == "处理中":
                         with dbtn1:
@@ -556,16 +561,20 @@ else:
                                 _set_status(iid, "已解决",
                                            note=st.session_state.get(detail_note_key, ""),
                                            assignee=st.session_state.get(detail_assignee_key, ""))
-                                st.session_state[detail_note_key] = ""
-                                st.session_state[detail_assignee_key] = ""
+                                if detail_note_key in st.session_state:
+                                    del st.session_state[detail_note_key]
+                                if detail_assignee_key in st.session_state:
+                                    del st.session_state[detail_assignee_key]
                                 st.rerun()
                         with dbtn2:
                             if st.button("↩️ 退回待处理", key=f"detail_return_{iid}", width="stretch"):
                                 _set_status(iid, "待处理",
                                            note=st.session_state.get(detail_note_key, ""),
                                            assignee=st.session_state.get(detail_assignee_key, ""))
-                                st.session_state[detail_note_key] = ""
-                                st.session_state[detail_assignee_key] = ""
+                                if detail_note_key in st.session_state:
+                                    del st.session_state[detail_note_key]
+                                if detail_assignee_key in st.session_state:
+                                    del st.session_state[detail_assignee_key]
                                 st.rerun()
                     elif status == "已解决":
                         with dbtn1:
@@ -573,8 +582,10 @@ else:
                                 _set_status(iid, "待处理",
                                            note=st.session_state.get(detail_note_key, ""),
                                            assignee=st.session_state.get(detail_assignee_key, ""))
-                                st.session_state[detail_note_key] = ""
-                                st.session_state[detail_assignee_key] = ""
+                                if detail_note_key in st.session_state:
+                                    del st.session_state[detail_note_key]
+                                if detail_assignee_key in st.session_state:
+                                    del st.session_state[detail_assignee_key]
                                 st.rerun()
 
                     # Quick assignee fill

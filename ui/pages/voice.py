@@ -88,9 +88,10 @@ with st.container(border=True):
                 st.session_state._create_proposal_feedback = f"✅ 提案 #{pid}「{title[:25]}」已发布！分类：{cat}"
                 st.session_state._create_proposal_error = ""
                 # Clear all form fields including category
-                st.session_state.create_proposal_title = ""
-                st.session_state.create_proposal_desc = ""
-                st.session_state.create_proposal_cat = "自动推断"
+                # Clear form — del avoids Streamlit's widget-ownership guard
+                for _key in ("create_proposal_title", "create_proposal_desc", "create_proposal_cat"):
+                    if _key in st.session_state:
+                        del st.session_state[_key]
             except Exception as e:
                 _log.debug("non-critical failure", exc_info=True)
                 st.session_state._create_proposal_error = f"发布失败：{e}"
