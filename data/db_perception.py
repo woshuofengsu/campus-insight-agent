@@ -1,5 +1,5 @@
 # data/db_perception.py
-"""🧠 背景感知引擎 — 定期自主扫描校园数据，生成感知洞察.
+"""🧠 背景感知模块 — 定期扫描校园数据，生成感知洞察.
 
 触发机制:
   - 任意用户访问任意页面 → init_session() → 检查距上次扫描是否超过阈值
@@ -42,7 +42,7 @@ def _n_days_ago(n: int) -> str:
 
 
 def get_perception_status() -> dict:
-    """返回感知引擎状态: 上次扫描时间、是否该再次扫描."""
+    """返回扫描状态: 上次扫描时间、是否需要重新扫描."""
     with get_db() as conn:
         row = conn.execute(
             "SELECT run_at FROM perception_log ORDER BY run_at DESC LIMIT 1"
@@ -349,7 +349,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         try:
             from data.db_notifications import log_activity
             log_activity(
-                "AI感知引擎", "自主扫描",
+                "系统感知", "定时扫描",
                 target_type="perception",
                 detail=f"发现 {len(anomalies)} 项异常 · {today_new} 件新增工单",
             )

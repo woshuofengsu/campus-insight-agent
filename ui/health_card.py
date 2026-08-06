@@ -1,5 +1,5 @@
 # ui/health_card.py
-"""🏥 健康风险卡片 — 共用渲染组件.
+"""健康风险卡片 —— 共用渲染组件.
 
 提供两个可复用的渲染函数，供 health.py、pulse.py、dashboard.py 等页面使用：
 

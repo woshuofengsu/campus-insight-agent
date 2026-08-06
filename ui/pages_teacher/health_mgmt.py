@@ -1,5 +1,5 @@
 # ui/pages_teacher/health_mgmt.py
-"""🏥 健康管理 — 教师端：全校健康风险、预警推送、防护建议."""
+"""健康管理（教师端）—— 全校健康风险、预警推送、防护建议."""
 import streamlit as st
 import altair as alt
 import pandas as pd

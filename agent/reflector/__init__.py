@@ -52,11 +52,11 @@ def enrich_response(raw_response: str, associations: dict) -> str:
     insight = associations.get("insight_text", "")
     if not insight:
         return raw_response or ""
-    if "智能关联分析" in (raw_response or ""):
+    if "关联分析" in (raw_response or ""):
         return raw_response or ""
     return (
         f"{raw_response}\n\n---\n\n"
-        f"💡 **智能关联分析**（AI 自动发现）：\n\n{insight}"
+        f"💡 **关联分析**：\n\n{insight}"
     )
 
 

@@ -38,7 +38,7 @@ AGENT_TEMPERATURE = 0.3
 PERCEPTION_IDLE_SECONDS = 30
 
 # ── Data Source Configuration ──
-USE_REAL_WEATHER = True        # 和风天气免费API（感知引擎触发用）
+USE_REAL_WEATHER = True        # 和风天气免费 API（感知模块触发用）
 
 # Campus settings
 CAMPUS_CITY = _secret("CAMPUS_CITY", "北京")

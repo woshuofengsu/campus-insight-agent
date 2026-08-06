@@ -417,7 +417,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
     if up:
         lines.append("---")
         lines.append("")
-        lines.append("## 🚀 治理升级路径")
+        lines.append("## 治理升级路径")
         lines.append("")
         for u in up[:4]:
             has = "✅ 已有提案" if u.get('has_proposal') else "⚠️ 建议发起提案"
@@ -467,8 +467,8 @@ def _format_report(data: dict, exec_summary: str) -> str:
     # ── Footer ──
     lines.append("---")
     lines.append("")
-    lines.append(f"*报告由 CampusInsight AI 自动生成于 {now.strftime('%Y-%m-%d %H:%M')}*")
-    lines.append(f"*数据来源：校园先知治理数据库 · 基于 OODA 反射器 + LLM 深度分析*")
+    lines.append(f"*报告由 CampusInsight 自动生成于 {now.strftime('%Y-%m-%d %H:%M')}*")
+    lines.append(f"*数据来源：校园先知治理数据库 · 基于 OODA 反射器分析*")
 
     return "\n".join(lines)
 

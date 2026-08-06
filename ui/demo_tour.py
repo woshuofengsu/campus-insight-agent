@@ -1,5 +1,5 @@
 # ui/demo_tour.py
-"""🎬 竞赛演示导览 — 5幕故事线，自动引导评委体验全流程."""
+"""演示导览 —— 引导体验全流程."""
 import streamlit as st
 from ui.components import TOKEN
 
@@ -121,7 +121,7 @@ Agent 会自动：
 
 | 环节 | 功能 | 技术 |
 |------|------|------|
-| 🧠 **治理引擎** | 治理工作流 + 14个工具 | LangChain + DeepSeek |
+| **治理工作流** | 16 个治理工具 | LangChain + DeepSeek |
 | 📊 **治理透明** | 多维健康度 + 趋势分析 | Altair + SQLite |
 | 🎨 **交互设计** | 双端分离 + 响应式 | Streamlit + CSS |
 

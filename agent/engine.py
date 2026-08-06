@@ -1,5 +1,5 @@
 # agent/engine.py
-"""Agent 推理引擎 —— OODA 治理工作流：观察 → 定位 → 决策 → 反思 → 关联
+"""Agent 推理模块 —— OODA 治理工作流：观察 → 定位 → 决策 → 反思 → 关联
 
 每个 run() 调用执行全部五个阶段，让 Agent 不仅回答问题，还能主动感知
 校园动态、自我纠错、发现关联模式。
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 
 class CampusAgent:
-    """校园先知主 Agent —— OODA 治理工作流"""
+    """主编排类 —— OODA 治理工作流"""
 
     def __init__(self, session_state):
         self.memory = MemoryManager(session_state)

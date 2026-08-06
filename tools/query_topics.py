@@ -1,5 +1,5 @@
 # tools/query_topics.py
-"""有话说 — AI 民意议题查询 + 自动发现."""
+"""议题查询 —— 活跃议题列表 + 热点自动发现."""
 from datetime import datetime
 from langchain.tools import tool
 from data.database import (

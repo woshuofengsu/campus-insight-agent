@@ -85,7 +85,7 @@ with c3:
 
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
-# ── 🧠 智能洞察（Agent 主动发现）──
+# ── 关联洞察（系统主动发现）──
 try:
     from agent.reflector import get_proactive_insights as _get_insights
     _insights = _get_insights()

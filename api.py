@@ -717,7 +717,7 @@ def agent_chat(req: ChatRequest):
 
 @app.post("/api/chat/offline", tags=["AI对话"])
 def agent_chat_offline(req: ChatRequest):
-    """离线 AI —— 不依赖 DeepSeek API，纯规则引擎。秒级响应。"""
+    """离线模式 —— 不依赖 DeepSeek API，规则匹配。"""
     try:
         from agent.offline_agent import OfflineAgent
 

@@ -380,7 +380,7 @@ with eff_col1:
         st.caption("已解决工单不足，暂无效率数据。")
 
 with eff_col2:
-    st.markdown("### 🚀 治理升级路径")
+    st.markdown("### 治理升级路径")
     up_data = data["upgrade_paths"]
     if up_data:
         for u in up_data[:5]:

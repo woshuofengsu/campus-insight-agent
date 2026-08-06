@@ -70,7 +70,7 @@ def main():
     if not DEEPSEEK_API_KEY and not is_offline:
         st.warning(
             "⚠️ 未检测到 DeepSeek API Key，已自动切换到**离线演示模式**。\n\n"
-            "部分 AI 功能（智能分类、反思分析）将使用规则引擎替代。"
+            "部分功能（自动分类、反思分析）将使用离线规则替代。"
         )
         st.caption("复制 `.env.example` 为 `.env` 并填入 API Key 即可启用完整 AI 能力。")
         is_offline = True

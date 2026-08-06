@@ -1,5 +1,5 @@
 # ui/pages_teacher/proposals_mgmt.py
-"""💡 提案管理 — 查看、回复、采纳学生提案."""
+"""提案管理（教师端）—— 查看、回复、采纳学生提案."""
 import csv
 import io
 from datetime import datetime

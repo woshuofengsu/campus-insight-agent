@@ -24,7 +24,7 @@ st.caption("感知校园动态，不错过任何大事小情。")
 ooda_nav("pulse")
 
 # ═══════════════════════════════════════════
-# 🧠 AI 自主感知 — 后台引擎定时扫描结果
+# 后台感知 — 定时扫描结果
 # ═══════════════════════════════════════════
 
 try:
@@ -79,7 +79,7 @@ try:
             c_refresh, _ = st.columns([1, 4])
             with c_refresh:
                 if st.button("🔄 立即扫描", key="force_perception", width="stretch",
-                             help="手动触发 AI 感知引擎扫描校园数据"):
+                             help="手动触发系统扫描校园数据"):
                     with st.spinner("🧠 正在扫描校园数据..."):
                         try:
                             result = force_perception_scan()
@@ -93,7 +93,7 @@ try:
                     st.rerun()
     else:
         # No perception data yet — show initial scan prompt
-        st.info("🧠 感知引擎就绪 · 正在初始化首次校园扫描...")
+        st.info("系统感知就绪 · 正在初始化首次扫描...")
 
 except Exception:
     _log.warning("Perception engine unavailable", exc_info=True)
@@ -313,7 +313,7 @@ if issues:
 
     st.markdown("")
 
-    # ── 🧠 智能洞察（Agent 主动发现）──
+    # ── 关联洞察（系统主动发现）──
     try:
         from agent.reflector import get_proactive_insights as _get_insights
         _insights = _get_insights()

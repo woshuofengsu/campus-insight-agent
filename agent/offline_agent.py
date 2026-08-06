@@ -1,8 +1,8 @@
 # agent/offline_agent.py
-"""Offline demo agent — 无 LLM 依赖，直接调用工具 + 规则引擎生成自然回复。
+"""Offline agent — 无 LLM 依赖，通过规则匹配 + 工具调用生成回复。
 
 用于 OFFLINE_MODE=true 或 ?offline=1 场景。所有回复基于数据库真实数据，
-通过模板引擎包装成接近 AI 对话体验的自然语言响应。
+通过模板转化为自然语言响应。
 """
 import logging
 import random
@@ -16,7 +16,7 @@ _log = logging.getLogger(__name__)
 
 
 class OfflineAgent:
-    """Rule-based agent — 调用真实 tool.invoke()，模板化包装为自然语言回复。"""
+    """基于规则的回复路由 —— 调用 tool.invoke()，模板化为自然语言回复。"""
 
     def __init__(self, session_state):
         self.memory = MemoryManager(session_state)

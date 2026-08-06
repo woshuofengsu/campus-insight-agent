@@ -1,5 +1,5 @@
 # ui/pages/health.py
-"""🏥 健康防护 — 疾病风险预警、预防建议、季节提醒."""
+"""健康防护 —— 疾病风险预警、预防建议、季节提醒."""
 import streamlit as st
 import altair as alt
 import pandas as pd
