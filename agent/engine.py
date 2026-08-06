@@ -203,7 +203,7 @@ class CampusAgent:
                 fallback = self._graceful_fallback(user_input, last_error)
             except Exception:
                 logger.debug("Static fallback also failed", exc_info=True)
-                fallback = f"😅 AI 服务暂时不可用，请稍后重试或使用页面顶部的「⚡ 快速报修」。"
+                fallback = f"😅 智能服务暂时不可用，请稍后重试或使用页面顶部的「⚡ 快速报修」。"
         try:
             self.memory.add_message("assistant", fallback)
         except Exception:  # non-critical: silent pass intended

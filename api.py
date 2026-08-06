@@ -59,7 +59,7 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(
     title="CampusInsight Agent API",
-    description="校园先知 CampusInsight — 校园微治理 AI 智能体对外 API。",
+    description="校园先知 CampusInsight — 校园微治理平台对外 API。",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -773,8 +773,8 @@ def export_openapi():
     schema = app.openapi()
     schema["info"]["title"] = "CampusInsight Agent"
     schema["info"]["description"] = (
-        "校园先知 —— 校园微治理 AI 智能体。提供工单上报/查询、提案管理、"
-        "议题讨论、天气、校园脉搏、治理健康度、AI 对话等能力。"
+        "校园先知 —— 校园微治理平台。提供工单上报/查询、提案管理、"
+        "议题讨论、天气、校园脉搏、治理健康度、智能对话等能力。"
     )
     return schema
 

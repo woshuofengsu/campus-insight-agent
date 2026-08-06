@@ -126,7 +126,7 @@ with st.expander("📊 我的处理统计", expanded=False):
                 "SELECT ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) as avg_days "
                 "FROM campus_issues WHERE status = '已解决' AND resolved_at > date('now', '-30 days')"
             ).fetchone()
-            avg_days = avg_days_row["avg_days"] if avg_days_row and avg_days_row["avg_days"] else None
+            avg_days = avg_days_row["avg_days"] if avg_days_row and avg_days_row["avg_days"] is not None else None
     except Exception:
         _log.warning("Failed to load teacher processing stats", exc_info=True)
         today_processed, week_processed, avg_days = 0, 0, None

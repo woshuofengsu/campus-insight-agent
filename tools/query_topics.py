@@ -29,7 +29,7 @@ def get_topics() -> str:
 
     for i, t in enumerate(topics, 1):
         summary = get_opinion_summary(t["id"])
-        source_tag = "🤖 AI自动发起" if t.get("created_by_agent") else "👤 管理员发布"
+        source_tag = "系统自动发起" if t.get("created_by_agent") else "👤 管理员发布"
         lines.append(
             f"{i}. **{t['title'][:35]}**\n"
             f"   {source_tag} · {summary['total_opinions']} 人参与讨论\n"
@@ -67,7 +67,7 @@ def get_topic_detail(topic_id: int) -> str:
         return f"⚠️ 未找到编号为 #{topic_id} 的议题。"
 
     t = summary["topic"]
-    source_tag = "🤖 AI自动发起" if t.get("created_by_agent") else "👤 管理员发布"
+    source_tag = "系统自动发起" if t.get("created_by_agent") else "👤 管理员发布"
 
     lines = [
         f"🗳️ **{t['title']}**",

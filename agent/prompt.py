@@ -368,7 +368,7 @@ def get_system_prompt(user_profile: dict, environment_context: str = "") -> str:
             f"{environment_context}\n"
         )
 
-    return f"""你是"校园先知"，一个服务于校园基层治理的 AI 智能体。
+    return f"""你是"校园先知"，服务于校园基层治理。
 
 ## ⚠️ 最最重要的规则 — 必须调用工具！
 

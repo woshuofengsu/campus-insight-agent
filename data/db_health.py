@@ -11,7 +11,7 @@ def get_avg_resolution_days() -> float | None:
             "SELECT AVG(julianday(resolved_at) - julianday(reported_at)) AS avg_days "
             "FROM campus_issues WHERE status = '已解决' AND resolved_at IS NOT NULL"
         ).fetchone()
-        return round(row["avg_days"], 1) if row and row["avg_days"] else None
+        return round(row["avg_days"], 1) if row and row["avg_days"] is not None else None
 
 
 def get_recent_issue_counts(days: int = 7) -> dict:

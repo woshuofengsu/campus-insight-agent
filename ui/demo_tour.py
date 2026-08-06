@@ -136,8 +136,7 @@ Agent 会自动：
 
 
 def render_tour_guide():
-
-        tour_step = st.session_state.get("_tour_step", 0)
+    tour_step = st.session_state.get("_tour_step", 0)
 
     if tour_step == 0:
         if st.sidebar.button("🎬 开始演示导览", type="primary", width="stretch",
@@ -148,7 +147,7 @@ def render_tour_guide():
         # Tour is active
         step_data = TOUR_STEPS[tour_step - 1]
 
-                with st.sidebar:
+        with st.sidebar:
             st.markdown("---")
             st.markdown(
                 f'<div style="background:{TOKEN["accent_bg"]};border:2px solid {TOKEN["accent_border"]};'
@@ -165,19 +164,19 @@ def render_tour_guide():
                 st.session_state._tour_step = 0
                 st.rerun()
 
-                _render_step_card(step_data, tour_step)
+        _render_step_card(step_data, tour_step)
 
-                if step_data.get("suggested_input"):
+        if step_data.get("suggested_input"):
             st.info(f"💡 **试试输入：** `{step_data['suggested_input']}`")
             # Quick copy button
             if st.button("📋 一键填入", key="_tour_copy_input"):
                 st.session_state._tour_copied = step_data["suggested_input"]
                 st.rerun()
 
-                if step_data.get("show_demo_hint"):
+        if step_data.get("show_demo_hint"):
             st.info("💡 提示：在地址栏加 `?demo=1` 可启用全屏演示模式，加 `?offline=1` 离线运行。")
 
-                c_prev, c_next = st.columns(2)
+        c_prev, c_next = st.columns(2)
         with c_prev:
             if tour_step > 1:
                 if st.button("← 上一步", width="stretch", key="_tour_prev"):
@@ -189,7 +188,7 @@ def render_tour_guide():
                     st.session_state._tour_step += 1
                     st.rerun()
 
-                target = step_data.get("target_page")
+        target = step_data.get("target_page")
         if target:
             st.markdown("---")
             if st.button(f"📌 直接跳转到「{step_data['title'][:20]}...」页面", width="stretch"):

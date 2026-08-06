@@ -15,8 +15,6 @@ Usage:
 import os, sys, time, json, io, contextlib
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-# Fix encoding for Windows console
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # ═══════════════════════════════════════════
 # Test case definitions

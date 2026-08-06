@@ -117,7 +117,7 @@ def _seed_knowledge():
 
 
 def _seed_issues():
-    """Seed 22 campus issues with authors for personal footprint demo."""
+    """Seed 38 campus issues with authors for personal footprint demo."""
     today = datetime.now()
     d = lambda n: (today - timedelta(days=n)).strftime("%Y-%m-%d")
 
@@ -261,7 +261,7 @@ def _seed_issues():
 
 
 def _seed_proposals():
-    """Seed 12 campus proposals with authors."""
+    """Seed 19 campus proposals with authors."""
     authors = ["张三", "李四", "王五", "陈同学", "刘同学", "杨同学", "周同学", "吴同学"]
 
     proposals = [
