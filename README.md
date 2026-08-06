@@ -31,7 +31,10 @@
 
 ## 🚀 快速启动
 
+**推荐方式：双击 [`start.bat`](start.bat)**（自动杀旧进程、检查依赖、打开浏览器）
+
 ```bash
+# 或手动：
 # 1. 安装依赖
 pip install -r requirements.txt
 
@@ -43,6 +46,7 @@ cp .env.example .env
 
 # 3. 启动应用（首次自动初始化数据库 + 种子数据）
 streamlit run app.py
+# 或双击 start.bat
 ```
 
 **大屏演示模式**（无需数据库）：
