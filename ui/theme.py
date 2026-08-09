@@ -223,6 +223,11 @@ def inject_theme_css():
     theme = get_theme()
     t = TOKEN_DARK if theme == "dark" else TOKEN_LIGHT
 
+    # ── Viewport meta for mobile ──
+    st.markdown("""<meta name="viewport" content="width=device-width, \
+initial-scale=1.0, maximum-scale=1.0, user-scalable=no">""",
+                unsafe_allow_html=True)
+
     root_vars = f"""
 :root {{
     --c-bg: {t["page_bg"]};
@@ -283,11 +288,18 @@ html, body, #root, [id="root"] {{
 }}
 
 /* ── Sidebar ── */
+/* Desktop: force sidebar visible with fixed width */
+@media (min-width: 769px) {{
+    [data-testid="stSidebar"] {{
+        min-width: 220px !important;
+        max-width: 280px !important;
+        background: {t["sidebar_bg"]} !important;
+        border-right: 1px solid {t["border"]} !important;
+    }}
+}}
+/* All screens: sidebar styling */
 [data-testid="stSidebar"] {{
-    min-width: 220px !important;
-    max-width: 280px !important;
     background: {t["sidebar_bg"]} !important;
-    border-right: 1px solid {t["border"]} !important;
 }}
 [data-testid="stSidebar"] * {{
     color: {t["text"]} !important;
@@ -597,6 +609,127 @@ code, pre {{
     color: {t["text"]} !important;
     border: 1px solid {t["border_visible"]} !important;
     border-radius: {t["radius_input"]} !important;
+}}
+
+/* ═══════════════════════════════════════════
+   Responsive — Mobile-first breakpoints
+   ═══════════════════════════════════════════ */
+
+/* ── ≤768px: Stack columns, full-width buttons, smaller cards ── */
+@media (max-width: 768px) {{
+    /* Force columns to stack */
+    [data-testid="stHorizontalBlock"] {{
+        flex-direction: column !important;
+        gap: 8px !important;
+    }}
+    [data-testid="stHorizontalBlock"] > div {{
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+    }}
+
+    /* Full-width buttons */
+    .stButton > button {{
+        width: 100% !important;
+        min-height: 44px !important;
+        font-size: 0.9em !important;
+    }}
+
+    /* Tighter cards */
+    [data-testid="stVerticalBlockBorderWrapper"] {{
+        padding: 10px !important;
+    }}
+
+    /* Smaller metrics */
+    [data-testid="stMetric"] {{
+        padding: 8px 10px !important;
+    }}
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {{
+        font-size: 1.3em !important;
+    }}
+    [data-testid="stMetric"] label {{
+        font-size: 0.68em !important;
+    }}
+
+    /* Tabs — smaller, scrollable */
+    .stTabs [data-baseweb="tab"] {{
+        font-size: 0.8em !important;
+        padding: 6px 10px !important;
+    }}
+
+    /* Sidebar — let Streamlit handle natively */
+    [data-testid="stSidebar"] {{
+        min-width: unset !important;
+        max-width: unset !important;
+    }}
+
+    /* Chat messages — less padding */
+    [data-testid="stChatMessage"] {{
+        padding: 10px 12px !important;
+    }}
+}}
+
+/* ── ≤480px: Phone-specific tweaks ── */
+@media (max-width: 480px) {{
+    /* Larger touch targets */
+    button,
+    [data-testid="stBaseButton-primary"],
+    [data-testid="stBaseButton-secondary"],
+    [kind="primary"],
+    [kind="secondary"] {{
+        min-height: 44px !important;
+        font-size: 0.95em !important;
+        padding: 8px 16px !important;
+    }}
+
+    /* Prevent iOS zoom on input focus */
+    input, select, textarea,
+    [data-baseweb="input"],
+    [data-baseweb="select"] {{
+        font-size: 16px !important;
+    }}
+
+    /* Compact cards */
+    [data-testid="stVerticalBlockBorderWrapper"] {{
+        padding: 8px !important;
+        border-radius: 4px !important;
+    }}
+
+    /* Smaller headings */
+    h1 {{ font-size: 1.3em !important; }}
+    h2 {{ font-size: 1.15em !important; }}
+    h3 {{ font-size: 1em !important; }}
+
+    /* Reduce margins */
+    .block-container {{
+        padding: 12px 8px !important;
+    }}
+
+    /* Chat input full-width */
+    [data-testid="stChatInput"] {{
+        padding: 6px 8px !important;
+    }}
+
+    /* Expander compact */
+    .stExpander {{
+        padding: 6px 10px !important;
+    }}
+
+    /* Table scrollable */
+    [data-testid="stTable"] {{
+        overflow-x: auto !important;
+    }}
+    [data-testid="stTable"] table {{
+        font-size: 0.75em !important;
+    }}
+    [data-testid="stTable"] th,
+    [data-testid="stTable"] td {{
+        padding: 4px 6px !important;
+    }}
+
+    /* OODA stepper — hide text labels, show emoji only */
+    .ooda-step-label {{ display: none !important; }}
+    .ooda-step {{ min-width: 38px !important; padding: 6px !important; }}
+    .ooda-step-emoji {{ font-size: 1.2em !important; }}
 }}
 </style>"""
     st.markdown(css, unsafe_allow_html=True)
