@@ -42,7 +42,7 @@
 
 <div id="left">
   <h1>🏛️ 校园先知 · CampusInsight</h1>
-  <div class="sub">键盘: 1-7 场景 · 空格 自动播放(11s/行) · ← → 翻行 · R 重置</div>
+  <div class="sub">键盘: 1-8 场景 · 空格 自动播放(11s/行) · ← → 翻行 · R 重置</div>
   <div class="sub" style="color:#40c880;">🌐 在线体验：campus-insight-agent.streamlit.app  |  📱 打开「扫码体验.html」评委扫二维码</div>
 
   <div class="scene" data-scene="1">
@@ -67,8 +67,8 @@
     <div class="line">其次是「报」——参与权。当学生发现校园问题时，使用自然语言描述即可。</div>
     <div class="action">Agent 回复，指向工单号、分类、紧急程度</div>
     <div class="line">系统通过 OODA 引擎的 Orient 阶段完成意图识别——当前输入被路由到报修助手角色。Agent 调用 report_issue 工具，自动完成分类、定级、工单生成。整个过程学生无需了解任何分类标准或操作流程。</div>
-    <div class="action">点击"推理链"展开面板，缓慢滚动展示各阶段卡片</div>
-    <div class="line">Agent 的每一次回复背后都有一条完整的推理链。Observe 阶段感知到的环境数据、Act 阶段调用了哪个工具以及工具返回了什么、Reflect 阶段执行了哪些检查——每一步决策都可追溯、可验证。这不是一个黑盒。</div>
+    <div class="action">点击"处理流程"展开面板，缓慢滚动展示各阶段卡片</div>
+    <div class="line">Agent 的每一次回复背后都有一条完整的处理流程。Observe 阶段感知到的环境数据、Act 阶段调用了哪个工具以及工具返回了什么、Reflect 阶段执行了哪些检查——每一步决策都可追溯、可验证。这不是一个黑盒。</div>
     <div class="action">快速切换到健康防护页面，滚动疾病卡片</div>
     <div class="line">此外，系统通过感知引擎主动推送健康风险信息。当前展示的是基于国家疾控局月度公报数据、结合季节模型和天气关联因子的疾病风险评估——甲型流感、乙型流感等疾病的全国趋势和校园风险等级。</div>
   </div>
@@ -78,8 +78,8 @@
     <div class="action">对话页，输入"看看大家有什么好提案"</div>
     <div class="line">第三个环节——「议」，表达权。</div>
     <div class="action">展示提案列表</div>
-    <div class="line">系统当前存储 19 条提案，按附议数降序排列。排名第一的实验楼安全排查提案，89 人附议，状态为已采纳。延长图书馆闭馆时间提案，73 人附议，已实施。增设快递柜提案，62 人附议，已获批。</div>
-    <div class="line">每一条提案包含完整的状态流转记录——从讨论中到已回应、已采纳、已实施。</div>
+    <div class="line">系统当前存储 19 条提案，按附议数降序排列。排名第一的实验楼安全排查提案，89 人附议，状态为已采纳。延长图书馆闭馆时间提案，73 人附议，已采纳。增设快递柜提案，62 人附议，已采纳。</div>
+    <div class="line">每一条提案包含完整的状态流转记录——从讨论中到已回应、已采纳。</div>
     <div class="action">输入创建提案</div>
     <div class="line">当学生提出新提案时，系统首先进行语义查重——计算标题与已有提案的字符重叠度。若相似度超过阈值，引导用户附议已有提案，避免支持力量分散。若为全新提案，自动创建并分类。</div>
     <div class="action">切到议题讨论区</div>
@@ -89,7 +89,7 @@
   <div class="scene" data-scene="5">
     <h2>五、督 — 治理透明窗 <span class="time">45s</span></h2>
     <div class="action">打开治理透明窗，指向健康度评分</div>
-    <div class="line">最后是「督」——监督权。治理透明窗的核心是健康度评分系统。</div>
+    <div class="line">第四个是「督」——监督权。治理透明窗的核心是健康度评分系统。</div>
     <div class="line">这不是简单的展示统计数据——而是一个三维加权评估模型：解决率占 40% 权重，解决速度占 35%，积压趋势占 25%。评分方法参考了 ISO 37120 市政治理指标体系。</div>
     <div class="line">七天趋势对比图展示治理动态——新增工单与已解决工单的双线对比，直观反映治理效率的变化方向。</div>
     <div class="action">点击治理大屏</div>
@@ -98,16 +98,28 @@
   </div>
 
   <div class="scene" data-scene="6">
-    <h2>六、技术架构 <span class="time">30s</span></h2>
+    <h2>六、教师端 — 管理闭环 <span class="time">35s</span></h2>
+    <div class="action">侧边栏 → "切换账号"下拉框 → 选择教师账号 → 📊 工作台</div>
+    <div class="line">最后一个环节——老师的视角。切换到教师端。</div>
+    <div class="action">展示教师工作台 KPI、智能洞察</div>
+    <div class="line">教师工作台展示所有待处理的工单和提案。刚才学生报修的水龙头已经出现在列表里——和学生端是同一套数据，实时同步。</div>
+    <div class="action">点击工单管理，筛选待处理，切换状态</div>
+    <div class="line">工单管理——教师按分类和紧急度筛选，一键把状态从待处理改为处理中、已解决。学生端立刻收到通知。上报到分派到处理到解决到通知——每一步都有记录，全部可追溯。</div>
+    <div class="action">点击提案管理，展示审核操作</div>
+    <div class="line">提案管理——教师逐条审核。89 人附议的实验楼安全排查，标记已采纳。学生端同步更新。管理不是黑盒——从学生表达到教师响应，完整的治理闭环。</div>
+  </div>
+
+  <div class="scene" data-scene="7">
+    <h2>七、技术架构 <span class="time">30s</span></h2>
     <div class="action">切换到 IDE/终端，展示项目结构或 pytest 结果</div>
     <div class="line">简要说明技术实现。系统基于 OODA 循环设计治理工作流引擎，每个用户请求经过五个阶段。</div>
     <div class="line">Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 368 个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 16 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。</div>
     <div class="line">系统设计了三层容错回退链：LLM 不可用时切换至规则引擎，规则引擎不可用时降级至数据库直查，确保服务持续可用。</div>
-    <div class="line">项目包含 309 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。</div>
+    <div class="line">项目包含 318 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。</div>
   </div>
 
-  <div class="scene" data-scene="7">
-    <h2>七、总结 <span class="time">10s</span></h2>
+  <div class="scene" data-scene="8">
+    <h2>八、总结 <span class="time">10s</span></h2>
     <div class="action">回到首页全景</div>
     <div class="line">知、报、议、督——四个环节构成完整的治理闭环。</div>
     <div class="line">校园先知的目标：让每个学生从被管理者转变为治理的参与者。</div>
@@ -120,11 +132,11 @@
     <div class="dot" style="background:#ef4444"></div>
     <div class="dot" style="background:#e8a040"></div>
     <div class="dot" style="background:#40c880"></div>
-    <span style="font-size:0.7em;color:#777;margin-left:6px;">提词器 · 约4分钟</span>
+    <span style="font-size:0.7em;color:#777;margin-left:6px;">提词器 · 约4分30秒</span>
   </div>
   <div id="scene-tag">一 · 项目概述</div>
   <div id="prompter">
-    <div class="line current">点击左侧场景<br>或按数字键 <span style="color:var(--accent);">1-7</span><br>开始演示</div>
+    <div class="line current">点击左侧场景<br>或按数字键 <span style="color:var(--accent);">1-8</span><br>开始演示</div>
   </div>
   <div id="bottombar">
     <button onclick="prev()" title="←">◀</button>
@@ -135,11 +147,11 @@
 </div>
 
 <div id="status">
-  <span>场景: <span class="v" id="s-scene">1</span>/7</span>
+  <span>场景: <span class="v" id="s-scene">1</span>/8</span>
   <span>行: <span class="v" id="s-line">0</span></span>
   <span>自动: <span class="v" id="s-auto">关</span></span>
-  <span>约4分钟</span>
-  <span style="margin-left:auto;">空格=播放 · ← →=翻行 · 1-7=场景 · R=重置</span>
+  <span>约4分30秒</span>
+  <span style="margin-left:auto;">空格=播放 · ← →=翻行 · 1-8=场景 · R=重置</span>
 </div>
 
 <script>
@@ -160,8 +172,8 @@ const S={
 {t:'其次是「报」——参与权。当学生发现校园问题时，使用自然语言描述即可。'},
 {a:'Agent回复，指向工单号、分类、紧急程度'},
 {t:'系统通过 OODA 引擎的 Orient 阶段完成意图识别——当前输入被路由到报修助手角色。Agent 调用 report_issue 工具，自动完成分类、定级、工单生成。整个过程学生无需了解任何分类标准或操作流程。'},
-{a:'点击"推理链"展开面板，缓慢滚动展示各阶段卡片'},
-{t:'Agent 的每一次回复背后都有一条完整的推理链。Observe 阶段感知到的环境数据、Act 阶段调用了哪个工具以及工具返回了什么、Reflect 阶段执行了哪些检查——每一步决策都可追溯、可验证。这不是一个黑盒。'},
+{a:'点击"处理流程"展开面板，缓慢滚动展示各阶段卡片'},
+{t:'Agent 的每一次回复背后都有一条完整的处理流程。Observe 阶段感知到的环境数据、Act 阶段调用了哪个工具以及工具返回了什么、Reflect 阶段执行了哪些检查——每一步决策都可追溯、可验证。这不是一个黑盒。'},
 {a:'快速切换到健康防护页面，滚动展示疾病卡片'},
 {t:'此外，系统通过感知引擎主动推送健康风险信息。当前展示的是基于国家疾控局月度公报数据、结合季节模型和天气关联因子的疾病风险评估——甲型流感、乙型流感等疾病的全国趋势和校园风险等级。'},
 ]},
@@ -169,8 +181,8 @@ const S={
 {a:'对话页，输入"看看大家有什么好提案"'},
 {t:'第三个环节——「议」，表达权。'},
 {a:'展示提案列表'},
-{t:'系统当前存储 19 条提案，按附议数降序排列。排名第一的实验楼安全排查提案，89 人附议，状态为已采纳。延长图书馆闭馆时间提案，73 人附议，已实施。增设快递柜提案，62 人附议，已获批。'},
-{t:'每一条提案包含完整的状态流转记录——从讨论中到已回应、已采纳、已实施。'},
+{t:'系统当前存储 19 条提案，按附议数降序排列。排名第一的实验楼安全排查提案，89 人附议，状态为已采纳。延长图书馆闭馆时间提案，73 人附议，已采纳。增设快递柜提案，62 人附议，已采纳。'},
+{t:'每一条提案包含完整的状态流转记录——从讨论中到已回应、已采纳。'},
 {a:'输入创建提案'},
 {t:'当学生提出新提案时，系统首先进行语义查重——计算标题与已有提案的字符重叠度。若相似度超过阈值，引导用户附议已有提案，避免支持力量分散。若为全新提案，自动创建并分类。'},
 {a:'切到议题讨论区'},
@@ -178,21 +190,30 @@ const S={
 ]},
 5:{title:'五 · 督',lines:[
 {a:'打开治理透明窗，指向健康度评分'},
-{t:'最后是「督」——监督权。治理透明窗的核心是健康度评分系统。'},
+{t:'第四个是「督」——监督权。治理透明窗的核心是健康度评分系统。'},
 {t:'这不是简单的展示统计数据——而是一个三维加权评估模型：解决率占 40% 权重，解决速度占 35%，积压趋势占 25%。评分方法参考了 ISO 37120 市政治理指标体系。'},
 {t:'七天趋势对比图展示治理动态——新增工单与已解决工单的双线对比，直观反映治理效率的变化方向。'},
 {a:'点击治理大屏'},
 {t:'治理大屏是为管理层设计的全屏实时仪表盘。六个核心 KPI、趋势图、工单流转管道、类别分布和最近动态。数据每 30 秒自动刷新，CSS 动画标记异常告警。'},
 {t:'透明是建立治理信任的基础。当学生看到自己的上报被处理、提案被采纳、数据在改善——参与意愿才能持续。'},
 ]},
-6:{title:'六 · 技术架构',lines:[
+6:{title:'六 · 教师端',lines:[
+{a:'侧边栏 → "切换账号"下拉框 → 选择教师账号 → 📊 工作台'},
+{t:'最后一个环节——老师的视角。切换到教师端。'},
+{t:'教师工作台展示所有待处理的工单和提案。刚才学生报修的水龙头已经出现在列表里——和学生端是同一套数据，实时同步。'},
+{a:'点击工单管理，筛选待处理，切换状态'},
+{t:'工单管理——教师按分类和紧急度筛选，一键把状态从待处理改为处理中、已解决。学生端立刻收到通知。上报到分派到处理到解决到通知——每一步都有记录，全部可追溯。'},
+{a:'点击提案管理，展示审核操作'},
+{t:'提案管理——教师逐条审核。89 人附议的实验楼安全排查，标记已采纳。学生端同步更新。管理不是黑盒——从学生表达到教师响应，完整的治理闭环。'},
+]},
+7:{title:'七 · 技术架构',lines:[
 {a:'切换到 IDE/终端，展示项目结构或 pytest 结果'},
 {t:'简要说明技术实现。系统基于 OODA 循环设计治理工作流引擎，每个用户请求经过五个阶段。'},
 {t:'Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 368 个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 16 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。'},
 {t:'系统设计了三层容错回退链：LLM 不可用时切换至规则引擎，规则引擎不可用时降级至数据库直查，确保服务持续可用。'},
-{t:'项目包含 309 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。'},
+{t:'项目包含 318 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。'},
 ]},
-7:{title:'七 · 总结',lines:[
+8:{title:'八 · 总结',lines:[
 {a:'回到首页全景'},
 {t:'知、报、议、督——四个环节构成完整的治理闭环。'},
 {t:'校园先知的目标：让每个学生从被管理者转变为治理的参与者。'},
@@ -220,18 +241,18 @@ function render(){
   const cur=el.querySelector('.current'); if(cur)cur.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
-function next(){ const m=(S[scene]?.lines||[]).length; if(idx<m-1)idx++; else if(scene<7){scene++;idx=0;} else stop(); render(); }
+function next(){ const m=(S[scene]?.lines||[]).length; if(idx<m-1)idx++; else if(scene<8){scene++;idx=0;} else stop(); render(); }
 function prev(){ if(idx>0)idx--; else if(scene>1){scene--;idx=(S[scene]?.lines||[]).length-1;} render(); }
 function go(n){ scene=n; idx=0; render(); }
 function toggle(){ timer?(stop(),btn.textContent='▶ 自动播放',btn.classList.remove('on'),document.getElementById('s-auto').textContent='关'):(btn.textContent='⏸ 暂停',btn.classList.add('on'),document.getElementById('s-auto').textContent='开',advance(),timer=setInterval(advance,11000)); }
 function stop(){ if(timer){clearInterval(timer);timer=null;} }
-function advance(){ const m=(S[scene]?.lines||[]).length; if(idx>=m-1){ if(scene>=7){stop();return;} scene++; idx=0; } else idx++; render(); }
+function advance(){ const m=(S[scene]?.lines||[]).length; if(idx>=m-1){ if(scene>=8){stop();return;} scene++; idx=0; } else idx++; render(); }
 function reset(){ stop(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; scene=1; idx=0; render(); }
 
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
   const k=e.key;
-  if(k>='1'&&k<='7'){ e.preventDefault(); stop(); go(parseInt(k)); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
+  if(k>='1'&&k<='8'){ e.preventDefault(); stop(); go(parseInt(k)); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
   else if(k==='ArrowRight'||k==='ArrowDown'){ e.preventDefault(); stop(); next(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
   else if(k==='ArrowLeft'||k==='ArrowUp'){ e.preventDefault(); stop(); prev(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
   else if(k===' '){ e.preventDefault(); toggle(); }

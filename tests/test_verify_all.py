@@ -9,9 +9,7 @@ import sys, os, tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Helper utilities
-# ══════════════════════════════════════════════════════════════════════════════
+# --  Helper utilities --
 
 def _ok(msg):
     print(f'  [OK] {msg}')
@@ -35,9 +33,7 @@ def _check(condition, count_obj, fail_msg):
 _section_counts = [0, 0]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  1. Module compilation
-# ══════════════════════════════════════════════════════════════════════════════
+# --  1. Module compilation --
 
 def test_01_module_compilation():
     """1. Module Compilation (35 modules)"""
@@ -71,9 +67,7 @@ def test_01_module_compilation():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  2. Persona routing
-# ══════════════════════════════════════════════════════════════════════════════
+# --  2. Persona routing --
 
 def test_02_persona_routing():
     """2. Persona Routing"""
@@ -114,9 +108,7 @@ def test_02_persona_routing():
     _section_counts[:] = [len(p_tests), p_ok]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  3. Text-action parsing
-# ══════════════════════════════════════════════════════════════════════════════
+# --  3. Text-action parsing --
 
 def test_03_text_action_parsing():
     """3. Text-Action Parsing"""
@@ -141,9 +133,7 @@ def test_03_text_action_parsing():
     _section_counts[:] = [len(t_tests), t_ok]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  4. Step summarization (14 tools)
-# ══════════════════════════════════════════════════════════════════════════════
+# --  4. Step summarization (14 tools) --
 
 def test_04_step_summarization():
     """4. Step Summarization (14 tools)"""
@@ -171,9 +161,7 @@ def test_04_step_summarization():
     _section_counts[:] = [len(s_tests), s_ok]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  5. Association dimensions
-# ══════════════════════════════════════════════════════════════════════════════
+# --  5. Association dimensions --
 
 def test_05_association_dimensions():
     """5. Association Dimensions"""
@@ -201,9 +189,7 @@ def test_05_association_dimensions():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  6. System prompt
-# ══════════════════════════════════════════════════════════════════════════════
+# --  6. System prompt --
 
 def test_06_system_prompt():
     """6. System Prompt"""
@@ -229,9 +215,7 @@ def test_06_system_prompt():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  7. Tool discovery
-# ══════════════════════════════════════════════════════════════════════════════
+# --  7. Tool discovery --
 
 def test_07_tool_discovery():
     """7. Tool Discovery"""
@@ -246,9 +230,7 @@ def test_07_tool_discovery():
     _section_counts[:] = [1, 1 if len(tools) >= 10 else 0]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  8. Database roundtrip
-# ══════════════════════════════════════════════════════════════════════════════
+# --  8. Database roundtrip --
 
 def test_08_database_roundtrip():
     """8. Database Roundtrip"""
@@ -326,9 +308,7 @@ def test_08_database_roundtrip():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  9. Prefetch functions
-# ══════════════════════════════════════════════════════════════════════════════
+# --  9. Prefetch functions --
 
 def test_09_prefetch_functions():
     """9. Prefetch Functions"""
@@ -435,9 +415,7 @@ def test_09_prefetch_functions():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  10. Seed deterministic hash
-# ══════════════════════════════════════════════════════════════════════════════
+# --  10. Seed deterministic hash --
 
 def test_10_seed_deterministic_hash():
     """10. Seed Deterministic Hash"""
@@ -465,9 +443,7 @@ def test_10_seed_deterministic_hash():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  11. Proposal status response preservation
-# ══════════════════════════════════════════════════════════════════════════════
+# --  11. Proposal status response preservation --
 
 def test_11_proposal_status_response_preservation():
     """11. Proposal Status Response Preservation"""
@@ -503,9 +479,7 @@ def test_11_proposal_status_response_preservation():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  12. Issue reopen (resolved_at → NULL)
-# ══════════════════════════════════════════════════════════════════════════════
+# --  12. Issue reopen (resolved_at → NULL) --
 
 def test_12_issue_reopen_resolved_clearing():
     """12. Issue Reopen Resolved Clearing"""
@@ -541,9 +515,7 @@ def test_12_issue_reopen_resolved_clearing():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  13. Enhanced anomaly detection
-# ══════════════════════════════════════════════════════════════════════════════
+# --  13. Enhanced anomaly detection --
 
 def test_13_enhanced_anomaly_detection():
     """13. Enhanced Anomaly Detection"""
@@ -603,9 +575,7 @@ def test_13_enhanced_anomaly_detection():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  14. Enhanced persona detection
-# ══════════════════════════════════════════════════════════════════════════════
+# --  14. Enhanced persona detection --
 
 def test_14_enhanced_persona_detection():
     """14. Enhanced Persona Detection"""
@@ -665,9 +635,7 @@ def test_14_enhanced_persona_detection():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  15. Governance audit data
-# ══════════════════════════════════════════════════════════════════════════════
+# --  15. Governance audit data --
 
 def test_15_governance_audit_data():
     """15. Governance Audit Data"""
@@ -704,9 +672,7 @@ def test_15_governance_audit_data():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  16. Theme token consistency
-# ══════════════════════════════════════════════════════════════════════════════
+# --  16. Theme token consistency --
 
 def test_16_theme_token_consistency():
     """16. Theme Token Consistency"""
@@ -757,9 +723,7 @@ def test_16_theme_token_consistency():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  17. Notification module
-# ══════════════════════════════════════════════════════════════════════════════
+# --  17. Notification module --
 
 def test_17_notification_module():
     """17. Notification Module"""
@@ -814,9 +778,7 @@ def test_17_notification_module():
     _section_counts[:] = cnt
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Direct execution entry point (backward compatible)
-# ══════════════════════════════════════════════════════════════════════════════
+# --  Direct execution entry point (backward compatible) --
 
 def main():
     """Run all 17 verification sections. Compatible with `python tests/test_verify_all.py`."""

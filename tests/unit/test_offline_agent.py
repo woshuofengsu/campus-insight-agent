@@ -28,9 +28,7 @@ def _make_mock_st():
     return mock_st
 
 
-# ═══════════════════════════════════════════════════════════════
-# 1. OfflineAgent._route — Persona Dispatch
-# ═══════════════════════════════════════════════════════════════
+# -- 1. OfflineAgent._route — Persona Dispatch --
 
 class TestOfflineAgentRoute(unittest.TestCase):
 
@@ -92,9 +90,7 @@ class TestOfflineAgentRoute(unittest.TestCase):
         self.assertIsNone(result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2. OfflineAgent._handle_general — Fallback Branches
-# ═══════════════════════════════════════════════════════════════
+# -- 2. OfflineAgent._handle_general — Fallback Branches --
 
 class TestOfflineAgentGeneral(unittest.TestCase):
 
@@ -177,9 +173,7 @@ class TestOfflineAgentGeneral(unittest.TestCase):
         self.assertIn("🤔", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 3. OfflineAgent._respond_pulse
-# ═══════════════════════════════════════════════════════════════
+# -- 3. OfflineAgent._respond_pulse --
 
 class TestOfflineAgentPulse(unittest.TestCase):
 
@@ -219,9 +213,7 @@ class TestOfflineAgentPulse(unittest.TestCase):
         self.assertTrue("💡" in result or "🌟" in result or "🙌" in result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 4. OfflineAgent._respond_stats
-# ═══════════════════════════════════════════════════════════════
+# -- 4. OfflineAgent._respond_stats --
 
 class TestOfflineAgentStats(unittest.TestCase):
 
@@ -261,9 +253,7 @@ class TestOfflineAgentStats(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 5. OfflineAgent._respond_report
-# ═══════════════════════════════════════════════════════════════
+# -- 5. OfflineAgent._respond_report --
 
 class TestOfflineAgentReport(unittest.TestCase):
 
@@ -308,9 +298,7 @@ class TestOfflineAgentReport(unittest.TestCase):
         self.assertTrue("🌟" in result or "🙌" in result or "✨" in result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 6. OfflineAgent._respond_proposal
-# ═══════════════════════════════════════════════════════════════
+# -- 6. OfflineAgent._respond_proposal --
 
 class TestOfflineAgentProposal(unittest.TestCase):
 
@@ -351,9 +339,7 @@ class TestOfflineAgentProposal(unittest.TestCase):
         self.assertTrue("🙌" in result or "💪" in result or "🗳️" in result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 7. OfflineAgent.run — Full Pipeline
-# ═══════════════════════════════════════════════════════════════
+# -- 7. OfflineAgent.run — Full Pipeline --
 
 class TestOfflineAgentRun(unittest.TestCase):
 
@@ -411,9 +397,7 @@ class TestOfflineAgentRun(unittest.TestCase):
         self.assertTrue(chain is None or isinstance(chain, dict))
 
 
-# ═══════════════════════════════════════════════════════════════
-# 8. OfflineAgent — Helper Methods
-# ═══════════════════════════════════════════════════════════════
+# -- 8. OfflineAgent — Helper Methods --
 
 class TestOfflineAgentHelpers(unittest.TestCase):
 

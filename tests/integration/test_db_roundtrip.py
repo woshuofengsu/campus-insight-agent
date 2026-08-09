@@ -27,9 +27,7 @@ def _cleanup_test_db(db_path):
         pass
 
 
-# ═══════════════════════════════════════════════════════════════
-# 1. Issue CRUD — Full Lifecycle
-# ═══════════════════════════════════════════════════════════════
+# -- 1. Issue CRUD — Full Lifecycle --
 
 class TestIssueCRUD(unittest.TestCase):
 
@@ -105,9 +103,7 @@ class TestIssueCRUD(unittest.TestCase):
         self.assertEqual(found[0]["status"], "已解决")
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2. Proposal Lifecycle
-# ═══════════════════════════════════════════════════════════════
+# -- 2. Proposal Lifecycle --
 
 class TestProposalLifecycle(unittest.TestCase):
 
@@ -175,9 +171,7 @@ class TestProposalLifecycle(unittest.TestCase):
         self.assertGreaterEqual(stats["total"], 2)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 3. Notification Flow
-# ═══════════════════════════════════════════════════════════════
+# -- 3. Notification Flow --
 
 class TestNotificationFlow(unittest.TestCase):
 
@@ -247,9 +241,7 @@ class TestNotificationFlow(unittest.TestCase):
         self.assertEqual(count, 0)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 4. Activity Log
-# ═══════════════════════════════════════════════════════════════
+# -- 4. Activity Log --
 
 class TestActivityLog(unittest.TestCase):
 
@@ -289,9 +281,7 @@ class TestActivityLog(unittest.TestCase):
         self.assertIn("today_proposals", summary)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 5. Cross-Table Consistency
-# ═══════════════════════════════════════════════════════════════
+# -- 5. Cross-Table Consistency --
 
 class TestCrossTableConsistency(unittest.TestCase):
 
@@ -355,9 +345,7 @@ class TestCrossTableConsistency(unittest.TestCase):
         self.assertEqual(len(errors), 0, f"Concurrent reads had errors: {errors}")
 
 
-# ═══════════════════════════════════════════════════════════════
-# 6. Health Score Computation
-# ═══════════════════════════════════════════════════════════════
+# -- 6. Health Score Computation --
 
 class TestHealthScore(unittest.TestCase):
 

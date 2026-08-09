@@ -23,9 +23,7 @@ st.caption("感知校园动态，不错过任何大事小情。")
 
 ooda_nav("pulse")
 
-# ═══════════════════════════════════════════
-# 后台感知 — 定时扫描结果
-# ═══════════════════════════════════════════
+# -- 后台感知 — 定时扫描结果 --
 
 try:
     from data.db_perception import get_latest_perception, get_perception_status, force_perception_scan
@@ -98,9 +96,7 @@ try:
 except Exception:
     _log.warning("Perception engine unavailable", exc_info=True)
 
-# ═══════════════════════════════════════════
-# Weather — full card (not compact)
-# ═══════════════════════════════════════════
+# -- Weather — full card (not compact) --
 
 st.markdown("---")
 
@@ -140,9 +136,7 @@ if days:
             unsafe_allow_html=True,
         )
 
-# ═══════════════════════════════════════════
-# 🏥 疾病防治 — 健康风险卡片
-# ═══════════════════════════════════════════
+# -- 🏥 疾病防治 — 健康风险卡片 --
 
 try:
     from data.db_health_alerts import cached_health_risk
@@ -152,9 +146,7 @@ try:
 except Exception:
     _log.warning("Health risk module unavailable", exc_info=True)
 
-# ═══════════════════════════════════════════
-# Upcoming events
-# ═══════════════════════════════════════════
+# -- Upcoming events --
 
 section("即将发生")
 
@@ -168,9 +160,7 @@ else:
     info_card("添加校历信息后可在此查看即将发生的大事")
 
 
-# ═══════════════════════════════════════════
-# 📡 校园动态时间线 — 实时活动
-# ═══════════════════════════════════════════
+# -- 📡 校园动态时间线 — 实时活动 --
 
 section("校园动态")
 
@@ -220,9 +210,7 @@ except Exception:
     _log.warning("Activity feed unavailable", exc_info=True)
 
 
-# ═══════════════════════════════════════════
-# 📚 校园百科 — RAG 语义搜索 + quick access
-# ═══════════════════════════════════════════
+# -- 📚 校园百科 — RAG 语义搜索 + quick access --
 
 section("校园百科")
 
@@ -286,9 +274,7 @@ else:
         info_card("添加校历、通知、常用电话等信息后展示")
 
 
-# ═══════════════════════════════════════════
-# Weekly hot spots
-# ═══════════════════════════════════════════
+# -- Weekly hot spots --
 
 section("本周热点")
 

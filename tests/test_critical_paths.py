@@ -16,7 +16,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
-# ═══════════ 1. Persona Detection ═══════════
+# -- 1. Persona Detection
 
 class TestPersonaDetection(unittest.TestCase):
 
@@ -88,7 +88,7 @@ class TestPersonaDetection(unittest.TestCase):
         self.assertGreater(len(prompt), 2000)
 
 
-# ═══════════ 2. Location Extraction ═══════════
+# -- 2. Location Extraction
 
 class TestLocationExtraction(unittest.TestCase):
 
@@ -131,7 +131,7 @@ class TestLocationExtraction(unittest.TestCase):
         self.assertEqual(extract_location("教三楼"), "教三楼")  # 教三楼
 
 
-# ═══════════ 3. Encouragement Phrases ═══════════
+# -- 3. Encouragement Phrases
 
 class TestEncouragement(unittest.TestCase):
 
@@ -143,7 +143,7 @@ class TestEncouragement(unittest.TestCase):
             self.assertTrue(len(result) > 5)
 
 
-# ═══════════ 4. Text-Action Parsing ═══════════
+# -- 4. Text-Action Parsing
 
 class TestTextActionParsing(unittest.TestCase):
 
@@ -167,7 +167,7 @@ class TestTextActionParsing(unittest.TestCase):
         self.assertEqual(len(steps), 0)
 
 
-# ═══════════ 5. OfflineAgent Routing ═══════════
+# -- 5. OfflineAgent Routing
 
 class TestOfflineAgentRouting(unittest.TestCase):
 
@@ -247,7 +247,7 @@ class TestOfflineAgentRouting(unittest.TestCase):
         self.assertTrue(len(result) > 5)
 
 
-# ═══════════ 6. CampusAgent._observe() ═══════════
+# -- 6. CampusAgent._observe()
 
 class TestObservePhase(unittest.TestCase):
 
@@ -309,7 +309,7 @@ class TestObservePhase(unittest.TestCase):
         self.assertIsInstance(env["hot_categories"], list)
 
 
-# ═══════════ 7. _enforce_tool_call Safety Net ═══════════
+# -- 7. _enforce_tool_call Safety Net
 
 class TestEnforceToolCall(unittest.TestCase):
 

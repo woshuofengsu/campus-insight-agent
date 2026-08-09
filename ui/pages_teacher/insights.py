@@ -23,9 +23,7 @@ st.markdown(
 )
 st.caption("基于 OODA 反射器的 7 维关联分析，自动发现校园治理中的隐藏模式和趋势。")
 
-# ═══════════════════════════════════════════════════
-# 🤖 治理周报 — 一键生成
-# ═══════════════════════════════════════════════════
+# -- 🤖 治理周报 — 一键生成 --
 st.markdown("---")
 
 c_rpt, c_btn = st.columns([3, 1])
@@ -208,9 +206,7 @@ data = _run_insight_analysis()
 if data is None:
     st.stop()
 
-# ═══════════════════════════════════════════════════
-# Row 1: Alert Cards (异常 + 超时SLA)
-# ═══════════════════════════════════════════════════
+# -- Row 1: Alert Cards (异常 + 超时SLA) --
 st.markdown("### 🚨 预警中心")
 
 alert_cols = st.columns(3)
@@ -278,9 +274,7 @@ with alert_cols[2]:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════════════
-# Row 2: Category Breakdown Chart + Spatial Hotspots
-# ═══════════════════════════════════════════════════
+# -- Row 2: Category Breakdown Chart + Spatial Hotspots --
 chart_col1, chart_col2 = st.columns([3, 2])
 
 with chart_col1:
@@ -341,9 +335,7 @@ with chart_col2:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════════════
-# Row 3: Resolution Efficiency + Upgrade Paths
-# ═══════════════════════════════════════════════════
+# -- Row 3: Resolution Efficiency + Upgrade Paths --
 eff_col1, eff_col2 = st.columns(2)
 
 with eff_col1:
@@ -400,9 +392,7 @@ with eff_col2:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════════════
-# Row 4: Recurrence Detection + Category Correlations
-# ═══════════════════════════════════════════════════
+# -- Row 4: Recurrence Detection + Category Correlations --
 rec_col1, rec_col2 = st.columns(2)
 
 with rec_col1:
@@ -439,9 +429,7 @@ with rec_col2:
 
 st.markdown("---")
 
-# ═══════════════════════════════════════════════════
-# Row 5: Overdue SLA Detail Table
-# ═══════════════════════════════════════════════════
+# -- Row 5: Overdue SLA Detail Table --
 if data["overdues"]:
     st.markdown("### ⏰ SLA 超时明细")
     st.caption("以下工单已逾期超过 7 天未解决，需立即关注。")

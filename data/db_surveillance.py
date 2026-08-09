@@ -21,9 +21,7 @@ import json
 from datetime import datetime
 from data.db_core import get_db
 
-# ═══════════════════════════════════════════════════════════
-# 1. Fallback Data — 近12个月国家法定传染病报告数据
-# ═══════════════════════════════════════════════════════════
+# -- 1. Fallback Data — 近12个月国家法定传染病报告数据 --
 #
 # 数据口径: 全国丙类传染病月发病数（近似值，基于公开发布的公报规律）
 # 来源: 国家疾控局 ndcpa.gov.cn 月度《全国法定传染病疫情概况》
@@ -84,9 +82,7 @@ _SURVEILLANCE_FALLBACK: list[tuple[str, int, int, int, int]] = [
 ]
 
 
-# ═══════════════════════════════════════════════════════════
-# 2. Seed function — 写入 health_surveillance 表
-# ═══════════════════════════════════════════════════════════
+# -- 2. Seed function — 写入 health_surveillance 表 --
 
 def seed_surveillance(force: bool = False):
     """Populate health_surveillance table with fallback data.
@@ -118,9 +114,7 @@ def seed_surveillance(force: bool = False):
         return {"seeded": inserted, "msg": f"Inserted {inserted} surveillance records"}
 
 
-# ═══════════════════════════════════════════════════════════
-# 3. Trend extraction — 将原始发病数映射到 0-100 风险分
-# ═══════════════════════════════════════════════════════════
+# -- 3. Trend extraction — 将原始发病数映射到 0-100 风险分 --
 
 def _normalize_to_risk(cases: int, hist_min: int, hist_max: int) -> float:
     """Map a case count to 0-100 scale using historical min/max.
@@ -248,9 +242,7 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
     return result
 
 
-# ═══════════════════════════════════════════════════════════
-# 4. Blending — 融合季节模型 + 真实监测数据
-# ═══════════════════════════════════════════════════════════
+# -- 4. Blending — 融合季节模型 + 真实监测数据 --
 
 def blend_risk(disease_name: str, seasonal_base: float,
                surveillance_weight: float = 0.6) -> tuple[float, dict]:
@@ -317,9 +309,7 @@ def blend_risk(disease_name: str, seasonal_base: float,
     return blended, meta
 
 
-# ═══════════════════════════════════════════════════════════
-# 5. Convenience: full trend snapshot for UI display
-# ═══════════════════════════════════════════════════════════
+# -- 5. Convenience: full trend snapshot for UI display --
 
 def get_surveillance_summary() -> dict:
     """Return a human-readable summary of current surveillance status.

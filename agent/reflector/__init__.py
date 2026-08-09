@@ -39,7 +39,7 @@ _summarize_step = summarize_step
 _parse_text_actions = parse_text_actions
 
 
-# ═══════════════════════ 1. Response enrichment ═══════════════════════
+# -- 1. Response enrichment
 
 def enrich_response(raw_response: str, associations: dict) -> str:
     """Append association insights to the agent's response if meaningful.
@@ -60,7 +60,7 @@ def enrich_response(raw_response: str, associations: dict) -> str:
     )
 
 
-# ═══════════════════════ 2. Main entry point ═══════════════════════
+# -- 2. Main entry point
 
 def build_reasoning_chain(
     intermediate_steps: list, raw_response: str, user_input: str,

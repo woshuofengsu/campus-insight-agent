@@ -93,9 +93,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
     week_ago = _n_days_ago(7)
 
     with get_db() as conn:
-        # ═══════════════════════════════════════════
-        # 1. 基础数据采集
-        # ═══════════════════════════════════════════
+        # -- 1. 基础数据采集 --
         total = conn.execute("SELECT COUNT(*) as cnt FROM campus_issues").fetchone()["cnt"]
         pending = conn.execute(
             "SELECT COUNT(*) as cnt FROM campus_issues WHERE status IN ('待处理','处理中')"
@@ -108,9 +106,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             (today_str,),
         ).fetchone()["cnt"]
 
-        # ═══════════════════════════════════════════
-        # 2. 趋势分析 — 本周 vs 上周
-        # ═══════════════════════════════════════════
+        # -- 2. 趋势分析 — 本周 vs 上周 --
         this_week_new = conn.execute(
             "SELECT COUNT(*) as cnt FROM campus_issues WHERE date(reported_at) >= ?",
             (week_ago,),
@@ -147,9 +143,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
         resolution_rate = round(this_week_resolved / max(1, this_week_new) * 100)
 
-        # ═══════════════════════════════════════════
-        # 3. 异常检测 — 分类/地点激增
-        # ═══════════════════════════════════════════
+        # -- 3. 异常检测 — 分类/地点激增 --
         anomalies: list[dict] = []
 
         # 3a. 分类激增检测：今日各分类 vs 近7天日均
@@ -207,9 +201,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                         "level": "warning",
                     })
 
-        # ═══════════════════════════════════════════
-        # 4. 积压预警 — SLA 超期工单
-        # ═══════════════════════════════════════════
+        # -- 4. 积压预警 — SLA 超期工单 --
         overdue_warning = conn.execute(
             "SELECT COUNT(*) as cnt FROM campus_issues "
             "WHERE status IN ('待处理','处理中') "
@@ -238,9 +230,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                 "level": "warning",
             })
 
-        # ═══════════════════════════════════════════
-        # 5. 舆情快照 — 近期反馈情绪
-        # ═══════════════════════════════════════════
+        # -- 5. 舆情快照 — 近期反馈情绪 --
         sentiment_rows = conn.execute(
             "SELECT sentiment, COUNT(*) as cnt FROM feedback_items "
             "WHERE created_at >= ? GROUP BY sentiment",
@@ -253,9 +243,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         total_fb = pos + neg + neu
         sentiment_ratio = round(pos / max(1, total_fb) * 100) if total_fb else 50
 
-        # ═══════════════════════════════════════════
-        # 6. 提案动态
-        # ═══════════════════════════════════════════
+        # -- 6. 提案动态 --
         proposals_active = conn.execute(
             "SELECT COUNT(*) as cnt FROM proposals WHERE status='讨论中'"
         ).fetchone()["cnt"]
@@ -264,9 +252,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             (week_ago,),
         ).fetchone()["cnt"]
 
-        # ═══════════════════════════════════════════
-        # 7. 生成综合摘要
-        # ═══════════════════════════════════════════
+        # -- 7. 生成综合摘要 --
         key_findings: list[str] = []
 
         # Trend finding
@@ -314,9 +300,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         else:
             overall = f"📊 校园运转平稳 · {today_new} 件新增 · 待处理 {pending} 件"
 
-        # ═══════════════════════════════════════════
-        # 8. 持久化
-        # ═══════════════════════════════════════════
+        # -- 8. 持久化 --
         details = {
             "this_week_new": this_week_new,
             "this_week_resolved": this_week_resolved,
@@ -343,9 +327,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         )
         conn.commit()
 
-        # ═══════════════════════════════════════════
-        # 9. 记录到活动日志
-        # ═══════════════════════════════════════════
+        # -- 9. 记录到活动日志 --
         try:
             from data.db_notifications import log_activity
             log_activity(
@@ -353,7 +335,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                 target_type="perception",
                 detail=f"发现 {len(anomalies)} 项异常 · {today_new} 件新增工单",
             )
-        except Exception:  # non-critical: silent pass intended
+        except Exception:  # best-effort, skip
             _log.debug("Failed to log activity for perception scan", exc_info=True)
             pass
 

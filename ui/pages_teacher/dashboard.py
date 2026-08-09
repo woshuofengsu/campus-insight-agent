@@ -44,7 +44,7 @@ try:
             f'{d["emoji"]} {d["condition"]} {d["temp_low"]}~{d["temp_high"]}°C '
             f'💧{d["rain_prob"]}%</span>'
         )
-except Exception:  # non-critical: logged and suppressed
+except Exception:  # log and skip
     _log.debug("Weather fetch failed", exc_info=True)
 
 st.markdown(
@@ -294,7 +294,7 @@ try:
             "ORDER BY days_open DESC LIMIT 8"
         ).fetchall()
         overdue_issues = [dict(r) for r in overdue_rows]
-except Exception:  # non-critical: logged and suppressed
+except Exception:  # log and skip
     _log.warning("SLA overdue query failed", exc_info=True)
 
 if overdue_issues:
@@ -449,7 +449,7 @@ try:
                 _log.warning("Live generator events unavailable", exc_info=True)
     else:
         st.caption("暂无校园动态。当学生上报问题或提交提案时，这里会实时更新。")
-except Exception:  # non-critical: logged and suppressed
+except Exception:  # log and skip
     _log.debug("Activity feed skipped", exc_info=True)
 
 # ── Top Proposals ──

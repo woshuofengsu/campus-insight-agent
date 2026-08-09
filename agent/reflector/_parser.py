@@ -52,15 +52,10 @@ _TRIVIAL_PATTERNS: set[str] = {
 }
 
 
-# ═══════════════════════ 1. Step normalisation ═══════════════════════
+# -- 1. Step normalisation
 
 def normalize_tool_input(tool_input) -> dict:
-    """Ensure tool_input is a dict, regardless of what LangChain passes.
-
-    StructuredTools always pass dicts, but plain @tool functions may pass
-    strings, numbers, or None. Normalize so downstream code can safely
-    use .get() and string formatting.
-    """
+    """Normalize tool_input to a dict. Accepts str, int, None — safe for .get()."""
     if tool_input is None:
         return {}
     if isinstance(tool_input, dict):
@@ -71,7 +66,7 @@ def normalize_tool_input(tool_input) -> dict:
     return {"value": tool_input}
 
 
-# ═══════════════════════ 2. Step summarisation ═══════════════════════
+# -- 2. Step summarisation
 
 def summarize_step(tool_name: str, tool_input: dict) -> str:
     """Generate a one-line human-readable Chinese summary of a tool call.
@@ -109,7 +104,7 @@ def summarize_step(tool_name: str, tool_input: dict) -> str:
     return f"调用 {tool_name}"
 
 
-# ═══════════════════════ 3. Step parsing ═══════════════════════
+# -- 3. Step parsing
 
 def parse_intermediate_steps(intermediate_steps: list) -> list[dict]:
     """Convert LangChain intermediate_steps (list[tuple[AgentAction, str]]) to structured steps."""
@@ -134,7 +129,7 @@ def parse_intermediate_steps(intermediate_steps: list) -> list[dict]:
     return steps
 
 
-# ═══════════════════════ 4. Text-action parsing (fallback) ═══════════════════════
+# -- 4. Text-action parsing (fallback)
 
 def parse_text_actions(raw_response: str) -> list[dict]:
     """Extract pseudo-steps from the agent's text response.
@@ -175,7 +170,7 @@ def parse_text_actions(raw_response: str) -> list[dict]:
     return steps
 
 
-# ═══════════════════════ 5. Trivial-input gate ═══════════════════════
+# -- 5. Trivial-input gate
 
 def is_trivial_input(user_input: str) -> bool:
     """Return True if the input is generic small-talk that shouldn't trigger

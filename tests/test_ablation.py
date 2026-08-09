@@ -16,9 +16,7 @@ import os, sys, time, json, io, contextlib
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# ═══════════════════════════════════════════
-# Test case definitions
-# ═══════════════════════════════════════════
+# -- Test case definitions --
 
 # (user_input, expected_tool, expected_persona, description)
 ACCURACY_CASES = [
@@ -52,9 +50,7 @@ ASSOCIATION_CASES = [
 ]
 
 
-# ═══════════════════════════════════════════
-# Mock session state for offline testing
-# ═══════════════════════════════════════════
+# -- Mock session state for offline testing --
 
 class MockSessionState(dict):
     """Minimal mock of Streamlit session_state for offline agent testing."""
@@ -84,9 +80,7 @@ def _make_mock_state():
     return state
 
 
-# ═══════════════════════════════════════════
-# Test runners
-# ═══════════════════════════════════════════
+# -- Test runners --
 
 def test_persona_routing():
     """Test persona detection accuracy."""
@@ -272,9 +266,7 @@ def test_memory_operations():
     }
 
 
-# ═══════════════════════════════════════════
-# Report generation
-# ═══════════════════════════════════════════
+# -- Report generation --
 
 def run_full_ablation(quick: bool = False) -> dict:
     """Run all ablation tests and return structured results."""
@@ -454,9 +446,7 @@ def format_report(report: dict) -> str:
     return "\n".join(lines)
 
 
-# ═══════════════════════════════════════════
-# CLI entry point
-# ═══════════════════════════════════════════
+# -- CLI entry point --
 
 if __name__ == "__main__":
     import argparse

@@ -8,9 +8,7 @@ from ui.session_state import SS
 import logging
 _log = logging.getLogger(__name__)
 
-# Bump this when agent code changes to force recreation on hot-reload.
-# The agent instance is cached in session_state and Streamlit's hot-reload
-# preserves session_state, so old agent code survives file changes.
+# Increment to invalidate cached agent on code change (hot-reload keeps session_state).
 _AGENT_VERSION = 4
 
 
@@ -18,9 +16,7 @@ def init_session():
     """Initialize database, agent, and memory. Idempotent — runs once per session."""
     init_db(DB_PATH)
 
-    # Streamlit hot-reload preserves session_state but reloads Python modules,
-    # so the agent instance in session_state runs OLD code after a file edit.
-    # Comparing a version stamp detects this and rebuilds the agent.
+    # Hot-reload keeps session_state but reloads modules — version stamp forces rebuild.
     cached_version = st.session_state.get(SS.agent_version, 0)
     if cached_version != _AGENT_VERSION:
         # Clear cached agent so it gets recreated with latest code
@@ -51,7 +47,7 @@ def init_session():
         qp = st.query_params.get("offline")
         if qp and str(qp).lower() in ("1", "true", "yes"):
             is_offline = True
-    except Exception:  # non-critical: silent pass intended
+    except Exception:  # best-effort, skip
         _log.debug("non-critical failure", exc_info=True)
         pass
     # Check for forced offline (auto-detected when no API key)

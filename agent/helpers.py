@@ -11,12 +11,7 @@ _log = logging.getLogger(__name__)
 
 
 def get_author_identifier(memory) -> str | None:
-    """Get the identifier used for filtering personal issues/proposals.
-
-    Delegates to _resolve_author() in db_governance.py — the single source of
-    truth for author identity resolution.  Returns None when the resolved
-    author is the generic "匿名" fallback (no identifiable user).
-    """
+    """Resolve the current user's author identifier. Returns None if anonymous."""
     from data.db_governance import _resolve_author
     author = _resolve_author("")
     return author if author != "匿名" else None
@@ -27,7 +22,7 @@ def get_user_name(memory) -> str:
     try:
         profile = memory.get_user_profile()
         return profile.get("name", "") or profile.get("student_id", "") or ""
-    except Exception:  # non-critical: graceful degradation
+    except Exception:  # ok to fail
         _log.debug("Failed to get user name from profile", exc_info=True)
         return ""
 

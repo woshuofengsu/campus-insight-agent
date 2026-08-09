@@ -45,38 +45,39 @@ if profile:
 
 stats = cached_my_stats(author)
 
-section("我的影响力")
+with st.container(border=True):
+    section("我的影响力")
 
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    stat("上报问题", str(stats["total_issues"]), TOKEN["accent"])
-with col2:
-    stat("已解决", str(stats["resolved_issues"]), TOKEN["success"])
-with col3:
-    stat("提交提案", str(stats["total_proposals"]), TOKEN["accent"])
-with col4:
-    stat("提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        stat("上报问题", str(stats["total_issues"]), TOKEN["accent"])
+    with col2:
+        stat("已解决", str(stats["resolved_issues"]), TOKEN["success"])
+    with col3:
+        stat("提交提案", str(stats["total_proposals"]), TOKEN["accent"])
+    with col4:
+        stat("提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
 
-# Impact summary
-if stats["total_issues"] + stats["total_proposals"] > 0:
-    impact_score = stats["resolved_issues"] * 10 + stats["adopted_proposals"] * 20 + stats["total_proposals"] * 5
-    if impact_score >= 200:
-        level, level_emoji, level_color = "钻石治理者", "💎", TOKEN["accent"]
-    elif impact_score >= 100:
-        level, level_emoji, level_color = "黄金守卫者", "🥇", TOKEN["warning"]
-    elif impact_score >= 50:
-        level, level_emoji, level_color = "白银参与者", "🥈", TOKEN["text_sec"]
-    elif impact_score >= 20:
-        level, level_emoji, level_color = "青铜新星", "🥉", TOKEN["warning"]
-    else:
-        level, level_emoji, level_color = "萌芽观察者", "🌱", TOKEN["success"]
-    st.markdown(
-        f'<div style="text-align:center;margin:8px 0 16px;">'
-        f'<span style="background:{level_color};color:#fff;font-size:0.9em;font-weight:600;'
-        f'padding:6px 18px;border-radius:99px;">{level_emoji} {level} · {impact_score} 分</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    # Impact summary
+    if stats["total_issues"] + stats["total_proposals"] > 0:
+        impact_score = stats["resolved_issues"] * 10 + stats["adopted_proposals"] * 20 + stats["total_proposals"] * 5
+        if impact_score >= 200:
+            level, level_emoji, level_color = "钻石治理者", "💎", TOKEN["accent"]
+        elif impact_score >= 100:
+            level, level_emoji, level_color = "黄金守卫者", "🥇", TOKEN["warning"]
+        elif impact_score >= 50:
+            level, level_emoji, level_color = "白银参与者", "🥈", TOKEN["text_sec"]
+        elif impact_score >= 20:
+            level, level_emoji, level_color = "青铜新星", "🥉", TOKEN["warning"]
+        else:
+            level, level_emoji, level_color = "萌芽观察者", "🌱", TOKEN["success"]
+        st.markdown(
+            f'<div style="text-align:center;margin:8px 0 4px;">'
+            f'<span style="background:{level_color};color:#fff;font-size:0.9em;font-weight:600;'
+            f'padding:6px 18px;border-radius:99px;">{level_emoji} {level} · {impact_score} 分</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 st.markdown("---")
 

@@ -478,8 +478,8 @@ def seed_all(db_path: str):
     except Exception as e:
         _log.debug("Activity log backfill failed: %s", e, exc_info=True)
         print(f"[seed] Activity log backfill skipped: {e}")
-    print("[seed] Done! Seeded: 9 knowledge entries, 38 campus issues, "
-          "19 proposals, 7 discussion topics, 29 opinions, 28 feedback items, "
+    print("[seed] Done! Seeded: 14 knowledge entries, 38 campus issues, "
+          "19 proposals, 7 discussion topics, 26 opinions, 28 feedback items, "
           "39 health surveillance records")
 
 

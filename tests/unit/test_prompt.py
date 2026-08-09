@@ -11,9 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# ═══════════════════════════════════════════════════════════════
-# 1. detect_persona — Repair Persona (报修助手)
-# ═══════════════════════════════════════════════════════════════
+# -- 1. detect_persona — Repair Persona (报修助手) --
 
 class TestPersonaRepair(unittest.TestCase):
     """Tests for 报修助手 persona detection."""
@@ -86,9 +84,7 @@ class TestPersonaRepair(unittest.TestCase):
         self.assertIn("报修", r["role"])
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2. detect_persona — Observer Persona (校园观察员)
-# ═══════════════════════════════════════════════════════════════
+# -- 2. detect_persona — Observer Persona (校园观察员) --
 
 class TestPersonaObserver(unittest.TestCase):
 
@@ -124,9 +120,7 @@ class TestPersonaObserver(unittest.TestCase):
         self.assertIn("观察员", r["role"])
 
 
-# ═══════════════════════════════════════════════════════════════
-# 3. detect_persona — Analyst Persona (数据分析师)
-# ═══════════════════════════════════════════════════════════════
+# -- 3. detect_persona — Analyst Persona (数据分析师) --
 
 class TestPersonaAnalyst(unittest.TestCase):
 
@@ -174,9 +168,7 @@ class TestPersonaAnalyst(unittest.TestCase):
         self.assertIn("数据分析师", r["role"])
 
 
-# ═══════════════════════════════════════════════════════════════
-# 4. detect_persona — Advisor Persona (议事顾问)
-# ═══════════════════════════════════════════════════════════════
+# -- 4. detect_persona — Advisor Persona (议事顾问) --
 
 class TestPersonaAdvisor(unittest.TestCase):
 
@@ -223,9 +215,7 @@ class TestPersonaAdvisor(unittest.TestCase):
         self.assertIn("议事顾问", r["role"])
 
 
-# ═══════════════════════════════════════════════════════════════
-# 5. detect_persona — Edge Cases & Boundaries
-# ═══════════════════════════════════════════════════════════════
+# -- 5. detect_persona — Edge Cases & Boundaries --
 
 class TestPersonaEdgeCases(unittest.TestCase):
 
@@ -280,9 +270,7 @@ class TestPersonaEdgeCases(unittest.TestCase):
             self.assertEqual(r.get("confidence"), "low")
 
 
-# ═══════════════════════════════════════════════════════════════
-# 6. detect_persona — Status Query Override
-# ═══════════════════════════════════════════════════════════════
+# -- 6. detect_persona — Status Query Override --
 
 class TestStatusQueryOverride(unittest.TestCase):
 
@@ -327,9 +315,7 @@ class TestStatusQueryOverride(unittest.TestCase):
         self.assertIn("数据分析师", r["role"])
 
 
-# ═══════════════════════════════════════════════════════════════
-# 7. detect_persona — Semantic Fallback
-# ═══════════════════════════════════════════════════════════════
+# -- 7. detect_persona — Semantic Fallback --
 
 class TestSemanticFallback(unittest.TestCase):
 
@@ -360,9 +346,7 @@ class TestSemanticFallback(unittest.TestCase):
         self.assertIsNone(r)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 8. get_system_prompt — System Prompt Building
-# ═══════════════════════════════════════════════════════════════
+# -- 8. get_system_prompt — System Prompt Building --
 
 class TestSystemPrompt(unittest.TestCase):
 
@@ -440,9 +424,7 @@ class TestSystemPrompt(unittest.TestCase):
         self.assertGreater(len(prompt), 1000)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 9. Helper: _detect_status_query
-# ═══════════════════════════════════════════════════════════════
+# -- 9. Helper: _detect_status_query --
 
 class TestDetectStatusQuery(unittest.TestCase):
 

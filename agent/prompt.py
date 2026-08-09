@@ -9,9 +9,7 @@ import re
 from datetime import datetime
 
 
-# ═══════════════════════════════════════════════════════════════
-# Persona Routing — lightweight intent detection (no LLM needed)
-# ═══════════════════════════════════════════════════════════════
+# -- Persona Routing — lightweight intent detection (no LLM needed) --
 
 # Each persona: (role_name, emoji, focus_hint)
 _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [

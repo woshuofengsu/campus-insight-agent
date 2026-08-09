@@ -28,7 +28,7 @@ _STOP_WORDS: set[str] = {
 }
 
 
-# ═══════════════════════ 1. Text extraction helpers ═══════════════════════
+# -- 1. Text extraction helpers
 
 def _extract_locations(text: str) -> set[str]:
     found: set[str] = set()
@@ -59,7 +59,7 @@ def _extract_keywords(text: str) -> list[str]:
     return result
 
 
-# ═══════════════════════ 2. Analysis helpers ═══════════════════════
+# -- 2. Analysis helpers
 
 def _cross_time_comparison(conn) -> dict:
     """Compare this week vs last week for new issues and resolutions."""
@@ -197,7 +197,7 @@ def _detect_upgrade_paths(conn) -> list[dict]:
     return upgrades[:4]
 
 
-# ═══════════════════════ 3. Main association computation ═══════════════════════
+# -- 3. Main association computation
 
 def compute_associations(user_input: str, steps: list[dict], db_path: str = "") -> dict:
     """Run SQL queries against campus DB to find spatial/temporal/recurrence associations.
@@ -312,13 +312,13 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
     return assoc_data
 
 
-# ═══════════════════════ 4. Optional query runners (non-critical) ═══════════════════════
+# -- 4. Optional query runners (non-critical)
 
 def _run_optional_query(conn, query_fn) -> list[dict]:
     """Run a query function, returning [] on any failure — non-critical by design."""
     try:
         return query_fn(conn)
-    except Exception:  # non-critical: graceful degradation
+    except Exception:  # ok to fail
         _logger.debug("Optional query failed, returning empty result", exc_info=True)
         return []
 
@@ -402,7 +402,7 @@ def _resolution_efficiency_query(conn) -> list[dict]:
     ]
 
 
-# ═══════════════════════ 5. Proactive dashboard insights ═══════════════════════
+# -- 5. Proactive dashboard insights
 
 def get_proactive_insights(db_path: str = "") -> dict:
     """Run association analysis without user input — for dashboard proactive insights.
@@ -433,7 +433,7 @@ def get_proactive_insights(db_path: str = "") -> dict:
                     "WHERE urgency='紧急' AND status != '已解决'"
                 ).fetchone()
                 urgent_count = row["cnt"] if row else 0
-            except Exception:  # non-critical: silent pass intended
+            except Exception:  # best-effort, skip
                 _logger.debug("Failed to query urgent count for proactive insights", exc_info=True)
                 pass
             try:
@@ -442,7 +442,7 @@ def get_proactive_insights(db_path: str = "") -> dict:
                     "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
                 ).fetchone()
                 stale_count = row["cnt"] if row else 0
-            except Exception:  # non-critical: silent pass intended
+            except Exception:  # best-effort, skip
                 _logger.debug("Failed to query stale count for proactive insights", exc_info=True)
                 pass
 

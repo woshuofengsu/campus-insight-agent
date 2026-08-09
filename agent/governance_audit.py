@@ -1,18 +1,11 @@
 # agent/governance_audit.py
-"""Governance audit engine -- comprehensive cross-table health analysis.
+"""Governance audit -- cross-table health report card.
 
-Extracted from CampusAgent._governance_audit() to keep engine.py focused on
-the OODA loop orchestration. Audits four dimensions (issue management,
-proposal engagement, citizen participation, hotspots) and produces a
-structured report card with per-dimension grades and prioritized actions.
-
-Scoring methodology:
-  - Resolution rate baseline 80% (ISO 37120 municipal governance indicator)
-  - Emergency penalty: 5 pts per unresolved urgent issue (cap 25)
-  - Staleness penalty: 3 pts per >7-day pending issue (cap 20)
-  - Unresponded proposal penalty: 8 pts each (cap 40)
-  - Adoption bonus: adoption_rate >= 50% -> full 20 pts
-  - Participation floor: <3 unique reporters -> -30 pts
+Audits four dimensions (issue management, proposal engagement, citizen
+participation, hotspots). Scoring: resolution rate baseline 80%, emergency
+penalty 5 pts/unresolved urgent (cap 25), staleness penalty 3 pts/>7d pending
+(cap 20), unresponded proposal penalty 8 pts (cap 40), adoption bonus, and
+participation floor.
 """
 import logging
 from data.database import get_db, compute_health_score
@@ -21,18 +14,7 @@ _log = logging.getLogger(__name__)
 
 
 def run_governance_audit() -> str:
-    """Run a comprehensive governance audit across all tables.
-
-    Returns a markdown-formatted report string with:
-      - Issue management stats (total, pending, processing, resolved)
-      - Urgency + staleness breakdown
-      - Proposal engagement (adoption rate, avg supporters)
-      - Citizen participation (unique authors, discussion topics)
-      - Hotspot categories
-      - Overall health score + grade
-      - Per-dimension report card (A/B/C/D with trends)
-      - Prioritized action items (top 3)
-    """
+    """Run a cross-table governance audit. Returns a markdown report."""
     try:
         health = compute_health_score()
         resolution_rate = health["resolution_rate"]

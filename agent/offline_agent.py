@@ -63,9 +63,7 @@ class OfflineAgent:
             return self._respond_proposal(txt)
         return None
 
-    # ═══════════════════════════════════════════
-    # 🌊 校园脉搏 — 综合快报
-    # ═══════════════════════════════════════════
+    # -- 🌊 校园脉搏 — 综合快报 --
 
     def _respond_pulse(self) -> str:
         """校园脉搏 — 调用 get_campus_pulse + get_weather，格式化为自然播报。"""
@@ -145,9 +143,7 @@ class OfflineAgent:
         parts.append(self._random_encouragement("pulse"))
         return "\n".join(parts)
 
-    # ═══════════════════════════════════════════
-    # 📊 治理数据 — 统计 + 分析
-    # ═══════════════════════════════════════════
+    # -- 📊 治理数据 — 统计 + 分析 --
 
     def _respond_stats(self, txt: str) -> str:
         """治理统计 — 调用 get_governance_stats，包装为分析报告。"""
@@ -180,7 +176,7 @@ class OfflineAgent:
                     from tools.query_campus_issues import query_issues
                     result = str(query_issues.invoke({"category": cn, "limit": 5}))
                     parts.append(f"\n🔍 **{cn}类工单详情**\n{self._reformat_issue_list(result)}")
-                except Exception:  # non-critical: silent pass intended
+                except Exception:  # best-effort, skip
                     _log.debug("query_issues for category=%r failed", cn, exc_info=True)
                     pass
                 break
@@ -188,9 +184,7 @@ class OfflineAgent:
         parts.append(f"\n💡 {self._random_encouragement('stats')}")
         return "\n".join(parts)
 
-    # ═══════════════════════════════════════════
-    # 🔧 报修 — 创建工单
-    # ═══════════════════════════════════════════
+    # -- 🔧 报修 — 创建工单 --
 
     def _respond_report(self, txt: str) -> str:
         """报修 — 调用 report_issue.invoke()，提取工单号并给出追踪提示。"""
@@ -252,9 +246,7 @@ class OfflineAgent:
                 f"请稍后重试，或通过顶部导航「🔧 随手报修」页面手动提交。"
             )
 
-    # ═══════════════════════════════════════════
-    # 💡 提案 — 查看 + 创建引导
-    # ═══════════════════════════════════════════
+    # -- 💡 提案 — 查看 + 创建引导 --
 
     def _respond_proposal(self, txt: str) -> str:
         """提案 — 调用 get_proposals + get_topics，展示热门提案。"""
@@ -288,7 +280,7 @@ class OfflineAgent:
                 from tools.query_topics import get_topics
                 raw = str(get_topics.invoke(""))
                 parts.append(f"\n💬 **活跃议题**\n{self._reformat_topic_list(raw)}")
-            except Exception:  # non-critical: silent pass intended
+            except Exception:  # best-effort, skip
                 _log.debug("get_topics failed", exc_info=True)
                 pass
 
@@ -305,9 +297,7 @@ class OfflineAgent:
         parts.append(f"\n{self._random_encouragement('proposal')}")
         return "\n".join(parts)
 
-    # ═══════════════════════════════════════════
-    # 🤔 通用 — 未匹配到具体意图
-    # ═══════════════════════════════════════════
+    # -- 🤔 通用 — 未匹配到具体意图 --
 
     def _handle_general(self, txt: str) -> str:
         """Fallback：未匹配任何 persona 时的通用回复。"""
@@ -364,9 +354,7 @@ class OfflineAgent:
             + "\n\n你想试试哪个？"
         )
 
-    # ═══════════════════════════════════════════
-    # 👤 我的 — 个人工单/提案追踪
-    # ═══════════════════════════════════════════
+    # -- 👤 我的 — 个人工单/提案追踪 --
 
     def _my_issues(self) -> str:
         """查看我的工单。"""
@@ -437,9 +425,7 @@ class OfflineAgent:
             _log.debug("my_proposals query failed: %s", e, exc_info=True)
             return f"💡 提案查询暂时不可用（{e}），请稍后重试。"
 
-    # ═══════════════════════════════════════════
-    # Helpers
-    # ═══════════════════════════════════════════
+    # -- Helpers --
 
     def _get_name(self) -> str:
         return get_user_name(self.memory)

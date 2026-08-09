@@ -1,20 +1,9 @@
 # agent/weekly_report.py
 """治理周报生成器 — 自动分析校园治理数据并生成结构化周报。
 
-Design:
-  - Reuses reflector.py's analysis functions (z-score, cross-time, upgrade paths)
-    to avoid duplicating SQL logic.
-  - Compiles a multi-section report: executive summary (LLM), KPI snapshot,
-    anomaly alerts, trend analysis, resolution efficiency, upgrade paths,
-    spatial hotspots, recurrence risks.
-  - LLM-powered executive summary that synthesizes all findings into
-    natural-language insights and action recommendations.
-  - Returns a markdown string suitable for display in the teacher insights page,
-    the bigscreen page, or as an exported report.
-
-Usage:
-    from agent.weekly_report import generate_weekly_report
-    report = generate_weekly_report()  # dict with sections + markdown
+Reuses reflector analysis functions (z-score, cross-time, upgrade paths).
+Compiles executive summary (LLM), KPI snapshot, anomaly alerts, trend analysis,
+resolution efficiency, upgrade paths, spatial hotspots, and recurrence risks.
 """
 
 import logging

@@ -38,9 +38,7 @@ from data.database import get_db
 _log = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════════════════════
-# 1. Season Model — month-based priors for northern China
-# ═══════════════════════════════════════════════════════════
+# -- 1. Season Model — month-based priors for northern China --
 
 _SEASON_DISEASES = {
     # (start_month, end_month): [(disease, base_risk_0_to_100, symptoms, advice)]
@@ -114,9 +112,7 @@ def get_seasonal_diseases(month: int | None = None) -> list[dict]:
     return results
 
 
-# ═══════════════════════════════════════════════════════════
-# 2. Weather Correlator
-# ═══════════════════════════════════════════════════════════
+# -- 2. Weather Correlator --
 
 def _get_weather_risk_modifiers() -> dict:
     """Fetch current weather and compute disease risk modifiers.
@@ -173,7 +169,7 @@ def _get_weather_risk_modifiers() -> dict:
                 modifiers["空气污染→呼吸道疾病"] = 12
 
             details["modifier_reasons"] = list(modifiers.keys())
-    except Exception:  # non-critical: silent pass intended
+    except Exception:  # best-effort, skip
         _log.debug("Weather risk modifier query failed", exc_info=True)
         pass
 
@@ -181,9 +177,7 @@ def _get_weather_risk_modifiers() -> dict:
             "breakdown": modifiers}
 
 
-# ═══════════════════════════════════════════════════════════
-# 3. Campus Density Model
-# ═══════════════════════════════════════════════════════════
+# -- 3. Campus Density Model --
 
 def _get_campus_density_risk() -> dict:
     """Estimate campus crowding → disease transmission risk.
@@ -203,9 +197,7 @@ def _get_campus_density_risk() -> dict:
     density_score = 0
     reasons: list[str] = []
 
-    # ═══════════════════════════════════════════════
-    # Layer 1: Time-of-day × Day-of-week density
-    # ═══════════════════════════════════════════════
+    # -- Layer 1: Time-of-day × Day-of-week density --
 
     if is_weekend:
         # Weekend: relaxed but dorms + library still active
@@ -267,9 +259,7 @@ def _get_campus_density_risk() -> dict:
             density_score += 3
             reasons.append("周一早高峰，全校满课")
 
-    # ═══════════════════════════════════════════════
-    # Layer 2: Calendar events (exam periods, etc.)
-    # ═══════════════════════════════════════════════
+    # -- Layer 2: Calendar events (exam periods, etc.) --
 
     # Exam periods (approximate for Chinese universities)
     exam_windows = [
@@ -315,9 +305,7 @@ def _get_campus_density_risk() -> dict:
     return {"score": density_score, "reasons": reasons}
 
 
-# ═══════════════════════════════════════════════════════════
-# 4. Health Risk Engine — aggregates all signals
-# ═══════════════════════════════════════════════════════════
+# -- 4. Health Risk Engine — aggregates all signals --
 
 class HealthRiskEngine:
     """Aggregate seasonal, weather, and campus-density signals into risk scores."""
@@ -473,9 +461,7 @@ class HealthRiskEngine:
         )
 
 
-# ═══════════════════════════════════════════════════════════
-# 5. Cached convenience
-# ═══════════════════════════════════════════════════════════
+# -- 5. Cached convenience --
 
 def cached_health_risk() -> dict:
     """Health risk evaluation.  Name preserved for backward compat — no longer cached."""

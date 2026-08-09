@@ -1,10 +1,9 @@
 # agent/enforce.py
-"""Anti-hallucination safety net — guarantee report_issue is called for repair intents.
+"""Safety net: enforce report_issue tool call when LLM hallucinates a response.
 
-Extracted from CampusAgent._enforce_tool_call(). When the LLM fails to call
-report_issue (or calls it but it fails), this module forces a real tool call
-using fast keyword-based classification.  The user never sees a hallucinated
-"工单 #42" that doesn't actually exist in the database.
+When the LLM describes taking an action (e.g. "已生成工单 #42") without
+actually calling the tool, this module forces a real report_issue call using
+keyword-based classification so the database stays consistent.
 """
 import logging
 
@@ -13,24 +12,12 @@ _log = logging.getLogger(__name__)
 
 def enforce_tool_call(response: str, user_input: str,
                       intermediate_steps: list | None = None) -> str:
-    """Safety net: guarantee report_issue is called AND succeeds for repair intents.
+    """Force a real report_issue call when LLM hallucinates or the tool fails.
 
-    Handles TWO failure modes:
-    1. LLM didn't call report_issue at all (hallucinated a fake response)
-    2. LLM called report_issue but it returned an error (e.g. validate_location
-       blocked it) — the LLM may still respond as if it succeeded
-
-    In both cases we force a real, successful tool call.
-
-    Args:
-        response: The LLM's raw text response.
-        user_input: The original user message.
-        intermediate_steps: List of (AgentAction, observation) tuples from the
-            LangChain agent executor, or None.
-
-    Returns:
-        The original response if everything is fine, or a replacement response
-        with the real report_issue result.
+    Covers two failure modes: LLM skipped the tool entirely (hallucinated
+    reply), or called it but the call failed (e.g. location validation).
+    Returns original response if all checks pass, or a replacement response
+    with the real report_issue result.
     """
     if not intermediate_steps:
         intermediate_steps = []

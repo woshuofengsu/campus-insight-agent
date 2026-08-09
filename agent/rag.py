@@ -1,19 +1,9 @@
 # agent/rag.py
-"""RAG semantic search engine for the campus knowledge base.
+"""RAG semantic search for the campus knowledge base.
 
-Design:
-  - Character n-gram TF-IDF (pure Python, zero dependencies) — works well
-    for Chinese text without requiring jieba, sentence-transformers, or
-    any ML packages.
-  - Embeddings are computed lazily and cached in a SQLite table
-    (kb_embeddings) for persistence across restarts.
-  - Falls back gracefully to keyword LIKE search if embedding fails.
-
-Why this approach:
-  - No pip install needed — runs on any Python 3.10+
-  - Bigram+trigram overlap captures Chinese semantics better than keyword match
-  - Fast enough for <1000 knowledge base entries
-  - Counts as genuine "RAG" for competition judging
+Character n-gram TF-IDF (pure Python, zero dependencies). Works well for
+Chinese text without jieba or ML packages. Embeddings cached in SQLite.
+Falls back to keyword LIKE search on failure.
 """
 
 import math
@@ -213,7 +203,7 @@ def semantic_search(query: str, top_k: int = 5,
 
         return results
 
-    except Exception:  # non-critical: graceful degradation
+    except Exception:  # ok to fail
         _log.debug("Semantic search failed, falling back to keyword search", exc_info=True)
         return _fallback_keyword_search(query, top_k, category)
 

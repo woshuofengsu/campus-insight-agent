@@ -1,9 +1,7 @@
 # agent/fallback.py
-"""Graceful fallback — context-aware responses when the LLM is unavailable.
+"""Graceful fallback — data-backed responses when the LLM is unavailable.
 
-Extracted from CampusAgent._graceful_fallback().  When the agent fails after
-retries, this module produces helpful, data-backed responses directly from
-the database — no LLM required.
+Produces helpful, context-aware responses directly from the database.
 """
 import logging
 
@@ -11,18 +9,7 @@ _log = logging.getLogger(__name__)
 
 
 def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
-    """Provide a graceful fallback response when the agent fails after retries.
-
-    Tries to produce a context-aware response based on the user's input intent
-    and available DB data, rather than showing a raw error message.
-
-    Args:
-        user_input: The original user message.
-        error: The exception that caused the agent to fail, if any.
-
-    Returns:
-        A user-facing fallback message in Chinese.
-    """
+    """Return a context-aware fallback response using DB data."""
     error_msg = str(error) if error else "未知错误"
     txt = user_input.strip()
 

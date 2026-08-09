@@ -26,9 +26,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-# ══════════════════════════════════════════════════════
-# DB Lazy Init — 防御性初始化，确保任何路径都不会漏掉
-# ══════════════════════════════════════════════════════
+# -- DB Lazy Init — 防御性初始化，确保任何路径都不会漏掉 --
 
 _db_initialized = False
 
@@ -46,9 +44,7 @@ def _ensure_db():
     _db_initialized = True
 
 
-# ══════════════════════════════════════════════════════
-# FastAPI App
-# ══════════════════════════════════════════════════════
+# -- FastAPI App --
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
@@ -122,9 +118,7 @@ async def _db_init_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# ══════════════════════════════════════════════════════
-# Request Models
-# ══════════════════════════════════════════════════════
+# -- Request Models --
 
 class ReportIssueRequest(BaseModel):
     title: str = Field(..., description="问题标题", min_length=2)
@@ -149,9 +143,7 @@ class ChatRequest(BaseModel):
     student_id: str = Field(default="", description="学号/工号")
 
 
-# ══════════════════════════════════════════════════════
-# Health
-# ══════════════════════════════════════════════════════
+# -- Health --
 
 @app.get("/api/health", tags=["系统"])
 def health_check():
@@ -164,9 +156,7 @@ def health_check():
     }
 
 
-# ══════════════════════════════════════════════════════
-# Weather
-# ══════════════════════════════════════════════════════
+# -- Weather --
 
 @app.get("/api/weather", tags=["天气"])
 def get_weather():
@@ -184,9 +174,7 @@ def get_weather():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# Campus Pulse
-# ══════════════════════════════════════════════════════
+# -- Campus Pulse --
 
 @app.get("/api/campus-pulse", tags=["校园脉搏"])
 def get_campus_pulse():
@@ -261,9 +249,7 @@ def get_campus_pulse():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# Issues
-# ══════════════════════════════════════════════════════
+# -- Issues --
 
 @app.get("/api/issues", tags=["工单"])
 def list_issues(
@@ -362,9 +348,7 @@ def report_issue(req: ReportIssueRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# Proposals
-# ══════════════════════════════════════════════════════
+# -- Proposals --
 
 @app.get("/api/proposals", tags=["提案"])
 def list_proposals(
@@ -458,9 +442,7 @@ def support_proposal(proposal_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# Topics
-# ══════════════════════════════════════════════════════
+# -- Topics --
 
 @app.get("/api/topics", tags=["议题"])
 def list_topics(limit: int = Query(10, ge=1, le=50)):
@@ -548,9 +530,7 @@ def express_opinion(topic_id: int, req: ExpressOpinionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# Governance
-# ══════════════════════════════════════════════════════
+# -- Governance --
 
 @app.get("/api/governance/health", tags=["治理"])
 def get_governance_health():
@@ -636,9 +616,7 @@ def get_governance_audit():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# AI Chat — 核心端点
-# ══════════════════════════════════════════════════════
+# -- AI Chat — 核心端点 --
 
 class FakeSession(dict):
     """Session-like object that supports both dict and attribute access.
@@ -741,9 +719,7 @@ def agent_chat_offline(req: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# Feedback
-# ══════════════════════════════════════════════════════
+# -- Feedback --
 
 @app.get("/api/feedback", tags=["反馈"])
 def get_feedback(topic: Optional[str] = Query(None)):
@@ -763,9 +739,7 @@ def get_feedback(topic: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ══════════════════════════════════════════════════════
-# OpenAPI 导出（扣子插件用）
-# ══════════════════════════════════════════════════════
+# -- OpenAPI 导出（扣子插件用） --
 
 @app.get("/openapi.json", tags=["系统"], include_in_schema=False)
 def export_openapi():
@@ -779,9 +753,7 @@ def export_openapi():
     return schema
 
 
-# ══════════════════════════════════════════════════════
-# Entrypoint
-# ══════════════════════════════════════════════════════
+# -- Entrypoint --
 
 if __name__ == "__main__":
     import uvicorn

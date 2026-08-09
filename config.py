@@ -16,7 +16,7 @@ def _secret(key: str, default: str = "") -> str:
         val = st.secrets.get(key)
         if val is not None and val != "":
             return val
-    except Exception:  # non-critical: logged and suppressed
+    except Exception:  # log and skip
         _log.debug("st.secrets access failed for key '%s', falling back to os.getenv", key)
     return os.getenv(key, default)
 

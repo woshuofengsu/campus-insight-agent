@@ -12,9 +12,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# ═══════════════════════════════════════════════════════════════
-# 1. extract_location — Known Buildings
-# ═══════════════════════════════════════════════════════════════
+# -- 1. extract_location — Known Buildings --
 
 class TestExtractLocationBuildings(unittest.TestCase):
 
@@ -71,9 +69,7 @@ class TestExtractLocationBuildings(unittest.TestCase):
         self.assertIn("教室", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2. extract_location — Edge Cases
-# ═══════════════════════════════════════════════════════════════
+# -- 2. extract_location — Edge Cases --
 
 class TestExtractLocationEdges(unittest.TestCase):
 
@@ -127,9 +123,7 @@ class TestExtractLocationEdges(unittest.TestCase):
         self.assertIn("主干道", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 3. random_encouragement — All Contexts
-# ═══════════════════════════════════════════════════════════════
+# -- 3. random_encouragement — All Contexts --
 
 class TestRandomEncouragement(unittest.TestCase):
 
@@ -182,9 +176,7 @@ class TestRandomEncouragement(unittest.TestCase):
         self.assertGreaterEqual(len(results), 2)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 4. get_author_identifier — delegates to _resolve_author
-# ═══════════════════════════════════════════════════════════════
+# -- 4. get_author_identifier — delegates to _resolve_author --
 
 class TestGetAuthorIdentifier(unittest.TestCase):
 
@@ -244,9 +236,7 @@ class TestGetAuthorIdentifier(unittest.TestCase):
             self.assertIsNone(result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 5. get_user_name
-# ═══════════════════════════════════════════════════════════════
+# -- 5. get_user_name --
 
 class TestGetUserName(unittest.TestCase):
 

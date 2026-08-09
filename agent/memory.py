@@ -20,10 +20,9 @@ MAX_LANGCHAIN_MESSAGES = 20    # keep last 10 exchanges (20 messages) for LLM co
 
 
 class MemoryManager:
-    """Manages the three-tier memory system for the Agent.
+    """Three-tier memory: working (session), long-term (SQLite), knowledge (SQLite).
 
-    Multi-user aware: stores user_id in session_state and passes it to all
-    DB operations so each user gets their own profile, preferences, and history.
+    Stores user_id per-session so each user gets isolated profile and history.
     """
 
     def __init__(self, session_state: Any):

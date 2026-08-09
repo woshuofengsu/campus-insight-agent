@@ -85,21 +85,12 @@ class CampusAgent:
             return_intermediate_steps=True,   # capture tool-call trace for reasoning chain viz
         )
 
-    # ═══════════════════════════════════════════════════════════════
-    # OODA Loop
-    # ═══════════════════════════════════════════════════════════════
+    # -- OODA Loop --
 
     def run(self, user_input: str) -> str:
-        """Execute one full OODA turn with the given user input.
+        """Execute one full OODA turn: Observe → Orient → Decide+Act → Reflect → Associate.
 
-        Observe → Orient → Decide+Act → Reflect → Associate (post-hoc)
-
-        Includes automatic retry (up to 2 attempts) on transient API errors
-        with exponential backoff. Falls back to a graceful cached-style response
-        if all retries are exhausted.
-
-        Outermost try/except ensures NO exception propagates to Streamlit
-        (prevents the app from crashing on unexpected errors).
+        Retries up to 2 times on transient API errors with backoff.
         """
         try:
             return self._run_impl(user_input)
@@ -206,7 +197,7 @@ class CampusAgent:
                 fallback = f"😅 智能服务暂时不可用，请稍后重试或使用页面顶部的「⚡ 快速报修」。"
         try:
             self.memory.add_message("assistant", fallback)
-        except Exception:  # non-critical: silent pass intended
+        except Exception:  # best-effort, skip
             logger.debug("Failed to save fallback message to memory", exc_info=True)
             pass
         return fallback
@@ -357,16 +348,11 @@ class CampusAgent:
 
     def _reflect(self, raw_response: str, user_input: str, environment: dict,
                  intermediate_steps: list | None = None) -> str:
-        """Phase 4 — Reflect: post-response quality check + thinking extraction.
+        """Phase 4 — Reflect: post-response validation.
 
-        Runs seven checks:
-        1. Strip AI thinking tags (DeepSeek) — saved to memory for UI expander
-        2. Empty response → friendly fallback
-        3. High-priority alerts unaddressed → append gentle reminder
-        4. Response too short for complex governance query → suggest elaboration
-        5. Closed-loop integrity — detect unresolved issues / stale proposals
-        6. Governance audit trigger — comprehensive cross-table analysis
-        7. Tool-call safety net — auto-call report_issue if LLM faked it
+        Runs seven checks: strip thinking tags, catch empty responses, verify
+        alerts were addressed, check response depth, closed-loop integrity,
+        governance audit trigger, and anti-hallucination tool-call enforcement.
         """
         # ── 4.0: Extract thinking blocks before any other processing ──
         cleaned, thinking = split_thinking(raw_response)
@@ -454,7 +440,7 @@ class CampusAgent:
         return check_closed_loop(self.memory, user_input, response)
 
     def _governance_audit(self) -> str:
-        """Run a comprehensive governance audit — delegates to governance_audit module.
+        """Run a governance audit — delegates to governance_audit module.
 
         Extracted from engine.py (v2 report card with per-dimension grades,
         trend arrows, and prioritized action items). See agent/governance_audit.py
@@ -481,20 +467,10 @@ class CampusAgent:
         return ""
 
     def _associate(self, intermediate_steps: list, raw_response: str, user_input: str) -> dict | None:
-        """Post-hoc association analysis: build reasoning chain + discover insights.
+        """Post-hoc association analysis. Builds reasoning chain, discovers patterns.
 
-        Called after _reflect() so we work with the cleaned response.
-        Uses the Reflector module to parse tool-call traces into a structured
-        reasoning chain and compute spatial/temporal/recurrence associations.
-
-        IMPORTANT: We do NOT short-circuit on empty intermediate_steps — the
-        reflector has a text-action fallback parser (_parse_text_actions) that
-        recovers pseudo-steps from the agent's natural-language response when
-        DeepSeek skips formal tool calls. Empty intermediate_steps is exactly
-        the case where that fallback matters most.
-
-        Returns the full reasoning chain dict (see agent/reflector.py) or None
-        if reflector is unavailable or both steps and text are empty.
+        Uses text-action fallback parser when DeepSeek skips formal tool calls,
+        so empty intermediate_steps is still processed. Returns dict or None.
         """
         try:
             from agent.reflector import build_reasoning_chain

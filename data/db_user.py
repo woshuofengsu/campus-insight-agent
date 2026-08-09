@@ -48,7 +48,7 @@ def _get_active_user_id() -> int:
         uid = st.session_state.get("_login_user_id")
         if uid is not None:
             return int(uid)
-    except Exception:  # non-critical: silent pass intended
+    except Exception:  # best-effort, skip
         _log.debug("Failed to resolve user from session_state", exc_info=True)
         pass
 

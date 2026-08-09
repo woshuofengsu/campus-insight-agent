@@ -32,7 +32,7 @@ def _resolve_author(author: str = "") -> str:
         uid = profile.get("id")
         if uid:
             return f"user_{uid}"
-    except Exception:  # non-critical: logged and suppressed
+    except Exception:  # log and skip
         _log.warning(
             "_resolve_author: failed to resolve user profile, using id-based fallback"
         )
@@ -42,7 +42,7 @@ def _resolve_author(author: str = "") -> str:
             uid = st.session_state.get("_login_user_id")
             if uid:
                 return f"user_{uid}"
-        except Exception:  # non-critical: silent pass intended
+        except Exception:  # best-effort, skip
             _log.debug("Failed to resolve author from session_state fallback", exc_info=True)
             pass
     return "匿名"
@@ -67,7 +67,7 @@ def report_issue(title: str, category: str, location: str = "",
         from data.db_notifications import log_activity
         log_activity(author, "上报问题", "issue", iid, title,
                      f"{category} · {location}" if location else category)
-    except Exception:  # non-critical: logged and suppressed
+    except Exception:  # log and skip
         _log.debug("log_activity failed for report_issue #%d (non-critical)", iid)
     return iid
 
@@ -210,7 +210,7 @@ def update_issue_status(issue_id: int, status: str, actor: str = "",
                 "issue", issue_id, issue_title,
                 f"{issue['category']} · {issue['location']}" if issue["location"] else issue["category"],
             )
-        except Exception:  # non-critical: logged and suppressed
+        except Exception:  # log and skip
             _log.debug("notify/log_activity failed for issue #%d status change (non-critical)", issue_id)
 
 
@@ -230,7 +230,7 @@ def create_proposal(title: str, description: str, category: str = "其他",
     try:
         from data.db_notifications import log_activity
         log_activity(author, "提交提案", "proposal", pid, title, category)
-    except Exception:  # non-critical: logged and suppressed
+    except Exception:  # log and skip
         _log.debug("log_activity failed for create_proposal #%d (non-critical)", pid)
     return pid
 
@@ -270,7 +270,7 @@ def support_proposal(proposal_id: int, actor: str = "") -> int:
         from data.db_notifications import log_activity
         log_activity(actor or "同学", "附议提案", "proposal", proposal_id,
                      row["title"] if row else "", f"共 {new_count} 人附议")
-    except Exception:  # non-critical: logged and suppressed
+    except Exception:  # log and skip
         _log.debug("log_activity failed for support_proposal #%d (non-critical)", proposal_id)
     return new_count
 
@@ -307,7 +307,7 @@ def update_proposal_status(proposal_id: int, status: str,
                 actor or "教师", action_map.get(status, "更新提案"),
                 "proposal", proposal_id, prop["title"], prop["category"],
             )
-        except Exception:  # non-critical: logged and suppressed
+        except Exception:  # log and skip
             _log.debug("notify/log_activity failed for proposal #%d status change (non-critical)", proposal_id)
 
 

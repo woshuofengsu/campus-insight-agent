@@ -1,14 +1,8 @@
 # agent/callbacks.py
-"""Streaming callback handler — captures agent thinking and tool calls in real-time.
+"""Streaming callback — captures agent thinking and tool calls in real-time.
 
-Integrates with LangChain's callback system to surface:
-  1. Tool execution start/end events → UI tool indicator
-  2. LLM token streaming → progressive text display
-  3. Chain-of-thought reasoning steps → reasoning chain viz
-
-Usage in engine.py:
-  callback = StreamingCallback(session_state)
-  executor.invoke({"input": ...}, {"callbacks": [callback]})
+Surfaces tool execution events, LLM token streaming, and chain-of-thought
+reasoning for UI rendering.
 """
 import time
 from typing import Any
@@ -26,12 +20,7 @@ class StreamingCallback(BaseCallbackHandler):
     """
 
     def __init__(self, event_sink: dict | None = None):
-        """Initialize with an optional event sink dict.
-
-        Args:
-            event_sink: Mutable dict to push events into. If None, events are
-                logged but not surfaced to UI.
-        """
+        """event_sink: optional dict for UI events. None = logged only."""
         super().__init__()
         self._sink = event_sink or {}
         self._events: list[dict] = []

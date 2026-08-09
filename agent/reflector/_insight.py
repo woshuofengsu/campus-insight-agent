@@ -1,12 +1,9 @@
 # agent/reflector/_insight.py
-"""LLM-powered natural-language insight generation ("something the data says").
+"""LLM-powered insight generation from association data.
 
-Extracted from the monolithic reflector.py. When the association engine finds
-significant patterns (anomalies, trends, upgrade paths), this module generates
-a human-readable interpretation via a lightweight LLM call.
-
-The LLM insight is the key differentiator — it doesn't just dump data,
-it explains WHY the pattern matters and WHAT should be done about it.
+When the association engine finds significant patterns (anomalies, trends,
+upgrade paths), this module generates a human-readable interpretation via
+a lightweight LLM call.
 """
 import logging
 import time
@@ -18,7 +15,7 @@ _logger = logging.getLogger("agent.reflector")
 _INSIGHT_LLM = None  # lazy singleton — created on first use
 
 
-# ═══════════════════════ 1. LLM client (lazy singleton) ═══════════════════════
+# -- 1. LLM client (lazy singleton)
 
 def _get_insight_llm():
     """Lazy-init a lightweight LLM client for insight generation.
@@ -45,7 +42,7 @@ def _get_insight_llm():
         return None
 
 
-# ═══════════════════════ 2. Prompt builder ═══════════════════════
+# -- 2. Prompt builder
 
 def _build_insight_prompt(associations: dict, user_input: str) -> str:
     """Build a focused prompt for the LLM insight generator.
@@ -156,7 +153,7 @@ def _build_insight_prompt(associations: dict, user_input: str) -> str:
     return "\n".join(parts)
 
 
-# ═══════════════════════ 3. LLM insight generation ═══════════════════════
+# -- 3. LLM insight generation
 
 def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
     """Try to generate a nuanced LLM insight. Returns None if unavailable/fails.
@@ -222,7 +219,7 @@ def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
     return None
 
 
-# ═══════════════════════ 4. Insight text builder (LLM + structured fallback) ═══════════════════════
+# -- 4. Insight text builder (LLM + structured fallback)
 
 def build_insight_text(associations: dict, user_input: str = "") -> str:
     """Build insight text: try LLM first, fall back to structured template.

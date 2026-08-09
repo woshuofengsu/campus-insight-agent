@@ -14,9 +14,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# ═══════════════════════════════════════════════════════════════
-# Helper: create a temp in-memory DB for tests that need one
-# ═══════════════════════════════════════════════════════════════
+# -- Helper: create a temp in-memory DB for tests that need one --
 
 def _init_test_db():
     """Init a temporary DB for tool tests."""
@@ -33,9 +31,7 @@ def _cleanup_test_db(db_path):
         pass
 
 
-# ═══════════════════════════════════════════════════════════════
-# 1. report_issue — issue reporting tool
-# ═══════════════════════════════════════════════════════════════
+# -- 1. report_issue — issue reporting tool --
 
 class TestReportIssue(unittest.TestCase):
 
@@ -144,9 +140,7 @@ class TestReportIssue(unittest.TestCase):
         self.assertTrue(re.search(r'#\d+', result))
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2. get_campus_pulse — campus pulse query
-# ═══════════════════════════════════════════════════════════════
+# -- 2. get_campus_pulse — campus pulse query --
 
 class TestCampusPulse(unittest.TestCase):
 
@@ -176,9 +170,7 @@ class TestCampusPulse(unittest.TestCase):
         self.assertTrue(len(text) > 50)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 3. query_issues — issue querying
-# ═══════════════════════════════════════════════════════════════
+# -- 3. query_issues — issue querying --
 
 class TestQueryIssues(unittest.TestCase):
 
@@ -208,9 +200,7 @@ class TestQueryIssues(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 4. get_governance_stats — governance statistics
-# ═══════════════════════════════════════════════════════════════
+# -- 4. get_governance_stats — governance statistics --
 
 class TestGovernanceStats(unittest.TestCase):
 
@@ -243,9 +233,7 @@ class TestGovernanceStats(unittest.TestCase):
         self.assertIn("总数", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 5. get_weather — weather query
-# ═══════════════════════════════════════════════════════════════
+# -- 5. get_weather — weather query --
 
 class TestWeather(unittest.TestCase):
 
@@ -298,9 +286,7 @@ class TestWeather(unittest.TestCase):
         self.assertIn("天气", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 6. get_proposals — proposal listing
-# ═══════════════════════════════════════════════════════════════
+# -- 6. get_proposals — proposal listing --
 
 class TestProposals(unittest.TestCase):
 
@@ -324,9 +310,7 @@ class TestProposals(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 7. create_proposal — proposal creation
-# ═══════════════════════════════════════════════════════════════
+# -- 7. create_proposal — proposal creation --
 
 class TestCreateProposal(unittest.TestCase):
 
@@ -369,9 +353,7 @@ class TestCreateProposal(unittest.TestCase):
         self.assertEqual(len(dups), 0)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 8. support_proposal — proposal support
-# ═══════════════════════════════════════════════════════════════
+# -- 8. support_proposal — proposal support --
 
 class TestSupportProposal(unittest.TestCase):
 
@@ -399,9 +381,7 @@ class TestSupportProposal(unittest.TestCase):
         self.assertIn("未找到", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 9. express_opinion — opinion expression
-# ═══════════════════════════════════════════════════════════════
+# -- 9. express_opinion — opinion expression --
 
 class TestExpressOpinion(unittest.TestCase):
 
@@ -421,9 +401,7 @@ class TestExpressOpinion(unittest.TestCase):
         self.assertIn("⚠️", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 10. query_knowledge — RAG knowledge search
-# ═══════════════════════════════════════════════════════════════
+# -- 10. query_knowledge — RAG knowledge search --
 
 class TestQueryKnowledge(unittest.TestCase):
 
@@ -446,9 +424,7 @@ class TestQueryKnowledge(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 11. get_topics — topic listing
-# ═══════════════════════════════════════════════════════════════
+# -- 11. get_topics — topic listing --
 
 class TestTopics(unittest.TestCase):
 
@@ -478,9 +454,7 @@ class TestTopics(unittest.TestCase):
         self.assertIsNone(result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 12. collect_feedback — opinion collection
-# ═══════════════════════════════════════════════════════════════
+# -- 12. collect_feedback — opinion collection --
 
 class TestCollectFeedback(unittest.TestCase):
 
@@ -503,9 +477,7 @@ class TestCollectFeedback(unittest.TestCase):
         self.assertIn("演示数据", result)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 13. Tool discovery
-# ═══════════════════════════════════════════════════════════════
+# -- 13. Tool discovery --
 
 class TestToolDiscovery(unittest.TestCase):
 

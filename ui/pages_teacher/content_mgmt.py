@@ -156,7 +156,7 @@ with col2:
                 "ORDER BY ended_at DESC LIMIT 5"
             ).fetchall()
             closed_topics = [dict(r) for r in rows]
-    except Exception:  # non-critical: silent pass intended
+    except Exception:  # best-effort, skip
         _log.debug("non-critical failure", exc_info=True)
         pass
 

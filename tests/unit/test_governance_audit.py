@@ -27,9 +27,7 @@ def _cleanup_test_db(db_path):
             pass
 
 
-# ═══════════════════════════════════════════════════════════════
-# 1. Empty DB — All Zero State
-# ═══════════════════════════════════════════════════════════════
+# -- 1. Empty DB — All Zero State --
 
 class TestGovernanceAuditEmptyDB(unittest.TestCase):
 
@@ -66,9 +64,7 @@ class TestGovernanceAuditEmptyDB(unittest.TestCase):
         self.assertIn("分维度评分", report)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2. Populated DB — With Sample Data
-# ═══════════════════════════════════════════════════════════════
+# -- 2. Populated DB — With Sample Data --
 
 class TestGovernanceAuditWithData(unittest.TestCase):
 
@@ -194,9 +190,7 @@ class TestGovernanceAuditWithData(unittest.TestCase):
         self.assertNotIn("Traceback", report)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 3. All Resolved DB — Perfect Health
-# ═══════════════════════════════════════════════════════════════
+# -- 3. All Resolved DB — Perfect Health --
 
 class TestGovernanceAuditAllResolved(unittest.TestCase):
 
@@ -242,9 +236,7 @@ class TestGovernanceAuditAllResolved(unittest.TestCase):
         self.assertNotIn("🔴", report)  # No urgent (red) action items
 
 
-# ═══════════════════════════════════════════════════════════════
-# 4. All Pending/Urgent DB — Poor Health
-# ═══════════════════════════════════════════════════════════════
+# -- 4. All Pending/Urgent DB — Poor Health --
 
 class TestGovernanceAuditAllPending(unittest.TestCase):
 
@@ -284,9 +276,7 @@ class TestGovernanceAuditAllPending(unittest.TestCase):
         self.assertTrue("积压" in report or "7天" in report)
 
 
-# ═══════════════════════════════════════════════════════════════
-# 5. DB Error — Graceful Degradation
-# ═══════════════════════════════════════════════════════════════
+# -- 5. DB Error — Graceful Degradation --
 
 class TestGovernanceAuditDBError(unittest.TestCase):
 

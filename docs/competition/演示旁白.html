@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园先知 · 演示旁白</title>
+<style>
+  :root {
+    --bg: #0f0f1a; --card: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.08); --text: #e8e8f0;
+    --text2: #9898a2; --accent: #6d6bf5;
+    --green: #34d399; --amber: #fbbf24;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 32px; max-width: 750px; margin: 0 auto;
+    line-height: 2;
+  }
+  h1 { font-size: 1.5em; text-align:center; margin-bottom: 16px; }
+  h2 { font-size: 1.1em; color: var(--accent); margin: 28px 0 10px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 0.85em; color: var(--text2); font-weight:400; margin: -4px 0 12px; font-style:italic; }
+  blockquote {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 18px; margin: 4px 0;
+    font-size: 0.82em; color: var(--text2); text-align:center;
+  }
+  .cue {
+    font-size: 0.75em; color: var(--amber); margin: 8px 0 2px;
+    font-style: italic;
+  }
+  .line {
+    font-size: 1.05em; margin: 4px 0; padding-left: 8px;
+    border-left: 2px solid var(--green);
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  code { background: rgba(109,107,245,0.10); color: var(--accent); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  @media (max-width: 600px) { body { padding: 16px; font-size: 0.9em; } }
+</style>
+</head>
+<body>
+
+<h1>🏛️ 校园先知 — 演示旁白</h1>
+
+<blockquote>正式版 · 括号内为操作提示不念 · 总时长约 4 分 30 秒</blockquote>
+
+<hr>
+
+<h2>一、开场（20秒）</h2>
+<p class="cue">（画面：Streamlit 首页全景）</p>
+<p class="line">各位评委好。我的作品叫「校园先知」——一个面向大学校园的基层治理平台。</p>
+<p class="line">大学是一座几万人的微型社会。设施坏了找谁修、提了建议石沉大海、不知道参与有没有用——这些都是真实的校园治理问题。</p>
+<p class="line">四个字：知、报、议、督。我演示一下。</p>
+
+<h2>二、知 — 校园脉搏（30秒）</h2>
+<p class="cue">（点击 🌊 校园脉搏，依次展示天气、热点、事件）</p>
+<p class="line">第一个——知，知情权。</p>
+<p class="line">打开应用就能看到校园脉搏。天气、这周上报热点、即将发生的事件。数据来自真实 API 和数据库实时统计。学生不需要做任何操作，知情是参与的前提。</p>
+
+<h2>三、报 — 随手报修（35秒）</h2>
+<p class="cue">（切换到 💬 对话页，输入：教三楼二楼走廊灯不亮了晚上走路不安全，发送）</p>
+<p class="line">第二个——报，参与权。</p>
+<p class="line">学生发现走廊灯坏了，用自然语言描述就行。系统自动识别这是报修场景，自动分成设施维修、判断紧急程度、生成工单。</p>
+<p class="cue">（指回复中的工单号、分类、紧急程度）</p>
+<p class="line">整个过程学生不需要知道分类标准、不需要找入口、不需要填表单。</p>
+<p class="cue">（点击回复上方的"处理流程"面板，滚动展示卡片）</p>
+<p class="line">每次回复背后都有一条处理流程——从感知环境数据、到调用哪个工具、到质量检查——每一步都可追溯。</p>
+
+<h2>四、议 — 有话说（55秒）</h2>
+<p class="cue">（输入：看看大家有什么好提案）</p>
+<p class="line">第三个——议，表达权。</p>
+<p class="line">系统里 19 条提案。89 人附议的实验楼安全排查已被采纳，73 人附议的延长图书馆已采纳。每一条都有完整的状态流转——讨论中、已回应、已采纳。</p>
+<p class="cue">（输入：我建议在每栋宿舍楼下设一个 24 小时自助还书机）</p>
+<p class="line">新提案创建时，系统自动语义查重。如果已经有类似提案，会引导去附议，避免力量分散。如果是全新的，自动创建分类。</p>
+<p class="cue">（切换到议题讨论区）</p>
+<p class="line">另外，当某一类问题在短期内集中出现时，系统自动发起议题、收集意见。不需要发问卷——学生在对话中自然表达。把分散的个人反馈变成结构化的民意数据。</p>
+
+<h2>五、督 — 治理透明窗（45秒）</h2>
+<p class="cue">（点击 📊 治理透明窗）</p>
+<p class="line">第四个——督，监督权。</p>
+<p class="line">治理透明窗的核心是健康度评分——三维加权：解决率占 40%、解决速度 35%、积压趋势 25%。</p>
+<p class="cue">（指趋势图）</p>
+<p class="line">七天趋势图——新增和已解决双线对比，治理在变好还是变差，一目了然。</p>
+<p class="cue">（点击 📺 治理大屏）</p>
+<p class="line">治理大屏——六个 KPI、趋势图、工单流转、类别分布，30 秒自动刷新。</p>
+<p class="line">透明本身就是信任。当学生看到自己上报的被处理、提案被采纳、数据在改善——才愿意持续参与。</p>
+
+<h2>六、教师端 — 管理闭环（35秒）</h2>
+<p class="cue">（侧边栏 → "切换账号"下拉框 → 选择教师账号 → 📊 工作台）</p>
+<p class="line">最后一个环节——老师的视角。</p>
+<p class="line">教师工作台展示所有待处理的工单和提案。刚才学生报修的水龙头已经出现在列表里——和学生端是同一套数据，实时同步。</p>
+<p class="cue">（点击 📋 工单管理，筛选待处理，切换工单状态）</p>
+<p class="line">工单管理——教师按分类和紧急度筛选，一键把状态从待处理改为处理中、已解决。学生端立刻收到通知。</p>
+<p class="line">上报→分派→处理→解决→通知——每一步都有记录，谁处理的、什么时候处理的，全部可追溯。</p>
+<p class="cue">（点击 💡 提案管理，展示提案列表和状态操作）</p>
+<p class="line">提案管理——教师逐条审核。89 人附议的实验楼安全排查，标记已采纳。学生端同步更新。管理不是黑盒，学生能看到自己的声音被认真对待。</p>
+<p class="cue">（回到首页全景，准备技术亮点）</p>
+<p class="line">从学生表达到教师响应——完整的治理闭环。</p>
+
+<h2>七、技术亮点（25秒）</h2>
+<p class="cue">（切换到终端，展示 pytest 结果）</p>
+<p class="line">简要说明技术实现。</p>
+<p class="line">OODA 工作流引擎——五个阶段贯穿每个请求：感知环境、判断意图、调用工具、执行操作、质量检查。11 个工具文件，16 个治理工具自动发现和编排。</p>
+<p class="line">368 个意图关键词覆盖四种角色。七项后处理检查中有专门的反幻觉安全网——检测到模型跳过工具直接编造回复时，强制执行真实工具调用。</p>
+<p class="line">三层容错回退：模型不可用切规则引擎，规则引擎不可用降级到数据库直查。318 个自动化测试，GitHub Actions 持续集成。</p>
+
+<h2>八、总结（10秒）</h2>
+<p class="cue">（回到首页全景）</p>
+<p class="line">知、报、议、督——知情权、参与权、表达权、监督权。四个环节构成完整的治理闭环。</p>
+<p class="line">把校园当作微型治理实验场——验证一套可迁移到社区、养老、园区更广泛场景的方法。让每个学生从被管理者变成治理的参与者。</p>
+<p class="line">谢谢各位评委！</p>
+<p class="cue">（展示二维码页面，提醒评委可扫码体验）</p>
+
+</body>
+</html>

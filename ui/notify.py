@@ -42,7 +42,7 @@ def _fetch_counts():
             "proposal_total": p_stats["total"],
             "proposal_pending": p_stats["by_status"].get("讨论中", 0),
         }
-    except Exception:  # non-critical: graceful degradation
+    except Exception:  # ok to fail
         _log.debug("_fetch_counts failed", exc_info=True)
         return None
 
@@ -78,7 +78,7 @@ def check_and_notify():
                     f"📢 校园新增 {new_count} 件工单，点击左侧「🌊 校园脉搏」查看最新动态",
                     icon="📢",
                 )
-            except Exception:  # non-critical: logged and suppressed
+            except Exception:  # log and skip
                 _log.debug("st.toast failed for student notification (non-critical)")
         st.session_state[SS.notif_last_total] = counts["total"]
 
@@ -106,7 +106,7 @@ def check_and_notify():
         for msg in toasts:
             try:
                 st.toast(msg, icon="🔔")
-            except Exception:  # non-critical: logged and suppressed
+            except Exception:  # log and skip
                 _log.debug("st.toast failed for teacher notification (non-critical)")
 
         st.session_state[SS.notif_last_urgent] = counts["urgent"]
@@ -130,7 +130,7 @@ def render_sidebar_badge():
     if role:
         try:
             role = role.get_user_profile().get("role", "student")
-        except Exception:  # non-critical: graceful degradation
+        except Exception:  # ok to fail
             _log.debug("Failed to resolve user role in render_sidebar_badge", exc_info=True)
             return
     else:
@@ -142,7 +142,7 @@ def render_sidebar_badge():
     try:
         from data.db_notifications import get_unread_count
         unread_note = get_unread_count(user_id)
-    except Exception:  # non-critical: logged and suppressed
+    except Exception:  # log and skip
         _log.debug("get_unread_count failed for user #%d (non-critical)", user_id)
 
     if role == "teacher":

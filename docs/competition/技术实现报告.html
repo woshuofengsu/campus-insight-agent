@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园先知 · 技术实现报告 — 校园先知 CampusInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>校园先知 CampusInsight Agent — 技术实现报告</h1>
+
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体OPC创新大赛<br><strong>赛道</strong>：基层治理<br><strong>项目</strong>：校园先知 CampusInsight Agent<br><strong>技术负责人</strong>：步承泽<br><strong>日期</strong>：2026年8月6日<br><strong>在线体验</strong>：https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/<br><strong>扫码体验</strong>：打开 <a href="扫码体验.html"><code>扫码体验.html</code></a>，手机扫二维码即可访问（推荐横屏操作）</div>
+
+<hr>
+
+<h2>一、技术栈总览</h2>
+
+<table>
+<th>层</th><th>技术选型</th><th>版本要求</th><th>说明</th>
+<tr><td><strong>UI 框架</strong></td><td>Streamlit</td><td>>=1.28.0</td><td>多页面导航 + 学生/教师双角色路由</td></tr>
+<tr><td><strong>对话引擎</strong></td><td>LangChain + DeepSeek</td><td>langchain>=0.3.0</td><td><code>return_intermediate_steps=True</code> 捕获完整工具调用链</td></tr>
+<tr><td><strong>大语言模型</strong></td><td>DeepSeek (deepseek-chat)</td><td>—</td><td>兼容 OpenAI API 格式，支持 tools/functions 调用</td></tr>
+<tr><td><strong>LLM 适配层</strong></td><td>langchain-openai</td><td>>=0.2.0</td><td>ChatOpenAI 适配 DeepSeek base_url</td></tr>
+<tr><td><strong>关联分析 LLM</strong></td><td>DeepSeek (独立 client)</td><td>—</td><td>反射器专用，独立于主对话链路</td></tr>
+<tr><td><strong>数据库</strong></td><td>SQLite</td><td>Python 内置 sqlite3</td><td>WAL 模式 + 外键约束，单文件零配置</td></tr>
+<tr><td><strong>数据可视化</strong></td><td>Altair</td><td>>=5.0.0</td><td>治理趋势图、类别分布、KPI 仪表盘</td></tr>
+<tr><td><strong>配置管理</strong></td><td>python-dotenv</td><td>>=1.0.0</td><td>环境变量管理，密钥不入版本控制</td></tr>
+<tr><td><strong>外部数据</strong></td><td>和风天气 API</td><td>—</td><td>实时天气数据，支持模拟降级</td></tr>
+<tr><td><strong>运行时</strong></td><td>Python</td><td>>=3.10</td><td>支持 <code>dict</code>/<code>list</code> 类型标注</td></tr>
+</table>
+
+<hr>
+
+<h2>二、项目目录结构</h2>
+
+<pre>
+campus-insight-agent/
+├── app.py                         # Streamlit 主入口（双角色路由 + 全局 CSS）
+├── config.py                      # 全局配置（API Key、模型参数、感知阈值）
+├── requirements.txt               # Python 依赖清单
+├── .env.example                   # 环境变量模板
+├── .github/workflows/test.yml     # CI：push/PR 自动运行 318 个测试
+│
+├── agent/                         # 对话与治理工作流模块
+│   ├── __init__.py
+│   ├── engine.py                  # 主编排层（559行，5 阶段工作流）
+│   ├── prompt.py                  # System Prompt + Persona Router（4 角色）
+│   ├── memory.py                  # 对话记忆管理（LangChain + 用户画像）
+│   ├── helpers.py                 # 共享工具函数（位置提取、身份解析）
+│   ├── offline_agent.py           # 离线模式（无 LLM 依赖的规则引擎）
+│   ├── enforce.py                 # 工具调用校验——检测并纠正 LLM 遗漏的调用
+│   ├── closed_loop.py             # 闭环追踪——检测未解决工单和过期提案
+│   ├── governance_audit.py        # 治理审计——四维度交叉评分
+│   ├── fallback.py                # 降级回复——LLM 不可用时 DB 直查
+│   ├── rag.py                     # 语义搜索——字符 n-gram TF-IDF 检索
+│   ├── callbacks.py               # LangChain 回调（事件追踪）
+│   ├── weekly_report.py           # 周报生成
+│   └── reflector/                 # 反射器（后处理分析）
+│       ├── __init__.py
+│       ├── _parser.py             # 工具步骤解析 + 文本动作回退（13 条规则）
+│       ├── _associations.py       # 10 维 SQL 关联分析
+│       └── _insight.py            # 关联洞察生成
+│
+├── tools/                         # 插件式工具层（pkgutil 自动发现）
+│   ├── __init__.py                # discover_tools() — 零配置注册
+│   ├── query_campus_pulse.py      # 校园脉搏快照
+│   ├── query_weather.py           # 天气查询（API / 模拟 自动切换）
+│   ├── query_campus_issues.py     # 工单查询 + 治理统计 + 意见收集
+│   ├── query_my_issues.py         # 个人工单/提案查询（自动身份解析）
+│   ├── query_proposals.py         # 提案查询
+│   ├── query_topics.py            # 议题查询 + 热点发现
+│   ├── query_knowledge.py         # 校园百科语义搜索
+│   ├── action_report_issue.py     # 问题上报（LLM 分类 + 关键词降级）
+│   ├── action_create_proposal.py  # 创建提案（自动查重）
+│   ├── action_support_proposal.py # 附议提案（里程碑提示）
+│   └── action_express_opinion.py  # 发表议题意见
+│
+├── data/                          # 数据层（模块化拆分）
+│   ├── __init__.py
+│   ├── database.py                # 重导出中枢（保持向后兼容）
+│   ├── db_core.py                 # 连接管理 + init_db
+│   ├── db_user.py                 # 用户认证与画像
+│   ├── db_governance.py           # 治理核心 CRUD（60+ 方法）
+│   ├── db_health.py               # 健康度评分算法
+│   ├── db_health_alerts.py        # 健康预警引擎
+│   ├── db_perception.py           # 感知日志
+│   ├── db_knowledge.py            # 知识库 + 反馈收集
+│   ├── db_academic.py             # 课程/考试/事件
+│   ├── db_notifications.py        # 通知系统 + 活动日志
+│   ├── db_surveillance.py         # 传染病监测数据
+│   ├── models.py                  # 数据模型
+│   ├── seed.py                    # 演示数据（38 条工单 + 19 条提案 + 7 个议题）
+│   └── live_generator.py          # 实时事件生成
+│
+├── ui/                            # Streamlit 界面层
+│   ├── __init__.py
+│   ├── theme.py                   # 双主题 Token 设计系统
+│   ├── session.py                 # 会话初始化（幂等）
+│   ├── session_state.py           # 会话状态键名常量
+│   ├── cache.py                   # 数据库查询缓存
+│   ├── onboarding.py              # 首次引导
+│   ├── components.py              # 设计系统组件库
+│   ├── thinking.py                # 推理链可视化
+│   ├── health_card.py             # 健康风险卡片组件
+│   ├── css.py                     # 全局 CSS（含移动端适配）
+│   ├── notify.py                  # 实时通知系统
+│   ├── prefetch.py                # 预取引擎（减少工具调用）
+│   ├── login.py                   # 登录/注册
+│   └── pages/                     # 学生端 9 页面
+│   └── pages_teacher/             # 教师端 6 页面
+│
+├── utils/                         # 工具函数
+│   ├── retry.py                   # 指数退避重试
+│   ├── text.py                    # 文本处理
+│   └── logger.py                  # 统一日志管理
+│
+├── tests/                         # 318 个测试，CI 自动化
+│   ├── test_verify_all.py         # 冒烟：17 项全模块验证
+│   ├── test_critical_paths.py     # 关键路径：40 用例
+│   ├── unit/                      # 单元测试：224 用例
+│   ├── integration/               # 集成测试：21 用例
+│   └── e2e/                       # 端到端：7 场景
+│
+└── docs/                          # 文档
+    ├── competition/               # 比赛材料
+    ├── TECHNICAL.md               # 技术亮点速览
+    └── DEPLOY.md                  # 部署指南
+</pre>
+
+<hr>
+
+<h2>三、核心架构：工作流编排</h2>
+
+<p>本项目以 LangChain AgentExecutor 为执行核心，在其前后增加了预处理层（环境感知 + 意图路由）和后处理层（质量控制 + 关联分析）。参照 OODA（Observe-Orient-Decide-Act）循环的阶段划分来组织各层逻辑——不是因为 OODA 本身有特殊的技术含义，而是因为它的阶段划分恰好能将预处理和后处理逻辑组织到清晰的边界里：</p>
+
+<pre>
+用户输入
+   │
+   ▼
+┌──────────────────────────────────────────────────┐
+│  [预处理] Observe — 环境感知                       │
+│  查询天气 API、统计工单热点、获取时间上下文           │
+│  纯数据收集，不涉及 LLM 调用                        │
+├──────────────────────────────────────────────────┤
+│  [预处理] Orient — 意图路由 + 上下文注入             │
+│  关键词匹配检测意图 → 选择角色提示                   │
+│  拼接时间/天气/热点/告警 → 形成消息前缀              │
+├──────────────────────────────────────────────────┤
+│  [核心] Decide + Act — Agent 执行                  │
+│  LangChain AgentExecutor + 16 个工具               │
+│  DeepSeek 编排工具调用顺序                          │
+│  return_intermediate_steps=True 捕获完整调用链      │
+├──────────────────────────────────────────────────┤
+│  [后处理] Reflect — 质量检查                        │
+│  提取 &amp;lt;think&amp;gt; 块 → 过滤日志泄露行              │
+│  校验工具调用：LLM 未调用的关键工具强制执行            │
+│  失败时如实返回，不编造结果                          │
+├──────────────────────────────────────────────────┤
+│  [后处理] Associate — 关联分析（反射器）             │
+│  解析工具调用链 → 10 维 SQL 分析                    │
+│  独立 LLM 调用生成治理洞察                          │
+│  构建结构化推理链 → 前端可视化                       │
+└──────────────────────────────────────────────────┘
+   │
+   ▼
+结构化响应 + 推理链 + 建议 → 渲染到聊天界面
+</pre>
+
+<p>关于 OODA 命名的说明：这不是引入新的理论框架——本质上是 LangChain Agent 的工程增强。前置了环境感知和意图路由来减少无效的 LLM 调用，后置了质量检查和关联分析来弥补 LLM 输出的不确定性。工程实现比概念命名更重要。</p>
+
+<h3>与普通对话机器人的区别</h3>
+
+<table>
+<th>维度</th><th>普通对话机器人</th><th>本项目</th>
+<tr><td>环境感知</td><td>无——只响应用户输入</td><td>主动——每次对话前查询天气/热点/工单状态</td></tr>
+<tr><td>意图路由</td><td>依赖 LLM 自行判断</td><td>关键词 + 语义回退——零延迟，可调试</td></tr>
+<tr><td>工具调用</td><td>单次 LLM 决策，失败无感知</td><td>可追溯 + 校验——捕获每步调用，遗漏时补执行</td></tr>
+<tr><td>质量控制</td><td>无——输出即结果</td><td>多层检查——空回复/告警遗漏/短回复自动补救</td></tr>
+<tr><td>关联分析</td><td>无</td><td>统计驱动——z-score 异常检测 + 跨周对比</td></tr>
+<tr><td>容错降级</td><td>LLM 不可用则服务中断</td><td>三层降级——重试 → 规则引擎 → 数据库直查</td></tr>
+<tr><td>闭环反馈</td><td>无</td><td>上报→分类→追踪→解决→通知</td></tr>
+</table>
+
+<hr>
+
+<h2>四、Agent 自主决策机制</h2>
+
+<h3>4.1 工具选择策略</h3>
+
+<p>Agent 根据用户输入自主决定调用哪些工具，而非走预设分支。核心机制：</p>
+
+<p><strong>Persona 信号 → 工具偏好</strong>：<code>detect_persona()</code> 检测到"报修"意图后，System Prompt 中对应角色的工具描述会前置，提高 LLM 选择报修相关工具的概率。这是"引导"而非"限制"——Agent 仍然可以调用任意工具。</p>
+
+<p><strong>工具描述即决策依据</strong>：每个工具的 <code>description</code> 字段是 Agent 的唯一决策信息来源。工具描述采用结构化格式：<code>[阶段] 功能描述。参数: ...。适用于: ...。</code> 确保 LLM 能准确判断在什么场景下应该调用哪个工具。</p>
+
+<p><strong>参数推断</strong>：Agent 从自然语言输入中推断工具参数。例如"三教二楼男厕所水龙头漏水" → <code>report_issue(title="三教二楼男厕所水龙头漏水", category="设施维修", location="三教二楼男厕所", urgency="中")</code>。分类推断结合了 LLM 语义理解和关键词匹配降级——LLM 分类失败时，回退到 141 个报修关键词的确定性匹配。</p>
+
+<h3>4.2 多步编排逻辑</h3>
+
+<p>复杂请求需要 Agent 编排多个工具调用。以"报修+查询历史+统计趋势"组合请求为例：</p>
+
+<pre>
+用户: "三教灯又坏了，最近这类问题多吗"
+  │
+  ├─ Step 1: report_issue(title="三教灯故障", category="设施维修", ...)
+  │     └─ 返回工单号 #42
+  │
+  ├─ Step 2: query_issues(category="设施维修", status="待处理", limit=10)
+  │     └─ 返回同类别待处理列表（含位置分布）
+  │
+  └─ Step 3: get_governance_stats()
+        └─ 返回类别分布统计 → Agent 回复"最近7天设施维修类已有8件，主要集中在三教和食堂区域"
+</pre>
+
+<p>每一步的工具调用由 LLM 根据前一步的返回结果动态决定。<code>return_intermediate_steps=True</code> 确保完整调用链被捕获，前端可展示推理过程。</p>
+
+<h3>4.3 自主纠错循环</h3>
+
+<p>Agent 的 <code>enforce.py</code> 模块在 LLM 完成后检查工具调用完整性：</p>
+
+<ul>
+<li><strong>漏调检测</strong>：用户输入匹配到报修关键词但 <code>intermediate_steps</code> 中没有 report_issue → 强制补调用</li>
+<li><strong>空回复检测</strong>：Agent 返回空字符串或过短回复 → 触发降级回复逻辑，走 DB 直查</li>
+<li><strong>幻觉检测</strong>：Agent 回复中包含工单号但对应工具调用不存在 → 标记为不可信，替换为如实描述</li>
+</ul>
+
+<p>这个循环让 Agent 具备了"知道自己可能犯错并修正"的能力。</p>
+
+<hr>
+
+<h2>五、反射器——后处理分析</h2>
+
+<p>反射器（<a href="agent/reflector/">agent/reflector/</a>，已模块化拆分）在 Agent 回复完成后运行，执行三层分析：</p>
+
+<h3>4.1 工具步骤解析</h3>
+
+<p>将 LangChain <code>intermediate_steps</code> 转换为结构化步骤卡片，包含阶段分类（observe/act）、工具摘要（16 工具分发表）、输入/输出截取。</p>
+
+<h3>4.2 文本动作回退解析（13 条正则规则）</h3>
+
+<p>当 LLM 在文本中直接描述动作（如"已为你生成工单 #42"）而未走 LangChain 正式工具调用时，反射器通过正则匹配恢复伪步骤。这体现了工程上的防御性设计——不假设 LLM 行为始终符合预期。</p>
+
+<h3>4.3 10 维 SQL 关联分析</h3>
+
+<table>
+<th>维度</th><th>分析方法</th><th>治理价值</th>
+<tr><td><strong>空间关联</strong></td><td>提取输入中的地点关键词，查同区域待处理工单</td><td>发现问题集中区域</td></tr>
+<tr><td><strong>时间趋势</strong></td><td>按类别统计近 7 天新增量</td><td>发现上升趋势</td></tr>
+<tr><td><strong>复发检测</strong></td><td>关键词匹配已解决工单</td><td>发现重复问题</td></tr>
+<tr><td><strong>异常检测</strong></td><td>本周 vs 前 4 周均值对比（阈值 1.5x + ≥3 件）</td><td>发现激增预警</td></tr>
+<tr><td><strong>类别关联</strong></td><td>同地点不同类别工单共现分析</td><td>发现连锁问题</td></tr>
+<tr><td><strong>提案关联</strong></td><td>热门待处理类别匹配相关提案</td><td>推动报→议升级</td></tr>
+<tr><td><strong>解决效率</strong></td><td>按类别统计平均解决天数</td><td>发现低效环节</td></tr>
+<tr><td><strong>跨时间对比</strong></td><td>本周 vs 上周新增与解决对比</td><td>判断治理趋势改善/恶化</td></tr>
+<tr><td><strong>Z-score 异常</strong></td><td>按类别 4 周窗口均值与标准差，统计学异常检测</td><td>比简单阈值更可靠的异常发现</td></tr>
+<tr><td><strong>报→议升级</strong></td><td>检测工单密集但无对应提案的类别</td><td>推动问题升级为治理提案</td></tr>
+</table>
+
+<h3>4.4 治理洞察生成</h3>
+
+<p>当关联数据达到阈值（空间 ≥3、时间 ≥5、任意异常），反射器调用独立 LLM（openai.OpenAI 直连 DeepSeek）生成 2-3 句自然语言洞察。该调用独立于主对话链路，即时失败也不影响回复质量。</p>
+
+<hr>
+
+<h2>六、工具层</h2>
+
+<h3>5.1 自动发现机制</h3>
+
+<p>新增工具文件放入 <code>tools/</code> 目录即可——<code>discover_tools()</code> 通过 <code>pkgutil.iter_modules</code> + <code>isinstance(attr, BaseTool)</code> 自动扫描注册。</p>
+
+<h3>5.2 16 个治理工具清单</h3>
+
+<table>
+<th>文件</th><th>函数名</th><th>阶段</th><th>核心参数</th><th>功能</th>
+<tr><td><code>query_campus_pulse.py</code></td><td><code>get_campus_pulse</code></td><td>知</td><td>无</td><td>校园脉搏快照（天气 + 事件 + KPI + 热点）</td></tr>
+<tr><td><code>query_weather.py</code></td><td><code>get_weather</code></td><td>知</td><td>无</td><td>当日+未来2天天气（API/模拟自动切换）</td></tr>
+<tr><td><code>query_campus_issues.py</code></td><td><code>query_issues</code></td><td>报</td><td>category, status, limit</td><td>多条件工单查询</td></tr>
+<tr><td><code>query_campus_issues.py</code></td><td><code>get_governance_stats</code></td><td>督</td><td>无</td><td>治理统计（总数+状态分布+类别分布+健康度）</td></tr>
+<tr><td><code>query_campus_issues.py</code></td><td><code>collect_feedback</code></td><td>议</td><td>topic</td><td>意见收集（含演示数据预览）</td></tr>
+<tr><td><code>query_my_issues.py</code></td><td><code>query_my_issues</code></td><td>报</td><td>无（自动身份解析）</td><td>当前用户的全部工单及进度</td></tr>
+<tr><td><code>query_my_issues.py</code></td><td><code>query_my_proposals</code></td><td>议</td><td>无（自动身份解析）</td><td>当前用户的全部提案及状态</td></tr>
+<tr><td><code>action_report_issue.py</code></td><td><code>report_issue</code></td><td>报</td><td>title, category, location, urgency, description</td><td>创建工单（LLM分类+关键词降级+地点校验）</td></tr>
+<tr><td><code>query_proposals.py</code></td><td><code>get_proposals</code></td><td>议</td><td>category, sort_by, limit</td><td>提案列表（按附议数/时间排序）</td></tr>
+<tr><td><code>action_create_proposal.py</code></td><td><code>create_proposal</code></td><td>议</td><td>title, description, category</td><td>创建提案（自动语义查重）</td></tr>
+<tr><td><code>action_support_proposal.py</code></td><td><code>support_proposal</code></td><td>议</td><td>proposal_id</td><td>附议提案（原子操作+里程碑提示）</td></tr>
+<tr><td><code>query_topics.py</code></td><td><code>get_topics</code></td><td>议</td><td>无</td><td>活跃议题列表 + 热点自动发现</td></tr>
+<tr><td><code>query_topics.py</code></td><td><code>get_topic_detail</code></td><td>议</td><td>topic_id</td><td>议题详情 + 全部意见</td></tr>
+<tr><td><code>action_express_opinion.py</code></td><td><code>express_opinion</code></td><td>议</td><td>topic_id, content</td><td>发表议题意见</td></tr>
+<tr><td><code>query_knowledge.py</code></td><td><code>query_knowledge</code></td><td>知</td><td>query</td><td>语义搜索校园百科（RAG）</td></tr>
+<tr><td><code>query_knowledge.py</code></td><td><code>get_school_policy</code></td><td>知</td><td>topic</td><td>查询校规政策原文</td></tr>
+</table>
+
+<h3>5.3 预取机制</h3>
+
+<p>为避免 Agent 在简单场景下过度调用工具，<code>home.py</code> 在每次渲染前预取 6 组数据（校园脉搏、治理统计、天气、热门提案、活跃议题、我的工单），通过系统标注注入用户消息。System Prompt 明确指示：看到 <code>[📊 以下数据已由系统预取...]</code> 标记时跳过查询类工具调用。</p>
+
+<hr>
+
+<h2>七、容错与降级设计</h2>
+
+<p>系统在三个层级提供容错能力，确保单点故障不导致服务中断：</p>
+
+<h3>7.1 LLM 调用层</h3>
+
+<p><code>utils/retry.py</code> 提供指数退避重试（初始 1s，倍增，最多 2 次），总超时 30s。重试失败后抛出可捕获异常，由上层决定降级策略。</p>
+
+<h3>7.2 Agent 执行层</h3>
+
+<p>LLM API 不可用时，<code>engine.py</code> 捕获异常后自动切换到 <code>OfflineAgent</code>（<a href="agent/offline_agent.py">agent/offline_agent.py</a>）——一个基于规则引擎的无 LLM 依赖降级方案：</p>
+
+<ul>
+<li><strong>意图路由</strong>：回退到纯关键词匹配（同一套 <code>_PERSONA_SIGNALS</code>，368 个关键词全覆盖）</li>
+<li><strong>工具调用</strong>：工单查询/提案查询/校园脉搏/天气 → 直接 SQL 查询，跳过 LLM 编排</li>
+<li><strong>报修分类</strong>：LLM 分类失败 → 141 个报修关键词确定性匹配（设施维修/环境卫生/网络故障等 8 类）</li>
+<li><strong>回复生成</strong>：使用预置回复模板 + 数据填充（如"当前共有 {pending} 件待处理工单，最近一件是 {title}"）</li>
+</ul>
+
+<p>离线模式下功能有退化（无法做开放式对话和复杂推理），但核心治理操作全部可用。</p>
+
+<h3>7.3 数据层</h3>
+
+<p><code>fallback.py</code> 在数据库异常时提供最后一道防线——内存缓存的关键统计数据（最近一次成功的 <code>get_governance_stats</code> 结果），有效期 5 分钟。过期后返回预设的静态快照数据。天气 API 不可用时自动切换为模拟气象数据。</p>
+
+<h3>7.4 降级可观测性</h3>
+
+<p>每次降级触发均记录到 <code>activity_log</code>（操作日志表），并在 UI 中通过 <code>st.warning</code> 提示用户当前处于降级模式。这确保了降级不是无声的——用户和开发者都能感知到系统状态的切换。</p>
+
+<hr>
+
+<h2>八、Persona Router——轻量级意图路由</h2>
+
+<p><code>detect_persona()</code> 函数（<a href="agent/prompt.py">agent/prompt.py</a>）使用关键词匹配实现意图检测，将用户输入映射到 4 种角色：</p>
+
+<table>
+<th>角色</th><th>关键词数</th><th>典型场景</th>
+<tr><td>报修助手</td><td>141</td><td>"教三楼灯坏了" → 自动分类+定级+生成工单</td></tr>
+<tr><td>议事顾问</td><td>108</td><td>"建议延长图书馆时间" → 查重→引导附议或创建</td></tr>
+<tr><td>数据分析师</td><td>77</td><td>"统计最近报修趋势" → 调取治理统计数据</td></tr>
+<tr><td>校园观察员</td><td>42</td><td>"校园脉搏" → 获取快照+播报</td></tr>
+</table>
+
+<p>优先级规则：强数据关键词（统计/分析/趋势）→ 数据分析师优先；提案关键词出现时议事顾问覆盖观察员；状态查询词（修好了吗/解决了吗）触发报修复向到数据查询。</p>
+
+<hr>
+
+<h2>九、数据库设计</h2>
+
+<p>15 张表，SQLite WAL 模式，外键约束。迁移使用 <code>ALTER TABLE ADD COLUMN</code> + try/except 兼容历史数据库。</p>
+
+<h3>治理核心表（5 张）</h3>
+
+<pre>
+-- 校园工单
+campus_issues (id, title, category, location, description, urgency, status,
+               author, reported_at, resolved_at)
+
+-- 提案
+proposals (id, title, description, category, supporter_count, status,
+           response_text, author, created_at)
+
+-- 讨论议题
+discussion_topics (id, title, description, category, created_by_agent,
+                   is_active, participant_count, created_at, ended_at)
+
+-- 议题意见
+topic_opinions (id, topic_id FK, content, participant_label, created_at)
+
+-- 反馈收集
+feedback_items (id, topic, opinion, source, sentiment, created_at)
+</pre>
+
+<h3>业务支撑表（6 张）</h3>
+
+<p><code>user_profile</code>（role/name/student_id）、<code>knowledge_base</code>、<code>courses</code>、<code>exams</code>、<code>events</code>、<code>club_activities</code>。</p>
+
+<h3>系统支撑表（4 张）</h3>
+
+<p><code>health_surveillance</code>（疾控监测数据）、<code>notifications</code>（通知推送）、<code>activity_log</code>（操作日志）、<code>perception_log</code>（感知巡检记录）。</p>
+
+<h3>治理健康度算法</h3>
+
+<p>三维加权评分（<code>compute_health_score()</code> in <a href="../data/db_health.py">data/db_health.py</a>）：</p>
+
+<pre>
+健康度 = 解决率(40%) + 速度分数(35%) + 积压分数(25%)
+
+- 解决率 = 已解决 / 总工单（空库时 100）
+- 速度分数 = max(0, min(100, 120 - 平均解决天数 × 8))
+  （7 天为满分基准线，无数据时为中性 70）
+- 积压分数 = 近 7 天新增 vs 解决对比
+  新增=0 → 100 | 解决≥新增 → 60+(解决/新增)×40 | 解决&lt;新增 → 0-95
+- 等级：优(≥80) | 良(≥50) | 需改进(&lt;50)
+- 趋势：↓改善中(≥75) | →持平(≥45) | ↑需关注(&lt;45)
+</pre>
+
+<p>审计模块（<a href="../agent/governance_audit.py">agent/governance_audit.py</a>）在此基础上增加四维度交叉分析（工单管理/提案参与/公民参与/热点检测），参考 ISO 37120 市政治理指标体系，输出 A/B/C/D 等级 + Top 3 优先行动建议。</p>
+
+<hr>
+
+<h2>十、双角色系统</h2>
+
+<h3>学生端（9 页）— 知·报·议·督 + 扩展功能</h3>
+<ul>
+<li>对话：交互中枢，快速报修，空闲感知，推理链可视化</li>
+<li>校园脉搏：天气 + 事件 + 百科 + 热点分布</li>
+<li>随手报修：快速上报 + 工单追踪 + 分类统计</li>
+<li>有话说：提案排行 + 创建提案 + 议题讨论</li>
+<li>治理透明窗：健康度 + 趋势 + 类别明细</li>
+<li>健康防护：疾病风险预警 + 预防建议</li>
+<li>消息：工单状态变更通知</li>
+<li>我的：个人参与记录 + 我的上报 + 我的提案</li>
+<li>治理大屏：全屏实时数据，30s 自动刷新</li>
+</ul>
+
+<h3>教师端（6 页）— 管理后台</h3>
+<ul>
+<li>工作台：KPI + 紧急工单 + 趋势 + 热门提案</li>
+<li>工单管理：表格视图 + 一键改状态 + 多重筛选</li>
+<li>提案管理：回复 + 采纳 + 实施</li>
+<li>内容发布：通知 + 百科 + 议题管理</li>
+<li>数据洞察：治理数据分析与可视化</li>
+<li>健康管理：校园健康监测</li>
+</ul>
+
+<hr>
+
+<h2>十一、关键技术决策</h2>
+
+<h3>9.1 模型选择</h3>
+
+<table>
+<th>考量</th><th>DeepSeek</th><th>GPT-4</th><th>结论</th>
+<tr><td>Function Calling</td><td>完整支持 <code>tools</code> + <code>tool_choice</code></td><td>原生支持</td><td>持平</td></tr>
+<tr><td>中文能力</td><td>国产模型，治理术语理解良好</td><td>良好</td><td>持平</td></tr>
+<tr><td>调用成本</td><td>约 1/10</td><td>—</td><td>DeepSeek</td></tr>
+<tr><td>网络可达性</td><td>国内直连</td><td>需代理</td><td>DeepSeek</td></tr>
+<tr><td>模型可替换性</td><td><code>ChatOpenAI(base_url=...)</code> 切换只需改 3 行</td><td>—</td><td>架构层面解耦</td></tr>
+</table>
+
+<h3>9.2 为什么在 AgentExecutor 外增加预处理/后处理</h3>
+
+<p>直接使用 LangChain AgentExecutor 可以实现"输入→工具→输出"的基本流程，但实际使用中暴露出几个问题：</p>
+<ul>
+<li><strong>LLM 对环境无感知</strong>——不知道当前时间、天气、工单热点 → 增加 Observe 层在对话前收集环境数据</li>
+<li><strong>LLM 容易混淆意图</strong>——"查询我的工单"和"上报新问题"可能被误判 → 增加 Orient 层做关键词意图路由</li>
+<li><strong>LLM 可能编造结果</strong>——描述"工单 #42 已创建"但实际未调用工具 → 增加 Reflect 层校验并补执行</li>
+<li><strong>单条数据背后的统计规律 LLM 不会主动分析</strong> → 增加 Associate 层做 SQL + z-score 关联分析</li>
+</ul>
+
+<p>这种结构将 LLM 的不可靠性限制在可控范围内——让 LLM 专注自然语言理解和生成，环境感知、意图判断、质量检查、统计推理由确定性代码完成。</p>
+
+<h3>9.3 为什么 Streamlit</h3>
+
+<p>比赛场景（单用户演示）下，Streamlit 的开发效率优势明显。内置 <code>st.chat_message</code>/<code>st.chat_input</code>、Altair 图表、session_state 状态管理、多页面导航——单人可在短时间内完成完整的交互界面。</p>
+
+<hr>
+
+<h2>十二、Prompt Engineering 策略</h2>
+
+<h3>11.1 System Prompt 结构</h3>
+
+<p>System Prompt 由 <code>agent/prompt.py</code> 中的 <code>get_system_prompt()</code> 动态生成，包含以下固定块：</p>
+
+<ul>
+<li><strong>1.</strong> <strong>角色定义</strong>（~80 tokens）：根据 <code>detect_persona()</code> 的结果选择对应角色描述</li>
+<li><strong>2.</strong> <strong>工具映射表</strong>（~200 tokens）：16 个工具的结构化清单，每个工具一行：<code>[阶段] 函数名 — 参数 — 一句话说明</code></li>
+<li><strong>3.</strong> <strong>预取数据标注</strong>（~150 tokens）：当前已预取的校园脉搏/天气/工单数据，标记为可直接使用</li>
+<li><strong>4.</strong> <strong>行为约束</strong>（~100 tokens）：禁止编造工单号、禁止跳过必要工具调用、失败时如实告知</li>
+</ul>
+
+<p>总长度控制在 600-800 tokens，确保在 DeepSeek 的上下文窗口内为对话历史留出足够空间。</p>
+
+<h3>11.2 工具描述设计</h3>
+
+<p>每个 LangChain Tool 的 <code>description</code> 是 Prompt Engineering 的关键——它是 LLM 判断是否调用该工具的唯一信息来源。设计原则：</p>
+
+<ul>
+<li><strong>阶段前缀</strong>：<code>[知]/[报]/[议]/[督]</code> 让 LLM 快速理解工具的治理定位</li>
+<li><strong>触发条件显式化</strong>：不写"查询工单"，写"当用户询问某类别/状态的工单列表时使用"</li>
+<li><strong>参数范围约束</strong>：<code>category 参数可选值：设施维修/环境卫生/网络故障/食堂餐饮/宿舍管理/安全管理/教学设备/其他</code></li>
+<li><strong>反例引导</strong>：对于查询类工具，添加"如果系统已预取数据则跳过此调用"</li>
+</ul>
+
+<h3>11.3 Few-Shot 示例注入</h3>
+
+<p>在 System Prompt 中嵌入 4 组典型交互示例（每组 2 轮对话 + 工具调用），覆盖报修、查询、提案、闲聊四个场景。示例展示的不是"正确答案"而是"正确的工具调用模式"——让 LLM 学会在什么情况下应该调用哪个工具、应该传递什么参数。</p>
+
+<hr>
+
+<h2>十三、代码质量与测试</h2>
+
+<h3>12.1 工程质量措施</h3>
+
+<ul>
+<li><strong>类型标注</strong>：所有公开函数含 Python 3.10+ 类型提示</li>
+<li><strong>异常处理</strong>：全项目 agent/data/tools/ui 四层，所有 <code>except</code> 块均有 <code>_log.debug(exc_info=True)</code></li>
+<li><strong>容错机制</strong>：<code>utils/retry.py</code> 指数退避重试（max 2 次），API 请求 30s 超时</li>
+<li><strong>CI</strong>：<code>.github/workflows/test.yml</code>——push/PR 自动运行全部测试</li>
+<li><strong>配置管理</strong>：<code>.env</code> 不入版本控制，<code>.env.example</code> 作为模板</li>
+<li><strong>幂等性</strong>：<code>seed.py</code> 自动检测已有数据，安全重复执行</li>
+<li><strong>数据库迁移</strong>：使用 try/except 兼容已有列，无需手动迁移</li>
+</ul>
+
+<h3>10.2 测试覆盖（318 tests, CI green）</h3>
+
+<pre>
+        ┌──────┐
+        │ E2E  │  7 场景（报修/脉搏/提案/闭环/审计/降级/多轮对话）
+       ┌┴──────┴┐
+       │ 集成   │  21 用例（CRUD + 通知 + 活动 + 并发读）
+      ┌┴────────┴┐
+      │  单元    │  224 用例（tools/prompt/helpers/offline/audit）
+     └───────────┘
+      冒烟: 17 项全模块编译 + DB 往返 + 路由验证
+      关键路径: 40 用例（persona/路由/校验/感知）
+</pre>
+
+<p>覆盖范围：每个工具函数的边界输入、Persona Router 的全量路由规则、工具调用的正确拦截与放行、空数据库下的审计稳定性、多线程并发读、通知已读/未读流转。</p>
+
+<hr>
+
+<h2>十四、性能指标</h2>
+
+<table>
+<th>指标</th><th>值</th><th>测量方式</th>
+<tr><td>简单问答响应</td><td>< 3s（预估）</td><td>用户消息 → 回复（无工具调用）</td></tr>
+<tr><td>工具编排响应</td><td>< 15s（预估）</td><td>用户消息 → 2-4 轮工具调用 → 回复</td></tr>
+<tr><td>反射器关联分析</td><td>< 200ms（实测）</td><td>SQLite 10 维查询</td></tr>
+<tr><td>洞察生成</td><td>< 2s（实测）</td><td>独立 DeepSeek API 调用，非阻塞</td></tr>
+<tr><td>感知巡检</td><td>< 100ms（实测）</td><td>4 项巡检串行执行</td></tr>
+<tr><td>数据库查询</td><td>< 50ms（实测）</td><td>SQLite WAL 模式，数据量 < 100 行</td></tr>
+<tr><td>页面首次渲染</td><td>< 2s（实测）</td><td>含缓存预热 + 种子数据</td></tr>
+<tr><td>内存占用</td><td>< 200MB</td><td>Python + Streamlit + LangChain</td></tr>
+</table>
+
+<p>*预估项标记为预估，实测项来自本地运行。完整端到端性能数据在演示视频中展示。*</p>
+
+<hr>
+
+<h2>十五、已知限制与后续方向</h2>
+
+<table>
+<th>限制</th><th>当前方案</th><th>后续方向</th>
+<tr><td>场景数据依赖预置种子</td><td>38 条工单 + 19 条提案模拟数据</td><td>接入真实数据 API</td></tr>
+<tr><td>后台推送依赖轮询</td><td>30s 空闲刷新触发</td><td>迁移 WebSocket 推送</td></tr>
+<tr><td>单用户模式</td><td>SQLite + session_state</td><td>引入用户路由 + PostgreSQL</td></tr>
+<tr><td>知识库检索为关键词匹配</td><td>SQL LIKE</td><td>Embedding + 向量检索</td></tr>
+<tr><td>无身份认证</td><td>session 本地存储</td><td>接入 OAuth/CAS</td></tr>
+<tr><td>天气数据支持降级</td><td>API → 模拟自动切换</td><td>接入更多数据源</td></tr>
+</table>
+
+<hr>
+
+<h2>十六、可迁移性：架构的场景无关设计</h2>
+
+<h3>13.1 设计原则</h3>
+
+<p>本项目的治理工作流、工具层、数据库结构、校验机制、降级链路在设计上保持场景无关。所有场景特定内容集中在以下文件中：</p>
+
+<table>
+<th>耦合点</th><th>文件</th><th>迁移方式</th>
+<tr><td>意图关键词</td><td><code>agent/prompt.py</code> → <code>_PERSONA_SIGNALS</code></td><td>替换关键词列表</td></tr>
+<tr><td>工具描述与参数</td><td><code>tools/*.py</code> → 16 个工具的 docstring + 回复文案</td><td>替换文档字符串与返回值模板</td></tr>
+<tr><td>System Prompt</td><td><code>agent/prompt.py</code> → <code>get_system_prompt()</code></td><td>替换角色上下文段落</td></tr>
+<tr><td>种子数据</td><td><code>data/seed.py</code></td><td>替换人物与场景名，保留数据规模和叙事结构</td></tr>
+</table>
+
+<p><strong>工作流引擎、数据库结构、UI 组件、校验逻辑、测试体系——不需要代码改动。</strong></p>
+
+<h3>13.2 验证的迁移路径</h3>
+
+<p>校园先知以大学校园（几万人、边界清晰、问题类型全）为原型验证环境。以下是三组可行的迁移路径：</p>
+
+<table>
+<th>治理维度</th><th>校园 →</th><th>社区治理</th><th>养老机构</th><th>企业园区</th>
+<tr><td>知</td><td>校园脉搏</td><td>社区周报</td><td>老人日报</td><td>园区简报</td></tr>
+<tr><td>报</td><td>随手报修</td><td>居民上报</td><td>一键求助</td><td>员工反馈</td></tr>
+<tr><td>议</td><td>有话说</td><td>居民议事</td><td>银龄之声</td><td>员工建言</td></tr>
+<tr><td>督</td><td>治理透明窗</td><td>治理公开</td><td>服务监督</td><td>运维看板</td></tr>
+<tr><td>角色</td><td>学生/教师</td><td>居民/网格员</td><td>老人/护工</td><td>员工/行政</td></tr>
+</table>
+
+<p>每组迁移的工程投入约 6-8 小时（关键词替换 + 工具文案替换 + 种子数据重写 + UI 标题替换）。核心架构完全不动。</p>
+
+<h3>13.3 校园作为原型验证环境的优势</h3>
+
+<table>
+<th>特质</th><th>校园</th><th>对验证的意义</th>
+<tr><td>规模</td><td>几万人，物理边界清晰</td><td>变量可控，先跑通再放大</td></tr>
+<tr><td>问题类型</td><td>设施维修、公共卫生、食品安全、政策反馈</td><td>覆盖基层治理主要场景</td></tr>
+<tr><td>反馈链路</td><td>学生→辅导员→后勤，三层以内</td><td>闭环验证成本低</td></tr>
+<tr><td>数据可获得</td><td>天气 API、疾控公报、校内工单</td><td>感知层有真实数据</td></tr>
+<tr><td>参与意愿</td><td>学生天然关心校园环境</td><td>无需额外激励设计</td></tr>
+</table>
+
+<hr>
+
+<hr>
+
+<h2>十七、部署与运维</h2>
+
+<h3>15.1 部署方式</h3>
+
+<p>项目通过 Streamlit Cloud 部署，连接到 GitHub 仓库自动构建。<code>.streamlit/config.toml</code> 中配置主题和服务器参数。部署流程：</p>
+
+<ul>
+<li><strong>1.</strong> 推送代码到 GitHub 主分支</li>
+<li><strong>2.</strong> Streamlit Cloud 自动检测更新并重新构建</li>
+<li><strong>3.</strong> 依赖安装依据 <code>requirements.txt</code>（约 20 个包）</li>
+<li><strong>4.</strong> 环境变量（API Key 等）通过 Streamlit Secrets 管理，不入仓库</li>
+</ul>
+
+<p>从 <code>git push</code> 到线上生效约 2-3 分钟。</p>
+
+<h3>15.2 CI/CD</h3>
+
+<p><code>.github/workflows/test.yml</code> 配置了 push 和 PR 触发器：Python 3.10 + 安装依赖 + <code>pytest tests/ -q</code>。318 个测试在 30 秒内完成。CI 失败时阻止合并。</p>
+
+<h3>15.3 监控与日志</h3>
+
+<p><code>utils/logger.py</code> 统一日志格式，关键路径均有 <code>_log.info</code> 埋点。<code>activity_log</code> 表记录所有操作（用户行为 + 系统事件 + 降级触发），可按时间范围和事件类型检索。感知巡检（<code>perception_log</code>）每次扫描记录快照，用于追踪系统健康度变化。</p>
+
+<h3>15.4 成本估算</h3>
+
+<ul>
+<li>DeepSeek API：每次对话调用约 2-5K tokens（含 System Prompt + 工具描述 + 对话历史 + 工具调用结果），按 DeepSeek 定价约 ¥0.002/次</li>
+<li>Streamlit Cloud：免费层足够演示使用（单用户场景）</li>
+<li>和风天气 API：免费层 1000 次/天，远超演示需求</li>
+<li>总运营成本：接近零</li>
+</ul>
+
+<hr>
+
+<h2>十八、AI 辅助开发实践</h2>
+
+<p>本项目的开发过程大量使用 Claude Code 作为 AI 编程助手，以下是在真实项目中验证的实践经验：</p>
+
+<h3>16.1 分阶段并行开发</h3>
+
+<p>项目按 Phase 0（数据层）→ Phase 1（工具层）→ Phase 2（Agent 引擎）→ Phase 3（UI 层）→ Phase 4（教师端 + 测试）五个阶段推进。每个阶段使用独立 sub-agent 并行开发，主 agent 负责整合和验证。这种方法使得跨 50+ 个文件、5000+ 行代码的项目能在短时间内完成从零到可用的完整迭代。</p>
+
+<h3>16.2 AI 擅长与不擅长的边界</h3>
+
+<p>实践中发现：AI 在生成 CRUD 代码、编写测试用例、修复 linter 错误方面速度远超人类；但在架构决策（需要权衡取舍）、调试多文件交互的运行时错误、理解 Streamlit session_state 的隐式依赖方面仍然需要人工判断。效率最高的模式是：人工做架构设计和接口定义，AI 实现细节和测试。</p>
+
+<h3>16.3 测试驱动与 AI 协作</h3>
+
+<p>先写测试、再让 AI 实现代码的工作流在项目中验证为高效稳定——318 个测试中的约 70% 由 AI 编写。测试作为"可执行的规格说明"显著减少了 AI 生成代码的理解偏差：AI 不需要猜测函数的行为，只需让测试通过。</p>
+
+<h3>16.4 代码审查策略</h3>
+
+<p>所有 AI 生成的代码在合入前经过两轮检查：第一轮是自动化（pytest + lint），第二轮是人工审查——重点关注异常处理是否完整、安全边界是否清晰、依赖是否最小化。比赛截止前的"去 AI 味"审查确保了代码注释符合人类开发者的表达风格。</p>
+
+<hr>
+
+<div class="meta">本报告为 2026年"京彩AI·智汇全球"首都大学生智能体OPC创新大赛参赛作品《校园先知 CampusInsight Agent》的技术实现文档。代码已开源。</div>
+
+<div class="footer">
+校园先知 CampusInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>

@@ -132,8 +132,7 @@ def collect_feedback(topic: str) -> str:
     agg = aggregate_feedback(topic)
 
     if agg["total"] == 0:
-        # ── No real data: show demo preview WITHOUT persisting to DB ──
-        # Clear separation ensures judges can distinguish real vs demo data.
+        # ── No real data: show demo preview (read-only, not persisted) ──
         demo_opinions = {
             "食堂": [
                 ("新开的麻辣烫窗口不错，价格合理", "正面"),

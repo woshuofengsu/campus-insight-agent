@@ -268,7 +268,7 @@ try:
     recent_issues = cached_issues(limit=10)
     if issue_stats.get("total", 0) == 0:
         _using_mock = True
-except Exception:  # non-critical: logged and suppressed
+except Exception:  # log and skip
     _log.warning("Data loading failed, falling back to mock data", exc_info=True)
     _using_mock = True
 
@@ -610,14 +610,13 @@ for i in recent_issues[:6]:
         f'{emoji} #{i["id"]} {i.get("title","")[:20]} — {s} · {i.get("reported_at","")[:10]}'
     )
 
-# Add proposal events
 ticker_events += [
     "💡 提案 #8「延长图书馆开放时间」获 73 人附议",
     "✅ 工单 #118「图书馆插座不足」已解决",
     "📢 新通知「秋季学期校历」已发布",
     "🎉 提案 #3「增设快递柜」已进入实施阶段",
 ]
-# Double up for seamless loop
+# Duplicate for continuous scroll
 ticker_events = ticker_events + ticker_events
 
 ticker_html = "".join(

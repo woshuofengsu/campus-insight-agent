@@ -61,9 +61,7 @@ class TestDemoScenarios(unittest.TestCase):
     def tearDownClass(cls):
         _cleanup_test_db(cls._db_path)
 
-    # ═══════════════════════════════════════════════════════════
-    # Scenario 1: 学生报修 → 自动分类 → 生成工单 → 确认工单号
-    # ═══════════════════════════════════════════════════════════
+    # -- Scenario 1: 学生报修 → 自动分类 → 生成工单 → 确认工单号 --
 
     def test_scenario_1_student_repair(self):
         """Student reports a facility issue, gets ticket ID back."""
@@ -78,9 +76,7 @@ class TestDemoScenarios(unittest.TestCase):
         self.assertIsInstance(response2, str)
         self.assertTrue(len(response2) > 10, "My issues query should return something")
 
-    # ═══════════════════════════════════════════════════════════
-    # Scenario 2: 校园脉搏 → 天气+热点+提案 三合一
-    # ═══════════════════════════════════════════════════════════
+    # -- Scenario 2: 校园脉搏 → 天气+热点+提案 三合一 --
 
     def test_scenario_2_campus_pulse(self):
         """Campus pulse delivers weather, hotspots, and proposals."""
@@ -94,9 +90,7 @@ class TestDemoScenarios(unittest.TestCase):
         # Should contain hotspot section
         self.assertIn("热点", response)
 
-    # ═══════════════════════════════════════════════════════════
-    # Scenario 3: 创建提案 → 附议 → 状态变更
-    # ═══════════════════════════════════════════════════════════
+    # -- Scenario 3: 创建提案 → 附议 → 状态变更 --
 
     def test_scenario_3_proposal_lifecycle(self):
         """Create proposal, check it appears, and support flow."""
@@ -115,9 +109,7 @@ class TestDemoScenarios(unittest.TestCase):
         response3 = self.agent.run("我的提案")
         self.assertIsInstance(response3, str)
 
-    # ═══════════════════════════════════════════════════════════
-    # Scenario 4: 查询我的工单 → 发现已解决 → 闭环确认
-    # ═══════════════════════════════════════════════════════════
+    # -- Scenario 4: 查询我的工单 → 发现已解决 → 闭环确认 --
 
     def test_scenario_4_closed_loop(self):
         """Query my issues, check status, closed-loop confirmation."""
@@ -129,9 +121,7 @@ class TestDemoScenarios(unittest.TestCase):
         self.assertIsInstance(response, str)
         self.assertTrue(len(response) > 10)
 
-    # ═══════════════════════════════════════════════════════════
-    # Scenario 5: 治理审计 → 四维度评分 → 行动建议
-    # ═══════════════════════════════════════════════════════════
+    # -- Scenario 5: 治理审计 → 四维度评分 → 行动建议 --
 
     def test_scenario_5_governance_audit(self):
         """Governance audit with four-dimension scoring."""
@@ -152,9 +142,7 @@ class TestDemoScenarios(unittest.TestCase):
         # Should have report card
         self.assertIn("分维度评分", report)
 
-    # ═══════════════════════════════════════════════════════════
-    # Scenario 6: LLM不可用 → OfflineAgent接管 → 优雅降级
-    # ═══════════════════════════════════════════════════════════
+    # -- Scenario 6: LLM不可用 → OfflineAgent接管 → 优雅降级 --
 
     def test_scenario_6_offline_fallback(self):
         """OfflineAgent handles all persona types without LLM."""
@@ -177,9 +165,7 @@ class TestDemoScenarios(unittest.TestCase):
                 self.assertTrue(len(response) > 5,
                     f"Response too short for '{scenario_type}': {response[:50]}")
 
-    # ═══════════════════════════════════════════════════════════
-    # Multi-turn conversation simulation
-    # ═══════════════════════════════════════════════════════════
+    # -- Multi-turn conversation simulation --
 
     def test_multi_turn_conversation(self):
         """Simulate a natural multi-turn conversation."""

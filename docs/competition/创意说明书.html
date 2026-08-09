@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园先知 · 创意说明书 — 校园先知 CampusInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>校园先知 CampusInsight Agent — 创意说明书</h1>
+
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体OPC创新大赛<br><strong>赛道</strong>：基层治理<br><strong>提交截止</strong>：2026年8月15日<br><strong>团队/作者</strong>：步承泽<br><strong>在线体验</strong>：https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/<br><strong>扫码体验</strong>：打开 <a href="扫码体验.html"><code>扫码体验.html</code></a>，手机扫二维码即可访问（推荐横屏操作）</div>
+
+<hr>
+
+<h2>一、项目概述</h2>
+
+<h3>1.1 项目名称</h3>
+
+<p><strong>校园先知 · CampusInsight Agent</strong></p>
+
+<h3>1.2 一句话描述</h3>
+
+<p>面向高校校园的基层微治理参与平台，以自然语言为交互界面，覆盖问题上报、提案讨论、数据监督的完整闭环。</p>
+
+<h3>1.3 项目定位</h3>
+
+<p>面向高校校园的<strong>基层微治理参与平台</strong>。</p>
+
+<p>高校是一座几万人的微型社会——有基础设施维护、公共卫生管理、民意收集与反馈、政策制定与监督等完整的治理需求。校园先知以大学校园为可控的实验场地，验证一套"公众参与 + 数据透明"的基层治理方法。</p>
+
+<p>核心理念：把校园视为微型治理沙盒——在边界清晰、信息可控的环境中先跑通"感知→参与→表达→监督"的完整链路，再迁移到社区、街道、养老机构等更大范围的基层治理场景。</p>
+
+<p>不是日程管理工具，不是管理后台——是连接学生与校园治理的通道，也是为更广泛的基层治理场景提供参考的验证系统。</p>
+
+<h3>1.4 为什么需要这个平台</h3>
+
+<p>当前高校校园治理面临三个结构性困境：</p>
+
+<p><strong>信息断层</strong> —— 学生发现问题（教室灯坏了、食堂卫生差、浴室水温不稳）但不知道找谁。后勤部门有维修能力但不知道哪里出了问题。信息不对称导致小问题拖成大问题。</p>
+
+<p><strong>反馈真空</strong> —— 学生提了建议（延长图书馆时间、增加自习室插座、改善食堂菜品）之后，没有任何反馈。建议投进了意见箱就像投进了黑洞。几次没有回应之后，学生不再提了。</p>
+
+<p><strong>信任赤字</strong> —— 学生看不到学校做了什么、花了多少钱、解决了多少问题。数据不公开，过程不透明。当参与无法被感知，参与本身就失去了意义。</p>
+
+<p>这三个问题不是某个学校的特例——在几万人的校园、几千人的社区、几百人的养老机构里都会反复出现。校园先知试图用一套"感知→参与→表达→监督"的轻量级治理框架来解决这个结构性问题。</p>
+
+<h3>1.5 目标用户</h3>
+
+<table>
+<th>角色</th><th>身份</th><th>核心诉求</th><th>使用场景</th>
+<tr><td><strong>学生</strong></td><td>本科/研究生，20-25岁</td><td>快速报修、表达意见、看到反馈</td><td>发现教室灯坏了→随手报修→2天后收到"已修好"通知</td></tr>
+<tr><td><strong>教师/行政</strong></td><td>辅导员、后勤、校领导</td><td>掌控全局、分配任务、量化考核</td><td>早上打开工作台→看到3条紧急工单→一键派单→下午查看解决率</td></tr>
+</table>
+
+<p>双角色共用一个系统，看到的是同一份数据——这本身就是透明机制。</p>
+
+<hr>
+
+<h2>二、核心设计</h2>
+
+<h3>2.1 四字架构：知→报→议→督</h3>
+
+<table>
+<th>环节</th><th>板块</th><th>含义</th><th>治理价值</th>
+<tr><td><strong>知</strong></td><td>校园脉搏</td><td>本周热点、校园事件、天气</td><td>知情权——了解身边正在发生什么</td></tr>
+<tr><td><strong>报</strong></td><td>随手报修</td><td>自然语言描述问题，自动分类上报</td><td>参与权——反映的问题有记录有追踪</td></tr>
+<tr><td><strong>议</strong></td><td>有话说</td><td>提交提案、附议他人、参与议题讨论</td><td>表达权——声音被听见、诉求被响应</td></tr>
+<tr><td><strong>督</strong></td><td>治理看板</td><td>工单进度、提案排行、治理健康度</td><td>监督权——看到改变发生、参与有意义</td></tr>
+</table>
+
+<h3>2.2 工作流设计</h3>
+
+<p>本项目在 LangChain Agent 的基础上增加了预处理层和后处理层，参照 OODA（Observe-Orient-Decide-Act，观察-判断-决策-行动）循环的阶段划分来组织这些逻辑。核心思路是：让 LLM 专注于它擅长的自然语言理解和生成，而环境感知、意图判断、质量检查、统计推理这些环节由确定性代码完成。</p>
+
+<p>五个阶段：</p>
+
+<ul>
+<li><strong>Observe（感知）</strong>：查询天气、统计工单热点、采集时间上下文——在用户开口之前完成环境数据收集</li>
+<li><strong>Orient（定位）</strong>：通过关键词匹配判断用户意图——报修、查询、提案还是闲聊——据此选择对应角色</li>
+<li><strong>Decide+Act（决策与执行）</strong>：LangChain Agent 调用治理工具——自动分类定级、查重提案、发起议题</li>
+<li><strong>Reflect（反思）</strong>：检查 LLM 的回复质量——是否跳过了必要的工具调用、是否编造了不存在的工单号。如有问题则纠正</li>
+</ul>
+
+<h3>2.3 降低参与门槛——自然语言即界面</h3>
+
+<p>用户不需要学习操作，用自然语言即可完成全部交互：</p>
+<ul>
+<li>"三教二楼男厕所水龙头漏水" → 自动识别为设施维修 → 定级 → 生成工单</li>
+<li>"我觉得图书馆应该延长到 23 点" → 检查是否有相似提案 → 引导附议或创建</li>
+<li>"食堂涨价你怎么看" → 检测为热点话题 → 发起议题 → 收集意见</li>
+</ul>
+
+<h3>2.4 数据透明建立信任——治理透明窗</h3>
+
+<p>学生端可直接查看：</p>
+<ul>
+<li>全校累计上报数量与解决数量</li>
+<li>自己上报问题的当前状态和处理进展</li>
+<li>自己提交提案的附议人数和采纳状态</li>
+<li>治理健康度评分（三维加权：解决率 40% + 速度分数 35% + 积压趋势 25%）</li>
+</ul>
+
+<p>数据透明本身就是信任机制。</p>
+
+<h3>2.5 Agent 智能体核心特性</h3>
+
+<p>与普通聊天机器人不同，校园先知是一个具备自主决策能力的 AI Agent。以下是体现 Agent 特性的四个核心设计：</p>
+
+<p><strong>环境感知（Context Awareness）</strong>：Agent 在每次对话前主动采集环境数据——天气状况、校园热点事件、工单统计快照、当前时间上下文。这些数据不是用户要求的，而是 Agent 自主判断"这些信息对本次对话有帮助"而提前准备的。例如学生问"最近流感严重吗"，Agent 已经预先拉取了疾控数据和校园脉搏快照，无需再逐项查询。</p>
+
+<p><strong>工具调用与编排（Tool Orchestration）</strong>：Agent 不是"一问一答"的问答机，而是根据用户意图自主决定调用哪些工具、以什么顺序调用。遇到报修请求时，Agent 自主编排 4 步调用链——分类识别（report_issue）→ 查重检查（query_issues）→ 工单创建（report_issue 写入）→ 统计更新（get_governance_stats）。每一步都是 Agent 的自主决策，而非预设的 if-else 分支。</p>
+
+<p><strong>自省与纠错（Self-Reflection）</strong>：Agent 在回复用户之前，会通过反射器（Reflector）自检输出质量——是否跳过了必要的工具调用？是否在文本中编造了不存在的工单号？工具调用链是否完整？发现问题后自动补充或纠正。这套机制确保了 LLM 的不可靠性被控制在可接受范围内。</p>
+
+<p><strong>离线韧性（Offline Resilience）</strong>：当 LLM API 不可用时，Agent 自动切换到离线模式——基于规则引擎 + 关键词匹配 + 数据库直查的降级方案。学生仍然可以查工单状态、看校园脉搏、提交报修请求（走关键词分类），整个系统不会因为 LLM 不可用而中断服务。</p>
+
+<hr>
+
+<h2>三、解决的实际问题</h2>
+
+<table>
+<th>问题</th><th>严重程度</th><th>当前做法</th><th>本项目方案</th>
+<tr><td>发现问题不知道找谁</td><td>高</td><td>不知→算了→没人管→越来越差</td><td>自然语言描述 → 自动分类上报</td></tr>
+<tr><td>提了建议没有回应</td><td>高</td><td>投意见箱→没有回音→不再提</td><td>提案+附议→达标自动推送→校方回应</td></tr>
+<tr><td>不了解校园动态</td><td>中</td><td>偶尔看通知栏</td><td>校园脉搏：每周简报+即将发生</td></tr>
+<tr><td>感觉参与没有意义</td><td>高</td><td>无反馈→无所谓→不参与</td><td>治理看板：数据可见→感到变化→持续参与</td></tr>
+<tr><td>民意收集靠偶然</td><td>中</td><td>问卷调查→回收率低</td><td>系统发现热点→发起议题→对话式收集</td></tr>
+</table>
+
+<hr>
+
+<h2>四、技术方案</h2>
+
+<pre>
+┌─────────────────────────────────────────────────────────────┐
+│              校园先知 · CampusInsight Agent                  │
+│                                                               │
+│  ┌─────────────────────────┐  ┌────────────────────────────┐ │
+│  │     对话面板             │  │      治理看板               │ │
+│  │                         │  │                            │ │
+│  │  知·报·议·督 自然语言    │  │  校园脉搏 · 本周简报      │ │
+│  │  自动分类/去重/汇总      │  │  随手报修 · 工单追踪      │ │
+│  │  对话即参与              │  │  有话说 · 提案+议题       │ │
+│  │                         │  │  治理透明窗 · KPI          │ │
+│  └───────────┬─────────────┘  └─────────────┬──────────────┘ │
+│              │                              │                 │
+│              └──────────┬───────────────────┘                 │
+│                         ▼                                     │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              OODA 治理工作流                              │ │
+│  │  Observe → Orient → Decide → Act → Reflect              │ │
+│  │  感知工单   判断意图   分类定级   上报提案   质量检查     │ │
+│  │  热点发现   匹配去重   议题生成   汇总民意   闭环跟踪     │ │
+│  └─────────────┬───────────────────────────────────────────┘ │
+│                │                                              │
+│                ▼                                              │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │        插件式工具层（16 个治理工具，pkgutil 自动发现）    │ │
+│  │  get_campus_pulse / report_issue / query_issues          │ │
+│  │  create_proposal / support_proposal / get_proposals      │ │
+│  │  get_topics / get_topic_detail / express_opinion         │ │
+│  │  get_governance_stats / collect_feedback / get_weather   │ │
+│  │  query_knowledge / get_school_policy                     │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+</pre>
+
+<h3>技术栈</h3>
+
+<table>
+<th>层</th><th>技术选型</th><th>说明</th>
+<tr><td>界面</td><td>Streamlit</td><td>Python 原生，对话+看板双面板布局</td></tr>
+<tr><td>对话引擎</td><td>LangChain + DeepSeek</td><td>OpenAI Functions Agent 兼容协议，自动工具编排</td></tr>
+<tr><td>数据库</td><td>SQLite</td><td>WAL 模式，15 张表（5 张治理核心 + 6 张业务支撑 + 4 张系统支撑）</td></tr>
+<tr><td>外部数据</td><td>和风天气 API</td><td>实时天气数据，支持模拟降级</td></tr>
+<tr><td>可视化</td><td>Altair</td><td>治理趋势图、类别分布、KPI 仪表盘</td></tr>
+</table>
+
+<hr>
+
+<h2>五、演示场景</h2>
+
+<h3>场景 1：知 + 报（40 秒）</h3>
+
+<p>打开应用 → 校园脉搏页面展示本周简报（天气、热点类别、校园事件）→ 对话页输入问题描述 → 系统自动分类定级、生成工单、返回工单号 → 展开处理流程面板查看各阶段执行记录。</p>
+
+<h3>场景 2：议（60 秒）</h3>
+
+<p>有话说页面查看提案列表（按附议数排序，含已采纳/已回应提案）→ 对已有提案一键附议 → 创建新提案时系统自动语义查重，提示相似提案 → 系统根据热点自动发起议题，学生在对话中发表意见。</p>
+
+<h3>场景 3：督（50 秒）</h3>
+
+<p>治理透明窗查看三维加权健康度评分及 7 天趋势图 → 治理大屏全屏实时仪表盘 → 工单状态变更时主动推送通知 → 学生看到自己的参与被记录和反馈。</p>
+
+<h3>场景 4：教师端管理闭环（60 秒）</h3>
+
+<p>教师角色切换到工作台 → KPI 总览（待处理工单、今日新增、紧急数、健康度）→ 工单管理页筛选"紧急+待处理"→ 一键修改工单状态为"处理中"→ 提案管理页查看热门提案并回复"已提交后勤评估"→ 数据洞察页查看本周趋势与类别分布 → 感知到治理运转的完整链路。</p>
+
+<hr>
+
+<h2>六、与已有方案的区别</h2>
+
+<table>
+<th>维度</th><th>校园 App / 公众号</th><th>通用对话机器人</th><th><strong>本项目</strong></th>
+<tr><td>交互方式</td><td>填表单</td><td>一问一答</td><td>自然语言 + 主动环境感知</td></tr>
+<tr><td>使用门槛</td><td>高（找入口→选分类→填说明）</td><td>无法处理结构化上报</td><td>低（直接描述问题即可）</td></tr>
+<tr><td>反馈闭环</td><td>无或弱</td><td>无</td><td>上报→追踪→解决→通知</td></tr>
+<tr><td>民意收集</td><td>问卷调查</td><td>不支持</td><td>自动发现热点 + 对话式收集</td></tr>
+<tr><td>数据透明</td><td>不公开</td><td>无</td><td>治理看板实时可见</td></tr>
+<tr><td>系统架构</td><td>传统 Web 应用</td><td>单层 LLM 包装</td><td>预处理 + Agent + 后处理</td></tr>
+<tr><td>场景可迁移</td><td>仅限当前场景</td><td>需重新开发</td><td>改 4 个配置即可切换场景</td></tr>
+</table>
+
+<hr>
+
+<h2>七、创新点总结</h2>
+
+<h3>7.1 将 OODA 循环引入校园治理 Agent</h3>
+
+<p>本项目将军事/应急管理领域的 OODA（Observe-Orient-Decide-Act-Reflect）循环适配为 AI Agent 的工作流框架。这不是对理论框架的生搬硬套——OODA 的阶段划分恰好将预处理和后处理逻辑组织到了清晰的工程边界里。Observe 和 Orient 在用户开口之前完成环境感知和意图路由，Decide+Act 由 LangChain Agent 执行工具编排，Reflect 在回复完成后做质量检查和关联分析。每个阶段的输入/输出都是可观测、可调试、可测试的。</p>
+
+<h3>7.2 "预处理 + Agent + 后处理"三层架构</h3>
+
+<p>单层 LLM Agent 面临的典型问题——幻觉、遗漏工具调用、缺乏上下文感知——被分发到三个独立的处理层中解决。预处理层负责环境数据采集和意图路由（确定性代码，零 LLM 消耗），核心 Agent 层负责自然语言理解和工具编排（LLM 擅长的事），后处理层负责质量校验和统计洞察生成（确定性 SQL + 独立 LLM）。三层解耦意味着任何一层的失败都不会导致整个系统崩溃。</p>
+
+<h3>7.3 确定性代码与 LLM 的分工边界</h3>
+
+<p>大部分 AI 项目将 LLM 用于所有环节——包括它不擅长的统计推理和数据查询。本项目的设计原则是：LLM 只负责自然语言理解和生成，环境感知、意图判断、质量检查、统计关联分析全部由确定性代码完成。这种边界划分让系统行为可预测：同样的输入产生同样的分类结果，同样的工单数据产生同样的健康度评分。</p>
+
+<h3>7.4 场景无关的治理工作流</h3>
+
+<p>治理工作流（知→报→议→督）、工具层架构（16 个插件式工具）、数据库结构（15 张表）、校验机制（enforce + closed_loop）、降级链路（重试→规则引擎→DB 直查）全部保持场景无关。场景迁移只需替换 4 个配置——关键词列表、工具描述文本、种子数据、System Prompt。从校园治理到社区治理的横向迁移预计 6-8 小时，不需要改动核心代码。</p>
+
+<h3>7.5 实时感知 + 主动推送</h3>
+
+<p>不同于被动等待用户输入的传统设计，本系统在每次用户访问时自动执行感知巡检——对比本周与上周工单趋势、检测分类/地点异常激增、统计 SLA 超期积压、采集舆情情绪分布。感知结果既用于对话上下文注入（让 Agent"知道"最近校园发生了什么），也用于教师端工作台的实时告警。</p>
+
+<hr>
+
+<h2>八、社会价值</h2>
+
+<ul>
+<li><strong>1.</strong> <strong>降低参与门槛</strong>：自然语言交互，不需要学习操作流程或记住入口位置</li>
+<li><strong>2.</strong> <strong>建立治理信任</strong>：数据透明的治理看板让参与者看到处理进展和结果</li>
+<li><strong>3.</strong> <strong>缩短响应链路</strong>：从"发现问题→层层转达→不知道谁处理"变成"描述→自动工单→追踪→解决→通知"</li>
+<li><strong>4.</strong> <strong>效果可量化</strong>：三维加权健康度评分让治理成效从主观感受变成客观数据</li>
+</ul>
+
+<hr>
+
+<h2>九、可迁移性</h2>
+
+<h3>9.1 为什么从校园开始</h3>
+
+<p>大学校园是基层治理方法的理想原型验证环境：</p>
+
+<table>
+<th>特质</th><th>校园</th><th>对验证的价值</th>
+<tr><td>规模可控</td><td>几万人，物理边界清晰</td><td>变量可控，先跑通小闭环再放大</td></tr>
+<tr><td>问题类型全</td><td>设施维修、公共卫生、食品安全、政策反馈</td><td>覆盖基层治理主要场景</td></tr>
+<tr><td>反馈链路短</td><td>学生→辅导员→后勤，三层以内</td><td>闭环验证成本低，迭代快</td></tr>
+<tr><td>数据可获得</td><td>天气 API、疾控月度公报、校内工单历史</td><td>感知层有真实数据源</td></tr>
+<tr><td>参与意愿强</td><td>学生天然关心校园环境</td><td>无需额外的激励设计</td></tr>
+</table>
+
+<h3>9.2 迁移场景映射</h3>
+
+<p>本项目的治理工作流与工具层在设计上保持场景无关。以下是三组可行的横向迁移：</p>
+
+<table>
+<th>治理维度</th><th>校园（当前）</th><th>→ 社区治理</th><th>→ 养老机构</th><th>→ 企业园区</th>
+<tr><td>知</td><td>校园脉搏</td><td>社区周报</td><td>老人日报</td><td>园区简报</td></tr>
+<tr><td>报</td><td>随手报修</td><td>居民上报</td><td>一键求助</td><td>员工反馈</td></tr>
+<tr><td>议</td><td>有话说</td><td>居民议事</td><td>银龄之声</td><td>员工建言</td></tr>
+<tr><td>督</td><td>治理透明窗</td><td>治理公开</td><td>服务监督</td><td>运维看板</td></tr>
+<tr><td>角色</td><td>学生 / 教师</td><td>居民 / 网格员</td><td>老人 / 护工</td><td>员工 / 行政</td></tr>
+</table>
+
+<h3>9.3 迁移成本</h3>
+
+<p>每组横向迁移涉及的工作：</p>
+<ul>
+<li>Persona Router 关键词列表替换（4 组共 368 个关键词）</li>
+<li>工具描述文本与参数名调整（11 个工具文件，16 个工具）</li>
+<li>种子数据替换（保留数据规模和叙事结构，换角色和场景名）</li>
+<li>System Prompt 上下文替换（保留工作流结构和工具映射表）</li>
+</ul>
+
+<p><strong>治理工作流、数据库结构、UI 组件、测试体系——不需要改动。</strong> 单组迁移预计 6-8 小时。</p>
+
+<hr>
+
+<div class="meta">校园先知——以大学校园为微型治理实验场，验证一套可迁移至社区、养老、园区等更广泛场景的基层治理方法。让每个学生都成为校园治理的参与者，而不仅仅是旁观者。</div>
+
+<div class="footer">
+校园先知 CampusInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>
