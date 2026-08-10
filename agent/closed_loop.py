@@ -67,8 +67,7 @@ def check_closed_loop(memory, user_input: str, response: str) -> str:
             ]
             if recent_resolved:
                 notes.append(
-                    f"✅ 你上报的 {len(recent_resolved)} 个问题今天已解决！"
-                    f"感谢你的参与 ✨"
+                    f"✅ 你上报的 {len(recent_resolved)} 个问题今天已解决。"
                 )
 
         all_props = get_proposals(limit=200)
@@ -81,7 +80,7 @@ def check_closed_loop(memory, user_input: str, response: str) -> str:
         if my_props_unresponded:
             prop = my_props_unresponded[0]
             notes.append(
-                f"💡 你的提案 #{prop['id']}「{prop['title'][:20]}」已有 "
+                f"你的提案 #{prop['id']}「{prop['title'][:20]}」已有 "
                 f"{prop['supporter_count']} 人附议，输入「查看我的提案」了解进展"
             )
 

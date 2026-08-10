@@ -20,7 +20,7 @@ st.markdown(
     f'</div>',
     unsafe_allow_html=True,
 )
-st.caption("你在校园治理中的每一次参与，都算数。")
+st.caption("个人参与记录与统计")
 
 ooda_nav("mine")
 
@@ -149,6 +149,6 @@ st.markdown("---")
 
 st.markdown(
     f'<div style="text-align:center;font-size:0.82em;color:{TOKEN["text_muted"]};margin-top:12px;">'
-    f'每一次上报、每一个提案，都在让校园变得更好 🌱</div>',
+    f'参与记录 · 实时更新</div>',
     unsafe_allow_html=True,
 )

@@ -257,7 +257,7 @@ def report_issue(title: str, category: str = "", location: str = "",
         )
     else:
         lines.append(
-            "\n💡 感谢你的反馈！维修/保洁人员将尽快处理。"
+            "\n维修/保洁人员将尽快处理。"
         )
 
     return "\n".join(lines)

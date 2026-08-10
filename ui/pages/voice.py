@@ -36,7 +36,7 @@ st.markdown(
     f'</div>',
     unsafe_allow_html=True,
 )
-st.caption("提建议、附议别人、参与 系统发起的民意议题——你的声音，校园听得见。")
+st.caption("创建提案、附议、参与议题讨论。")
 
 ooda_nav("voice")
 
@@ -72,7 +72,7 @@ with st.container(border=True):
             key="create_proposal_cat",
         )
     with c2:
-        submit_prop = st.button("🚀 发布提案", type="primary", width="stretch", key="create_proposal_btn")
+        submit_prop = st.button("发布提案", type="primary", width="stretch", key="create_proposal_btn")
 
     if submit_prop:
         title = prop_title.strip()
@@ -280,6 +280,6 @@ st.markdown("---")
 
 st.markdown(
     f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-top:12px;">'
-    f'💡 提案状态：💬讨论中 → 📝已回应 → ✅已采纳 → 🎉已实施</div>',
+    f'提案状态：💬讨论中 → 📝已回应 → ✅已采纳 → 🎉已实施</div>',
     unsafe_allow_html=True,
 )

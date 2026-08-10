@@ -23,7 +23,7 @@ def _check_duplicate(title: str) -> list[dict]:
 
 @tool
 def create_proposal(title: str, description: str, category: str = "其他") -> str:
-    """创建一个校园改进提案。把你的建议和想法提出来，让学校听见！
+    """创建一个校园改进提案。
 
     参数：
     - title: 提案标题（必填），如"建议图书馆延长闭馆时间到23:00"
@@ -46,7 +46,7 @@ def create_proposal(title: str, description: str, category: str = "其他") -> s
     if duplicates:
         dup_titles = "、".join(f"「{d['title'][:20]}」({d['supporter_count']}人附议)" for d in duplicates[:3])
         dup_note = (
-            f"\n💡 已有相似提案：{dup_titles}"
+            f"\n已有相似提案：{dup_titles}"
             f"\n建议也去看看，帮忙附议。"
         )
 
@@ -64,5 +64,5 @@ def create_proposal(title: str, description: str, category: str = "其他") -> s
         f"📝 #{proposal_id} **{title}**\n"
         f"📂 分类：{category}\n"
         f"👤 当前附议：1 人（含你）\n"
-        f"💡 分享给同学让更多人附议，附议量越高越容易被学校看到！{dup_note}"
+        f"附议量越高越容易被校方关注。{dup_note}"
     )

@@ -45,6 +45,6 @@ def get_proposals(category: str = "", sort_by: str = "supporters", limit: int = 
         )
 
     lines.append("")
-    lines.append("💡 点'附议'支持你认可的提案，附议越多越容易被学校看到！")
+    lines.append("附议越多越容易被校方关注。")
 
     return "\n".join(lines)

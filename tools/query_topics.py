@@ -45,7 +45,7 @@ def get_topics() -> str:
                 lines.append(f"     · {label}：{content}...")
         lines.append("")
 
-    lines.append("💡 对任何议题有想法？直接告诉我'我想对议题X发表意见'即可！")
+    lines.append("对议题有想法？输入「我想对议题X发表意见」。")
 
     return "\n".join(lines)
 
@@ -88,7 +88,7 @@ def get_topic_detail(topic_id: int) -> str:
         lines.append("· 暂无观点，来做第一个发声的人！")
 
     lines.append("")
-    lines.append("💡 对这个议题有看法？直接告诉我你的想法！")
+    lines.append("输入你的意见发表看法。")
 
     return "\n".join(lines)
 

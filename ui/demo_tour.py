@@ -10,7 +10,7 @@ TOUR_STEPS = [
         "body": """
 **你想扮演的角色的？**
 
-校园先知是一个围绕 **知·报·议·督** 四字闭环设计的校园微治理 平台。
+校园先知围绕 **知·报·议·督** 四个板块运行。
 
 - 🎓 **学生端**：感知校园动态 → 随手报修 → 提案讨论 → 数据监督
 - 👨‍🏫 **教师端**：治理工作台 → 工单管理 → 提案回复 → 内容发布
@@ -86,7 +86,7 @@ Agent 会自动：
 - 🔢 实时数字跳动计数器
 - 🗺️ 校园问题热力分布图
 - 📟 底部事件滚动播报
-- 💫 KPI 卡片发光动画
+- KPI 卡片动画效果
 
 💡 **加上 `?demo=1` 参数**可启用演示模式（全屏 + 模拟数据）。
         """,
@@ -117,7 +117,7 @@ Agent 会自动：
         "body": """
 **校园先知 · CampusInsight**
 
-基于知·报·议·督工作流的校园微治理 平台：
+基于知·报·议·督工作流的校园治理平台：
 
 | 环节 | 功能 | 技术 |
 |------|------|------|
@@ -169,7 +169,7 @@ def render_tour_guide():
         if step_data.get("suggested_input"):
             st.info(f"💡 **试试输入：** `{step_data['suggested_input']}`")
             # Quick copy button
-            if st.button("📋 一键填入", key="_tour_copy_input"):
+            if st.button("📋 填入", key="_tour_copy_input"):
                 st.session_state._tour_copied = step_data["suggested_input"]
                 st.rerun()
 

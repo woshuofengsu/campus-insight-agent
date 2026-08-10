@@ -108,8 +108,8 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
     is_student = role == "student"
     emoji = "🎓" if is_student else "👨‍🏫"
     title = "学生信息" if is_student else "教职工信息"
-    subtitle = "填写基本信息，开始你的校园治理之旅" if is_student else "填写工作信息，进入校园治理管理后台"
-    btn_label = "✨ 开始参与校园治理" if is_student else "✨ 进入治理工作台"
+    subtitle = "填写基本信息" if is_student else "填写工作信息，进入管理后台"
+    btn_label = "开始使用" if is_student else "进入工作台"
 
     # Center with columns
     col_l, col_m, col_r = st.columns([1, 2.2, 1])
@@ -182,7 +182,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
                 "🔧 **报** · 发现校园问题，直接描述即可上报\n"
                 "🗳️ **议** · 有想法？'我有个提案'或参与讨论\n"
                 "📊 **督** · 治理透明窗看校园数据全貌\n\n"
-                "你的每一次参与，都在让校园变得更好。",
+                "输入「校园脉搏」开始体验。",
             )
         else:
             memory.add_message(
@@ -193,6 +193,6 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
                 "📋 **工单管理** · 查看和处理所有上报问题\n"
                 "💡 **提案管理** · 回复和采纳学生提案\n"
                 "📢 **内容发布** · 发布通知和讨论议题\n\n"
-                "你的每一次行动，都在让校园变得更好。",
+                "工作台已就绪。",
             )
         st.rerun()

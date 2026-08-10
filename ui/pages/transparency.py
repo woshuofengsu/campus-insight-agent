@@ -521,6 +521,6 @@ if feed_items:
 st.markdown("---")
 st.markdown(
     f'<div style="text-align:center;font-size:0.82em;color:{TOKEN["text_muted"]};margin-top:12px;">'
-    f'数据实时更新 · 每一次参与都让校园更好 🌱</div>',
+    f'数据实时更新</div>',
     unsafe_allow_html=True,
 )

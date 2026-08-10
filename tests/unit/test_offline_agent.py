@@ -210,7 +210,7 @@ class TestOfflineAgentPulse(unittest.TestCase):
 
     def test_pulse_has_encouragement(self):
         result = self.agent._respond_pulse()
-        self.assertTrue("💡" in result or "🌟" in result or "🙌" in result)
+        self.assertTrue("📊" in result or "深入了解" in result or "直接描述" in result)
 
 
 # -- 4. OfflineAgent._respond_stats --
@@ -295,7 +295,7 @@ class TestOfflineAgentReport(unittest.TestCase):
 
     def test_report_with_encouragement(self):
         result = self.agent._respond_report("教三楼水龙头漏水")
-        self.assertTrue("🌟" in result or "🙌" in result or "✨" in result)
+        self.assertTrue("已上报" in result or "查看我的工单" in result or "追踪进度" in result)
 
 
 # -- 6. OfflineAgent._respond_proposal --
@@ -336,7 +336,7 @@ class TestOfflineAgentProposal(unittest.TestCase):
 
     def test_proposal_has_encouragement(self):
         result = self.agent._respond_proposal("看看提案")
-        self.assertTrue("🙌" in result or "💪" in result or "🗳️" in result)
+        self.assertTrue("附议" in result or "提案已创建" in result or "提案已提交" in result)
 
 
 # -- 7. OfflineAgent.run — Full Pipeline --

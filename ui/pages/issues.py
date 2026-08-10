@@ -113,7 +113,7 @@ with st.container(border=True):
             key="quick_report_location",
         )
     with c2:
-        st.button("🚀 立即上报", type="primary", width="stretch", key="quick_report_btn", on_click=_do_issues_report)
+        st.button("上报", type="primary", width="stretch", key="quick_report_btn", on_click=_do_issues_report)
 
 # Show result/error from callback (survives rerun)
 if st.session_state.get("_report_error"):

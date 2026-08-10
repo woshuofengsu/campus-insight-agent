@@ -22,7 +22,7 @@ def express_opinion(topic_id: int, content: str) -> str:
         return "⚠️ 请提供有效的议题编号。输入'查看议题'可以浏览所有活跃议题。"
 
     if not content or len(content.strip()) < 2:
-        return "⚠️ 意见内容太短了，请至少写几个字说说你的想法~"
+        return "⚠️ 意见内容太短了，请至少写几个字。"
 
     # Verify topic exists and is active
     topics = _db_get_active_topics(limit=50)
@@ -50,5 +50,5 @@ def express_opinion(topic_id: int, content: str) -> str:
         f"💬 你的意见已发表！\n"
         f"📋 议题：{target['title'][:30]}\n"
         f"👥 当前参与人数：{summary['total_opinions']}\n"
-        f"💡 你的声音很重要——AI会定期汇总讨论结果，形成民意报告。"
+        f"讨论结果会定期汇总为民意报告。"
     )

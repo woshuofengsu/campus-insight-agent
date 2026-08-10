@@ -6,7 +6,7 @@ from data.database import support_proposal as _db_support_proposal, get_db
 
 @tool
 def support_proposal(proposal_id: int) -> str:
-    """附议（支持）一个校园提案。你的每一次附议，都在让校园变得更好！
+    """附议（支持）一个校园提案。
 
     参数：
     - proposal_id: 提案编号（必填），可在提案列表中查看每个提案的 #编号
@@ -31,14 +31,14 @@ def support_proposal(proposal_id: int) -> str:
     # Milestone messages
     milestone = ""
     if new_count == 10:
-        milestone = " 🎯 已达成 10 人附议里程碑！"
+        milestone = " -- 已达成 10 人附议"
     elif new_count == 50:
-        milestone = " 🔥 已达成 50 人附议里程碑！热度飙升中！"
+        milestone = " -- 已达成 50 人附议"
     elif new_count == 100:
-        milestone = " 🚀 已达成 100 人附议！提案已自动置顶到治理看板！"
+        milestone = " -- 已达成 100 人附议，已置顶到治理看板"
 
     return (
         f"👍 你附议了提案 #{proposal_id} **{target['title'][:30]}**\n"
         f"当前附议人数：**{new_count}**{milestone}\n"
-        f"💡 分享给同学，让更多人支持这个提案！"
+        f"分享给同学以获得更多附议。"
     )

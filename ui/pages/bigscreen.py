@@ -361,7 +361,7 @@ st.markdown(f"""
     <div style="font-size:1.8em;font-weight:800;color:{C["text"]};letter-spacing:-0.02em;
         display:flex;align-items:center;gap:12px;">
         <span style="font-size:1.3em;">🏛️</span>
-        校园治理实时指挥中心
+        校园治理数据看板
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{C["success"]};box-shadow:0 0 8px {C["success_glow"]};margin-left:4px;"
             title="系统在线"></span>

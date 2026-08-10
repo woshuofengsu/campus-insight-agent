@@ -1,10 +1,10 @@
-# 🚀 CampusInsight Agent 部署指南
+# CampusInsight Agent 部署指南
 
 让评委/同学在手机和电脑上访问你的校园治理智能平台。
 
 ---
 
-## 方案一：Docker 一键部署（⭐⭐ 推荐）
+## 方案一：Docker 部署（推荐）
 
 ### 前置条件
 - 一台云服务器（阿里云/腾讯云学生机 ~10元/月，或任何有公网 IP 的机器）
@@ -47,7 +47,7 @@ apt install nginx certbot python3-certbot-nginx
 
 ---
 
-## 方案二：Streamlit Community Cloud（⭐ 免费最快）
+## 方案二：Streamlit Community Cloud（免费）
 
 ### 步骤
 

@@ -89,7 +89,7 @@ class OfflineAgent:
                     )
             except Exception:
                     _log.debug("get_today_weather fallback also failed", exc_info=True)
-                    parts.append("🌤️ 今日天气晴好，适合校园活动~")
+                    parts.append("🌤️ 天气数据暂不可用")
 
         # ── 本周数据 ──
         try:
@@ -287,11 +287,11 @@ class OfflineAgent:
         # ── 创建意图 ──
         if any(kw in txt for kw in ["创建", "发起", "提一个", "我想提", "新提案"]):
             parts.append(
-                "\n✨ 好的！直接在对话框里告诉我：\n"
+                "\n好的，直接在对话框里告诉我：\n"
                 "1. **提案标题**（一句话概括）\n"
                 "2. **为什么要提**（背景和理由）\n"
                 "3. **你期望的效果**\n\n"
-                "我会帮你创建提案并发布到「🗳️ 有话说」页面~"
+                "我会帮你创建提案并发布到「🗳️ 有话说」页面。"
             )
 
         parts.append(f"\n{self._random_encouragement('proposal')}")
@@ -305,9 +305,9 @@ class OfflineAgent:
         # ── 感谢/正向反馈（必须在问候之前检查）──
         if any(kw in txt for kw in ["谢谢", "感谢", "太好了", "很棒", "不错", "厉害"]):
             return random.choice([
-                "😊 不客气！能帮到你我也很开心~校园因为你的参与变得更好了一点 ✨",
-                "🙏 谢谢你的反馈！有任何校园问题随时找我~",
-                "💪 一起让校园变得更好！有什么需要随时叫我~",
+                "不客气。有需要随时找我。",
+                "谢谢反馈，有校园问题可以问我。",
+                "有需要随时找我。",
             ])
 
         # ── 打招呼 ──
@@ -318,18 +318,18 @@ class OfflineAgent:
         if any(g in txt.lower() for g in greetings):
             name = self._get_name()
             greeting = random.choice([
-                f"👋 嗨！{'📛 ' + name + '，' if name else ''}欢迎回到校园先知~",
-                f"你好呀！{'📛 ' + name + '，' if name else ''}今天有什么可以帮你的？",
-                f"Hi there！{'📛 ' + name + '，' if name else ''}校园先知在线中~",
+                f"你好{'，' + name if name else ''}。有什么可以帮你的？",
+                f"你好{'，' + name if name else ''}。",
+                f"你好{'，' + name if name else ''}。校园先知在线。",
             ])
             return (
                 f"{greeting}\n\n"
-                f"我是校园先知，围绕 **知·报·议·督** 四字闭环运行：\n\n"
-                f"🌊 **知** · 输入「**校园脉搏**」看本周校园动态\n"
-                f"🔧 **报** · 发现设施问题？直接告诉我，我帮你上报\n"
-                f"🗳️ **议** · 有想法？说「**我有个提案**」参与校园建设\n"
-                f"📊 **督** · 输入「**治理数据**」查看全局统计\n\n"
-                f"想了解什么？试试上面任意一个~"
+                f"我是校园先知，围绕 **知·报·议·督** 四个板块运行：\n\n"
+                f"🌊 **知** · 输入「**校园脉搏**」看本周动态\n"
+                f"🔧 **报** · 发现设施问题直接告诉我，帮你上报\n"
+                f"🗳️ **议** · 说「**我有个提案**」参与校园建设\n"
+                f"📊 **督** · 输入「**治理数据**」查看统计\n\n"
+                f"想了解什么？"
             )
 
         # ── 查看工单意图 ──
@@ -360,7 +360,7 @@ class OfflineAgent:
         """查看我的工单。"""
         author = self._get_author_identifier()
         if not author:
-            return "😅 无法确认你的身份。请先在「👤 我的」页面完善个人信息~"
+            return "无法确认你的身份。请先在「👤 我的」页面完善个人信息。"
         try:
             from data.database import get_issues
             all_issues = get_issues(limit=200)
@@ -390,7 +390,7 @@ class OfflineAgent:
                         f"· 解决于 {(i.get('resolved_at') or '')[:10]}"
                     )
             if pending:
-                lines.append(f"\n💡 有 {len(pending)} 件还在处理中，我会持续追踪~")
+                lines.append(f"\n{len(pending)} 件还在处理中。输入「查看我的工单」追踪。")
             return "\n".join(lines)
         except Exception as e:
             _log.debug("my_issues query failed: %s", e, exc_info=True)
@@ -400,13 +400,13 @@ class OfflineAgent:
         """查看我的提案。"""
         author = self._get_author_identifier()
         if not author:
-            return "😅 无法确认你的身份。请先在「👤 我的」页面完善个人信息~"
+            return "无法确认你的身份。请先在「👤 我的」页面完善个人信息。"
         try:
             from data.database import get_proposals
             all_props = get_proposals(limit=200)
             mine = [p for p in all_props if p.get("author") == author]
             if not mine:
-                return "💡 你还没有提交过提案。有想法？直接告诉我，我帮你创建！"
+                return "你还没有提交过提案。输入「我有个建议」创建。"
 
             lines = [f"💡 **你的提案**（共 {len(mine)} 件）\n"]
             for p in mine:

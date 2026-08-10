@@ -53,7 +53,7 @@ def query_my_issues() -> str:
     if not issues:
         return (
             f"📋 你（{author}）还没有上报过任何问题。\n\n"
-            "发现校园里的问题？直接描述，我帮你秒速上报！比如「教三楼二楼水龙头漏水」。"
+            "发现校园里的问题？直接描述，帮你上报。比如「教三楼二楼水龙头漏水」。"
         )
 
     # ── Stats summary ──
@@ -95,10 +95,10 @@ def query_my_issues() -> str:
 
     # ── Governance encouragement ──
     if pending == 0 and resolved > 0:
-        lines.append("🎉 你上报的所有问题都已解决！感谢你对校园治理的贡献~")
+        lines.append("你上报的所有问题都已解决。")
     elif pending > 0:
         lines.append(
-            f"💡 还有 {pending} 件工单在处理中。输入「查看工单 #编号」了解具体进度，"
+            f"还有 {pending} 件工单在处理中。输入「查看工单 #编号」了解进度，"
             "或切换到「📊 治理透明窗」查看全校治理态势。"
         )
 
@@ -123,7 +123,7 @@ def query_my_proposals() -> str:
     if not proposals:
         return (
             f"📋 你（{author}）还没有提交过任何提案。\n\n"
-            "有好的校园改进建议？直接告诉我，比如「建议在宿舍楼下增设快递柜」~"
+            "有好的校园改进建议？直接告诉我，比如「建议在宿舍楼下增设快递柜」。"
         )
 
     lines = [

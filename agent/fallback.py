@@ -69,14 +69,14 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
         return (
             "🔧 看起来你想报修一个问题。\n\n"
             "智能服务暂时不可用，但你可以使用页面顶部的 **快速报修** 功能直接提交工单——"
-            "填写问题描述和地点，点击「🚀 上报」即可，系统会自动分类。\n\n"
+            "填写问题描述和地点，点击「上报」提交，系统自动分类。\n\n"
             "或者稍后重试对话，服务恢复后会帮你处理。"
         )
 
     # ── Proposal intent ──
     if any(kw in txt for kw in ("提案", "建议", "提议")):
         return (
-            "💡 看起来你想提交建议或查看提案。\n\n"
+            "看起来你想提交建议或查看提案。\n\n"
             "智能服务暂时不可用，但你可以在左侧导航中切换到 **🗳️ 有话说** 页面，"
             "那里可以直接查看热门提案和提交新建议。\n\n"
             "稍后重试对话也可以获得完整的智能分析。"
@@ -94,7 +94,7 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
                 f"- 趋势：{health['trend']}\n"
                 f"- 近7天新增 {health.get('new_recent', '?')} 件 · "
                 f"解决 {health.get('resolved_recent', '?')} 件\n\n"
-                f"💡 如需更详细分析，请在服务恢复后重试。"
+                f"如需更详细分析，请在服务恢复后重试。"
             )
         except Exception:
             _log.debug("Health score fallback query failed", exc_info=True)
