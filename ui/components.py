@@ -400,6 +400,31 @@ def time_ago(ts: str) -> str:
 
 
 def resolve_author(profile: dict) -> str:
-    sid = profile.get("student_id", "")
-    if sid: return sid
-    return f"{profile.get('school', '')}{profile.get('grade', '')}" or "me"
+    """Resolve display author from user profile.
+
+    Priority: student_id → school+grade → name → login_id fallback → "我"
+    Must match data.db_governance._resolve_author() logic so that proposals
+    created via the Agent are visible on the "我的" page.
+    """
+    sid = (profile.get("student_id") or "").strip()
+    if sid:
+        return sid
+    school = (profile.get("school") or "").strip()
+    grade = (profile.get("grade") or "").strip()
+    if school:
+        return f"{school}{grade}" if grade else school
+    name = (profile.get("name") or "").strip()
+    if name:
+        return name
+    uid = profile.get("id")
+    if uid:
+        return f"user_{uid}"
+    # session_state fallback
+    try:
+        import streamlit as st
+        sid_uid = st.session_state.get("_login_user_id")
+        if sid_uid:
+            return f"user_{sid_uid}"
+    except Exception:
+        pass
+    return "我"

@@ -156,6 +156,7 @@ def init_db(db_path: str):
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             category TEXT DEFAULT '其他',
+            author TEXT DEFAULT '',
             supporter_count INTEGER DEFAULT 1,
             status TEXT DEFAULT '讨论中',
             response_text TEXT DEFAULT '',

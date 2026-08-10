@@ -130,6 +130,10 @@ def test_tool_discovery():
 
 def test_ooda_pipeline_latency(quick: bool = False):
     """Measure latency of each OODA phase using mock (no LLM call)."""
+    from config import DB_PATH
+    from data.database import init_db
+    init_db(DB_PATH)
+
     from perception.monitor import PerceptionMonitor
 
     # Phase 1: Observe
