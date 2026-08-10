@@ -226,6 +226,13 @@ def report_issue(title: str, category: str = "", location: str = "",
         author="",  # Let _resolve_author() auto-fill from user profile
     )
 
+    # Invalidate teacher-side caches so new issue is visible immediately
+    try:
+        from ui.cache import invalidate_issues
+        invalidate_issues()
+    except Exception:
+        pass
+
     # Get current stats for context
     stats = _db_get_stats()
 

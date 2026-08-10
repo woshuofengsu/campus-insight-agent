@@ -30,8 +30,8 @@ DEEPSEEK_BASE_URL = _secret("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 DEEPSEEK_MODEL = _secret("DEEPSEEK_MODEL", "deepseek-chat")
 
 # Agent settings
-AGENT_MAX_ITERATIONS = 10
-AGENT_TIMEOUT = 30
+AGENT_MAX_ITERATIONS = 6
+AGENT_TIMEOUT = 20
 AGENT_TEMPERATURE = 0.3
 
 # Perception settings

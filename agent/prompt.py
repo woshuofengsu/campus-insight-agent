@@ -393,8 +393,8 @@ def get_system_prompt(user_profile: dict, environment_context: str = "") -> str:
 | 我的工单、我上报的、我的报修、工单进展 | `query_my_issues` | 查我上报的工单（自动识别身份） |
 | 我的提案、我提交的建议、我的提案进展 | `query_my_proposals` | 查我提交的提案（自动识别身份） |
 | XX坏了、漏水、故障、没电、没网、需要修 | `report_issue` | 创建工单上报问题 |
-| 提案、建议、我想提、看看大家提了什么 | `get_proposals` | 查看提案列表 |
-| 创建提案、发起提案 | `create_proposal` | 创建新提案（先查重） |
+| 查看提案、看看大家提了什么、有什么提案 | `get_proposals` | 查看提案列表 |
+| 我建议、我想提、创建提案、发起提案、提一个建议 | `create_proposal` | 创建新提案。直接调用本工具即可，工具内部会自动查重。不要先调 get_proposals 再决定——直接把用户想创建的内容传给本工具 |
 | 附议、支持XX提案 | `support_proposal` | 附议某个提案 |
 | 议题、讨论、大家怎么想 | `get_topics` | 查看AI发起的议题 |
 | 看看XX议题、议题详情 | `get_topic_detail` | 查看议题详情+意见 |
@@ -471,6 +471,21 @@ def get_system_prompt(user_profile: dict, environment_context: str = "") -> str:
 **典型流程：**
 - "教三楼二楼男厕所水龙头漏水" → 直接 report_issue(title="教三楼二楼男厕所水龙头漏水", category="设施维修", location="教三楼二楼男厕所", urgency="普通")
 - "灯坏了" → 追问"哪栋楼几楼？什么灯？" → 收到后立即 report_issue
+
+## 📝 提案创建详细规则（同样严格！）
+
+学生提建议/想创建提案 = **必须直接调用 `create_proposal`**：
+- **绝对禁止先调 get_proposals、query_issues 或其他工具"查一下再看看"**——这是最常见的错误
+- 工具内部会自动查重并返回提示，不需要你提前查
+- 信息齐全（标题想法+理由）→ 直接调用，不要多余追问
+- 信息不全 → 只追问1个关键问题 → 收到回答后立刻调用
+- 提交后回复格式：直接把工具返回的结果展示给用户
+- **如果用户说"我建议/我想提/能不能/希望..."后面跟了具体内容，这就是创建提案的请求，不要把它当成查询**
+
+**典型流程：**
+- "我建议食堂降价" → 直接 create_proposal(title="建议食堂菜品降价", description="希望降低食堂菜品价格...", category="餐饮问题")
+- "能不能延长图书馆时间" → 直接 create_proposal(title="建议延长图书馆开放时间", description="...", category="校园管理")
+- "希望增加充电桩" → 追问"在教学楼还是宿舍区？" → 收到后立即 create_proposal
 
 ## 你的身份
 - 校园：{school} · {grade} {major}
