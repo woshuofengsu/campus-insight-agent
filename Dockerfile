@@ -1,15 +1,15 @@
-# CampusInsight Agent — Docker 部署镜像
-# 校园先知 · AI 校园治理平台
+# CommunityInsight Agent — Docker 部署镜像
+# 社区先知 · AI 社区治理平台
 #
-# 构建: docker build -t campus-insight .
-# 运行: docker run -p 8501:8501 --env-file .env campus-insight
+# 构建: docker build -t community-insight .
+# 运行: docker run -p 8501:8501 --env-file .env community-insight
 # 或使用 docker-compose up
 
 FROM python:3.11-slim
 
-LABEL org.opencontainers.image.title="CampusInsight Agent"
-LABEL org.opencontainers.image.description="AI-powered campus governance platform"
-LABEL org.opencontainers.image.authors="CampusInsight Team"
+LABEL org.opencontainers.image.title="CommunityInsight Agent"
+LABEL org.opencontainers.image.description="AI-powered community governance platform"
+LABEL org.opencontainers.image.authors="CommunityInsight Team"
 
 # ── System dependencies ──
 RUN apt-get update && apt-get install -y --no-install-recommends \

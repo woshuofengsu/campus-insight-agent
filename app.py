@@ -1,5 +1,5 @@
 # app.py
-"""校园先知 CampusInsight Agent — Streamlit 多页面入口."""
+"""社区先知 CommunityInsight Agent — Streamlit 多页面入口."""
 import sys
 import os
 
@@ -13,7 +13,7 @@ from config import DEEPSEEK_API_KEY, OFFLINE_MODE
 
 # ── Global Altair theme ──
 # Provides sensible defaults; individual charts override via configure_altair().
-@alt.theme.register("campus", enable=True)
+@alt.theme.register("community", enable=True)
 def _alt_theme():
     return alt.theme.ThemeConfig({
         "background": "transparent",
@@ -43,8 +43,8 @@ def main():
     # apply_native_theme() called immediately after to preserve dark-mode
     # overrides that st.set_page_config() would otherwise reset to config.toml.
     st.set_page_config(
-        page_title="校园先知 · CampusInsight",
-        page_icon="🏛️",
+        page_title="社区先知 · CommunityInsight",
+        page_icon="🏘️",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -106,34 +106,44 @@ def main():
     profile = memory.get_user_profile()
     if profile is None:
         profile = {}
-    role = profile.get("role", "student")
+    role = profile.get("role", "resident")
 
-    if role == "teacher":
+    if role == "grid":
         nav = st.navigation([
-            st.Page("ui/pages_teacher/dashboard.py", title="工作台", icon=":material/dashboard:", default=True),
-            st.Page("ui/pages_teacher/issues_mgmt.py", title="工单管理", icon=":material/assignment:"),
-            st.Page("ui/pages_teacher/proposals_mgmt.py", title="提案管理", icon=":material/lightbulb:"),
-            st.Page("ui/pages_teacher/content_mgmt.py", title="内容发布", icon=":material/campaign:"),
-            st.Page("ui/pages_teacher/insights.py", title="数据洞察", icon=":material/insights:"),
-            st.Page("ui/pages_teacher/health_mgmt.py", title="健康管理", icon=":material/health_and_safety:"),
+            st.Page("ui/pages_grid/dashboard.py", title="工作台", icon=":material/dashboard:", default=True),
+            st.Page("ui/pages_grid/issues_mgmt.py", title="工单管理", icon=":material/assignment:"),
+            st.Page("ui/pages_grid/proposals_mgmt.py", title="提案管理", icon=":material/lightbulb:"),
+            st.Page("ui/pages_grid/content_mgmt.py", title="内容发布", icon=":material/campaign:"),
+            st.Page("ui/pages_grid/insights.py", title="数据洞察", icon=":material/insights:"),
+            st.Page("ui/pages_grid/health_mgmt.py", title="健康管理", icon=":material/health_and_safety:"),
+        ])
+    elif role == "elderly":
+        nav = st.navigation([
+            st.Page("ui/pages_elderly/home.py", title="🏠 首页", icon=":material/home:", default=True),
+            st.Page("ui/pages_elderly/report.py", title="🗣️ 一句话上报", icon=":material/mic:"),
+            st.Page("ui/pages_elderly/progress.py", title="📋 我的工单", icon=":material/assignment:"),
+            st.Page("ui/pages_elderly/notify.py", title="🔊 听通知", icon=":material/notifications:"),
+            st.Page("ui/pages_elderly/health.py", title="🏥 我的健康", icon=":material/health_and_safety:"),
+            st.Page("ui/pages_elderly/meds.py", title="💊 吃药提醒", icon=":material/medication:"),
         ])
     else:
         nav = st.navigation([
             st.Page("ui/pages/home.py", title="对话", icon=":material/chat:", default=True),
-            st.Page("ui/pages/pulse.py", title="校园脉搏", icon=":material/waves:"),
-            st.Page("ui/pages/issues.py", title="随手报修", icon=":material/build:"),
-            st.Page("ui/pages/voice.py", title="有话说", icon=":material/forum:"),
-            st.Page("ui/pages/transparency.py", title="治理透明窗", icon=":material/bar_chart:"),
+            st.Page("ui/pages/pulse.py", title="社区脉搏", icon=":material/waves:"),
+            st.Page("ui/pages/issues.py", title="接诉即办", icon=":material/build:"),
+            st.Page("ui/pages/voice.py", title="邻里议事", icon=":material/forum:"),
+            st.Page("ui/pages/transparency.py", title="社区治理看板", icon=":material/bar_chart:"),
             st.Page("ui/pages/health.py", title="健康防护", icon=":material/health_and_safety:"),
             st.Page("ui/pages/notifications.py", title="消息", icon=":material/notifications:"),
             st.Page("ui/pages/mine.py", title="我的", icon=":material/person:"),
             st.Page("ui/pages/bigscreen.py", title="治理大屏", icon=":material/tv:"),
         ])
 
-    # ── Sidebar ──
-    with st.sidebar:
-        from ui.sidebar import render_sidebar
-        render_sidebar(profile, role)
+    # ── Sidebar（elderly 全屏无侧边栏，页面内大字导航 + 紧急联系） ──
+    if role != "elderly":
+        with st.sidebar:
+            from ui.sidebar import render_sidebar
+            render_sidebar(profile, role)
 
     nav.run()
 

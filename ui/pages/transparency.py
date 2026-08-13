@@ -1,5 +1,5 @@
 # ui/pages/transparency.py
-"""📊 治理透明窗 · 督 — 多维健康度 + 趋势分析 + 参与足迹."""
+"""📊 社区治理看板 · 督 — 多维健康度 + 趋势分析 + 参与足迹."""
 import streamlit as st
 import altair as alt
 import pandas as pd
@@ -14,24 +14,15 @@ from ui.cache import (
     cached_feedback_stats as get_feedback_stats,
     cached_knowledge_base as get_knowledge_base,
 )
-from ui.components import TOKEN, section, stat, info_card, ooda_nav, CAT_LABEL, configure_altair
+from ui.components import TOKEN, section, stat, info_card, ooda_nav, CAT_LABEL, configure_altair, page_header
+from data.db_sla import get_sla_breaches
 import logging
 _log = logging.getLogger(__name__)
 
 # ── Page header ──
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">📊 治理透明窗</span>'
-    f'<span style="background:{TOKEN["success"]};color:#fff;font-size:0.7em;font-weight:600;'
-    f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">督</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("数据透明就是最好的信任机制——看看校园治理的真实状况。")
+page_header("📊 社区治理看板", "数据透明就是最好的信任机制——看看社区治理的真实状况。", "督")
 
 ooda_nav("transparency")
-
-st.markdown("---")
 
 # -- Health score — multi-dimensional --
 
@@ -49,7 +40,7 @@ score = health["score"]
 
 if grade == "优":
     health_emoji, health_color = "🟢", TOKEN["success"]
-    health_detail = "校园治理健康度优秀，问题解决效率高、积压可控。"
+    health_detail = "社区治理健康度优秀，问题解决效率高、积压可控。"
 elif grade == "良":
     health_emoji, health_color = "🟡", TOKEN["warning"]
     health_detail = "治理基本正常，仍有提升空间。"
@@ -61,8 +52,8 @@ else:
 st.markdown(
     f'<div style="background:{TOKEN["card_bg"]};border:2px solid {health_color};'
     f'border-radius:{TOKEN["radius_card"]};padding:20px 24px;text-align:center;'
-    f'box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">'
-    f'<div style="font-size:0.88em;color:{TOKEN["text_sec"]};margin-bottom:6px;">🏥 校园治理健康度</div>'
+    f'box-shadow:{TOKEN["shadow_md"]};margin-bottom:16px;">'
+    f'<div style="font-size:0.88em;color:{TOKEN["text_sec"]};margin-bottom:6px;">🏥 社区治理健康度</div>'
     f'<div style="font-size:3em;font-weight:800;color:{health_color};">'
     f'{health_emoji} {grade} <span style="font-size:0.5em;color:{TOKEN["text_sec"]};">{score}分</span></div>'
     f'<div style="font-size:0.9em;color:{TOKEN["text_sec"]};margin-top:4px;">{health_detail}</div>'
@@ -160,13 +151,14 @@ pending = by_status.get("待处理", 0)
 topics = get_active_topics(limit=100)
 total_participants = sum(t.get("participant_count", 0) for t in topics)
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3 = st.columns(3)
 with c1:
     stat("总上报", str(total_i), TOKEN["accent"])
 with c2:
     stat("解决率", f"{health['resolution_rate']}%", TOKEN["success"])
 with c3:
     stat("待处理", str(pending), TOKEN["warning"] if pending > 0 else TOKEN["success"])
+c4, c5 = st.columns(2)
 with c4:
     stat("提案", str(total_p), TOKEN["accent"])
 with c5:
@@ -236,7 +228,7 @@ st.markdown("---")
 
 # -- 📢 舆情情感分析 — from feedback_items --
 
-section("学生舆情分析")
+section("居民舆情分析")
 
 fb = get_feedback_stats()
 if fb["total"] > 0:
@@ -294,38 +286,30 @@ if fb["total"] > 0:
 
 st.markdown("---")
 
-# -- ⚠️ 积压预警 — oldest unresolved issues --
+# -- ⚠️ 积压预警 — SLA 超时工单（分级口径统一走 data/db_sla.py）--
 
 section("积压预警")
 
-stale_issues = sorted(
-    get_issues(status="待处理", limit=50),
-    key=lambda i: i.get("reported_at", ""),
-)
+stale_issues = get_sla_breaches(limit=50)
 
 if stale_issues:
-    # Find issues older than 5 days
-    from datetime import datetime, timedelta
-    cutoff = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
-    old_issues = [i for i in stale_issues if i.get("reported_at", "") <= cutoff]
-    if old_issues:
-        st.warning(f"🚨 {len(old_issues)} 个问题超过 5 天未处理，建议优先解决：")
-        cols = st.columns(2)
-        for idx, issue in enumerate(old_issues[:6]):
-            with cols[idx % 2]:
-                st.markdown(
-                    f'<div style="background:{TOKEN["danger_bg"]};border:1px solid {TOKEN["danger_border"]};'
-                    f'border-radius:{TOKEN["radius_card"]};padding:8px 12px;margin:3px 0;font-size:0.84em;">'
-                    f'🔴 <strong>#{issue["id"]}</strong> {issue.get("title","")[:30]}'
-                    f'<br><span style="color:{TOKEN["text_muted"]};font-size:0.8em;">'
-                    f'{issue.get("category","")} · {issue.get("reported_at","")[:10]} · {issue.get("urgency","")}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-    else:
-        st.success("✅ 所有待处理问题都在 5 天内，没有积压。")
+    st.warning(f"🚨 {len(stale_issues)} 个问题已超时未处理，建议优先解决：")
+    cols = st.columns(2)
+    for idx, issue in enumerate(stale_issues[:6]):
+        with cols[idx % 2]:
+            hours = issue.get("hours_open", 0)
+            time_str = f"{hours // 24} 天" if hours >= 24 else f"{hours} 小时"
+            st.markdown(
+                f'<div style="background:{TOKEN["danger_bg"]};border:1px solid {TOKEN["danger_border"]};'
+                f'border-radius:{TOKEN["radius_card"]};padding:8px 12px;margin:3px 0;font-size:0.84em;">'
+                f'🔴 <strong>#{issue["id"]}</strong> {issue.get("title","")[:30]}'
+                f'<br><span style="color:{TOKEN["text_muted"]};font-size:0.8em;">'
+                f'{issue.get("category","")} · {time_str} · {issue.get("urgency","")}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 else:
-    st.success("✅ 暂无待处理问题。")
+    st.success("✅ 暂无超时工单，没有积压。")
 
 st.markdown("---")
 
@@ -480,7 +464,7 @@ if issues_all and len(issues_all) >= 3:
                 hide_index=False,
             )
 
-        st.caption("影响力 = 上报数×2 + 获得附议数。积极上报问题和提出优秀提案都能为校园治理做出贡献！")
+        st.caption("影响力 = 上报数×2 + 获得附议数。积极上报问题和提出优秀提案都能为社区治理做出贡献！")
 
 st.markdown("---")
 

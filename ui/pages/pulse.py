@@ -1,25 +1,17 @@
 # ui/pages/pulse.py
-"""🌊 校园脉搏 · 知 — 正在发生什么？即将发生什么？"""
+"""🌊 社区脉搏 · 知 — 正在发生什么？即将发生什么？"""
 import logging
 import streamlit as st
 import altair as alt
 import pandas as pd
-from ui.cache import cached_issues, cached_campus_events as get_campus_events, cached_knowledge_base as get_knowledge_base
+from ui.cache import cached_issues, cached_community_events as get_community_events, cached_knowledge_base as get_knowledge_base
 from tools.query_weather import get_today_weather, _get_data_source_note as _weather_source_note
-from ui.components import TOKEN, section, info_card, event_card, issue_card, stat, ooda_nav, CAT_LABEL, configure_altair
+from ui.components import TOKEN, section, info_card, event_card, issue_card, stat, ooda_nav, CAT_LABEL, configure_altair, page_header
 
 _log = logging.getLogger(__name__)
 
 # ── Page header ──
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🌊 校园脉搏</span>'
-    f'<span style="background:{TOKEN["accent"]};color:#fff;font-size:0.7em;font-weight:600;'
-    f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">知</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("感知校园动态，不错过任何大事小情。")
+page_header("🌊 社区脉搏", "感知社区动态，不错过任何大事小情。", "知")
 
 ooda_nav("pulse")
 
@@ -51,7 +43,7 @@ try:
             # Header row
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-                f'<span style="font-weight:700;color:{TOKEN["text"]};">校园感知</span>'
+                f'<span style="font-weight:700;color:{TOKEN["text"]};">社区感知</span>'
                 f'<span style="display:inline-block;width:8px;height:8px;'
                 f'background:{dot_color};border-radius:50%;margin-left:6px;" '
                 f'title="perception active"></span>'
@@ -77,8 +69,8 @@ try:
             c_refresh, _ = st.columns([1, 4])
             with c_refresh:
                 if st.button("🔄 立即扫描", key="force_perception", width="stretch",
-                             help="手动触发系统扫描校园数据"):
-                    with st.spinner("🧠 正在扫描校园数据..."):
+                             help="手动触发系统扫描社区数据"):
+                    with st.spinner("🧠 正在扫描社区数据..."):
                         try:
                             result = force_perception_scan()
                             if result:
@@ -150,19 +142,19 @@ except Exception:
 
 section("即将发生")
 
-events = get_campus_events(limit=10)
+events = get_community_events(limit=10)
 if events:
     cols = st.columns(2)
     for i, e in enumerate(events):
         with cols[i % 2]:
             event_card(e)
 else:
-    info_card("添加校历信息后可在此查看即将发生的大事")
+    info_card("添加社区活动安排后可在此查看即将发生的大事")
 
 
-# -- 📡 校园动态时间线 — 实时活动 --
+# -- 📡 社区动态时间线 — 实时活动 --
 
-section("校园动态")
+section("社区动态")
 
 try:
     from data.db_notifications import get_activity_feed
@@ -175,7 +167,7 @@ try:
             "采纳提案": "✅", "实施提案": "🎉",
         }
         for entry in feed[:8]:
-            actor = entry.get("actor", "") or "同学"
+            actor = entry.get("actor", "") or "邻居"
             action = entry.get("action", "")
             icon = action_icons.get(action, "📌")
             detail = entry.get("detail", "")
@@ -202,22 +194,22 @@ try:
             if summary:
                 st.info(f"📡 {summary}")
             else:
-                st.caption("暂无校园动态。当同学们开始上报问题和提交提案时，这里会实时更新。")
+                st.caption("暂无社区动态。当邻居们开始上报问题和提交提案时，这里会实时更新。")
         except Exception:
             _log.debug("non-critical failure", exc_info=True)
-            st.caption("暂无校园动态。")
+            st.caption("暂无社区动态。")
 except Exception:
     _log.warning("Activity feed unavailable", exc_info=True)
 
 
-# -- 📚 校园百科 — RAG 语义搜索 + quick access --
+# -- 📚 社区百科 — RAG 语义搜索 + quick access --
 
-section("校园百科")
+section("社区百科")
 
 # ── Semantic search bar ──
 kb_search_query = st.text_input(
-    "🔍 搜索校规、通知、FAQ...",
-    placeholder="例如：食堂营业时间、奖学金申请条件、宿舍管理规定...",
+    "🔍 搜索社区公约、通知、FAQ...",
+    placeholder="例如：助餐点营业时间、活动室开放时间、楼栋管理规定...",
     key="pulse_kb_search",
     label_visibility="collapsed",
 )
@@ -271,7 +263,7 @@ else:
                         unsafe_allow_html=True,
                     )
     else:
-        info_card("添加校历、通知、常用电话等信息后展示")
+        info_card("添加社区活动安排、通知、常用电话等信息后展示")
 
 
 # -- Weekly hot spots --
@@ -306,10 +298,13 @@ if issues:
         if _insights.get("has_insight"):
             with st.container(border=True):
                 st.markdown(
-                    f'<span style="font-size:0.9em;font-weight:700;color:{TOKEN["text"]};">'
-                    f'🧠 智能洞察</span>'
-                    f'<span style="font-size:0.68em;color:{TOKEN["text_muted"]};margin-left:6px;">'
-                    f'系统自动发现</span>',
+                    f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                    f'<span style="background:{TOKEN["brand_gradient"]};color:#ffffff;'
+                    f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
+                    f'padding:2px 10px;border-radius:{TOKEN["radius_full"]};">🤖 AI 主动发现</span>'
+                    f'<span style="font-size:0.9em;font-weight:700;color:{TOKEN["text"]};">🧠 智能洞察</span>'
+                    f'<span style="font-size:0.68em;color:{TOKEN["text_muted"]};margin-left:auto;">'
+                    f'系统自动发现</span></div>',
                     unsafe_allow_html=True,
                 )
                 for part in _insights.get("summary_parts", [])[:3]:

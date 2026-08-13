@@ -278,9 +278,9 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
             "icon": "📋", "text": "工单已上报，你可以在「我的」页面追踪进度",
             "action_hint": "切到「👤 我的」页面查看",
         })
-    if "get_campus_pulse" in tool_names:
+    if "get_community_pulse" in tool_names:
         suggestions.append({
-            "icon": "🔧", "text": "看到校园动态后，有想上报的问题吗？",
+            "icon": "🔧", "text": "看到社区动态后，有想上报的问题吗？",
             "action_hint": "直接描述问题，我会帮你上报",
         })
 
@@ -314,14 +314,14 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
 # ---------------------------------------------------------------------------
 
 TOOL_ICONS = {
-    "report_issue": "🔧", "query_issues": "🔍", "get_campus_pulse": "🌊",
+    "report_issue": "🔧", "query_issues": "🔍", "get_community_pulse": "🌊",
     "get_governance_stats": "📊", "get_weather": "🌤️", "create_proposal": "💡",
     "support_proposal": "👍", "get_proposals": "📋", "get_topics": "🗣️",
     "get_topic_detail": "📖", "express_opinion": "💬", "collect_feedback": "📥",
 }
 
 TOOL_LABELS = {
-    "report_issue": "上报问题", "query_issues": "查询工单", "get_campus_pulse": "校园脉搏",
+    "report_issue": "上报问题", "query_issues": "查询工单", "get_community_pulse": "社区脉搏",
     "get_governance_stats": "治理统计", "get_weather": "天气查询", "create_proposal": "创建提案",
     "support_proposal": "附议提案", "get_proposals": "查询提案", "get_topics": "查询议题",
     "get_topic_detail": "议题详情", "express_opinion": "发表意见", "collect_feedback": "收集反馈",

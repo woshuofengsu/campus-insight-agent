@@ -10,6 +10,18 @@ import logging
 _log = logging.getLogger(__name__)
 
 
+# ── 幻觉工单检测：LLM 回复是否声称"已生成/已上报"工单 ──
+_CLAIMED_REPORT_MARKERS = (
+    "已上报", "已生成工单", "已创建工单", "已为你生成", "已帮你上报",
+    "上报成功", "工单编号",
+)
+
+
+def _claimed_report(response: str) -> bool:
+    """检测 LLM 回复是否声称创建了工单（幻觉工单号）。"""
+    return any(m in response for m in _CLAIMED_REPORT_MARKERS)
+
+
 def enforce_tool_call(response: str, user_input: str,
                       intermediate_steps: list | None = None) -> str:
     """Force a real report_issue call when LLM hallucinates or the tool fails.
@@ -40,12 +52,12 @@ def enforce_tool_call(response: str, user_input: str,
     if report_succeeded:
         return response  # Tool was called and succeeded — nothing to do
 
-    # ── Check if user input looks like a problem report ──
-    from agent.prompt import detect_persona
-    persona = detect_persona(user_input)
-    is_repair_intent = bool(persona and "报修助手" in persona.get("role", ""))
-
-    if not is_repair_intent:
+    # ── 修复"假工单"：只在两种情况下兜底 ──
+    # 1. report_issue 被调用但失败（report_called=True）→ 重试
+    # 2. LLM 声称已上报但没调工具（幻觉工单号）→ 补真实上报
+    # 之前仅凭 detect_persona 判"用户输入像上报"就兜底，会把 LLM 的正常追问
+    # （"哪栋楼？"）和咨询（"充电桩怎么收费？"）误判成幻觉，强制生成假工单。
+    if not report_called and not _claimed_report(response):
         return response
 
     # ── Force the real tool call ──

@@ -14,16 +14,16 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
     txt = user_input.strip()
 
     # ── Pulse intent ──
-    if any(kw in txt for kw in ("校园脉搏", "动态", "最近发生")):
+    if any(kw in txt for kw in ("社区脉搏", "动态", "最近发生")):
         try:
-            from data.database import get_issues, get_proposals, get_campus_events, get_issues_stats
+            from data.database import get_issues, get_proposals, get_community_events, get_issues_stats
             stats = get_issues_stats()
             issues = get_issues(status="待处理", limit=5)
             proposals = get_proposals(sort_by="supporters", limit=3)
-            events = get_campus_events(limit=3)
+            events = get_community_events(limit=3)
             lines = [
                 "🤖 智能服务暂时繁忙，以下是从数据库直接查询的最新数据：\n",
-                f"📊 **校园脉搏快照**",
+                f"📊 **社区脉搏快照**",
                 f"- 工单总数：{stats['total']} 件",
             ]
             by_status = stats.get("by_status", {})
@@ -67,9 +67,9 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
     # ── Repair intent ──
     if any(kw in txt for kw in ("报修", "上报", "坏了", "故障", "漏水", "不亮")):
         return (
-            "🔧 看起来你想报修一个问题。\n\n"
-            "智能服务暂时不可用，但你可以使用页面顶部的 **快速报修** 功能直接提交工单——"
-            "填写问题描述和地点，点击「上报」提交，系统自动分类。\n\n"
+            "🔧 看起来你想上报一个诉求。\n\n"
+            "智能服务暂时不可用，但你可以使用页面顶部的 **接诉即办** 功能直接提交工单——"
+            "填写诉求描述和地点，点击「上报」提交，系统自动分类。\n\n"
             "或者稍后重试对话，服务恢复后会帮你处理。"
         )
 
@@ -77,7 +77,7 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
     if any(kw in txt for kw in ("提案", "建议", "提议")):
         return (
             "看起来你想提交建议或查看提案。\n\n"
-            "智能服务暂时不可用，但你可以在左侧导航中切换到 **🗳️ 有话说** 页面，"
+            "智能服务暂时不可用，但你可以在左侧导航中切换到 **🗳️ 邻里议事** 页面，"
             "那里可以直接查看热门提案和提交新建议。\n\n"
             "稍后重试对话也可以获得完整的智能分析。"
         )

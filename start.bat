@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title 校园先知 CampusInsight
+title 社区先知 CommunityInsight
 
 echo.
 echo   ╔══════════════════════════════════════════════╗
-echo   ║  🏛️  校园先知 CampusInsight Agent           ║
+echo   ║  🏘️  社区先知 CommunityInsight Agent           ║
 echo   ║     竞赛演示启动脚本                         ║
 echo   ╚══════════════════════════════════════════════╝
 echo.

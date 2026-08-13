@@ -1,33 +1,40 @@
-# ui/pages_teacher/issues_mgmt.py
+# ui/pages_grid/issues_mgmt.py
 """📋 工单管理 — 表格视图、筛选、批量操作、指派、时效统计."""
 import csv
 import io
 import logging
 from datetime import datetime
 import streamlit as st
-from ui.components import TOKEN, tag
+from ui.guard import require_role
+
+require_role("grid")
+
+from ui.components import TOKEN, tag, page_header
 from ui.cache import cached_issues, cached_issues_stats, invalidate_issues
-from data.database import update_issue_status, get_db
+from data.database import update_issue_status, get_db, review_dissatisfaction
+from data.db_sla import get_sla_summary
 
 _log = logging.getLogger(__name__)
 
 # ── Page Render ──
-st.markdown(
-    f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
-    f'📋 工单管理</span>',
-    unsafe_allow_html=True,
-)
-st.caption("查看、筛选、处理所有校园问题上报。")
+page_header("📋 工单管理", "查看、筛选、处理所有社区诉求上报。")
+
+# 当前网格员身份（用于「我的待办」过滤：优先按 assignee_id 主键，旧数据回退姓名）
+_memory = st.session_state.get("memory")
+_profile = _memory.get_user_profile() if _memory is not None else {}
+_my_id = (_profile or {}).get("id")
+_my_name = (_profile.get("name") or "").strip() or (_profile.get("unit") or "").strip()
 
 # ── Status filter ──
 status_choice = st.radio(
     "状态筛选",
-    ["全部", "⏳ 待处理", "🔄 处理中", "✅ 已解决"],
+    ["全部", "⏳ 待处理", "🔄 处理中", "🧐 待复核", "✅ 已解决"],
     horizontal=True,
     label_visibility="collapsed",
     key="_issues_status_filter",
 )
-_STATUS_MAP = {"全部": None, "⏳ 待处理": "待处理", "🔄 处理中": "处理中", "✅ 已解决": "已解决"}
+_STATUS_MAP = {"全部": None, "⏳ 待处理": "待处理", "🔄 处理中": "处理中",
+               "🧐 待复核": "待复核", "✅ 已解决": "已解决"}
 status_val = _STATUS_MAP.get(status_choice)
 
 # ── Filters (2+2 grid: stacks to 4 rows on mobile) ──
@@ -35,7 +42,7 @@ c1, c2 = st.columns(2)
 with c1:
     cat_choice = st.selectbox(
         "分类",
-        ["全部", "设施维修", "环境卫生", "安全隐患", "教学设备", "网络服务", "餐饮问题", "校园管理", "其他"],
+        ["全部", "设施维修", "环境卫生", "安全隐患", "停车管理", "噪音扰民", "物业服务", "邻里矛盾", "社区事务", "其他"],
         key="_issues_cat_filter",
         label_visibility="collapsed",
     )
@@ -51,6 +58,7 @@ with c3:
     )
 with c4:
     batch_mode = st.toggle("🔲 批量", key="_issues_batch_mode")
+    show_mine = st.toggle("👷 我的待办", key="_issues_mine_filter")
 
 # ── Fetch data ──
 cat_val = None if cat_choice == "全部" else cat_choice
@@ -61,6 +69,15 @@ issues = cached_issues(category=cat_val, status=status_val, urgency=urgency_val,
 if search:
     issues = [i for i in issues if search.lower() in (i.get("title") or "").lower()]
 
+# 「我的待办」：只看指派给当前网格员的工单（真派单闭环）
+# 优先按 assignee_id 主键匹配（同名不串单）；旧数据（无 assignee_id）回退姓名匹配
+if show_mine:
+    issues = [
+        i for i in issues
+        if (i.get("assignee_id") is not None and i.get("assignee_id") == _my_id)
+        or (i.get("assignee_id") is None and (i.get("assignee") or "").strip() == _my_name)
+    ]
+
 # ── Sort: urgent first, then by status priority (待处理 > 处理中 > 已解决), then newest first ──
 _STATUS_PRIORITY = {"待处理": 0, "处理中": 1, "已解决": 2}
 issues.sort(key=lambda x: (
@@ -70,45 +87,33 @@ issues.sort(key=lambda x: (
 ))
 
 
-# -- Auto Category Suggestion (keyword-based, no LLM) --
-_CATEGORY_KEYWORDS = {
-    "设施维修": ["灯", "水龙头", "空调", "门", "窗", "电梯", "厕所", "卫生间", "漏水", "坏了", "故障", "不亮", "不漏", "关不上", "打不开", "墙", "地板", "天花板", "管道", "暖气"],
-    "环境卫生": ["垃圾", "脏", "臭", "清洁", "卫生", "异味", "蟑螂", "老鼠", "虫子", "发霉", "长毛", "烟头", "纸屑", "落叶"],
-    "安全隐患": ["火", "电线", "裸露", "消防", "灭火器", "应急灯", "护栏", "松动", "摇晃", "塌", "滑", "摔", "漏电", "冒烟"],
-    "教学设备": ["投影", "电脑", "黑板", "白板", "桌椅", "话筒", "音响", "多媒体", "机房", "实验室", "仪器"],
-    "网络服务": ["网", "wifi", "WiFi", "信号", "校园网", "VPN", "宽带", "断网", "网速", "卡顿"],
-    "餐饮问题": ["食堂", "餐厅", "饭菜", "涨价", "价格", "口味", "窗口", "排队", "座位", "筷子", "碗", "餐具"],
-    "校园管理": ["快递", "停车", "自行车", "电动车", "校门", "保安", "宿舍", "自习室", "图书馆", "开放时间"],
-}
+# -- AI Category Suggestion (real LLM; keyword fallback lives inside _llm_classify) --
+def _suggest_category(title: str, description: str = "", stored: str = "") -> str:
+    """Suggest a category via the shared AI classifier. Returns '' if uncertain.
 
-
-def _suggest_category(title: str, description: str = "") -> str:
-    """Suggest a category based on keyword matching. Returns '' if uncertain."""
-    text = f"{title} {description}".lower()
-    scores = {}
-    for cat, keywords in _CATEGORY_KEYWORDS.items():
-        score = sum(1 for kw in keywords if kw.lower() in text)
-        if score > 0:
-            scores[cat] = score
-    if not scores:
+    Prefers the persisted ``suggested_category`` (captured at report time by the
+    real LLM); for legacy rows it falls back to a fresh LLM classification (which
+    itself degrades to keywords on API failure).
+    """
+    if stored:
+        return stored
+    try:
+        from tools.action_report_issue import _llm_classify
+        cat, _ = _llm_classify(title, description)
+        return cat
+    except Exception:  # log and skip — no suggestion is better than a wrong one
+        _log.debug("AI category suggestion unavailable for '%s'", title)
         return ""
-    # Return best match, but only if it's a clear winner (score >= 2 or > 2x runner-up)
-    best = max(scores, key=scores.get)
-    best_score = scores[best]
-    runner_up = max((s for k, s in scores.items() if k != best), default=0)
-    if best_score >= 2 or best_score > runner_up * 2:
-        return best
-    return ""
 
 
-# ── Teacher processing stats ──
+# ── Grid processing stats ──
 with st.expander("📊 我的处理统计", expanded=False):
     try:
         with get_db() as conn:
             my_processed = conn.execute(
                 "SELECT COUNT(*) as cnt FROM activity_log "
                 "WHERE action IN ('开始处理', '解决问题', '重新打开', '更新工单') "
-                "AND date(created_at) = date('now', 'localtime')"
+                "AND date(created_at, 'localtime') = date('now', 'localtime')"
             ).fetchone()
             today_processed = my_processed["cnt"] if my_processed else 0
 
@@ -122,11 +127,11 @@ with st.expander("📊 我的处理统计", expanded=False):
             # Avg resolution time this month
             avg_days_row = conn.execute(
                 "SELECT ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) as avg_days "
-                "FROM campus_issues WHERE status = '已解决' AND resolved_at > date('now', '-30 days')"
+                "FROM community_issues WHERE status = '已解决' AND resolved_at > date('now', '-30 days')"
             ).fetchone()
             avg_days = avg_days_row["avg_days"] if avg_days_row and avg_days_row["avg_days"] is not None else None
     except Exception:
-        _log.warning("Failed to load teacher processing stats", exc_info=True)
+        _log.warning("Failed to load grid processing stats", exc_info=True)
         today_processed, week_processed, avg_days = 0, 0, None
 
     mc1, mc2, mc3 = st.columns(3)
@@ -143,31 +148,22 @@ pending_c = stats["by_status"].get("待处理", 0)
 progress_c = stats["by_status"].get("处理中", 0)
 resolved_c = stats["by_status"].get("已解决", 0)
 
-# ── SLA summary ──
-overdue_total = 0
-urgent_unresolved = 0
-try:
-    with get_db() as conn:
-        overdue_row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
-            "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-        ).fetchone()
-        overdue_total = overdue_row["cnt"] if overdue_row else 0
-        urgent_row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
-            "WHERE urgency='紧急' AND status != '已解决'"
-        ).fetchone()
-        urgent_unresolved = urgent_row["cnt"] if urgent_row else 0
-except Exception:
-    _log.warning("Failed to load SLA/urgent counts", exc_info=True)
+# ── SLA summary (per-urgency deadlines, not a flat 7-day rule) ──
+_sla = get_sla_summary()
+urgent_unresolved = _sla["urgent_pending"]
+overdue_total = _sla["total_overdue"]
+critical_overdue = _sla["critical_overdue"]
+normal_overdue = _sla["normal_overdue"]
 
 c_stats, c_export = st.columns([5, 1])
 with c_stats:
     sla_parts = []
     if urgent_unresolved > 0:
         sla_parts.append(f'🔴 紧急未处理 {urgent_unresolved}')
-    if overdue_total > 0:
-        sla_parts.append(f'⚠️ 超7天积压 {overdue_total}')
+    if critical_overdue > 0:
+        sla_parts.append(f'🚨 紧急超时 {critical_overdue}')
+    if normal_overdue > 0:
+        sla_parts.append(f'⚠️ 普通超时 {normal_overdue}')
     sla_str = ' · '.join(sla_parts) if sla_parts else ''
     st.caption(
         f'共 {len(issues)} 条 · '
@@ -214,10 +210,10 @@ with c_export:
 # ── Quick Response Templates ──
 with st.expander("📋 常用回复模板", expanded=False):
     templates = {
-        "已派维修": "已通知后勤维修组前往处理，预计24小时内完成。",
+        "已派维修": "已通知物业维修组前往处理，预计24小时内完成。",
         "配件待购": "配件已采购，预计3-5天内到货后立即更换。",
         "已列入计划": "问题已确认，已列入下周维修计划。",
-        "已修复": "已安排维修人员处理完毕，请同学核实。",
+        "已修复": "已安排维修人员处理完毕，请邻居核实。",
         "转交部门": "该问题已转交相关管理部门处理，请耐心等待。",
         "需要进一步核实": "已收到反馈，需要进一步现场核实后再做处理。",
     }
@@ -244,8 +240,21 @@ st.markdown("---")
 
 
 # ── Actions handler ──
+def _resolve_assignee_id(name: str) -> int | None:
+    """Resolve a grid worker's user id from their display name (for manual dispatch)."""
+    if not name:
+        return None
+    from data.db_user import list_users
+    for u in list_users(role="grid"):
+        if (u.get("name") or "").strip() == name or (u.get("username") or "") == name:
+            return u.get("id")
+    return None
+
+
 def _set_status(iid: int, new_status: str, note: str = "", assignee: str = ""):
-    update_issue_status(iid, new_status, processing_note=note, assignee=assignee)
+    assignee_id = _resolve_assignee_id(assignee) if assignee else None
+    update_issue_status(iid, new_status, processing_note=note,
+                        assignee=assignee, assignee_id=assignee_id)
     invalidate_issues()
 
 
@@ -445,8 +454,7 @@ else:
 
             # ── Column 4: Suggested category ──
             with c_suggest:
-                if not suggested_cat:
-                    suggested_cat = _suggest_category(title, desc)
+                suggested_cat = _suggest_category(title, desc, suggested_cat)
                 if suggested_cat and suggested_cat != cat:
                     st.markdown(
                         f'<span style="font-size:0.72em;background:{TOKEN["accent_bg"]};'
@@ -573,6 +581,18 @@ else:
                                     del st.session_state[detail_note_key]
                                 if detail_assignee_key in st.session_state:
                                     del st.session_state[detail_assignee_key]
+                                st.rerun()
+                    elif status == "待复核":
+                        st.caption("居民评价「不满意」，请确认是否重开：")
+                        with dbtn1:
+                            if st.button("✅ 确认重开", key=f"review_reopen_{iid}", width="stretch"):
+                                review_dissatisfaction(iid, reopen=True)
+                                invalidate_issues()
+                                st.rerun()
+                        with dbtn2:
+                            if st.button("↩️ 驳回（维持已解决）", key=f"review_dismiss_{iid}", width="stretch"):
+                                review_dissatisfaction(iid, reopen=False)
+                                invalidate_issues()
                                 st.rerun()
                     elif status == "已解决":
                         with dbtn1:

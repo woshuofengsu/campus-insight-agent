@@ -29,7 +29,7 @@ class _Keys:
     ob_role: str = "_ob_role"
     agent_version: str = "_agent_version"
 
-    campus_theme: str = "_campus_theme"
+    community_theme: str = "_community_theme"
 
     tour_step: str = "_tour_step"
     force_offline: str = "_force_offline"
@@ -145,12 +145,12 @@ class _Session:
         st.session_state[SS.memory] = value
 
     @property
-    def campus_theme(self) -> str:
-        return st.session_state.get(SS.campus_theme, "light")
+    def community_theme(self) -> str:
+        return st.session_state.get(SS.community_theme, "light")
 
-    @campus_theme.setter
-    def campus_theme(self, value: str) -> None:
-        st.session_state[SS.campus_theme] = value
+    @community_theme.setter
+    def community_theme(self, value: str) -> None:
+        st.session_state[SS.community_theme] = value
 
     def get(self, key: str, default=None):
         """Typed get — prefer specific properties for common keys."""

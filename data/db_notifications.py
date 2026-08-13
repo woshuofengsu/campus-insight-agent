@@ -2,13 +2,17 @@
 """Notification system — persistent notifications for the feedback loop.
 
 Triggers:
-  - Teacher updates issue status → notifies the reporter
-  - Teacher responds/adopts proposal → notifies the author
+  - Grid updates issue status → notifies the reporter
+  - Grid responds/adopts proposal → notifies the author
   - Health alerts → notifies all users (future)
 
 Displayed in sidebar badge + notification center page.
 """
+import logging
+
 from data.db_core import get_db
+
+_log = logging.getLogger(__name__)
 
 
 # ── Create ──
@@ -28,13 +32,13 @@ def create_notification(user_id: int, type_: str, title: str,
 
 def broadcast_notification(type_: str, title: str,
                            content: str = "", related_id: int | None = None) -> int:
-    """Broadcast a notification to all active student users. Returns count of recipients."""
+    """Broadcast a notification to all active resident users. Returns count of recipients."""
     with get_db() as conn:
-        students = conn.execute(
-            "SELECT id FROM user_profile WHERE role = 'student' AND is_active = 1"
+        residents = conn.execute(
+            "SELECT id FROM user_profile WHERE role = 'resident' AND is_active = 1"
         ).fetchall()
         count = 0
-        for s in students:
+        for s in residents:
             conn.execute(
                 "INSERT INTO notifications (user_id, type, title, content, related_id) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -47,32 +51,41 @@ def broadcast_notification(type_: str, title: str,
 
 def notify_issue_status_change(issue_id: int, new_status: str,
                                 reporter_username: str = "") -> None:
-    """When teacher changes issue status, notify the reporter.
+    """When grid changes issue status, notify the reporter.
 
     Resolves the reporter from the issue's author field, then looks up
-    the user by that author name/student_id.
+    the user by that author name/resident_id.
     """
     with get_db() as conn:
         issue = conn.execute(
-            "SELECT title, author FROM campus_issues WHERE id = ?", (issue_id,)
+            "SELECT title, author, reporter_id FROM community_issues WHERE id = ?", (issue_id,)
         ).fetchone()
         if not issue:
             return
 
         issue_title = issue["title"] or f"工单 #{issue_id}"
         author = (issue["author"] or "").strip()
+        reporter_id = issue["reporter_id"]
 
-        # Resolve author to user_id — try student_id, name, then username
+        # Resolve reporter: prefer reporter_id (robust + privacy-safe for anonymous
+        # reports), fall back to author-string matching for legacy rows.
         reporter = None
-        if author:
+        if reporter_id:
             reporter = conn.execute(
                 "SELECT id, username, name FROM user_profile "
-                "WHERE (student_id = ? OR name = ? OR username = ?) AND is_active = 1 "
+                "WHERE id = ? AND is_active = 1 LIMIT 1",
+                (reporter_id,),
+            ).fetchone()
+        if not reporter and author:
+            reporter = conn.execute(
+                "SELECT id, username, name FROM user_profile "
+                "WHERE (resident_id = ? OR name = ? OR username = ?) AND is_active = 1 "
                 "LIMIT 1",
                 (author, author, author),
             ).fetchone()
 
         if not reporter:
+            _log.debug("notify_issue_status_change: reporter not found for #%d", issue_id)
             return  # can't find the reporter — skip notification
 
         status_cn = {
@@ -93,38 +106,45 @@ def notify_issue_status_change(issue_id: int, new_status: str,
 
 def notify_proposal_status_change(proposal_id: int, new_status: str,
                                    response_text: str = "") -> None:
-    """When teacher responds/adopts proposal, notify the author."""
+    """When grid responds/adopts proposal, notify the author."""
     with get_db() as conn:
         prop = conn.execute(
-            "SELECT title, author FROM proposals WHERE id = ?", (proposal_id,)
+            "SELECT title, author, reporter_id FROM proposals WHERE id = ?", (proposal_id,)
         ).fetchone()
         if not prop:
             return
 
         prop_title = prop["title"] or f"提案 #{proposal_id}"
         author = (prop["author"] or "").strip()
+        reporter_id = prop["reporter_id"]
 
         proposer = None
-        if author:
+        if reporter_id:
+            proposer = conn.execute(
+                "SELECT id FROM user_profile WHERE id = ? AND is_active = 1 LIMIT 1",
+                (reporter_id,),
+            ).fetchone()
+        if not proposer and author:
             proposer = conn.execute(
                 "SELECT id FROM user_profile "
-                "WHERE (student_id = ? OR name = ? OR username = ?) AND is_active = 1 "
+                "WHERE (resident_id = ? OR name = ? OR username = ?) AND is_active = 1 "
                 "LIMIT 1",
                 (author, author, author),
             ).fetchone()
 
         if not proposer:
+            _log.debug("notify_proposal_status_change: proposer not found for #%d", proposal_id)
             return
 
         status_config = {
             "已回应": (
                 "💬 收到回复",
-                f"你的提案「{prop_title}」收到了老师回复"
+                f"你的提案「{prop_title}」收到了网格员回复"
                 + (f"：{response_text[:100]}" if response_text else "。"),
             ),
             "已采纳": (
                 "✅ 已被采纳",
-                f"你的提案「{prop_title}」已被学校采纳！"
+                f"你的提案「{prop_title}」已被社区采纳！"
                 + (f" 回复：{response_text[:100]}" if response_text else ""),
             ),
             "已实施": (
@@ -227,17 +247,17 @@ def get_activity_summary() -> dict:
     with get_db() as conn:
         today_issues = conn.execute(
             "SELECT COUNT(*) as cnt FROM activity_log "
-            "WHERE date(created_at) = date('now', 'localtime') "
+            "WHERE date(created_at, 'localtime') = date('now', 'localtime') "
             "AND action = '上报问题'"
         ).fetchone()
         today_resolved = conn.execute(
             "SELECT COUNT(*) as cnt FROM activity_log "
-            "WHERE date(created_at) = date('now', 'localtime') "
+            "WHERE date(created_at, 'localtime') = date('now', 'localtime') "
             "AND action = '解决问题'"
         ).fetchone()
         today_proposals = conn.execute(
             "SELECT COUNT(*) as cnt FROM activity_log "
-            "WHERE date(created_at) = date('now', 'localtime') "
+            "WHERE date(created_at, 'localtime') = date('now', 'localtime') "
             "AND action = '提交提案'"
         ).fetchone()
         return {
@@ -248,7 +268,7 @@ def get_activity_summary() -> dict:
 
 
 def seed_activity_from_existing() -> dict:
-    """Backfill activity_log from existing campus_issues and proposals.
+    """Backfill activity_log from existing community_issues and proposals.
 
     Idempotent — skips entries that already have corresponding log records.
     Returns counts of what was created.
@@ -259,13 +279,13 @@ def seed_activity_from_existing() -> dict:
         # ── Issue reports ──
         issues = conn.execute(
             "SELECT id, title, author, category, location, status, "
-            "reported_at, resolved_at FROM campus_issues "
+            "reported_at, resolved_at FROM community_issues "
             "WHERE author IS NOT NULL AND author != '' AND author != '系统感知'"
         ).fetchall()
 
         for issue in issues:
             iid = issue["id"]
-            author = issue["author"] or "同学"
+            author = issue["author"] or "居民"
             title = issue["title"] or ""
             detail = f'{issue["category"]} · {issue["location"]}' if issue["location"] else issue["category"]
 
@@ -295,7 +315,7 @@ def seed_activity_from_existing() -> dict:
                     conn.execute(
                         "INSERT INTO activity_log (actor, action, target_type, target_id, "
                         "target_title, detail, created_at) VALUES (?, '解决问题', 'issue', ?, ?, ?, ?)",
-                        ("后勤维修组", iid, title, detail, issue["resolved_at"]),
+                        ("物业维修班", iid, title, detail, issue["resolved_at"]),
                     )
                     result["resolutions"] += 1
 
@@ -309,7 +329,7 @@ def seed_activity_from_existing() -> dict:
 
         for prop in proposals:
             pid = prop["id"]
-            author = prop["author"] or "同学"
+            author = prop["author"] or "居民"
             title = prop["title"] or ""
             cat = prop["category"] or ""
 
@@ -340,7 +360,7 @@ def seed_activity_from_existing() -> dict:
                         "INSERT INTO activity_log (actor, action, target_type, target_id, "
                         "target_title, detail, created_at) VALUES (?, ?, 'proposal', ?, ?, ?, "
                         "datetime(?, '+1 day'))",
-                        ("校方", action, pid, title, cat, prop["created_at"]),
+                        ("网格员", action, pid, title, cat, prop["created_at"]),
                     )
                     result["proposals"] += 1
 

@@ -1,12 +1,12 @@
 # ui/pages/issues.py
-"""🔧 随手报修 · 报 — 直接上报、追踪工单、看分类分布."""
+"""🔧 接诉即办 · 报 — 直接上报、追踪工单、看分类分布."""
 import streamlit as st
 import altair as alt
 import pandas as pd
 from data.database import get_issues, report_issue as db_report_issue
 from ui.cache import cached_issues_stats as get_issues_stats, invalidate_issues
-from tools.action_report_issue import _auto_classify, _auto_urgency, validate_location
-from ui.components import TOKEN, section, stat, issue_card, info_card, ooda_nav, CAT_LABEL, resolve_author, configure_altair
+from tools.action_report_issue import _llm_classify, validate_location
+from ui.components import TOKEN, section, stat, issue_card, info_card, ooda_nav, CAT_LABEL, resolve_author, configure_altair, page_header
 import logging
 _log = logging.getLogger(__name__)
 
@@ -20,19 +20,9 @@ else:
 # Derive author identity from profile
 _author = resolve_author(profile)
 
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🔧 随手报修</span>'
-    f'<span style="background:{TOKEN["warning"]};color:#fff;font-size:0.7em;font-weight:600;'
-    f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">报</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("发现校园问题？一句话上报，自动分类定级。")
+page_header("🔧 接诉即办", "发现社区诉求？一句话上报，自动分类定级。", "报")
 
 ooda_nav("issues")
-
-st.markdown("---")
 
 # ⚡ Quick report — native form (no chat needed)
 
@@ -65,9 +55,11 @@ def _do_issues_report():
     if loc_err:
         st.session_state._report_error = loc_err
         return
-    # Auto classify and submit
-    category = _auto_classify(title, "")
-    urgency = _auto_urgency(title, "")
+    # Auto classify (single LLM call, cached) and submit
+    category, urgency = _llm_classify(title, "")
+    # Anonymous reporting: public author field stores a stable pseudonym; reporter_id
+    # still tracks identity for closed-loop notification.
+    anonymous = st.session_state.get("quick_report_anonymous", False)
     try:
         issue_id = db_report_issue(
             title=title,
@@ -76,6 +68,8 @@ def _do_issues_report():
             description="",
             urgency=urgency,
             author=_author,
+            suggested_category=category,  # persist AI classification for grid-manager review
+            anonymous=anonymous,
         )
         urgency_emoji = {"普通": "🔵", "紧急": "🟠", "极急": "🔴"}
         invalidate_issues()  # ensure "我的" page shows fresh data
@@ -101,7 +95,7 @@ with st.container(border=True):
     )
     st.text_input(
         "问题描述",
-        placeholder="比如：三教二楼男厕所水龙头漏水、操场跑道有个坑...",
+        placeholder="比如：3号楼二楼卫生间水龙头漏水、小区广场地面有个坑...",
         label_visibility="collapsed",
         key="quick_report_title",
     )
@@ -109,9 +103,10 @@ with st.container(border=True):
     with c1:
         st.text_input(
             "📍 地点（可选）",
-            placeholder="比如：三教二楼男厕",
+            placeholder="比如：3号楼二楼卫生间",
             key="quick_report_location",
         )
+        st.checkbox("🙈 匿名上报（不公开我的信息）", key="quick_report_anonymous")
     with c2:
         st.button("上报", type="primary", width="stretch", key="quick_report_btn", on_click=_do_issues_report)
 
@@ -135,7 +130,7 @@ except Exception as e:
 total = stats["total"]
 
 if total == 0:
-    info_card("在上方输入框描述问题，成为第一个让校园变好的人！")
+    info_card("在上方输入框描述问题，成为第一个让社区变好的人！")
     st.stop()
 
 by_status = stats.get("by_status", {})

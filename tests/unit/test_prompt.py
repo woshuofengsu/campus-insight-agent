@@ -11,92 +11,92 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# -- 1. detect_persona — Repair Persona (报修助手) --
+# -- 1. detect_persona — Repair Persona (接诉助手) --
 
 class TestPersonaRepair(unittest.TestCase):
-    """Tests for 报修助手 persona detection."""
+    """Tests for 接诉助手 persona detection."""
 
     def test_broken_keyword_high_confidence(self):
         from agent.prompt import detect_persona
-        r = detect_persona("教三楼灯坏了漏水故障不亮了")
+        r = detect_persona("3号楼灯坏了漏水故障不亮了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
         self.assertEqual(r["confidence"], "high")
 
     def test_single_broken_keyword(self):
         from agent.prompt import detect_persona
         r = detect_persona("水龙头漏水了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_not_working_pattern(self):
         from agent.prompt import detect_persona
         r = detect_persona("空调不工作了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_no_power_pattern(self):
         from agent.prompt import detect_persona
-        r = detect_persona("教室没电了")
+        r = detect_persona("楼道没电了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_stopped_pattern(self):
         from agent.prompt import detect_persona
         r = detect_persona("电梯停了不动了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_broken_window_pattern(self):
         from agent.prompt import detect_persona
         r = detect_persona("窗户玻璃碎了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_v2_extended_keyword_blurry(self):
         from agent.prompt import detect_persona
-        r = detect_persona("投影仪模糊看不清")
+        r = detect_persona("路灯模糊看不清")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_v2_extended_keyword_too_loud(self):
         from agent.prompt import detect_persona
-        r = detect_persona("教室太吵了噪音大")
+        r = detect_persona("楼道太吵了噪音大")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_v2_extended_keyword_stuck(self):
         from agent.prompt import detect_persona
         r = detect_persona("门卡住了关不上")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_v2_toilet_keyword(self):
         from agent.prompt import detect_persona
         r = detect_persona("马桶堵了冲不了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_v2_smell_keyword(self):
         from agent.prompt import detect_persona
-        r = detect_persona("厕所味大臭了")
+        r = detect_persona("楼道味大臭了")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
 
-# -- 2. detect_persona — Observer Persona (校园观察员) --
+# -- 2. detect_persona — Observer Persona (社区观察员) --
 
 class TestPersonaObserver(unittest.TestCase):
 
-    def test_campus_pulse_direct(self):
+    def test_community_pulse_direct(self):
         from agent.prompt import detect_persona
-        r = detect_persona("校园脉搏")
+        r = detect_persona("社区脉搏")
         self.assertIsNotNone(r)
         self.assertIn("观察员", r["role"])
 
     def test_whats_happening(self):
         from agent.prompt import detect_persona
-        r = detect_persona("最近校园发生了什么")
+        r = detect_persona("最近社区发生了什么")
         self.assertIsNotNone(r)
         self.assertIn("观察员", r["role"])
 
@@ -115,7 +115,7 @@ class TestPersonaObserver(unittest.TestCase):
 
     def test_news_query(self):
         from agent.prompt import detect_persona
-        r = detect_persona("校园最新消息")
+        r = detect_persona("社区最新消息")
         self.assertIsNotNone(r)
         self.assertIn("观察员", r["role"])
 
@@ -132,7 +132,7 @@ class TestPersonaAnalyst(unittest.TestCase):
 
     def test_data_query(self):
         from agent.prompt import detect_persona
-        r = detect_persona("校园治理数据")
+        r = detect_persona("社区治理数据")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
@@ -144,7 +144,7 @@ class TestPersonaAnalyst(unittest.TestCase):
 
     def test_category_question(self):
         from agent.prompt import detect_persona
-        r = detect_persona("食堂有什么问题")
+        r = detect_persona("停车有什么问题")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
@@ -156,7 +156,7 @@ class TestPersonaAnalyst(unittest.TestCase):
 
     def test_report_stats_pattern(self):
         from agent.prompt import detect_persona
-        r = detect_persona("报修统计数据")
+        r = detect_persona("工单统计数据")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
@@ -180,13 +180,13 @@ class TestPersonaAdvisor(unittest.TestCase):
 
     def test_suggestion_pattern(self):
         from agent.prompt import detect_persona
-        r = detect_persona("我觉得应该延长图书馆时间")
+        r = detect_persona("我觉得应该延长活动室时间")
         self.assertIsNotNone(r)
         self.assertIn("议事顾问", r["role"])
 
     def test_price_complaint(self):
         from agent.prompt import detect_persona
-        r = detect_persona("食堂涨价太贵了不合理")
+        r = detect_persona("物业费涨价太贵了不合理")
         self.assertIsNotNone(r)
         self.assertIn("议事顾问", r["role"])
 
@@ -204,7 +204,7 @@ class TestPersonaAdvisor(unittest.TestCase):
 
     def test_v2_appeal_pattern(self):
         from agent.prompt import detect_persona
-        r = detect_persona("呼吁学校建设快递柜")
+        r = detect_persona("呼吁降低物业费")
         self.assertIsNotNone(r)
         self.assertIn("议事顾问", r["role"])
 
@@ -247,16 +247,16 @@ class TestPersonaEdgeCases(unittest.TestCase):
     def test_very_long_input(self):
         """Very long inputs should still work (no truncation)."""
         from agent.prompt import detect_persona
-        long_text = "教三楼" + "的灯" * 200 + "坏了"
+        long_text = "3号楼" + "的灯" * 200 + "坏了"
         r = detect_persona(long_text)
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_mixed_chinese_english(self):
         from agent.prompt import detect_persona
-        r = detect_persona("wifi坏了教室")
+        r = detect_persona("wifi坏了楼道")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_pure_english_no_match(self):
         from agent.prompt import detect_persona
@@ -284,7 +284,7 @@ class TestStatusQueryOverride(unittest.TestCase):
 
     def test_solved_yet_redirects_to_analyst(self):
         from agent.prompt import detect_persona
-        r = detect_persona("教三楼的灯坏了解决了吗")
+        r = detect_persona("3号楼的灯坏了解决了吗")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
@@ -322,16 +322,16 @@ class TestSemanticFallback(unittest.TestCase):
     def test_regex_fallback_repair(self):
         """Input with location+problem not in keyword list — semantic regex catches it."""
         from agent.prompt import detect_persona
-        # "教3楼饮水机无法出水" — "饮水机" in facility regex, "无法" in problem regex
+        # "3号楼饮水机突然无法出水" — "饮水机" in facility regex, "无法" in problem regex
         # but neither is in the keyword list, so it must go through semantic fallback
-        r = detect_persona("教3楼饮水机无法出水")
+        r = detect_persona("饮水机突然无法出水")
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])
+        self.assertIn("接诉", r["role"])
 
     def test_regex_fallback_projector(self):
         from agent.prompt import detect_persona
-        r = detect_persona("投影仪模糊看不清")
-        # This one has keyword "看不清" + "投影仪" → direct match likely
+        r = detect_persona("路灯模糊看不清")
+        # This one has keyword "看不清" + "路灯" → direct match likely
         self.assertIsNotNone(r)
 
     def test_regex_fallback_suggestion(self):
@@ -353,9 +353,9 @@ class TestSystemPrompt(unittest.TestCase):
     def test_builds_with_basic_profile(self):
         from agent.prompt import get_system_prompt
         prompt = get_system_prompt({
-            "school": "测试大学",
-            "grade": "大三",
-            "major": "计算机科学",
+            "community": "测试大学",
+            "building": "大三",
+            "unit": "计算机科学",
         })
         self.assertIsInstance(prompt, str)
         self.assertIn("测试大学", prompt)
@@ -369,18 +369,18 @@ class TestSystemPrompt(unittest.TestCase):
 
     def test_contains_tool_names(self):
         from agent.prompt import get_system_prompt
-        prompt = get_system_prompt({"school": "测试"})
+        prompt = get_system_prompt({"community": "测试"})
         # Should mention key tool names
         self.assertIn("report_issue", prompt)
 
     def test_contains_forbidden_behavior(self):
         from agent.prompt import get_system_prompt
-        prompt = get_system_prompt({"school": "测试"})
+        prompt = get_system_prompt({"community": "测试"})
         self.assertIn("绝对不能", prompt)
 
     def test_contains_four_characters(self):
         from agent.prompt import get_system_prompt
-        prompt = get_system_prompt({"school": "测试"})
+        prompt = get_system_prompt({"community": "测试"})
         self.assertIn("知", prompt)
         self.assertIn("报", prompt)
         self.assertIn("议", prompt)
@@ -389,7 +389,7 @@ class TestSystemPrompt(unittest.TestCase):
     def test_injects_environment_context(self):
         from agent.prompt import get_system_prompt
         prompt = get_system_prompt(
-            {"school": "测试"},
+            {"community": "测试"},
             environment_context="⚠️ 当前有3条紧急告警",
         )
         self.assertIn("紧急告警", prompt)
@@ -404,9 +404,9 @@ class TestSystemPrompt(unittest.TestCase):
         from agent.prompt import get_system_prompt
         # Preferences are parsed but may or may not appear in prompt depending on template
         prompt = get_system_prompt({
-            "school": "测试",
-            "grade": "大三",
-            "major": "计算机",
+            "community": "测试",
+            "building": "大三",
+            "unit": "计算机",
             "preferences": '["篮球", "编程"]',
         })
         self.assertIsInstance(prompt, str)
@@ -417,7 +417,7 @@ class TestSystemPrompt(unittest.TestCase):
         from agent.prompt import get_system_prompt
         # Invalid JSON should not crash
         prompt = get_system_prompt({
-            "school": "测试",
+            "community": "测试",
             "preferences": "not valid json",
         })
         self.assertIsInstance(prompt, str)

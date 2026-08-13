@@ -4,9 +4,9 @@
 Covers the code paths that competition judges are most likely to inspect:
   1. detect_persona() -- keyword-based intent routing
   2. OfflineAgent._route() -- rule-based persona dispatch
-  3. CampusAgent._enforce_tool_call() -- anti-hallucination safety net
-  4. CampusAgent._observe() -- environment perception phase
-  5. helpers.extract_location() -- campus location parsing
+  3. CommunityAgent._enforce_tool_call() -- anti-hallucination safety net
+  4. CommunityAgent._observe() -- environment perception phase
+  5. helpers.extract_location() -- community location parsing
 """
 import sys
 import os
@@ -22,20 +22,20 @@ class TestPersonaDetection(unittest.TestCase):
 
     def test_repair_high_confidence(self):
         from agent.prompt import detect_persona
-        r = detect_persona("教三楼灯坏了漏水故障")  # 教三楼灯坏了漏水故障
+        r = detect_persona("3号楼灯坏了漏水故障")  # 3号楼灯坏了漏水故障
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])  # 报修
+        self.assertIn("接诉", r["role"])  # 接诉
         self.assertEqual(r["confidence"], "high")
 
     def test_repair_single_keyword(self):
         from agent.prompt import detect_persona
         r = detect_persona("水龙头漏水")  # 水龙头漏水
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])  # 报修
+        self.assertIn("接诉", r["role"])  # 接诉
 
     def test_pulse_observer(self):
         from agent.prompt import detect_persona
-        r = detect_persona("校园脉搏")  # 校园脉搏
+        r = detect_persona("社区脉搏")  # 社区脉搏
         self.assertIsNotNone(r)
         self.assertIn("观察员", r["role"])  # 观察员
 
@@ -75,14 +75,14 @@ class TestPersonaDetection(unittest.TestCase):
 
     def test_mixed_cn_en(self):
         from agent.prompt import detect_persona
-        r = detect_persona("wifi坏了教室")  # wifi坏了教室
+        r = detect_persona("wifi坏了楼道")  # wifi坏了楼道
         self.assertIsNotNone(r)
-        self.assertIn("报修", r["role"])  # 报修
+        self.assertIn("接诉", r["role"])  # 接诉
 
     def test_system_prompt_builds(self):
         from agent.prompt import get_system_prompt
         prompt = get_system_prompt({
-            "school": "测试大学", "grade": "大三", "major": "计算机"
+            "community": "测试大学", "building": "大三", "unit": "计算机"
         })
         self.assertIn("report_issue", prompt)
         self.assertGreater(len(prompt), 2000)
@@ -94,32 +94,32 @@ class TestLocationExtraction(unittest.TestCase):
 
     def test_building_with_number(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("教三楼灯坏了"), "教三楼")  # 教三楼灯坏了
+        self.assertEqual(extract_location("3号楼灯坏了"), "3号楼")  # 3号楼灯坏了
 
     def test_dorm_with_room(self):
         from agent.helpers import extract_location
-        result = extract_location("5号宿舍楼302空调坏了")  # 5号宿舍楼302空调坏了
-        self.assertIn("5号宿舍楼", result)  # 5号宿舍楼
+        result = extract_location("5号楼302空调坏了")  # 5号楼302空调坏了
+        self.assertIn("5号楼", result)  # 5号楼
 
     def test_canteen(self):
         from agent.helpers import extract_location
         self.assertEqual(
-            extract_location("一食堂麻辣烫涨价"),  # 一食堂麻辣烫涨价
-            "一食堂"  # 一食堂
+            extract_location("助餐点麻辣烫涨价"),  # 助餐点麻辣烫涨价
+            "助餐点"  # 助餐点
         )
 
     def test_library(self):
         from agent.helpers import extract_location
         self.assertEqual(
-            extract_location("图书馆自习区插座不足"),  # 图书馆自习区插座不足
-            "图书馆"  # 图书馆
+            extract_location("活动室自习区插座不足"),  # 活动室自习区插座不足
+            "活动室"  # 活动室
         )
 
     def test_playground(self):
         from agent.helpers import extract_location
         self.assertEqual(
-            extract_location("操场看台座椅锈蚀"),  # 操场看台座椅锈蚀
-            "操场"  # 操场
+            extract_location("广场看台座椅锈蚀"),  # 广场看台座椅锈蚀
+            "广场"  # 广场
         )
 
     def test_no_location(self):
@@ -128,7 +128,7 @@ class TestLocationExtraction(unittest.TestCase):
 
     def test_short_input_is_location(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("教三楼"), "教三楼")  # 教三楼
+        self.assertEqual(extract_location("3号楼"), "3号楼")  # 3号楼
 
 
 # -- 3. Encouragement Phrases
@@ -158,7 +158,7 @@ class TestTextActionParsing(unittest.TestCase):
 
     def test_multi_action_detected(self):
         from agent.reflector._parser import parse_text_actions
-        steps = parse_text_actions("今日校园脉搏：3个待处理问题，天气晴")  # 今日校园脉搏：3个待处理问题，天气晴
+        steps = parse_text_actions("今日社区脉搏：3个待处理问题，天气晴")  # 今日社区脉搏：3个待处理问题，天气晴
         self.assertGreaterEqual(len(steps), 1)
 
     def test_no_action_detected(self):
@@ -191,8 +191,8 @@ class TestOfflineAgentRouting(unittest.TestCase):
         mock_st.langchain_memory.chat_memory = MagicMock()
         mock_st.langchain_memory.chat_memory.messages = []
         mock_st._login_user_profile = {
-            "name": "test_user", "student_id": "2024001",
-            "school": "测试大学", "grade": "大三", "major": "计算机",
+            "name": "test_user", "resident_id": "2024001",
+            "community": "测试大学", "building": "大三", "unit": "计算机",
         }
         cls.agent = OfflineAgent(mock_st)
 
@@ -205,16 +205,16 @@ class TestOfflineAgentRouting(unittest.TestCase):
 
     def test_route_pulse(self):
         from agent.prompt import detect_persona
-        persona = detect_persona("校园脉搏")  # 校园脉搏
-        result = self.agent._route(persona, "校园脉搏")
+        persona = detect_persona("社区脉搏")  # 社区脉搏
+        result = self.agent._route(persona, "社区脉搏")
         self.assertIsNotNone(result)
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 50)
 
     def test_route_repair(self):
         from agent.prompt import detect_persona
-        persona = detect_persona("教三楼灯坏了")  # 教三楼灯坏了
-        result = self.agent._route(persona, "教三楼灯坏了")
+        persona = detect_persona("3号楼灯坏了")  # 3号楼灯坏了
+        result = self.agent._route(persona, "3号楼灯坏了")
         self.assertIsNotNone(result)
         self.assertIn("#", result)
 
@@ -239,7 +239,7 @@ class TestOfflineAgentRouting(unittest.TestCase):
     def test_handle_general_greeting(self):
         result = self.agent._handle_general("你好")  # 你好
         self.assertIsNotNone(result)
-        self.assertIn("校园", result)  # 校园
+        self.assertIn("社区", result)  # 社区
 
     def test_handle_general_thanks(self):
         result = self.agent._handle_general("谢谢")  # 谢谢
@@ -247,7 +247,7 @@ class TestOfflineAgentRouting(unittest.TestCase):
         self.assertTrue(len(result) > 5)
 
 
-# -- 6. CampusAgent._observe()
+# -- 6. CommunityAgent._observe()
 
 class TestObservePhase(unittest.TestCase):
 
@@ -260,17 +260,17 @@ class TestObservePhase(unittest.TestCase):
         from data.database import init_db
         init_db(cls._db_path)
 
-        from agent.engine import CampusAgent
+        from agent.engine import CommunityAgent
         mock_st = MagicMock()
         mock_st.langchain_memory = MagicMock()
         mock_st.langchain_memory.chat_memory = MagicMock()
         mock_st.langchain_memory.chat_memory.messages = []
         mock_st._login_user_profile = {
-            "name": "test", "student_id": "2024001",
-            "school": "测试大学", "grade": "大三",
+            "name": "test", "resident_id": "2024001",
+            "community": "测试大学", "building": "大三",
         }
-        with patch.object(CampusAgent, '_create_llm', return_value=MagicMock()):
-            cls.agent = CampusAgent(mock_st)
+        with patch.object(CommunityAgent, '_create_llm', return_value=MagicMock()):
+            cls.agent = CommunityAgent(mock_st)
 
     @classmethod
     def tearDownClass(cls):
@@ -322,17 +322,17 @@ class TestEnforceToolCall(unittest.TestCase):
         from data.database import init_db
         init_db(cls._db_path)
 
-        from agent.engine import CampusAgent
+        from agent.engine import CommunityAgent
         mock_st = MagicMock()
         mock_st.langchain_memory = MagicMock()
         mock_st.langchain_memory.chat_memory = MagicMock()
         mock_st.langchain_memory.chat_memory.messages = []
         mock_st._login_user_profile = {
-            "name": "test", "student_id": "2024001",
-            "school": "测试大学", "grade": "大三",
+            "name": "test", "resident_id": "2024001",
+            "community": "测试大学", "building": "大三",
         }
-        with patch.object(CampusAgent, '_create_llm', return_value=MagicMock()):
-            cls.agent = CampusAgent(mock_st)
+        with patch.object(CommunityAgent, '_create_llm', return_value=MagicMock()):
+            cls.agent = CommunityAgent(mock_st)
 
     @classmethod
     def tearDownClass(cls):
@@ -344,15 +344,15 @@ class TestEnforceToolCall(unittest.TestCase):
     def test_successful_call_returns_unchanged(self):
         response = "工单 #42 已创建"  # 工单 #42 已创建
         result = self.agent._enforce_tool_call(
-            response, "教三楼灯坏了",  # 教三楼灯坏了
+            response, "3号楼灯坏了",  # 3号楼灯坏了
             [(MagicMock(tool="report_issue"), "工单 #42 已上报")]  # 工单 #42 已上报
         )
         self.assertEqual(result, response)
 
     def test_non_repair_intent_passes_through(self):
-        response = "校园脉搏显示本周有3个新工单"  # 校园脉搏显示本周有3个新工单
+        response = "社区脉搏显示本周有3个新工单"  # 社区脉搏显示本周有3个新工单
         result = self.agent._enforce_tool_call(
-            response, "校园脉搏", []  # 校园脉搏
+            response, "社区脉搏", []  # 社区脉搏
         )
         self.assertEqual(result, response)
 
@@ -360,7 +360,7 @@ class TestEnforceToolCall(unittest.TestCase):
         """Repair intent + no tool calls -> safety net triggers."""
         result = self.agent._enforce_tool_call(
             "已帮你上报，工单为 #999",  # 已帮你上报，工单为 #999
-            "教三楼灯坏了",  # 教三楼灯坏了
+            "3号楼灯坏了",  # 3号楼灯坏了
             []  # No tool was actually called
         )
         self.assertIsNotNone(result)
@@ -370,7 +370,7 @@ class TestEnforceToolCall(unittest.TestCase):
         """Repair intent + failed tool call -> safety net retries."""
         result = self.agent._enforce_tool_call(
             "工单已创建",  # 工单已创建
-            "教三楼灯坏了",  # 教三楼灯坏了
+            "3号楼灯坏了",  # 3号楼灯坏了
             [(MagicMock(tool="report_issue"), "❌ 上报失败：位置验证不通过")]  # 上报失败：位置验证不通过
         )
         self.assertIsNotNone(result)

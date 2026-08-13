@@ -3,7 +3,7 @@
 import logging
 import streamlit as st
 from ui.session_state import SS
-from ui.components import TOKEN
+from ui.components import TOKEN, page_header
 from data.db_notifications import get_notifications, mark_read, mark_all_read, get_unread_count
 
 _log = logging.getLogger(__name__)
@@ -14,16 +14,7 @@ except Exception:
     _log.warning("Failed to get unread notification count", exc_info=True)
     unread = 0
 
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🔔 消息中心</span>'
-    + (f'<span style="background:{TOKEN["danger"]};color:#fff;font-size:0.7em;font-weight:600;'
-       f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">{unread} 条未读</span>'
-       if unread else '')
-    + '</div>',
-    unsafe_allow_html=True,
-)
-st.caption("教师处理反馈、提案进展、系统提醒 — 全部在这里。")
+page_header("🔔 消息中心", "网格员处理反馈、提案进展、系统提醒 — 全部在这里。", f"{unread} 条未读" if unread else "")
 
 if unread:
     c1, c2 = st.columns([1, 4])
@@ -32,8 +23,6 @@ if unread:
             n = mark_all_read(st.session_state.get(SS.login_user_id, 0))
             st.toast(f"已标记 {n} 条为已读", icon="✅")
             st.rerun()
-
-st.markdown("---")
 
 user_id = st.session_state.get(SS.login_user_id, 0)
 if not user_id:
@@ -49,7 +38,7 @@ if not notifications:
         f'<div style="font-size:3em;margin-bottom:12px;">📭</div>'
         f'<div style="font-size:1em;font-weight:600;color:{TOKEN["text"]};">暂无消息</div>'
         f'<div style="font-size:0.8em;color:{TOKEN["text_muted"]};margin-top:4px;">'
-        f'当老师处理你的报修或回复你的提案时，消息会出现在这里。</div>'
+        f'当网格员处理你的诉求或回复你的提案时，消息会出现在这里。</div>'
         f'</div>',
         unsafe_allow_html=True,
     )

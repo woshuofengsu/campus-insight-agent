@@ -1,13 +1,15 @@
 # ui/theme.py
-"""Theme system — enterprise SaaS, cold gray + single indigo accent.
+"""Theme system — community service counter: warm paper + dual indigo/violet brand.
 
 Design:
   - Light is DEFAULT. Dark available via toggle.
-  - ONE accent color (#4f46e5). Used only on primary buttons, selection,
-    active indicators. Never on card borders, dividers, or decoration.
+  - TWO brand colors: indigo #4f46e5 (primary actions, selection, active) and
+    violet #7c3aed (community-life accent: 议事/活动/通知/邻里温度). Neither is
+    used on card borders, dividers, or decoration.
   - Semantic colors (green/amber/red) appear ONLY on status tags and KPI values.
-  - Cold grays throughout. No warm tones.
-  - 4 font sizes. 2 font weights. No micro-tuning.
+  - Warm neutrals throughout (paper ground, warm near-black text) — no cold gray.
+  - 8 community categories get a color-dot (see ui/components.CAT_COLORS).
+  - 4 font sizes. 3 font weights. No micro-tuning.
 """
 
 import logging
@@ -19,8 +21,16 @@ _log = logging.getLogger(__name__)
 TOKEN_LIGHT = {
         "accent":           "#4f46e5",
     "accent_hover":     "#4338ca",
-    "accent_bg":        "#f0efff",
-    "accent_border":    "#d2d0f8",
+    "accent_bg":        "#eef0ff",
+    "accent_border":    "#cfd4f8",
+
+        "accent2":          "#7c3aed",
+    "accent2_hover":    "#6d28d9",
+    "accent2_bg":       "#f3eefd",
+    "accent2_border":   "#ddd0fb",
+
+        "brand_gradient":   "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+    "brand_gradient_hover": "linear-gradient(135deg, #4338ca 0%, #6d28d9 100%)",
 
         "success":          "#059669",
     "success_bg":       "#ecfdf5",
@@ -35,27 +45,41 @@ TOKEN_LIGHT = {
     "info_bg":          "#ecfeff",
     "info_border":      "#a5f3fc",
 
-        "page_bg":          "#fafafa",
-    "sidebar_bg":       "#f5f5f5",
-    "surface":          "#f5f5f5",
+        "page_bg":          "#faf9f7",
+    "sidebar_bg":       "#f4f1ec",
+    "sidebar_surface":  "#ffffff",
+    "sidebar_border":   "#e9e5df",
+    "sidebar_text":     "#1f1d19",
+    "sidebar_text_sec": "#6b665e",
+    "sidebar_text_muted": "#9c958a",
+    "sidebar_accent":   "#4f46e5",
+    "sidebar_accent_bg":"#eef0ff",
+    "sidebar_warn_bg":  "#fffbeb",
+    "sidebar_warn":     "#d97706",
+    "sidebar_dang_bg":  "#fef2f2",
+    "sidebar_dang":     "#dc2626",
+    "sidebar_succ_bg":  "#ecfdf5",
+    "sidebar_succ":     "#059669",
+    "surface":          "#f4f1ec",
     "card_bg":          "#ffffff",
-    "card_hover":       "#fafafa",
+    "card_hover":       "#fafaf8",
     "input_bg":         "#ffffff",
-    "border":           "#ebebeb",
-    "border_visible":   "#dcdcdc",
-    "border_focus":     "#d0d0f0",
-    "divider":          "#ebebeb",
+    "border":           "#e9e5df",
+    "border_visible":   "#d8d3cb",
+    "border_focus":     "#cfc9f5",
+    "divider":          "#e9e5df",
 
-        "text":             "#1a1a1a",
-    "text_sec":         "#6e6e6e",
-    "text_muted":       "#a0a0a0",
+        "text":             "#1f1d19",
+    "text_sec":         "#6b665e",
+    "text_muted":       "#9c958a",
     "text_inverse":     "#ffffff",
 
-        "font_display":     "1.25em",
+        "font_display":     "1.35em",
     "font_body":        "0.875em",
     "font_label":       "0.75em",
     "font_micro":       "0.6875em",
     "weight_bold":       "700",
+    "weight_semibold":   "600",
     "weight_medium":     "500",
     "tracking_label":    "0.04em",
 
@@ -67,18 +91,18 @@ TOKEN_LIGHT = {
     "space_xl":         "24px",
     "space_2xl":        "32px",
 
-        "radius_input":     "4px",
-    "radius_card":      "6px",
+        "radius_input":     "8px",
+    "radius_card":      "10px",
     "radius_full":      "99px",
 
         "shadow_none":      "none",
-    "shadow_sm":        "0 1px 2px rgba(0,0,0,0.04)",
-    "shadow":           "0 1px 3px rgba(0,0,0,0.06)",
-    "shadow_md":        "0 4px 16px rgba(0,0,0,0.06)",
+    "shadow_sm":        "0 1px 2px rgba(31,29,25,0.05)",
+    "shadow":           "0 1px 3px rgba(31,29,25,0.07)",
+    "shadow_md":        "0 4px 16px rgba(31,29,25,0.08)",
 
         "transition":       "0.15s ease",
 
-        "chart_grid":       "rgba(0,0,0,0.05)",
+        "chart_grid":       "rgba(31,29,25,0.06)",
 }
 
 # Dark tokens
@@ -87,6 +111,14 @@ TOKEN_DARK = {
     "accent_hover":     "#807ef7",
     "accent_bg":        "rgba(109,107,245,0.10)",
     "accent_border":    "rgba(109,107,245,0.18)",
+
+        "accent2":          "#a78bfa",
+    "accent2_hover":    "#b9a0fb",
+    "accent2_bg":       "rgba(167,139,250,0.10)",
+    "accent2_border":   "rgba(167,139,250,0.18)",
+
+        "brand_gradient":   "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+    "brand_gradient_hover": "linear-gradient(135deg, #4338ca 0%, #6d28d9 100%)",
 
         "success":          "#34d399",
     "success_bg":       "rgba(52,211,153,0.08)",
@@ -101,27 +133,41 @@ TOKEN_DARK = {
     "info_bg":          "rgba(34,211,238,0.08)",
     "info_border":      "rgba(34,211,238,0.16)",
 
-        "page_bg":          "#0a0a0f",
-    "sidebar_bg":       "#0e0e14",
-    "surface":          "#111118",
-    "card_bg":          "#18181f",
-    "card_hover":       "#1e1e26",
-    "input_bg":         "#14141a",
-    "border":           "#25252e",
-    "border_visible":   "#2e2e38",
+        "page_bg":          "#12100d",
+    "sidebar_bg":       "#1a1713",
+    "sidebar_surface":  "#201c17",
+    "sidebar_border":   "#2c2822",
+    "sidebar_text":     "#ece9e4",
+    "sidebar_text_sec": "#a39d92",
+    "sidebar_text_muted": "#6b665d",
+    "sidebar_accent":   "#6d6bf5",
+    "sidebar_accent_bg":"rgba(109,107,245,0.10)",
+    "sidebar_warn_bg":  "rgba(251,191,36,0.08)",
+    "sidebar_warn":     "#fbbf24",
+    "sidebar_dang_bg":  "rgba(248,113,113,0.08)",
+    "sidebar_dang":     "#f87171",
+    "sidebar_succ_bg":  "rgba(52,211,153,0.08)",
+    "sidebar_succ":     "#34d399",
+    "surface":          "#1a1713",
+    "card_bg":          "#201c17",
+    "card_hover":       "#262119",
+    "input_bg":         "#1c1915",
+    "border":           "#2c2822",
+    "border_visible":   "#38332c",
     "border_focus":     "rgba(109,107,245,0.25)",
-    "divider":          "#25252e",
+    "divider":          "#2c2822",
 
-        "text":             "#e8e8ed",
-    "text_sec":         "#9898a2",
-    "text_muted":       "#5e5e6a",
-    "text_inverse":     "#0a0a0f",
+        "text":             "#ece9e4",
+    "text_sec":         "#a39d92",
+    "text_muted":       "#6b665d",
+    "text_inverse":     "#12100d",
 
-        "font_display":     "1.25em",
+        "font_display":     "1.35em",
     "font_body":        "0.875em",
     "font_label":       "0.75em",
     "font_micro":       "0.6875em",
     "weight_bold":       "700",
+    "weight_semibold":   "600",
     "weight_medium":     "500",
     "tracking_label":    "0.04em",
 
@@ -133,8 +179,8 @@ TOKEN_DARK = {
     "space_xl":         "24px",
     "space_2xl":        "32px",
 
-        "radius_input":     "4px",
-    "radius_card":      "6px",
+        "radius_input":     "8px",
+    "radius_card":      "10px",
     "radius_full":      "99px",
 
         "shadow_none":      "none",
@@ -148,7 +194,7 @@ TOKEN_DARK = {
 }
 
 # Theme state management
-_THEME_KEY = "_campus_theme_v4"
+_THEME_KEY = "_community_theme_v4"
 
 
 def apply_theme_at_startup():
@@ -191,13 +237,13 @@ def apply_native_theme():
     theme = get_theme()
     try:
         if theme == "dark":
-            st._config.set_option("theme.backgroundColor", "#0a0a0f")
-            st._config.set_option("theme.secondaryBackgroundColor", "#111118")
-            st._config.set_option("theme.textColor", "#e8e8ed")
+            st._config.set_option("theme.backgroundColor", "#12100d")
+            st._config.set_option("theme.secondaryBackgroundColor", "#1a1713")
+            st._config.set_option("theme.textColor", "#ece9e4")
         else:
-            st._config.set_option("theme.backgroundColor", "#fafafa")
-            st._config.set_option("theme.secondaryBackgroundColor", "#f5f5f5")
-            st._config.set_option("theme.textColor", "#1a1a1a")
+            st._config.set_option("theme.backgroundColor", "#faf9f7")
+            st._config.set_option("theme.secondaryBackgroundColor", "#f4f1ec")
+            st._config.set_option("theme.textColor", "#1f1d19")
     except Exception:
         _log.debug("Failed to set native theme config options", exc_info=True)
         pass
@@ -242,6 +288,9 @@ initial-scale=1.0, maximum-scale=1.0, user-scalable=no">""",
     --c-accent: {t["accent"]};
     --c-accent-bg: {t["accent_bg"]};
     --c-accent-border: {t["accent_border"]};
+    --c-accent2: {t["accent2"]};
+    --c-accent2-bg: {t["accent2_bg"]};
+    --c-accent2-border: {t["accent2_border"]};
     --c-success: {t["success"]};
     --c-success-bg: {t["success_bg"]};
     --c-warning: {t["warning"]};
@@ -287,23 +336,45 @@ html, body, #root, [id="root"] {{
     background: {t["page_bg"]} !important;
 }}
 
-/* ── Sidebar ── */
+/* ── Sidebar (warm surface, matches main content) ── */
 @media (min-width: 769px) {{
     [data-testid="stSidebar"] {{
         min-width: 220px !important;
         max-width: 280px !important;
         background: {t["sidebar_bg"]} !important;
-        border-right: 1px solid {t["border"]} !important;
+        border-right: 1px solid {t["sidebar_border"]} !important;
     }}
 }}
 [data-testid="stSidebar"] {{
     background: {t["sidebar_bg"]} !important;
 }}
 [data-testid="stSidebar"] * {{
-    color: {t["text"]} !important;
+    color: {t["sidebar_text"]} !important;
 }}
 [data-testid="stSidebar"] hr {{
-    border-color: {t["border"]} !important;
+    border-color: {t["sidebar_border"]} !important;
+}}
+[data-testid="stSidebar"] .stButton > button {{
+    background: {t["sidebar_surface"]} !important;
+    color: {t["sidebar_text"]} !important;
+    border-color: {t["sidebar_border"]} !important;
+}}
+[data-testid="stSidebar"] .stButton > button:hover {{
+    border-color: {t["sidebar_accent"]} !important;
+    background: {t["sidebar_accent_bg"]} !important;
+    color: {t["sidebar_accent"]} !important;
+}}
+[data-testid="stSidebar"] .stButton > button[kind="primary"] {{
+    background: {t["brand_gradient"]} !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}}
+[data-testid="stSidebar"] [data-baseweb="select"] > div {{
+    background: {t["sidebar_surface"]} !important;
+    border-color: {t["sidebar_border"]} !important;
+}}
+[data-testid="stSidebar"] [data-baseweb="select"] * {{
+    color: {t["sidebar_text"]} !important;
 }}
 
 /* ── Cards ── */
@@ -394,13 +465,15 @@ html, body, #root, [id="root"] {{
     color: {t["accent"]} !important;
 }}
 .stButton > button[kind="primary"] {{
-    background: {t["accent"]} !important;
-    color: #fff !important;
-    border-color: transparent !important;
-    font-weight: {t["weight_bold"]} !important;
+    background: {t["brand_gradient"]} !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: {t["weight_semibold"]} !important;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.28) !important;
 }}
 .stButton > button[kind="primary"]:hover {{
-    background: {t["accent_hover"]} !important;
+    background: {t["brand_gradient_hover"]} !important;
+    box-shadow: 0 6px 18px rgba(79,70,229,0.36) !important;
     filter: none !important;
 }}
 
@@ -472,7 +545,6 @@ html, body, #root, [id="root"] {{
     font-size: {t["font_label"]} !important;
     font-weight: {t["weight_medium"]} !important;
     letter-spacing: {t["tracking_label"]} !important;
-    text-transform: uppercase !important;
 }}
 [data-testid="stMetric"] [data-testid="stMetricValue"] {{
     color: {t["text"]} !important;
@@ -486,12 +558,21 @@ html, body, #root, [id="root"] {{
     border-radius: {t["radius_card"]} !important;
 }}
 [data-testid="stChatMessage"][aria-label*="user"] {{
-    background: {t["accent_bg"]} !important;
-    border-color: {t["accent_border"]} !important;
+    background: {t["brand_gradient"]} !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(79,70,229,0.24) !important;
+}}
+[data-testid="stChatMessage"][aria-label*="user"] [data-testid="stMarkdownContainer"] {{
+    color: #ffffff !important;
+}}
+[data-testid="stChatMessage"][aria-label*="user"] [data-testid="stCaptionContainer"],
+[data-testid="stChatMessage"][aria-label*="user"] .stCaption {{
+    color: rgba(255,255,255,0.78) !important;
 }}
 [data-testid="stChatMessage"][aria-label*="assistant"] {{
     background: {t["card_bg"]} !important;
-    border-color: {t["border"]} !important;
+    border: 1px solid {t["border"]} !important;
+    border-left: 3px solid {t["accent"]} !important;
 }}
 
 /* ── Alerts ── */
@@ -531,12 +612,12 @@ hr {{
 /* ── Scrollbar ── */
 ::-webkit-scrollbar {{ width: 5px; height: 5px; }}
 ::-webkit-scrollbar-thumb {{
-    background: {"rgba(255,255,255,0.10)" if theme == "dark" else "rgba(0,0,0,0.12)"} !important;
+    background: {"rgba(255,255,255,0.10)" if theme == "dark" else "rgba(31,29,25,0.12)"} !important;
     border-radius: 3px;
 }}
 ::-webkit-scrollbar-track {{ background: transparent !important; }}
 ::-webkit-scrollbar-thumb:hover {{
-    background: {"rgba(255,255,255,0.16)" if theme == "dark" else "rgba(0,0,0,0.20)"} !important;
+    background: {"rgba(255,255,255,0.16)" if theme == "dark" else "rgba(31,29,25,0.20)"} !important;
 }}
 
 /* ── Charts ── */
@@ -708,10 +789,6 @@ code, pre {{
     [data-testid="stTable"] td {{
         padding: 4px 6px !important;
     }}
-
-    .ooda-step-label {{ display: none !important; }}
-    .ooda-step {{ min-width: 38px !important; padding: 6px !important; }}
-    .ooda-step-emoji {{ font-size: 1.2em !important; }}
 }}
 </style>"""
     st.markdown(css, unsafe_allow_html=True)

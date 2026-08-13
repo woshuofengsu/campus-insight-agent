@@ -2,8 +2,8 @@
 """Real-time notification system — sidebar badges + toast alerts.
 
 Tracks "last seen" counts in st.session_state and detects changes on each
-rerun. When new issues appear (student view) or urgent items increase
-(teacher view), shows a toast notification and sidebar badge.
+rerun. When new issues appear (resident view) or urgent items increase
+(grid view), shows a toast notification and sidebar badge.
 
 Architecture:
   - Each check compares current DB counts vs. cached session_state counts
@@ -52,8 +52,8 @@ def check_and_notify():
 
     Call once per rerun, before page content (after onboarding gate).
 
-    For students: alerts on new pending issues matching their reports.
-    For teachers: alerts on new urgent issues, new proposals.
+    For residents: alerts on new pending issues matching their reports.
+    For grid managers: alerts on new urgent issues, new proposals.
     """
     counts = _fetch_counts()
     if not counts:
@@ -62,24 +62,24 @@ def check_and_notify():
     role = st.session_state.get("memory")
     if role:
         try:
-            role = role.get_user_profile().get("role", "student")
+            role = role.get_user_profile().get("role", "resident")
         except Exception:
             _log.debug("Failed to resolve user role from memory profile", exc_info=True)
-            role = "student"
+            role = "resident"
     else:
-        role = "student"
+        role = "resident"
 
-    if role == "student":
+    if role == "resident":
         last_total = st.session_state.get(SS.notif_last_total, 0)
         if counts["total"] > last_total and last_total > 0:
             new_count = counts["total"] - last_total
             try:
                 st.toast(
-                    f"📢 校园新增 {new_count} 件工单，点击左侧「🌊 校园脉搏」查看最新动态",
+                    f"📢 社区新增 {new_count} 件工单，点击左侧「🌊 社区脉搏」查看最新动态",
                     icon="📢",
                 )
             except Exception:  # log and skip
-                _log.debug("st.toast failed for student notification (non-critical)")
+                _log.debug("st.toast failed for resident notification (non-critical)")
         st.session_state[SS.notif_last_total] = counts["total"]
 
     else:
@@ -107,7 +107,7 @@ def check_and_notify():
             try:
                 st.toast(msg, icon="🔔")
             except Exception:  # log and skip
-                _log.debug("st.toast failed for teacher notification (non-critical)")
+                _log.debug("st.toast failed for grid notification (non-critical)")
 
         st.session_state[SS.notif_last_urgent] = counts["urgent"]
         st.session_state[SS.notif_last_proposal] = counts["proposal_total"]
@@ -118,7 +118,7 @@ def render_sidebar_badge():
     """Render notification badges in the sidebar.
 
     Shows:
-      - 🔴 badge for urgent items (teacher only)
+      - 🔴 badge for urgent items (grid only)
       - 🟡 badge for pending items
       - 🔔 badge for unread notifications (both roles)
     """
@@ -129,7 +129,7 @@ def render_sidebar_badge():
     role = st.session_state.get("memory")
     if role:
         try:
-            role = role.get_user_profile().get("role", "student")
+            role = role.get_user_profile().get("role", "resident")
         except Exception:  # ok to fail
             _log.debug("Failed to resolve user role in render_sidebar_badge", exc_info=True)
             return
@@ -145,7 +145,7 @@ def render_sidebar_badge():
     except Exception:  # log and skip
         _log.debug("get_unread_count failed for user #%d (non-critical)", user_id)
 
-    if role == "teacher":
+    if role == "grid":
         urgent = counts.get("urgent", 0)
         pending = counts.get("pending", 0)
 
@@ -153,16 +153,16 @@ def render_sidebar_badge():
 
         if urgent > 0:
             badge_html += (
-                f'<span style="background:{TOKEN["danger_bg"]};color:{TOKEN["danger"]};'
-                f'border:1px solid {TOKEN["danger_border"]};border-radius:99px;'
+                f'<span style="background:{TOKEN["sidebar_dang_bg"]};color:{TOKEN["sidebar_dang"]};'
+                f'border:1px solid {TOKEN["sidebar_dang"]};border-radius:99px;'
                 f'padding:2px 10px;font-size:0.72em;font-weight:700;white-space:nowrap;">'
                 f'🔴 {urgent} 紧急</span>'
             )
 
         if pending > 0:
             badge_html += (
-                f'<span style="background:{TOKEN["warning_bg"]};color:{TOKEN["warning"]};'
-                f'border:1px solid {TOKEN["warning_border"]};border-radius:99px;'
+                f'<span style="background:{TOKEN["sidebar_warn_bg"]};color:{TOKEN["sidebar_warn"]};'
+                f'border:1px solid {TOKEN["sidebar_warn"]};border-radius:99px;'
                 f'padding:2px 10px;font-size:0.72em;font-weight:700;white-space:nowrap;">'
                 f'⏳ {pending} 待处理</span>'
             )
@@ -172,17 +172,17 @@ def render_sidebar_badge():
         if urgent > 0 or pending > 0:
             st.markdown(badge_html, unsafe_allow_html=True)
 
-    # Student: show pending count + unread notifications
+    # Resident: show pending count + unread notifications
     else:
         pending = counts.get("pending", 0)
         if pending > 5 or unread_note > 0:
             parts = []
             if pending > 5:
-                parts.append(f'⏳ 全校 {pending} 件待处理')
+                parts.append(f'⏳ 全小区 {pending} 件待处理')
             if unread_note > 0:
                 parts.append(f'🔔 {unread_note} 条新消息')
             st.markdown(
-                f'<div style="font-size:0.72em;color:{TOKEN["warning"]};'
+                f'<div style="font-size:0.72em;color:{TOKEN["sidebar_warn"]};'
                 f'padding:3px 0;">{" · ".join(parts)}</div>',
                 unsafe_allow_html=True,
             )

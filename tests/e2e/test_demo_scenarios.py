@@ -2,8 +2,8 @@
 """End-to-end demo scenario tests — full pipeline from user input to agent response.
 
 Runs 6 competition demo scenarios using OfflineAgent (no LLM dependency):
-  1. Student reports a facility issue → ticket created with ID
-  2. Campus pulse query → weather + hotspots + proposals
+  1. Resident reports a facility issue → ticket created with ID
+  2. Community pulse query → weather + hotspots + proposals
   3. Create proposal → support → status change
   4. Query my issues → find resolved → closed-loop confirmation
   5. Governance audit → four-dimension scoring → action items
@@ -25,11 +25,11 @@ def _make_mock_st():
     mock_st.langchain_memory.chat_memory = MagicMock()
     mock_st.langchain_memory.chat_memory.messages = []
     mock_st._login_user_profile = {
-        "name": "演示学生",
-        "student_id": "2024001",
-        "school": "北京科技大学",
-        "grade": "大三",
-        "major": "计算机科学与技术",
+        "name": "演示居民",
+        "resident_id": "2024001",
+        "community": "北京科技大学",
+        "building": "大三",
+        "unit": "计算机科学与技术",
     }
     return mock_st
 
@@ -61,26 +61,26 @@ class TestDemoScenarios(unittest.TestCase):
     def tearDownClass(cls):
         _cleanup_test_db(cls._db_path)
 
-    # -- Scenario 1: 学生报修 → 自动分类 → 生成工单 → 确认工单号 --
+    # -- Scenario 1: 居民报修 → 自动分类 → 生成工单 → 确认工单号 --
 
-    def test_scenario_1_student_repair(self):
-        """Student reports a facility issue, gets ticket ID back."""
-        # Step 1: Student describes a problem
-        response1 = self.agent.run("教三楼二楼走廊的灯不亮了，晚上走路很危险")
+    def test_scenario_1_resident_repair(self):
+        """Resident reports a facility issue, gets ticket ID back."""
+        # Step 1: Resident describes a problem
+        response1 = self.agent.run("3号楼二楼楼道的灯不亮了，晚上走路很危险")
         self.assertIsInstance(response1, str)
         self.assertIn("✅", response1, "Should confirm issue creation")
         self.assertIn("#", response1, "Should include issue ID")
 
-        # Step 2: Student checks their issues (may not match due to offline author resolution)
+        # Step 2: Resident checks their issues (may not match due to offline author resolution)
         response2 = self.agent.run("查看我的工单")
         self.assertIsInstance(response2, str)
         self.assertTrue(len(response2) > 10, "My issues query should return something")
 
-    # -- Scenario 2: 校园脉搏 → 天气+热点+提案 三合一 --
+    # -- Scenario 2: 社区脉搏 → 天气+热点+提案 三合一 --
 
-    def test_scenario_2_campus_pulse(self):
-        """Campus pulse delivers weather, hotspots, and proposals."""
-        response = self.agent.run("校园脉搏")
+    def test_scenario_2_community_pulse(self):
+        """Community pulse delivers weather, hotspots, and proposals."""
+        response = self.agent.run("社区脉搏")
         self.assertIsInstance(response, str)
         self.assertTrue(len(response) > 80, "Pulse should be substantial")
 
@@ -96,7 +96,7 @@ class TestDemoScenarios(unittest.TestCase):
         """Create proposal, check it appears, and support flow."""
         # Step 1: Express intent to create a proposal
         response1 = self.agent.run(
-            "我觉得应该延长图书馆开放时间到晚上11点，方便考研同学复习"
+            "我觉得应该延长活动室开放时间到晚上11点，方便大家活动"
         )
         self.assertIsInstance(response1, str)
         self.assertTrue(len(response1) > 20)
@@ -114,7 +114,7 @@ class TestDemoScenarios(unittest.TestCase):
     def test_scenario_4_closed_loop(self):
         """Query my issues, check status, closed-loop confirmation."""
         # First report an issue to have data
-        self.agent.run("教三楼水龙头漏水需要维修")
+        self.agent.run("3号楼水龙头漏水需要维修")
 
         # Then check "my issues"
         response = self.agent.run("我的工单处理得怎么样了")
@@ -148,9 +148,9 @@ class TestDemoScenarios(unittest.TestCase):
         """OfflineAgent handles all persona types without LLM."""
         # Test all four personas work in offline mode
         tests = [
-            ("校园脉搏", "observer"),
+            ("社区脉搏", "observer"),
             ("统计治理数据", "analyst"),
-            ("教三楼灯坏了", "repair"),
+            ("3号楼灯坏了", "repair"),
             ("有什么提案", "advisor"),
             ("你好", "greeting"),
             ("谢谢", "thanks"),
@@ -171,14 +171,14 @@ class TestDemoScenarios(unittest.TestCase):
         """Simulate a natural multi-turn conversation."""
         # Turn 1: Greeting
         r1 = self.agent.run("你好")
-        self.assertIn("校园", r1)
+        self.assertIn("社区", r1)
 
-        # Turn 2: Campus pulse
-        r2 = self.agent.run("校园脉搏")
+        # Turn 2: Community pulse
+        r2 = self.agent.run("社区脉搏")
         self.assertTrue(len(r2) > 50)
 
         # Turn 3: Report an issue
-        r3 = self.agent.run("图书馆空调不制冷了")
+        r3 = self.agent.run("活动室空调不制冷了")
         self.assertIn("✅", r3)
 
         # Turn 4: Check my issues

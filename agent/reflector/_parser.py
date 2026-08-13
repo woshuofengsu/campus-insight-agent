@@ -30,7 +30,7 @@ _TEXT_ACTION_PATTERNS: list[tuple[str, str, str]] = [
     (r"(上报|报修|创建).{0,10}(工单|问题)", "⚡", "act"),
     (r"(已上报|已报修|已提交)", "⚡", "act"),
     (r"(查询|正在查|检索).{0,10}(工单|问题|数据|提案|议题|报修)", "🔍", "observe"),
-    (r"校园脉搏", "🌊", "observe"),
+    (r"社区脉搏", "🌊", "observe"),
     (r"治理(统计|数据|快照|健康)", "📊", "observe"),
     (r"天气", "🌤️", "observe"),
     (r"(创建|发起).{0,10}(提案|议题)", "🗳️", "act"),
@@ -78,16 +78,16 @@ def summarize_step(tool_name: str, tool_input: dict) -> str:
 
     handlers = {
         # 报 — issue reporting
-        "report_issue": lambda: f"上报问题：{str(ti.get('title',''))[:30]} → {ti.get('category','')}",
+        "report_issue": lambda: f"上报诉求：{str(ti.get('title',''))[:30]} → {ti.get('category','')}",
         "query_issues": lambda: f"查询工单：{ti.get('category','') or '全部'} {ti.get('status','') or '全部'}",
         "query_my_issues": lambda: "查询我的工单",
         "query_my_proposals": lambda: "查询我的提案",
         # 知 — observation
-        "get_campus_pulse": lambda: "获取校园脉搏快照",
+        "get_community_pulse": lambda: "获取社区脉搏快照",
         "get_governance_stats": lambda: "查询治理统计数据",
         "get_weather": lambda: "查询天气信息",
-        "query_knowledge": lambda: f"语义搜索校园百科：{str(ti.get('query',''))[:30]}",
-        "get_school_policy": lambda: f"检索校规政策：{str(ti.get('topic',''))[:30]}",
+        "query_knowledge": lambda: f"语义搜索社区知识：{str(ti.get('query',''))[:30]}",
+        "get_community_policy": lambda: f"检索社区规章：{str(ti.get('topic',''))[:30]}",
         # 议 — proposals & discussion
         "create_proposal": lambda: f"创建提案：{str(ti.get('title',''))[:30]}",
         "support_proposal": lambda: f"附议提案 #{ti.get('proposal_id','?')}",
@@ -95,7 +95,7 @@ def summarize_step(tool_name: str, tool_input: dict) -> str:
         "get_topics": lambda: "查询讨论议题",
         "get_topic_detail": lambda: f"查看议题 #{ti.get('topic_id','?')} 详情",
         "express_opinion": lambda: "发表议题意见",
-        "collect_feedback": lambda: "收集校园意见",
+        "collect_feedback": lambda: "收集社区意见",
     }
 
     handler = handlers.get(tool_name)

@@ -1,6 +1,6 @@
 # 扣子 AI 集成指南
 
-让扣子 Bot 能读取你的 CampusInsight Agent 网站，本质是：**你的 API 部署到公网 → 扣子插件导入 OpenAPI → Bot 调用。**
+让扣子 Bot 能读取你的 CommunityInsight Agent 网站，本质是：**你的 API 部署到公网 → 扣子插件导入 OpenAPI → Bot 调用。**
 
 ---
 
@@ -95,7 +95,7 @@ https://你的域名/openapi.json
 3. 选择 **导入 OpenAPI** → 粘贴 `/openapi.json` 的 URL（公网可访问的那个）
 4. 扣子会自动识别所有端点：
    - `POST /api/chat` — 智能对话（核心）
-   - `GET /api/campus-pulse` — 校园脉搏
+   - `GET /api/community-pulse` — 社区脉搏
    - `GET /api/weather` — 天气
    - `GET/POST /api/issues` — 工单查询/上报
    - `GET/POST /api/proposals` — 提案
@@ -111,10 +111,10 @@ https://你的域名/openapi.json
 扣子 Bot 的「人设与回复逻辑」中配置提示词，把插件工具加进去。例如：
 
 ```
-你是「校园先知」，一个校园治理智能助手。
+你是「社区先知」，一个社区治理智能助手。
 
-当学生问你工单/报修/提案/天气/校园脉搏等问题时，
-必须调用 CampusInsight 插件获取真实数据，不得编造。
+当居民问你工单/接诉/提案/天气/社区脉搏等问题时，
+必须调用 CommunityInsight 插件获取真实数据，不得编造。
 
 可用的插件工具：
 - get_weather: 查天气
@@ -122,13 +122,13 @@ https://你的域名/openapi.json
 - report_issue: 上报问题
 - list_proposals: 查提案
 - create_proposal: 创建提案
-- get_campus_pulse: 校园脉搏
+- get_community_pulse: 社区脉搏
 - agent_chat: 智能综合对话（兜底）
 ```
 
 **方式二：用工作流编排**
 
-扣子工作流中，添加 **插件节点** → 选择 CampusInsight → 配置输入参数 → 连接输出到回复。
+扣子工作流中，添加 **插件节点** → 选择 CommunityInsight → 配置输入参数 → 连接输出到回复。
 
 推荐工作流：
 
@@ -137,7 +137,7 @@ https://你的域名/openapi.json
   ↓
 意图识别节点（判断用户想做什么）
   ├─ "天气" → get_weather 插件 → 格式化回复
-  ├─ "报修" → report_issue 插件 → 回复工单号
+  ├─ "接诉" → report_issue 插件 → 回复工单号
   ├─ "提案" → list_proposals 插件 → 展示列表
   └─ "其他" → agent_chat 插件 → 智能综合回复
 ```
@@ -158,17 +158,17 @@ curl http://localhost:18800/api/weather
 # 测试智能对话
 curl -X POST http://localhost:18800/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "最近校园有什么新鲜事？"}'
+  -d '{"message": "最近社区有什么新鲜事？"}'
 
 # 测试离线 AI
 curl -X POST http://localhost:18800/api/chat/offline \
   -H "Content-Type: application/json" \
-  -d '{"message": "教三楼灯坏了"}'
+  -d '{"message": "3号楼电梯故障"}'
 
 # 测试工单上报
 curl -X POST http://localhost:18800/api/issues \
   -H "Content-Type: application/json" \
-  -d '{"title":"图书馆三楼空调漏水","location":"图书馆三楼","description":"持续滴水"}'
+  -d '{"title":"3号楼电梯故障","location":"3号楼","description":"运行时异响"}'
 ```
 
 ### 5.2 扣子 Bot 测试
@@ -176,9 +176,9 @@ curl -X POST http://localhost:18800/api/issues \
 在扣子中点击「发布」→ 在测试窗口对话：
 
 - "今天天气怎么样？" → 应返回真实天气
-- "教三楼灯坏了怎么办？" → 应自动上报工单
-- "看看校园最近有什么提案" → 应返回提案列表
-- "校园脉搏" → 应返回综合快照
+- "3号楼电梯故障怎么办？" → 应自动上报工单
+- "看看社区最近有什么提案" → 应返回提案列表
+- "社区脉搏" → 应返回综合快照
 
 ---
 
@@ -201,10 +201,10 @@ A: 检查公网 URL 是否可达（用浏览器打开 /api/health 验证），�
 A: DeepSeek API 首包延迟 ~2-5 秒。扣子工作流有 30s 超时，足够。如想更快，用 `/api/chat/offline`。
 
 **Q: 没有 DeepSeek API Key？**
-A: 用离线模式 `/api/chat/offline`，纯规则引擎，<100ms 响应。离线模式覆盖 7 种场景：天气、报修、查询、提案、校园脉搏、治理数据、闲聊。
+A: 用离线模式 `/api/chat/offline`，纯规则引擎，<100ms 响应。离线模式覆盖 7 种场景：天气、接诉、查询、提案、社区脉搏、治理数据、闲聊。
 
 **Q: 数据库在哪里？**
-A: API 和 Streamlit 共用同一个 `data/campus_insight.db`。种子数据自动生成。
+A: API 和 Streamlit 共用同一个 `data/community_insight.db`。种子数据自动生成。
 
 **Q: 扣子能读取 Streamlit 网页吗？**
 A: 扣子的「网页浏览」插件只能读静态 HTML。对 Streamlit 这种需要 JS 渲染的动态页面无效。REST API 是正确方式。

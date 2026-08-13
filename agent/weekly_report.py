@@ -1,5 +1,5 @@
 # agent/weekly_report.py
-"""治理周报生成器 — 自动分析校园治理数据并生成结构化周报。
+"""治理周报生成器 — 自动分析社区治理数据并生成结构化周报。
 
 Reuses reflector analysis functions (z-score, cross-time, upgrade paths).
 Compiles executive summary (LLM), KPI snapshot, anomaly alerts, trend analysis,
@@ -28,7 +28,7 @@ def _run_all_analysis():
 
     result = {
         "generated_at": datetime.now().isoformat(),
-        "title": f"校园治理周报 · {datetime.now().strftime('%Y年%m月%d日')}",
+        "title": f"社区治理周报 · {datetime.now().strftime('%Y年%m月%d日')}",
     }
 
     try:
@@ -38,26 +38,26 @@ def _run_all_analysis():
             result["upgrade_paths"] = _detect_upgrade_paths(conn)
 
             # ── Overall KPIs ──
-            total = conn.execute("SELECT COUNT(*) as c FROM campus_issues").fetchone()
+            total = conn.execute("SELECT COUNT(*) as c FROM community_issues").fetchone()
             pending = conn.execute(
-                "SELECT COUNT(*) as c FROM campus_issues WHERE status='待处理'"
+                "SELECT COUNT(*) as c FROM community_issues WHERE status='待处理'"
             ).fetchone()
             in_progress = conn.execute(
-                "SELECT COUNT(*) as c FROM campus_issues WHERE status='处理中'"
+                "SELECT COUNT(*) as c FROM community_issues WHERE status='处理中'"
             ).fetchone()
             resolved = conn.execute(
-                "SELECT COUNT(*) as c FROM campus_issues WHERE status='已解决'"
+                "SELECT COUNT(*) as c FROM community_issues WHERE status='已解决'"
             ).fetchone()
             urgent = conn.execute(
-                "SELECT COUNT(*) as c FROM campus_issues "
-                "WHERE urgency='紧急' AND status != '已解决'"
+                "SELECT COUNT(*) as c FROM community_issues "
+                "WHERE urgency IN ('极急','紧急') AND status != '已解决'"
             ).fetchone()
             week_new = conn.execute(
-                "SELECT COUNT(*) as c FROM campus_issues "
+                "SELECT COUNT(*) as c FROM community_issues "
                 "WHERE reported_at > date('now', '-7 days')"
             ).fetchone()
             week_resolved = conn.execute(
-                "SELECT COUNT(*) as c FROM campus_issues "
+                "SELECT COUNT(*) as c FROM community_issues "
                 "WHERE status='已解决' AND resolved_at > date('now', '-7 days')"
             ).fetchone()
 
@@ -77,7 +77,7 @@ def _run_all_analysis():
             # ── Category breakdown (this week) ──
             cat_rows = conn.execute("""
                 SELECT category, COUNT(*) as cnt
-                FROM campus_issues
+                FROM community_issues
                 WHERE reported_at > date('now', '-7 days')
                 GROUP BY category
                 ORDER BY cnt DESC LIMIT 8
@@ -88,7 +88,7 @@ def _run_all_analysis():
             spatial_rows = conn.execute("""
                 SELECT location, COUNT(*) as cnt,
                        SUM(CASE WHEN urgency='紧急' THEN 1 ELSE 0 END) as urgent_cnt
-                FROM campus_issues
+                FROM community_issues
                 WHERE status IN ('待处理', '处理中') AND location != ''
                 GROUP BY location
                 ORDER BY cnt DESC LIMIT 6
@@ -100,7 +100,7 @@ def _run_all_analysis():
                 SELECT category,
                        COUNT(*) AS resolved_count,
                        ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) AS avg_days
-                FROM campus_issues
+                FROM community_issues
                 WHERE status = '已解决' AND resolved_at IS NOT NULL
                 GROUP BY category
                 HAVING resolved_count >= 2
@@ -108,16 +108,12 @@ def _run_all_analysis():
             """).fetchall()
             result["resolution_efficiency"] = [dict(r) for r in eff_rows]
 
-            # ── SLA overdue (pending > 7 days) ──
-            sla_rows = conn.execute("""
-                SELECT id, title, category, reported_at,
-                       CAST(julianday('now') - julianday(reported_at) AS INTEGER) AS days_open
-                FROM campus_issues
-                WHERE status IN ('待处理', '处理中')
-                  AND reported_at < date('now', '-7 days')
-                ORDER BY days_open DESC LIMIT 8
-            """).fetchall()
-            result["sla_overdue"] = [dict(r) for r in sla_rows]
+            # ── SLA overdue（分级口径统一走 data/db_sla.py）──
+            from data.db_sla import get_sla_breaches
+            result["sla_overdue"] = [
+                {**s, "days_open": s.get("hours_open", 0) // 24}
+                for s in get_sla_breaches(limit=8)
+            ]
 
             # ── Proposals summary ──
             prop_total = conn.execute("SELECT COUNT(*) as c FROM proposals").fetchone()
@@ -187,7 +183,7 @@ def _build_exec_summary_prompt(data: dict) -> str:
     spatial = data.get("spatial_hotspots", [])
 
     parts = [
-        "你是校园治理周报的首席分析师。请根据以下数据撰写一份简短的执行摘要。",
+        "你是社区治理周报的首席分析师。请根据以下数据撰写一份简短的执行摘要。",
         "",
         "## 本周KPI",
         f"- 总工单: {kpi.get('total', 0)} | 待处理: {kpi.get('pending', 0)} | "
@@ -223,11 +219,11 @@ def _build_exec_summary_prompt(data: dict) -> str:
         parts.append("")
 
     if sla:
-        parts.append("## SLA 逾期")
+        parts.append("## SLA 超时")
         for s in sla[:5]:
             parts.append(
                 f"- #{s['id']} {s['title'][:30]} · {s.get('category','')} · "
-                f"逾期 {s['days_open']} 天"
+                f"超时 {s['days_open']} 天"
             )
         parts.append("")
 
@@ -279,7 +275,7 @@ def _generate_exec_summary(data: dict) -> str:
             model=DEEPSEEK_MODEL,
             messages=[
                 {"role": "system",
-                 "content": "你是一个校园治理数据分析师，擅长从数据中发现隐藏的模式和趋势。用简洁专业的中文回复。"},
+                 "content": "你是一个社区治理数据分析师，擅长从数据中发现隐藏的模式和趋势。用简洁专业的中文回复。"},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=500,
@@ -303,8 +299,8 @@ def _format_report(data: dict, exec_summary: str) -> str:
     """Build the full markdown report from analysis data + executive summary."""
     now = datetime.now()
     lines = [
-        f"# 📊 校园治理周报",
-        f"**{now.strftime('%Y年%m月%d日')}** · 校园先知 CampusInsight 自动生成",
+        f"# 📊 社区治理周报",
+        f"**{now.strftime('%Y年%m月%d日')}** · 社区先知 CommunityInsight 自动生成",
         "",
         "---",
         "",
@@ -376,13 +372,13 @@ def _format_report(data: dict, exec_summary: str) -> str:
     if sla:
         lines.append("---")
         lines.append("")
-        lines.append("## ⏰ SLA 逾期预警")
+        lines.append("## ⏰ SLA 超时预警")
         lines.append("")
-        lines.append("| # | 标题 | 类别 | 逾期天数 |")
+        lines.append("| # | 标题 | 类别 | 超时天数 |")
         lines.append("|---|------|------|----------|")
         for s in sla[:8]:
             days = s.get('days_open', 0)
-            flag = "🔴" if days >= 14 else "🟠" if days >= 10 else "🟡"
+            flag = "🔴" if s.get("level") == "critical" else "🟡"
             lines.append(
                 f"| {flag} #{s['id']} | {s['title'][:30]} | "
                 f"{s.get('category', '')} | {days} 天 |"
@@ -456,8 +452,8 @@ def _format_report(data: dict, exec_summary: str) -> str:
     # ── Footer ──
     lines.append("---")
     lines.append("")
-    lines.append(f"*报告由 CampusInsight 自动生成于 {now.strftime('%Y-%m-%d %H:%M')}*")
-    lines.append(f"*数据来源：校园先知治理数据库 · 基于 OODA 反射器分析*")
+    lines.append(f"*报告由 CommunityInsight 自动生成于 {now.strftime('%Y-%m-%d %H:%M')}*")
+    lines.append(f"*数据来源：社区先知治理数据库 · 基于 OODA 反射器分析*")
 
     return "\n".join(lines)
 
@@ -486,5 +482,5 @@ def generate_weekly_report(include_llm_summary: bool = True) -> dict:
         "data": data,
         "exec_summary": exec_summary,
         "markdown": markdown,
-        "title": data.get("title", "校园治理周报"),
+        "title": data.get("title", "社区治理周报"),
     }

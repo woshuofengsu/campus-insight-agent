@@ -1,13 +1,13 @@
-# CampusInsight Agent 部署指南
+# CommunityInsight Agent 部署指南
 
-让评委/同学在手机和电脑上访问你的校园治理智能平台。
+让评委/居民在手机和电脑上访问你的社区治理智能平台。
 
 ---
 
 ## 方案一：Docker 部署（推荐）
 
 ### 前置条件
-- 一台云服务器（阿里云/腾讯云学生机 ~10元/月，或任何有公网 IP 的机器）
+- 一台云服务器（阿里云/腾讯云轻量服务器 ~10元/月，或任何有公网 IP 的机器）
 - 服务器安装 Docker 和 Docker Compose
 
 ### 步骤
@@ -65,7 +65,7 @@ gh repo create campus-insight-agent --public --push
 **4. 在 Advanced Settings 中添加 Secrets：**
 ```
 DEEPSEEK_API_KEY = "sk-xxx"
-CAMPUS_CITY = "北京"
+COMMUNITY_CITY = "北京"
 ```
 
 **5. Deploy！获得 `https://你的用户名.streamlit.app` 链接**
@@ -175,9 +175,9 @@ server {
 DEEPSEEK_API_KEY=sk-your-key-here
 
 # 可选
-CAMPUS_CITY=北京
-CAMPUS_DISTRICT=海淀区
-CAMPUS_API_KEY=your-api-auth-key    # FastAPI 鉴权
+COMMUNITY_CITY=北京
+COMMUNITY_DISTRICT=海淀区
+COMMUNITY_API_KEY=your-api-auth-key    # FastAPI 鉴权
 HEFENG_API_KEY=your-hefeng-key      # 和风天气（不填则用模拟数据）
 OFFLINE_MODE=false                  # 离线模式
 ```

@@ -1,7 +1,7 @@
 # agent/closed_loop.py
 """Closed-loop integrity check — detect unresolved issues and stale proposals.
 
-Extracted from CampusAgent._check_closed_loop().  After each agent response,
+Extracted from CommunityAgent._check_closed_loop().  After each agent response,
 scans the database for the current user's open governance loops and appends
 a gentle reminder note when applicable.
 """
@@ -18,7 +18,7 @@ def check_closed_loop(memory, user_input: str, response: str) -> str:
       - User's pending/processing issues
       - Recently resolved issues (same-day)
       - User's unresponded proposals with ≥5 supporters
-      - Campus-wide stale issues (>7 days)
+      - Community-wide stale issues (>7 days)
 
     Args:
         memory: MemoryManager instance for author resolution.
@@ -84,14 +84,11 @@ def check_closed_loop(memory, user_input: str, response: str) -> str:
                 f"{prop['supporter_count']} 人附议，输入「查看我的提案」了解进展"
             )
 
-        with get_db() as conn:
-            stale = conn.execute(
-                "SELECT COUNT(*) as cnt FROM campus_issues "
-                "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-            ).fetchone()
-        if stale and stale["cnt"] >= 3:
+        from data.db_sla import get_sla_summary
+        stale_cnt = get_sla_summary().get("total_overdue", 0)
+        if stale_cnt >= 3:
             notes.append(
-                f"⚠️ 全校有 {stale['cnt']} 件工单超过 7 天未处理，建议关注积压问题"
+                f"⚠️ 社区有 {stale_cnt} 件工单超时未处理，建议关注积压问题"
             )
 
         if not notes:

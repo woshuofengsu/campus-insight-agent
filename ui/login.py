@@ -1,18 +1,14 @@
 # ui/login.py
 """Login page — clean authentication gate."""
 import streamlit as st
+from ui.components import TOKEN
 from data.db_user import authenticate, create_user, get_user_by_username
 
 
 def render_login():
-    from ui.theme import get_theme
-    is_dark = get_theme() == "dark"
-
-    page_bg = "#0a0a0f" if is_dark else "#fafafa"
-
     st.markdown(f"""
 <style>
-    .stApp {{ background: {page_bg} !important; }}
+    .stApp {{ background: {TOKEN["page_bg"]} !important; }}
     [data-testid="stSidebar"] {{ display: none !important; }}
     [data-testid="stSidebar"] * {{ display: none !important; }}
 </style>
@@ -22,39 +18,47 @@ def render_login():
 
     with col_m:
         st.markdown(f"""
-        <div style="text-align:center;padding:32px 0 20px;">
-            <div style="font-size:1.35em;font-weight:700;color:{("#e8e8ed" if is_dark else "#1a1a1a")};
-                letter-spacing:-0.01em;margin-bottom:4px;">CampusInsight</div>
-            <div style="font-size:0.8em;color:{("#5e5e6a" if is_dark else "#a0a0a0")};">
-                校园治理平台</div>
+        <div style="text-align:center;padding:28px 0 22px;">
+            <div style="width:56px;height:56px;border-radius:16px;
+                background:{TOKEN["brand_gradient"]};
+                display:flex;align-items:center;justify-content:center;
+                font-size:1.6em;margin:0 auto 14px;
+                box-shadow:0 8px 24px rgba(79,70,229,0.35);">🏘️</div>
+            <div style="font-size:1.5em;font-weight:800;color:{TOKEN["text"]};
+                letter-spacing:-0.01em;line-height:1.2;">CommunityInsight</div>
+            <div style="font-size:0.85em;color:{TOKEN["text_muted"]};margin-top:5px;">
+                社区治理平台 · 接诉即办 · 海淀小区</div>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown(
             f'<div style="text-align:center;margin:8px 0 6px;font-size:0.75em;'
-            f'color:{("#5e5e6a" if is_dark else "#a0a0a0")};">快速体验</div>',
+            f'color:{TOKEN["text_muted"]};">快速体验</div>',
             unsafe_allow_html=True,
         )
-        c_demo1, c_demo2 = st.columns(2)
+        c_demo1, c_demo2, c_demo3 = st.columns(3)
         with c_demo1:
-            if st.button("学生", key="demo_student", use_container_width=True):
-                _login_demo("student")
+            if st.button("居民", key="demo_resident", use_container_width=True):
+                _login_demo("resident")
         with c_demo2:
-            if st.button("教师", key="demo_teacher", use_container_width=True):
-                _login_demo("teacher")
+            if st.button("网格员", key="demo_grid", use_container_width=True):
+                _login_demo("grid")
+        with c_demo3:
+            if st.button("👴 老年关怀版", key="demo_elderly", use_container_width=True):
+                _login_demo("elderly")
 
         st.markdown("---")
 
         tab_login, tab_register = st.tabs(["登录", "注册"])
 
         with tab_login:
-            _render_login_form(is_dark)
+            _render_login_form()
         with tab_register:
-            _render_register_form(is_dark)
+            _render_register_form()
 
 
-def _render_login_form(is_dark: bool):
-    muted_color = "#5e5e6a" if is_dark else "#a0a0a0"
+def _render_login_form():
+    muted_color = TOKEN["text_muted"]
 
     username = st.text_input("用户名", key="login_username", placeholder="请输入用户名")
     password = st.text_input("密码", type="password", key="login_password", placeholder="请输入密码")
@@ -74,31 +78,33 @@ def _render_login_form(is_dark: bool):
 
     st.markdown(
         f'<div style="font-size:0.7em;color:{muted_color};margin-top:12px;text-align:center;">'
-        f'演示账号：<code>student1</code> / <code>teacher1</code> — 密码：<code>123</code></div>',
+        f'演示账号：<code>resident1</code> / <code>grid1</code> — 密码：<code>123</code></div>',
         unsafe_allow_html=True,
     )
 
 
-def _render_register_form(is_dark: bool):
-    """Registration form (student only)."""
-    muted_color = "#5e5e6a" if is_dark else "#a0a0a0"
+def _render_register_form():
+    """Registration form (resident only)."""
+    muted_color = TOKEN["text_muted"]
 
     new_username = st.text_input("用户名", key="reg_username", placeholder="请设置用户名")
     new_password = st.text_input("密码", type="password", key="reg_password", placeholder="请设置密码")
+    community = st.text_input("🏘️ 小区", key="reg_community", placeholder="如：海淀小区")
     col_n1, col_n2 = st.columns(2)
     with col_n1:
-        school = st.text_input("院系", key="reg_school", placeholder="如：计算机学院")
+        building = st.text_input("楼栋", key="reg_building", placeholder="如：3号楼")
     with col_n2:
-        grade = st.text_input("年级", key="reg_grade", placeholder="如：2024")
+        unit = st.text_input("单元", key="reg_unit", placeholder="如：2单元")
 
     if st.button("注册", type="primary", width="stretch", key="reg_btn"):
-        if not new_username or not new_password:
-            st.error("请填写必填项")
+        if not new_username or not new_password or not community.strip():
+            st.error("请填写必填项（用户名 / 密码 / 小区）")
             return
         if get_user_by_username(new_username):
             st.error("用户名已存在")
             return
-        uid = create_user(new_username, new_password, school, grade, role="student")
+        uid = create_user(new_username, new_password, community=community.strip(),
+                          building=building, unit=unit, role="resident")
         if uid:
             st.session_state["_login_user_id"] = uid
             st.session_state["_ob_role"] = ""
@@ -109,7 +115,7 @@ def _render_register_form(is_dark: bool):
 
     st.markdown(
         f'<div style="font-size:0.7em;color:{muted_color};margin-top:8px;text-align:center;">'
-        f'学生自行注册。教师账号由管理员预创建。</div>',
+        f'居民自行注册。网格员账号由管理员预创建。</div>',
         unsafe_allow_html=True,
     )
 

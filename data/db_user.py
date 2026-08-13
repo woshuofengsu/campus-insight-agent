@@ -63,8 +63,8 @@ def _get_active_user_id() -> int:
 def authenticate(username: str, password: str = "") -> dict | None:
     """Verify credentials. Returns user profile dict on success, None on failure.
 
-    Students (role='student'): password is optional — empty password accepted.
-    Teachers (role='teacher'): password is REQUIRED and verified against hash.
+    Residents (role='resident'): password is optional — empty password accepted.
+    Grid managers (role='grid'): password is REQUIRED and verified against hash.
     """
     with get_db() as conn:
         row = conn.execute(
@@ -77,12 +77,12 @@ def authenticate(username: str, password: str = "") -> dict | None:
         user = dict(row)
         stored_hash = user.get("password_hash", "")
 
-        if user["role"] == "teacher":
-            # Teacher must provide correct password
+        if user["role"] == "grid":
+            # Grid must provide correct password
             if not _verify_password(password, stored_hash):
                 return None
         else:
-            # Student: if a password is set, verify it; if not, any/empty password works
+            # Resident: if a password is set, verify it; if not, any/empty password works
             if stored_hash and not _verify_password(password, stored_hash):
                 return None
 
@@ -147,21 +147,21 @@ def list_users(role: str | None = None) -> list[dict]:
     with get_db() as conn:
         if role:
             rows = conn.execute(
-                "SELECT id, username, role, name, school, student_id, grade, major "
+                "SELECT id, username, role, name, community, resident_id, building, unit "
                 "FROM user_profile WHERE is_active = 1 AND role = ? ORDER BY role, id",
                 (role,),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT id, username, role, name, school, student_id, grade, major "
+                "SELECT id, username, role, name, community, resident_id, building, unit "
                 "FROM user_profile WHERE is_active = 1 ORDER BY role, id"
             ).fetchall()
         return [dict(r) for r in rows]
 
 
-def create_user(username: str, password: str = "", role: str = "student",
-                school: str = "", grade: str = "", major: str = "",
-                name: str = "", student_id: str = "") -> int:
+def create_user(username: str, password: str = "", role: str = "resident",
+                community: str = "", building: str = "", unit: str = "",
+                name: str = "", resident_id: str = "") -> int:
     """Create a new user. Returns the new user ID. Raises ValueError on duplicate."""
     with get_db() as conn:
         existing = conn.execute(
@@ -172,16 +172,16 @@ def create_user(username: str, password: str = "", role: str = "student",
         pw_hash = _hash_password(password) if password else ""
         cur = conn.execute(
             """INSERT INTO user_profile
-               (username, password_hash, role, school, grade, major, name, student_id)
+               (username, password_hash, role, community, building, unit, name, resident_id)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (username.strip(), pw_hash, role, school, grade, major, name, student_id),
+            (username.strip(), pw_hash, role, community, building, unit, name, resident_id),
         )
         conn.commit()
         return cur.lastrowid
 
 
-def update_user_profile(school: str | None = None, grade: str | None = None,
-                        major: str | None = None, student_id: str | None = None,
+def update_user_profile(community: str | None = None, building: str | None = None,
+                        unit: str | None = None, resident_id: str | None = None,
                         role: str | None = None, name: str | None = None,
                         preferences: list[str] | None = None,
                         user_id: int | None = None,
@@ -197,18 +197,18 @@ def update_user_profile(school: str | None = None, grade: str | None = None,
     with get_db() as conn:
         parts = []
         params: list = []
-        if school is not None:
-            parts.append("school = ?")
-            params.append(school)
-        if grade is not None:
-            parts.append("grade = ?")
-            params.append(grade)
-        if student_id is not None:
-            parts.append("student_id = ?")
-            params.append(student_id)
-        if major is not None:
-            parts.append("major = ?")
-            params.append(major)
+        if community is not None:
+            parts.append("community = ?")
+            params.append(community)
+        if building is not None:
+            parts.append("building = ?")
+            params.append(building)
+        if resident_id is not None:
+            parts.append("resident_id = ?")
+            params.append(resident_id)
+        if unit is not None:
+            parts.append("unit = ?")
+            params.append(unit)
         if role is not None:
             parts.append("role = ?")
             params.append(role)

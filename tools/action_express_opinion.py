@@ -1,5 +1,5 @@
 # tools/action_express_opinion.py
-"""有话说 — 对民意议题发表意见."""
+"""邻里议事 — 对民意议题发表意见."""
 from langchain.tools import tool
 from data.database import (
     add_opinion,
@@ -10,13 +10,13 @@ from data.database import (
 
 @tool
 def express_opinion(topic_id: int, content: str) -> str:
-    """对校园民意议题发表你的看法和意见。
+    """对社区民意议题发表你的看法和意见。
 
     参数：
     - topic_id: 议题编号（必填），可在议题列表中查看
     - content: 你的意见内容（必填），可以是支持、反对、建议、或任何想法
 
-    你的意见会匿名展示在议题讨论区。参与讨论可以帮助学校更好地了解学生需求。
+    你的意见会匿名展示在议题讨论区。参与讨论可以帮助社区更好地了解居民需求。
     """
     if not topic_id or topic_id <= 0:
         return "⚠️ 请提供有效的议题编号。输入'查看议题'可以浏览所有活跃议题。"
@@ -41,7 +41,7 @@ def express_opinion(topic_id: int, content: str) -> str:
     opinion_id = add_opinion(
         topic_id=topic_id,
         content=content.strip(),
-        participant_label="匿名学生",
+        participant_label="匿名居民",
     )
 
     summary = get_opinion_summary(topic_id)

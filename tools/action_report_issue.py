@@ -1,7 +1,7 @@
 # tools/action_report_issue.py
-"""校园问题上报工具 — 基层治理核心功能。
+"""社区诉求上报工具 — 接诉即办核心功能。
 
-学生随手提交校园问题（设施损坏、卫生状况、安全隐患等），
+居民随手提交社区诉求（设施损坏、卫生状况、安全隐患等），
 Agent 使用 LLM 自动分类、评估紧急程度、生成工单记录。
 LLM 调用失败时自动降级为关键词匹配。
 """
@@ -48,8 +48,8 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
         )
 
         prompt = (
-            "你是校园问题分类助手。根据标题和描述，判断类别和紧急程度。\n\n"
-            "类别选项：设施维修, 环境卫生, 安全隐患, 教学设备, 网络服务, 餐饮问题, 校园管理, 其他\n"
+            "你是社区诉求分类助手。根据标题和描述，判断类别和紧急程度。\n\n"
+            "类别选项：设施维修, 环境卫生, 安全隐患, 停车管理, 噪音扰民, 物业服务, 邻里矛盾, 社区事务\n"
             "紧急程度：普通（一般问题）, 紧急（影响较大需尽快处理）, 极急（涉及人身安全或大面积影响）\n\n"
             "甄别标准：\n"
             "- 极急：火灾、漏电、大面积停电停水、电梯困人、严重漏水、人员受伤、煤气泄漏\n"
@@ -74,8 +74,8 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
             urgency = result.get("urgency", "普通")
 
             valid_cats = {
-                "设施维修", "环境卫生", "安全隐患", "教学设备",
-                "网络服务", "餐饮问题", "校园管理", "其他",
+                "设施维修", "环境卫生", "安全隐患", "停车管理",
+                "噪音扰民", "物业服务", "邻里矛盾", "社区事务",
             }
             valid_urg = {"普通", "紧急", "极急"}
             if category not in valid_cats:
@@ -100,31 +100,30 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
     return cat, urg
 
 
-# ── Location validation: dorm/classroom should have location info ──
+# ── Location validation: building/unit issues should have location info ──
 
 _ROOM_REQUIRED_KEYWORDS = [
-    "宿舍", "寝室", "教室", "多媒体", "机房", "实验室", "自习室",
-    "办公室", "会议室", "活动室", "琴房", "画室", "舞蹈室",
+    "楼", "单元", "楼道", "电梯", "天台", "屋面", "车库", "地下室",
 ]
 _ROOM_EXEMPT_KEYWORDS = [
-    "厕所", "洗手间", "卫生间", "走廊", "楼梯", "电梯", "大厅",
-    "操场", "食堂", "图书馆", "校门", "道路", "停车场", "车棚",
-    "快递", "围墙", "花园", "草坪",
+    "广场", "花园", "草坪", "道路", "步道", "大门", "东门", "西门",
+    "南门", "北门", "围墙", "车棚", "快递柜", "全小区", "垃圾桶",
+    "垃圾点", "绿化带", "健身器材",
 ]
-# Accept any reasonable location: building+floor, room number, or building name
+# Accept any reasonable location: building+floor, unit number, or building name
 _ROOM_NUMBER_PATTERN = re.compile(
     r"(\d{3,}|[号楼栋幢层Ff]\s*\d+|"
     r"[A-Za-z]\d{2,}|\d+[层Ff楼]|"
     r"[一二三四五六七八九十]+[层Ff楼]|"
-    r"\d+号(?:宿舍|学生)?楼)"
+    r"\d+号(?:楼|单元)?)"
 )
 
 
 def validate_location(title: str, location: str) -> str | None:
-    """Check dorm/classroom issues have at least building-level location.
+    """Check building/unit issues have at least building-level location.
 
-    Returns error only when location is completely empty for dorm/classroom
-    issues. Any non-empty location (building name, floor, room) is accepted —
+    Returns error only when location is completely empty for building/unit
+    issues. Any non-empty location (building name, floor, unit) is accepted —
     having some location info is always more actionable than blocking the report.
     """
     text = f"{title} {location}"
@@ -133,22 +132,25 @@ def validate_location(title: str, location: str) -> str | None:
 
     if needs_room and not is_exempt:
         if not location.strip():
-            return "⚠️ 宿舍/教室类问题请填写位置（如：5号楼302、教三楼205、宿舍楼2楼）"
+            return "⚠️ 楼栋/单元类诉求请填写位置（如：3号楼2单元、7号楼前空地、中心花园）"
         # Any non-empty location is accepted — partial info > no report
     return None
 
 # Issue categories for auto-classification
 _CATEGORIES = {
-    "设施维修": ["灯", "水龙头", "空调", "电梯", "门", "窗", "桌椅", "投影仪", "黑板", "电源",
-                 "水管", "暖气", "锁", "扶手", "天花板", "地板", "漏水", "停电", "停水"],
-    "环境卫生": ["垃圾", "厕所", "异味", "蟑螂", "老鼠", "灰尘", "脏", "清洁", "消毒", "卫生纸",
-                 "洗手液", "下水道", "污水"],
-    "安全隐患": ["火灾", "电线", "裸露", "玻璃", "裂", "塌", "摔倒", "漏电", "煤气", "消防",
-                 "通道堵塞", "电梯故障", "围栏"],
-    "教学设备": ["电脑", "网络", "WiFi", "音响", "麦克风", "屏幕", "机房", "多媒体", "话筒"],
-    "网络服务": ["网速", "断网", "VPN", "校园网", "登录不了", "系统", "网站", "APP"],
-    "餐饮问题": ["食堂", "饭菜", "价格", "食品", "卫生许可证", "食材", "变质", "排队"],
-    "其他": [],
+    "安全隐患": ["火灾", "漏电", "触电", "煤气", "爆炸", "消防", "通道堵塞", "玻璃碎裂",
+                 "瓷砖脱落", "外墙", "年检", "飞线", "电动车", "电线裸露", "塌", "困人"],
+    "停车管理": ["停车", "车位", "地锁", "占位", "乱停", "违停", "车库", "占道"],
+    "噪音扰民": ["噪音", "扰民", "广场舞", "装修", "施工", "喇叭", "犬吠", "狗叫", "吵闹", "分贝"],
+    "物业服务": ["物业", "报修", "保洁", "保安", "安保", "门禁", "监控", "服务态度"],
+    "邻里矛盾": ["邻里", "纠纷", "矛盾", "空调滴水", "占用公共"],
+    "环境卫生": ["垃圾", "异味", "蟑螂", "老鼠", "蚊虫", "灰尘", "脏", "清洁", "消毒",
+                 "绿化", "杂草", "粪便", "堆物", "清运", "满溢"],
+    "设施维修": ["灯", "水龙头", "空调", "电梯", "门", "窗", "管道", "漏水", "停电", "停水",
+                 "暖气", "扶手", "天花板", "地板", "墙面", "瓷砖", "快递柜", "健身器材",
+                 "滑梯", "声控灯", "路灯", "坡道", "屋面", "渗水", "反味", "下水道", "器材"],
+    "社区事务": ["助餐", "活动", "独居", "老人", "僵尸车", "政策", "咨询", "议事",
+                 "充电桩", "加装电梯", "自行车棚"],
 }
 
 
@@ -179,30 +181,36 @@ def _keyword_urgency(title: str, description: str) -> str:
     return "普通"
 
 
-# Backward-compatible aliases (used by other modules)
-_auto_classify = _keyword_classify
-_auto_urgency = _keyword_urgency
+# ── AI-powered classification for UI forms (LLM with keyword fallback) ──
+def _auto_classify(title: str, description: str = "") -> str:
+    """AI 语义分类 — 由 DeepSeek 判断类别，失败时自动降级为关键词匹配。"""
+    return _llm_classify(title, description)[0]
+
+
+def _auto_urgency(title: str, description: str = "") -> str:
+    """AI 紧急度评估 — 由 DeepSeek 判断紧急程度，失败时自动降级为关键词匹配。"""
+    return _llm_classify(title, description)[1]
 
 
 @tool
 def report_issue(title: str, category: str = "", location: str = "",
                  description: str = "", urgency: str = "") -> str:
-    """上报校园问题 — 发现设施损坏、环境卫生、安全隐患等问题时使用。
+    """上报社区诉求 — 发现设施损坏、环境卫生、安全隐患等问题时使用。
 
-    学生可以快速提交校园中发现的各类问题。Agent 使用 DeepSeek 自动分析和分类，
-    根据语义理解（而非关键词匹配）判断问题类别和紧急程度。LLM 不可用时自动降级为
+    居民可以快速提交小区中发现的各类诉求。Agent 使用 DeepSeek 自动分析和分类，
+    根据语义理解（而非关键词匹配）判断诉求类别和紧急程度。LLM 不可用时自动降级为
     关键词匹配。
     参数：
-    - title: 问题标题（如"三教二楼男厕水龙头漏水"）
-    - category: 可选，问题分类。留空则自动分类
-    - location: 问题地点
-    - description: 问题详细描述
+    - title: 诉求标题（如"3号楼2单元电梯困人"）
+    - category: 可选，诉求分类。留空则自动分类
+    - location: 诉求地点
+    - description: 诉求详细描述
     - urgency: 可选，紧急程度。与 category 同时提供时跳过 LLM 分类（快速路径）
     """
     if not title.strip():
-        return "❌ 请至少提供问题标题，例如：'三教二楼走廊灯不亮了'"
+        return "❌ 请至少提供诉求标题，例如：'3号楼2单元电梯困人了'"
 
-    # Validate location for dorm/classroom issues
+    # Validate location for building/unit issues
     loc_err = validate_location(title, location)
     if loc_err:
         return loc_err
@@ -224,9 +232,10 @@ def report_issue(title: str, category: str = "", location: str = "",
         description=description.strip(),
         urgency=urgency,
         author="",  # Let _resolve_author() auto-fill from user profile
+        suggested_category=category,  # persist AI classification for grid-manager review
     )
 
-    # Invalidate teacher-side caches so new issue is visible immediately
+    # Invalidate grid-side caches so new issue is visible immediately
     try:
         from ui.cache import invalidate_issues
         invalidate_issues()
@@ -240,24 +249,24 @@ def report_issue(title: str, category: str = "", location: str = "",
     ue = urgency_emoji.get(urgency, "🔵")
 
     lines = [
-        "✅ 问题已上报成功！",
+        "✅ 诉求已上报成功！",
         f"",
         f"  📋 工单编号：#{issue_id}",
         f"  📂 分类：{category}",
         f"  {ue} 紧急程度：{urgency}",
         f"  📍 地点：{location or '未指定'}",
         f"",
-        f"📊 校园治理数据：当前共有 {stats['total']} 个上报问题，"
+        f"📊 社区治理数据：当前共有 {stats['total']} 个上报诉求，"
         f"其中 {stats['by_status'].get('待处理', 0)} 个待处理。",
     ]
 
     if urgency in ("紧急", "极急"):
         lines.append(
-            f"\n⚠️ 该问题已被标记为 **{urgency}**，建议同步电话通知相关部门。"
+            f"\n⚠️ 该诉求已被标记为 **{urgency}**，建议同步电话通知网格员/物业。"
         )
     else:
         lines.append(
-            "\n维修/保洁人员将尽快处理。"
+            "\n网格员/物业将尽快处理，进度可在「接诉即办」中追踪。"
         )
 
     return "\n".join(lines)

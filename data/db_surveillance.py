@@ -1,5 +1,5 @@
 # data/db_surveillance.py
-"""🦠 国家传染病监测数据层 — 真实疾控数据 + 季节模型融合.
+"""🦠 国家传染病监测数据层 — 疾控趋势近似数据 + 季节模型融合.
 
 数据来源:
   国家疾控局 (ndcpa.gov.cn) 每月发布《全国法定传染病疫情概况》
@@ -14,7 +14,7 @@
 Why this matters for the competition:
   硬编码的季节模型（"1月流感高发"）没有数据支撑。接入国家监测数据后:
   - base_risk 从 if-else 升级为 data-driven
-  - 评委问"准确率"时: "基于国家疾控局月度公报，近12个月发病率z-score标准化"
+  - 评委问"数据来源"时: "基于国家疾控局月度公报趋势的近似演示值，近12个月发病率z-score标准化"
   - 趋势可视化: 可以画"全国流感发病趋势 vs 本校风险评估"对比图
 """
 import json
@@ -107,7 +107,7 @@ def seed_surveillance(force: bool = False):
                 "INSERT OR REPLACE INTO health_surveillance "
                 "(disease, report_year, report_month, national_cases, national_deaths, region, source) "
                 "VALUES (?,?,?,?,?,?,?)",
-                (disease, year, month, cases, deaths, "全国", "国家疾控局月度公报"),
+                (disease, year, month, cases, deaths, "全国", "国家疾控局月度公报（近似值）"),
             )
             inserted += 1
         conn.commit()
@@ -148,7 +148,7 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
                 "hist_min": 15000, "hist_max": 305000,
                 "trend_direction": "peak",    # "rising" | "peak" | "falling" | "trough"
                 "month_over_month": +125000,  # change vs previous month
-                "data_source": "国家疾控局月度公报",
+                "data_source": "国家疾控局月度公报（近似值）",
             },
             ...
         }
@@ -235,7 +235,7 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
             "hist_max": hist_max,
             "trend_direction": direction,
             "month_over_month": mom_change,
-            "data_source": "国家疾控局月度公报",
+            "data_source": "国家疾控局月度公报（近似值）",
             "data_month": f"{current_record['year']}-{current_record['month']:02d}",
         }
 
@@ -327,9 +327,9 @@ def get_surveillance_summary() -> dict:
     active = [name for name, t in trends.items() if t["trend_risk"] >= 40]
     return {
         "available": True,
-        "message": f"基于国家疾控局月度公报 · 追踪 {len(trends)} 种疾病 · {len(active)} 种处于流行期",
+        "message": f"基于国家疾控局月度公报（近似值） · 追踪 {len(trends)} 种疾病 · {len(active)} 种处于流行期",
         "disease_count": len(trends),
         "active_count": len(active),
-        "source": "国家疾控局",
+        "source": "国家疾控局（近似演示值）",
         "updated": max(t["data_month"] for t in trends.values()) if trends else "—",
     }

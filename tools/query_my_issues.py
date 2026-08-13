@@ -1,13 +1,13 @@
 # tools/query_my_issues.py
-"""个人工单查询工具 — 让学生查询自己上报的问题及处理进度。
+"""个人工单查询工具 — 让居民查询自己上报的诉求及处理进度。
 
 解决之前 AI 无法按作者过滤工单的问题：
 - query_issues 只能按 category/status 过滤，不含 author 参数
 - LLM 无从得知当前用户的 author 标识，无法在回复中手动过滤
-- 学生问"我的工单怎么样了"→ AI 只能返回全部工单或说"没有"
+- 居民问"我的工单怎么样了"→ AI 只能返回全部工单或说"没有"
 
 此工具自动从 session 解析当前用户身份，直接调用 get_my_issues，
-让学生侧对话能准确返回"我的工单"。
+让居民侧对话能准确返回"我的工单"。
 """
 import logging
 from langchain.tools import tool
@@ -36,24 +36,24 @@ _STATUS_LABELS = {
 
 @tool
 def query_my_issues() -> str:
-    """查询我上报的所有问题工单及其处理进度。
+    """查询我上报的所有诉求工单及其处理进度。
 
     无需参数——自动识别当前登录用户，返回该用户上报的全部工单。
-    当学生问"我的工单""我报修的问题""我上报的XX修好了吗"时调用此工具。
+    当居民问"我的工单""我报修的诉求""我上报的XX修好了吗"时调用此工具。
     """
     author = _resolve_current_author()
     if not author:
         return (
-            "⚠️ 无法识别当前用户身份。请先在「我的」页面完善个人信息（学号或姓名），"
-            "或联系管理员绑定账号。"
+            "⚠️ 无法识别当前用户身份。请先在「我的」页面完善个人信息（门牌号或姓名），"
+            "或联系网格员绑定账号。"
         )
 
     issues = get_my_issues(author, limit=50)
 
     if not issues:
         return (
-            f"📋 你（{author}）还没有上报过任何问题。\n\n"
-            "发现校园里的问题？直接描述，帮你上报。比如「教三楼二楼水龙头漏水」。"
+            f"📋 你（{author}）还没有上报过任何诉求。\n\n"
+            "发现小区里的问题？直接描述，帮你上报。比如「3号楼2单元电梯困人了」。"
         )
 
     # ── Stats summary ──
@@ -99,7 +99,7 @@ def query_my_issues() -> str:
     elif pending > 0:
         lines.append(
             f"还有 {pending} 件工单在处理中。输入「查看工单 #编号」了解进度，"
-            "或切换到「📊 治理透明窗」查看全校治理态势。"
+            "或切换到「📊 社区治理看板」查看全小区治理态势。"
         )
 
     return "\n".join(lines)
@@ -110,12 +110,12 @@ def query_my_proposals() -> str:
     """查询我提交的所有提案及其状态。
 
     无需参数——自动识别当前登录用户。
-    当学生问"我的提案""我提的建议""我的提案有回复吗"时调用此工具。
+    当居民问"我的提案""我提的建议""我的提案有回复吗"时调用此工具。
     """
     author = _resolve_current_author()
     if not author:
         return (
-            "⚠️ 无法识别当前用户身份。请先在「我的」页面完善个人信息（学号或姓名）。"
+            "⚠️ 无法识别当前用户身份。请先在「我的」页面完善个人信息（门牌号或姓名）。"
         )
 
     proposals = get_my_proposals(author, limit=50)
@@ -123,7 +123,7 @@ def query_my_proposals() -> str:
     if not proposals:
         return (
             f"📋 你（{author}）还没有提交过任何提案。\n\n"
-            "有好的校园改进建议？直接告诉我，比如「建议在宿舍楼下增设快递柜」。"
+            "有好的社区改进建议？直接告诉我，比如「建议在小区空地加装充电桩」。"
         )
 
     lines = [

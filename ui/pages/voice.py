@@ -1,5 +1,5 @@
 # ui/pages/voice.py
-"""🗳️ 有话说 · 议 — 提案、附议（一键操作）、议题讨论（直接发言）."""
+"""🗳️ 邻里议事 · 议 — 提案、附议（一键操作）、议题讨论（直接发言）."""
 import streamlit as st
 from data.database import (
     support_proposal as db_support,
@@ -15,7 +15,7 @@ from ui.cache import (
     invalidate_proposals,
     invalidate_opinions,
 )
-from ui.components import TOKEN, section, stat, info_card, proposal_card, topic_card, ooda_nav, resolve_author
+from ui.components import TOKEN, section, stat, info_card, proposal_card, topic_card, ooda_nav, resolve_author, page_header
 import logging
 _log = logging.getLogger(__name__)
 
@@ -28,19 +28,9 @@ else:
 
 _author = resolve_author(profile)
 
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🗳️ 有话说</span>'
-    f'<span style="background:{TOKEN["accent"]};color:#fff;font-size:0.7em;font-weight:600;'
-    f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">议</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("创建提案、附议、参与议题讨论。")
+page_header("🗳️ 邻里议事", "创建提案、附议、参与议题讨论。", "议")
 
 ooda_nav("voice")
-
-st.markdown("---")
 
 # ✍️ Create proposal form
 
@@ -55,7 +45,7 @@ with st.container(border=True):
     )
     prop_title = st.text_input(
         "提案标题",
-        placeholder="比如：建议图书馆延长闭馆时间到23:00...",
+        placeholder="比如：建议活动室延长开放时间到23:00...",
         key="create_proposal_title",
     )
     prop_desc = st.text_area(
@@ -68,7 +58,7 @@ with st.container(border=True):
     with c1:
         prop_category = st.selectbox(
             "分类（可选，留空自动推断）",
-            ["自动推断"] + ["设施维修", "环境卫生", "安全隐患", "教学设备", "网络服务", "餐饮问题", "校园管理", "其他"],
+            ["自动推断"] + ["设施维修", "环境卫生", "安全隐患", "停车管理", "噪音扰民", "物业服务", "邻里矛盾", "社区事务"],
             key="create_proposal_cat",
         )
     with c2:
@@ -205,7 +195,7 @@ section("正在热议")
 topics = get_active_topics(limit=20)
 
 if not topics:
-    info_card("系统会根据校园热点自动发起讨论")
+    info_card("系统会根据社区热点自动发起讨论")
 else:
     opinion_feedback = st.session_state.get("_opinion_feedback", {})
 
@@ -256,7 +246,7 @@ else:
                         st.warning("意见太短了，至少写几个字~")
                     else:
                         try:
-                            add_opinion(topic_id=tid, content=content, participant_label="匿名学生")
+                            add_opinion(topic_id=tid, content=content, participant_label="匿名居民")
                             invalidate_opinions()
                             summary = get_opinion_summary(tid)
                             st.session_state._opinion_feedback = {

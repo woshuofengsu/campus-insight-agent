@@ -18,55 +18,55 @@ class TestExtractLocationBuildings(unittest.TestCase):
 
     def test_jiao_building(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("教三楼灯坏了"), "教三楼")
+        self.assertEqual(extract_location("3号楼灯坏了"), "3号楼")
 
     def test_jiao_building_chinese_number(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("教五楼电梯故障"), "教五楼")
+        self.assertEqual(extract_location("五号楼电梯故障"), "五号楼")
 
     def test_dorm_with_room(self):
         from agent.helpers import extract_location
-        result = extract_location("5号宿舍楼302空调坏了")
-        self.assertIn("5号宿舍楼", result)
+        result = extract_location("5号楼302空调坏了")
+        self.assertIn("5号楼", result)
 
     def test_dorm_building_only(self):
         from agent.helpers import extract_location
-        result = extract_location("3号宿舍楼停水了")
-        self.assertIn("3号宿舍楼", result)
+        result = extract_location("3号楼停水了")
+        self.assertIn("3号楼", result)
 
     def test_canteen_first(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("一食堂麻辣烫涨价"), "一食堂")
+        self.assertEqual(extract_location("助餐点麻辣烫涨价"), "助餐点")
 
     def test_canteen_second(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("二食堂饭菜有问题"), "二食堂")
+        self.assertEqual(extract_location("助餐点饭菜有问题"), "助餐点")
 
     def test_canteen_east(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("东食堂门口积水"), "东食堂")
+        self.assertEqual(extract_location("助餐点门口积水"), "助餐点")
 
     def test_library(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("图书馆自习区插座不足"), "图书馆")
+        self.assertEqual(extract_location("活动室自习区插座不足"), "活动室")
 
     def test_playground(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("操场看台座椅锈蚀"), "操场")
+        self.assertEqual(extract_location("广场看台座椅锈蚀"), "广场")
 
     def test_lab_building(self):
         from agent.helpers import extract_location
-        result = extract_location("实验楼漏水需要维修")
-        self.assertIn("实验楼", result)
+        result = extract_location("3号楼漏水需要维修")
+        self.assertIn("3号楼", result)
 
     def test_admin_building(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("行政楼电梯坏了"), "行政楼")
+        self.assertEqual(extract_location("4号楼电梯坏了"), "4号楼")
 
     def test_classroom(self):
         from agent.helpers import extract_location
-        result = extract_location("教室投影仪坏了")
-        self.assertIn("教室", result)
+        result = extract_location("楼道投影仪坏了")
+        self.assertIn("楼道", result)
 
 
 # -- 2. extract_location — Edge Cases --
@@ -83,7 +83,7 @@ class TestExtractLocationEdges(unittest.TestCase):
 
     def test_short_is_location(self):
         from agent.helpers import extract_location
-        self.assertEqual(extract_location("教三楼"), "教三楼")
+        self.assertEqual(extract_location("3号楼"), "3号楼")
 
     def test_only_problem_no_location(self):
         from agent.helpers import extract_location
@@ -91,36 +91,36 @@ class TestExtractLocationEdges(unittest.TestCase):
 
     def test_location_in_middle(self):
         from agent.helpers import extract_location
-        result = extract_location("我发现图书馆的空调不制冷")
-        self.assertIn("图书馆", result)
+        result = extract_location("我发现活动室的空调不制冷")
+        self.assertIn("活动室", result)
 
     def test_multiple_locations_returns_first(self):
         from agent.helpers import extract_location
-        result = extract_location("教三楼和图书馆都漏水")
+        result = extract_location("3号楼和活动室都漏水")
         # Should find at least one location
         self.assertTrue(len(result) > 0)
 
-    def test_dorm_student_building(self):
+    def test_dorm_resident_building(self):
         from agent.helpers import extract_location
-        result = extract_location("2号学生宿舍楼网络很差")
-        # May match "2号学生楼" (first pattern) or "宿舍楼" (general pattern)
+        result = extract_location("2号楼网络很差")
+        # Matches "2号楼" (building pattern)
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 0)
 
     def test_gate(self):
         from agent.helpers import extract_location
-        result = extract_location("校门口道路破损")
-        self.assertIn("校门口", result)
+        result = extract_location("小区门口道路破损")
+        self.assertIn("小区", result)
 
     def test_express_station(self):
         from agent.helpers import extract_location
-        result = extract_location("快递站排队太长")
-        self.assertIn("快递站", result)
+        result = extract_location("快递柜排队太长")
+        self.assertIn("快递柜", result)
 
     def test_main_road(self):
         from agent.helpers import extract_location
-        result = extract_location("主干道路灯不亮")
-        self.assertIn("主干道", result)
+        result = extract_location("小区主干道路灯不亮")
+        self.assertIn("小区", result)
 
 
 # -- 3. random_encouragement — All Contexts --
@@ -180,30 +180,30 @@ class TestRandomEncouragement(unittest.TestCase):
 
 class TestGetAuthorIdentifier(unittest.TestCase):
 
-    def test_returns_student_id_first(self):
+    def test_returns_resident_id_first(self):
         from agent.helpers import get_author_identifier
         with patch("data.db_user.get_current_user") as mock_user:
             mock_user.return_value = {
-                "student_id": "2024001", "name": "张三",
-                "school": "测试大学", "grade": "大三",
+                "resident_id": "2024001", "name": "张三",
+                "community": "测试大学", "building": "大三",
             }
             result = get_author_identifier(MagicMock())
             self.assertEqual(result, "2024001")
 
-    def test_falls_back_to_school_grade(self):
+    def test_falls_back_to_community_building(self):
         from agent.helpers import get_author_identifier
         with patch("data.db_user.get_current_user") as mock_user:
             mock_user.return_value = {
-                "student_id": "", "school": "测试大学", "grade": "大三",
+                "resident_id": "", "community": "测试大学", "building": "大三",
             }
             result = get_author_identifier(MagicMock())
             self.assertEqual(result, "测试大学大三")
 
-    def test_falls_back_to_school_only(self):
+    def test_falls_back_to_community_only(self):
         from agent.helpers import get_author_identifier
         with patch("data.db_user.get_current_user") as mock_user:
             mock_user.return_value = {
-                "student_id": "", "school": "测试大学", "grade": "",
+                "resident_id": "", "community": "测试大学", "building": "",
             }
             result = get_author_identifier(MagicMock())
             self.assertEqual(result, "测试大学")
@@ -212,7 +212,7 @@ class TestGetAuthorIdentifier(unittest.TestCase):
         from agent.helpers import get_author_identifier
         with patch("data.db_user.get_current_user") as mock_user:
             mock_user.return_value = {
-                "student_id": "", "school": "", "grade": "", "name": "李四",
+                "resident_id": "", "community": "", "building": "", "name": "李四",
             }
             result = get_author_identifier(MagicMock())
             self.assertEqual(result, "李四")
@@ -221,7 +221,7 @@ class TestGetAuthorIdentifier(unittest.TestCase):
         from agent.helpers import get_author_identifier
         with patch("data.db_user.get_current_user") as mock_user:
             mock_user.return_value = {
-                "student_id": "", "school": "", "grade": "", "name": "", "id": 42,
+                "resident_id": "", "community": "", "building": "", "name": "", "id": 42,
             }
             result = get_author_identifier(MagicMock())
             self.assertEqual(result, "user_42")
@@ -245,17 +245,17 @@ class TestGetUserName(unittest.TestCase):
         mock_memory = MagicMock()
         mock_memory.get_user_profile.return_value = {
             "name": "王五",
-            "student_id": "2024002",
+            "resident_id": "2024002",
         }
         result = get_user_name(mock_memory)
         self.assertEqual(result, "王五")
 
-    def test_falls_back_to_student_id(self):
+    def test_falls_back_to_resident_id(self):
         from agent.helpers import get_user_name
         mock_memory = MagicMock()
         mock_memory.get_user_profile.return_value = {
             "name": "",
-            "student_id": "2024003",
+            "resident_id": "2024003",
         }
         result = get_user_name(mock_memory)
         self.assertEqual(result, "2024003")

@@ -3,19 +3,9 @@
 import streamlit as st
 import altair as alt
 import pandas as pd
-from ui.components import TOKEN, section, stat, info_card, configure_altair
+from ui.components import TOKEN, section, stat, info_card, configure_altair, page_header
 
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">🏥 健康防护</span>'
-    f'<span style="background:{TOKEN["success"]};color:#fff;font-size:0.7em;font-weight:600;'
-    f'padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;">防</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("校园健康风险预警 · 季节性疾病预防 · 你的校园健康卫士。")
-
-st.markdown("---")
+page_header("🏥 健康防护", "社区健康风险预警 · 季节性疾病预防 · 你的社区健康卫士。", "防")
 
 try:
     from data.db_health_alerts import cached_health_risk
@@ -33,10 +23,10 @@ hs = h["overall_score"]
 hcolor = TOKEN[hc] if hc in ("success", "warning", "danger") else TOKEN["accent"]
 
 level_map = {
-    "low": ("低风险", "校园健康状态良好", "继续保持良好卫生习惯"),
+    "low": ("低风险", "社区健康状态良好", "继续保持良好卫生习惯"),
     "moderate": ("注意防护", "部分疾病进入高发期", "建议关注以下提醒并做好预防"),
-    "high": ("警示", "多种风险因素叠加", "请认真阅读以下防护建议并转发同学"),
-    "critical": ("高危预警", "需要立即采取防护措施", "建议辅导员向全院转发健康提醒"),
+    "high": ("警示", "多种风险因素叠加", "请认真阅读以下防护建议并转发邻居"),
+    "critical": ("高危预警", "需要立即采取防护措施", "建议网格员向全体居民转发健康提醒"),
 }
 lvl_label, lvl_subtitle, lvl_action = level_map.get(hl, level_map["low"])
 
@@ -46,7 +36,7 @@ st.markdown(
     f'box-shadow:{TOKEN["shadow_md"]};margin-bottom:16px;">'
     f'<div style="font-size:4em;margin-bottom:8px;">{he}</div>'
     f'<div style="font-size:1.4em;font-weight:800;color:{TOKEN["text"]};">'
-    f'校园健康风险等级：<span style="color:{hcolor};">{lvl_label}</span></div>'
+    f'社区健康风险等级：<span style="color:{hcolor};">{lvl_label}</span></div>'
     f'<div style="font-size:3em;font-weight:800;color:{hcolor};margin:8px 0;">{hs} 分</div>'
     f'<div style="font-size:0.88em;color:{TOKEN["text_sec"]};">{lvl_subtitle}</div>'
     f'</div>',
@@ -61,7 +51,7 @@ with c1:
          TOKEN["warning"] if h.get("weather_mod_total", 0) >= 10 else TOKEN["success"],
          sub=temp_str)
 with c2:
-    cd = h.get("campus_density", {})
+    cd = h.get("community_density", {})
     stat("人员密度", f"+{cd.get('score', 0)}",
          TOKEN["warning"] if cd.get("score", 0) >= 8 else TOKEN["success"],
          sub=" · ".join(cd.get("reasons", ["正常"])))
@@ -102,14 +92,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-cd = h.get("campus_density", {})
+cd = h.get("community_density", {})
 if cd.get("reasons"):
     st.markdown("---")
-    st.caption("🏫 校园人员密度评估：" + " · ".join(cd["reasons"]))
+    st.caption("👥 小区人员密度评估：" + " · ".join(cd["reasons"]))
 
 st.markdown("---")
 st.markdown(
     f'<div style="text-align:center;font-size:0.78em;color:{TOKEN["text_muted"]};">'
-    f'数据来源：国家疾控局月度公报 × 季节模型 × 实时天气 × 校园密度 · 仅供参考 · {h["evaluated_at"]}</div>',
+    f'数据来源：国家疾控局月度公报（近似值） × 季节模型 × 实时天气 × 小区密度 · 仅供参考 · {h["evaluated_at"]}</div>',
     unsafe_allow_html=True,
 )

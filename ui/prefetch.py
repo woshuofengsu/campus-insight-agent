@@ -9,7 +9,7 @@ import logging
 from collections.abc import Callable
 from data.database import (
     get_issues, get_issues_stats, get_recent_issue_counts,
-    get_proposals, get_campus_events, get_active_topics,
+    get_proposals, get_community_events, get_active_topics,
     get_opinion_summaries_batch,
     compute_health_score,
 )
@@ -17,7 +17,7 @@ from data.database import (
 _logger = logging.getLogger("ui.prefetch")
 
 PREFETCH_SIGNALS: list[tuple[list[str], str]] = [
-    (["校园脉搏", "动态", "最近动态", "校园动态", "最近发生", "发生什么了", "最近有什么", "这周情况", "今天发生"], "_prefetch_pulse"),
+    (["社区脉搏", "动态", "最近动态", "社区动态", "最近发生", "发生什么了", "最近有什么", "这周情况", "今天发生"], "_prefetch_pulse"),
     (["治理数据", "统计数据", "治理统计", "治理情况", "健康度", "解决率", "工单概览"], "_prefetch_stats"),
     (["天气", "温度", "下雨", "刮风", "空气质量", "多少度", "冷不冷", "热不热", "带伞", "防晒"], "_prefetch_weather"),
     (["提案", "建议", "提议", "大家提了", "看看有什么想法", "有什么好主意"], "_prefetch_proposals"),
@@ -27,14 +27,14 @@ PREFETCH_SIGNALS: list[tuple[list[str], str]] = [
 
 
 def _prefetch_pulse() -> str:
-    """Pre-fetch campus pulse data from DB."""
+    """Pre-fetch community pulse data from DB."""
     try:
         issues = get_issues(status="待处理", limit=5)
         proposals = get_proposals(sort_by="supporters", limit=5)
-        events = get_campus_events(limit=5)
+        events = get_community_events(limit=5)
         stats = get_issues_stats()
 
-        lines = ["## 校园脉搏快照（系统预取）", ""]
+        lines = ["## 社区脉搏快照（系统预取）", ""]
         lines.append(f"📊 工单总数：{stats['total']} 件")
         by_status = stats.get("by_status", {})
         lines.append(f"   ⏳ 待处理 {by_status.get('待处理', 0)} · 🔄 处理中 {by_status.get('处理中', 0)} · ✅ 已解决 {by_status.get('已解决', 0)}")

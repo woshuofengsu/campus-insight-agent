@@ -1,19 +1,18 @@
-# ui/pages_teacher/proposals_mgmt.py
-"""提案管理（教师端）—— 查看、回复、采纳学生提案."""
+# ui/pages_grid/proposals_mgmt.py
+"""提案管理（网格员端）—— 查看、回复、采纳居民提案."""
 import csv
 import io
 from datetime import datetime
 import streamlit as st
-from ui.components import TOKEN, tag
+from ui.guard import require_role
+
+require_role("grid")
+
+from ui.components import TOKEN, tag, page_header
 from ui.cache import cached_proposals, cached_proposals_stats, invalidate_proposals
 from data.database import update_proposal_status
 
-st.markdown(
-    f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
-    f'💡 提案管理</span>',
-    unsafe_allow_html=True,
-)
-st.caption("查看学生提交的校园治理提案，回复并采纳可行建议。")
+page_header("💡 提案管理", "查看居民提交的社区治理提案，回复并采纳可行建议。")
 
 status_choice = st.radio(
     "状态筛选",

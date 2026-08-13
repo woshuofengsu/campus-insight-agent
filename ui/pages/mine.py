@@ -1,8 +1,9 @@
 # ui/pages/mine.py
 """👤 我的 — 个人参与足迹、影响力统计."""
 import streamlit as st
-from ui.cache import cached_my_issues, cached_my_proposals, cached_my_stats
-from ui.components import TOKEN, section, stat, info_card, issue_card, ooda_nav, tag, resolve_author
+from ui.cache import cached_my_issues, cached_my_proposals, cached_my_stats, invalidate_issues
+from ui.components import TOKEN, section, stat, info_card, issue_card, ooda_nav, tag, resolve_author, page_header
+from data.database import set_satisfaction, get_my_anonymous_issues
 
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
@@ -14,31 +15,60 @@ else:
 # Derive author identity from profile — must match database._resolve_author()
 author = resolve_author(profile)
 
-st.markdown(
-    f'<div style="margin-bottom:4px;">'
-    f'<span style="font-size:1.35em;font-weight:800;color:{TOKEN["text"]};">👤 我的</span>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-st.caption("个人参与记录与统计")
+page_header("👤 我的", "个人参与记录与统计")
 
 ooda_nav("mine")
 
-st.markdown("---")
+
+def _submit_satisfaction(issue_id: int, value: str):
+    """Record resident satisfaction for a resolved issue; refresh caches."""
+    reason = (st.session_state.get(f"sat_reason_{issue_id}") or "").strip()
+    try:
+        new_status = set_satisfaction(issue_id, value, reason=reason)
+        invalidate_issues()
+        if value == "不满意":
+            st.session_state["_sat_feedback"] = "🔄 已记录「不满意」，工单已重新打开，网格员将重新处理。"
+        else:
+            st.session_state["_sat_feedback"] = "✅ 已记录「满意」，感谢你的反馈！"
+        st.session_state.pop(f"sat_reason_{issue_id}", None)
+    except Exception as e:  # non-critical — surface, don't crash
+        st.session_state["_sat_feedback"] = f"评价提交失败：{e}"
+
+
+def _render_satisfaction(issue: dict):
+    """满意度反馈控件 — 仅对已解决工单展示，闭环「办结→评价」."""
+    sat = issue.get("satisfaction", "")
+    iid = issue["id"]
+    if sat == "满意":
+        st.caption("✅ 已评价：满意")
+        return
+    if sat == "不满意":
+        reason = issue.get("satisfaction_reason", "")
+        st.caption("🔄 已评价：不满意" + (f"（原因：{reason}）" if reason else "") + "（等待网格员复核）")
+        return
+    b1, b2 = st.columns(2)
+    with b1:
+        st.button("👍 满意", key=f"sat_ok_{iid}", on_click=_submit_satisfaction,
+                  args=(iid, "满意"), width="stretch")
+    with b2:
+        st.button("👎 不满意", key=f"sat_no_{iid}", on_click=_submit_satisfaction,
+                  args=(iid, "不满意"), width="stretch")
+    st.text_input("不满意原因（选填）", key=f"sat_reason_{iid}",
+                  placeholder="若点「不满意」，可简述原因，帮助网格员改进")
 
 if profile:
-    school = profile.get("school", "")
-    grade = profile.get("grade", "")
-    major = profile.get("major", "")
+    community = profile.get("community", "")
+    building = profile.get("building", "")
+    unit = profile.get("unit", "")
     name = profile.get("name", "")
-    display_name = name or (f"{school}" if school else "同学")
+    display_name = name or (f"{community}" if community else "邻居")
     st.markdown(
         f'<div style="background:{TOKEN["card_bg"]};border:1px solid {TOKEN["border"]};'
         f'border-radius:{TOKEN["radius_card"]};padding:16px 20px;box-shadow:{TOKEN["shadow_sm"]};'
         f'margin-bottom:12px;">'
         f'<div style="font-size:1.1em;font-weight:700;color:{TOKEN["text"]};margin-bottom:4px;">'
         f'{display_name}</div>'
-        f'<div style="font-size:0.85em;color:{TOKEN["text_sec"]};">{school} · {grade} · {major}</div>'
+        f'<div style="font-size:0.85em;color:{TOKEN["text_sec"]};">{community} · {building} · {unit}</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -58,23 +88,17 @@ with st.container(border=True):
     with col4:
         stat("提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
 
-    # Impact summary
+    # Impact summary（治理化表述：聚焦「你推动了什么」，不做排行榜式等级）
     if stats["total_issues"] + stats["total_proposals"] > 0:
-        impact_score = stats["resolved_issues"] * 10 + stats["adopted_proposals"] * 20 + stats["total_proposals"] * 5
-        if impact_score >= 200:
-            level, level_emoji, level_color = "钻石治理者", "💎", TOKEN["accent"]
-        elif impact_score >= 100:
-            level, level_emoji, level_color = "黄金守卫者", "🥇", TOKEN["warning"]
-        elif impact_score >= 50:
-            level, level_emoji, level_color = "白银参与者", "🥈", TOKEN["text_sec"]
-        elif impact_score >= 20:
-            level, level_emoji, level_color = "青铜新星", "🥉", TOKEN["warning"]
-        else:
-            level, level_emoji, level_color = "萌芽观察者", "🌱", TOKEN["success"]
+        resolved = stats["resolved_issues"]
+        adopted = stats["adopted_proposals"]
+        impact = f"🌱 你上报的 {stats['total_issues']} 件诉求中 {resolved} 件已解决"
+        if adopted:
+            impact += f"，{adopted} 条提案被采纳"
         st.markdown(
             f'<div style="text-align:center;margin:8px 0 4px;">'
-            f'<span style="background:{level_color};color:#fff;font-size:0.9em;font-weight:600;'
-            f'padding:6px 18px;border-radius:99px;">{level_emoji} {level} · {impact_score} 分</span>'
+            f'<span style="background:{TOKEN["accent_bg"]};color:{TOKEN["text"]};font-size:0.85em;'
+            f'padding:6px 14px;border-radius:99px;border:1px solid {TOKEN["accent_border"]};">{impact}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -86,7 +110,9 @@ section("我上报的问题")
 my_issues = cached_my_issues(author, limit=20)
 
 if not my_issues:
-    info_card("去「随手报修」页面提交第一个校园问题吧！")
+    info_card("还没有上报过诉求", "成为第一个让社区变好的人")
+    if st.button("🔧 去上报诉求", type="primary", width="stretch"):
+        st.switch_page("ui/pages/issues.py")
 else:
     # Status summary
     pending_count = len([i for i in my_issues if i.get("status") == "待处理"])
@@ -113,10 +139,37 @@ else:
             unsafe_allow_html=True,
         )
 
+    if st.session_state.get("_sat_feedback"):
+        st.success(st.session_state.pop("_sat_feedback"))
+
     cols = st.columns(2)
     for idx, issue in enumerate(my_issues):
         with cols[idx % 2]:
             issue_card(issue)
+            if issue.get("status") == "已解决":
+                _render_satisfaction(issue)
+            elif issue.get("status") == "待复核":
+                _reason = issue.get("satisfaction_reason", "")
+                st.caption("🔄 已评价：不满意" + (f"（原因：{_reason}）" if _reason else "") + "，等待网格员复核")
+
+st.markdown("---")
+
+# ── 匿名工单（隐私闭环：按 reporter_id 追溯，不暴露真实身份） ──
+_reporter_id = (profile or {}).get("id")
+_anon_issues = get_my_anonymous_issues(_reporter_id, limit=20) if _reporter_id else []
+if _anon_issues:
+    st.markdown("---")
+    section("我的匿名工单")
+    st.caption("🙈 匿名上报的工单只对你本人可见（按身份哈希追溯），不会公开你的真实信息。")
+    _acols = st.columns(2)
+    for _idx, _issue in enumerate(_anon_issues):
+        with _acols[_idx % 2]:
+            issue_card(_issue)
+            if _issue.get("status") == "已解决":
+                _render_satisfaction(_issue)
+            elif _issue.get("status") == "待复核":
+                _reason = _issue.get("satisfaction_reason", "")
+                st.caption("🔄 已评价：不满意" + (f"（原因：{_reason}）" if _reason else "") + "，等待网格员复核")
 
 st.markdown("---")
 
@@ -125,7 +178,9 @@ section("我提交的提案")
 my_proposals = cached_my_proposals(author, limit=20)
 
 if not my_proposals:
-    info_card("去「有话说」页面创建你的第一个提案！")
+    info_card("还没有发起过提案", "在「邻里议事」发起你的第一个提案")
+    if st.button("💬 去发起提案", type="primary", width="stretch"):
+        st.switch_page("ui/pages/voice.py")
 else:
     for p in my_proposals:
         s = p.get("status", "讨论中")

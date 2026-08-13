@@ -1,19 +1,23 @@
-# ui/pages_teacher/dashboard.py
-"""📊 工作台 — 教师端首页：KPI、紧急工单、趋势、热门提案."""
+# ui/pages_grid/dashboard.py
+"""📊 工作台 — 网格员端首页：KPI、紧急工单、趋势、热门提案."""
 import logging
 from datetime import datetime
 import streamlit as st
+from ui.guard import require_role
+
+require_role("grid")
 
 _log = logging.getLogger(__name__)
 import altair as alt
 import pandas as pd
-from ui.components import TOKEN, tag, stat, section, configure_altair
+from ui.components import TOKEN, tag, stat, section, configure_altair, methodology_panel
 from ui.cache import (
     cached_issues, cached_issues_stats, cached_issues_timeline,
     cached_proposals, cached_proposals_stats, cached_health_score,
     invalidate_issues, invalidate_proposals,
 )
-from data.database import update_issue_status, update_proposal_status, get_db
+from data.database import update_issue_status, update_proposal_status, get_db, get_satisfaction_stats, get_dissatisfaction_reasons
+from data.db_sla import get_sla_breaches, get_sla_summary, get_escalated_issues
 
 
 def _now_short() -> str:
@@ -28,9 +32,9 @@ if memory is not None:
     profile = memory.get_user_profile()
 else:
     profile = {}
-school = profile.get("school", "校园")
-dept = profile.get("grade", "")       # teacher: department stored in grade field
-display_name = profile.get("name", "") or profile.get("major", "")
+community = profile.get("community", "小区")
+dept = profile.get("building", "")       # grid: department stored in building field
+display_name = profile.get("name", "") or profile.get("unit", "")
 
 # ── Weather widget (lightweight) ──
 weather_html = ""
@@ -50,15 +54,42 @@ except Exception:  # log and skip
 st.markdown(
     f'<div style="margin-bottom:4px;">'
     f'<span style="font-size:{TOKEN["font_display"]};font-weight:{TOKEN["weight_bold"]};color:{TOKEN["text"]};">'
-    f'{school} &middot; 工作台</span>'
+    f'{community} &middot; 工作台</span>'
     f'<span style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_muted"]};margin-left:12px;">'
     f'{_now_short()}</span>'
     f'{weather_html}'
     f'</div>',
     unsafe_allow_html=True,
 )
-st.caption(f"欢迎回来，{display_name or dept or '老师'}。")
+st.caption(f"欢迎回来，{display_name or dept or '网格员'}。")
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:8px 0 16px;"></div>', unsafe_allow_html=True)
+
+# ── 🎯 今日待办（核心动作前置：网格员第一眼看到"要做什么"，而非"发生了什么"）──
+_sla_todo = get_sla_summary()
+_todo_urgent = cached_issues(urgency="紧急", status=None, limit=100)
+_todo_pending_props = sum(1 for p in cached_proposals(sort_by="supporters", limit=200)
+                          if p.get("status") in ("讨论中", "已回应"))
+_todo_total = len(_todo_urgent) + _sla_todo["total_overdue"] + _todo_pending_props
+
+with st.container(border=True):
+    st.markdown(
+        f'<div style="font-size:0.92em;font-weight:700;color:{TOKEN["text"]};margin-bottom:8px;">'
+        f'🎯 今日待办</div>',
+        unsafe_allow_html=True,
+    )
+    if _todo_total == 0:
+        st.caption("✅ 今日没有待办，社区运转平稳。")
+    else:
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            st.metric("🔴 紧急工单", f"{len(_todo_urgent)} 件")
+        with tc2:
+            st.metric("⏰ 超时工单", f"{_sla_todo['total_overdue']} 件")
+        with tc3:
+            st.metric("💬 待回应提案", f"{_todo_pending_props} 件")
+        st.caption("请优先处理上述事项 → 前往「工单管理」/「提案管理」")
+
+st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
 # ── KPI Row ──
 stats = cached_issues_stats()
@@ -82,129 +113,61 @@ with c2:
 with c3:
     stat("健康度", f'{health.get("score", "-")} {grade}',
          TOKEN["success"] if grade == "优" else TOKEN["warning"] if grade == "良" else TOKEN["danger"])
+    _sat = get_satisfaction_stats()
+    stat("满意率", f'{_sat["rate"]}%' if _sat["rate"] is not None else "—",
+         TOKEN["success"] if (_sat["rate"] or 0) >= 80 else TOKEN["warning"])
 
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
-# ── 关联洞察（系统主动发现）──
-try:
-    from agent.reflector import get_proactive_insights as _get_insights
-    _insights = _get_insights()
-    if _insights.get("has_insight"):
-        with st.container(border=True):
+# ── Dissatisfaction reasons (满意度透传) ──
+_diss = get_dissatisfaction_reasons(limit=5)
+if _diss:
+    with st.expander(f"😞 不满意反馈（{len(_diss)} 条）"):
+        for _d in _diss:
+            _reason = _d.get("satisfaction_reason", "")
             st.markdown(
-                f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">'
-                f'🧠 智能洞察</span>'
-                f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:8px;">'
-                f'系统自动分析 · 实时更新</span>',
-                unsafe_allow_html=True,
+                f"· #{_d['id']}「{(_d.get('title') or '')[:30]}」"
+                + (f" — {_reason}" if _reason else " —（未填写原因）")
             )
-            # ── Anomaly alerts ──
-            for za in _insights.get("z_anomalies", [])[:2]:
-                level_icon = {"critical": "🔴", "high": "🟠", "moderate": "🟡"}.get(za.get("level", ""), "⚪")
-                st.markdown(
-                    f'{level_icon} **{za["category"]}** 类异常 · 严重度 {za["severity"]}/10 '
-                    f'· 本周 {za["recent"]} 件'
-                    + (f' · 紧急 {za["urgent_pending"]} 件' if za.get("urgent_pending") else ''),
-                )
-            # ── Cross-time trend ──
-            ct = _insights.get("cross_time", {})
-            if ct:
-                trend_icon = "⚠️" if ct.get("is_worsening") else "✅" if ct.get("is_improving") else "📊"
-                st.markdown(
-                    f'{trend_icon} 本周新增 {ct.get("new_this_week", 0)} 件 '
-                    f'({ct.get("new_trend", "→")}) · '
-                    f'解决 {ct.get("resolved_this_week", 0)} 件 '
-                    f'({ct.get("resolved_trend", "→")})'
-                )
-            # ── Upgrade suggestions ──
-            for u in _insights.get("uncovered_upgrades", [])[:2]:
-                st.markdown(
-                    f'🚀 **{u["category"]}** 类 {u["issue_count"]} 件待处理，建议发起治理提案'
-                )
-            st.caption(f'🕐 基于 {datetime.now().strftime("%H:%M")} 数据 · 由系统自动生成')
-except ImportError:
-    _log.warning("Reflector module not available for proactive insights", exc_info=True)
-except Exception:
-    _log.warning("Failed to load proactive insights", exc_info=True)
 
-# ── 🏥 Health Risk Overview (compact) — shared component ──
+# ── 老年关怀：SOS 求助 + 重点关注老人（血压/用药依从） ──
 try:
-    from data.db_health_alerts import cached_health_risk as _cached_health
-    from ui.health_card import render_health_risk_overview
-    _h = _cached_health()
-    render_health_risk_overview(_h)
-except Exception:
-    _log.warning("Health risk module unavailable", exc_info=True)
-
-st.markdown("---")
-
-# ── 🧠 校园感知 Insights (background engine) ──
-try:
-    from data.db_perception import get_latest_perception, get_perception_status
-    perception = get_latest_perception()
-    if perception:
-        mins_ago = perception.get("minutes_ago")
-        if mins_ago is not None and mins_ago < 60:
-            time_label = f"{mins_ago} 分钟前"
-        elif mins_ago is not None:
-            time_label = f"{mins_ago // 60} 小时前"
-        else:
-            time_label = "刚刚"
-
-        anomaly_count = perception.get("anomaly_count", 0)
-        overall = perception.get("overall_summary", "")
-        findings = perception.get("key_findings", [])[:3]
-
-        alert_color = TOKEN["danger"] if anomaly_count > 0 else TOKEN["success"]
-        alert_icon = "🚨" if anomaly_count > 0 else "✅"
-
-        with st.container(border=True):
-            c1, c2 = st.columns([4, 1])
-            with c1:
+    from data.db_elderly import get_pending_sos, mark_sos_done, get_elderly_overview
+    _sos = get_pending_sos()
+    _elders = get_elderly_overview()
+    if _sos or _elders:
+        st.markdown("---")
+        section("👴 老年关怀")
+        # SOS（最紧急置顶）
+        for _s in _sos:
+            st.markdown(f"🚨 **SOS 紧急求助：{_s.get('name','')}**（{( _s.get('created_at') or '')[:16]}）")
+            if st.button(f"✅ 已处理 SOS #{_s['id']}", key=f"sos_done_{_s['id']}", width="stretch"):
+                mark_sos_done(_s["id"])
+                st.rerun()
+        # 老人档案：最近活跃 + 血压 + 用药依从
+        for _e in _elders:
+            _name = _e.get("name") or "老人"
+            if _e.get("is_living_alone"):
+                _name += "（独居）"
+            _last = (_e.get("last_active_at") or "")[:16] or "从未互动"
+            _bp = _e.get("latest_bp")
+            _bp_txt = f"{_bp.get('sys')}/{_bp.get('dia')} mmHg（{_bp.get('date','')}）" if _bp else "未记录"
+            _adh = _e.get("adherence", [])
+            _adh_txt = f"近7天确认 {len(_adh)} 次" if _adh else "近7天无确认"
+            with st.container(border=True):
                 st.markdown(
-                    f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">'
-                    f'🧠 校园感知</span>'
-                    f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:10px;">'
-                    f'{time_label} 自动扫描</span>'
-                    f'<span style="font-size:0.85em;color:{alert_color};margin-left:8px;font-weight:600;">'
-                    f'{alert_icon} {overall[:50]}</span>',
+                    f"<strong>{_name}</strong> · ⏱ 活跃：{_last}",
                     unsafe_allow_html=True,
                 )
-                if findings:
-                    for f_text in findings:
-                        st.markdown(
-                            f'<span style="font-size:0.76em;color:{TOKEN["text_sec"]};">{f_text}</span>',
-                            unsafe_allow_html=True,
-                        )
-            with c2:
-                st.markdown("")
-                if anomaly_count > 0:
-                    st.markdown(
-                        f'<div style="text-align:center;padding-top:8px;">'
-                        f'<div style="font-size:2em;">{alert_icon}</div>'
-                        f'<div style="font-size:1.4em;font-weight:800;color:{alert_color};">{anomaly_count}</div>'
-                        f'<div style="font-size:0.68em;color:{TOKEN["text_muted"]};">项异常</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        f'<div style="text-align:center;padding-top:8px;">'
-                        f'<div style="font-size:2em;">🌿</div>'
-                        f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};">一切正常</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
+                st.caption(f"🩺 最近血压 {_bp_txt} · 💊 {_adh_txt}")
 except Exception:
-    _log.warning("Perception engine unavailable", exc_info=True)
-
-st.markdown("---")
+    _log.debug("elderly care section unavailable", exc_info=True)
 
 # ── Urgent Issues (Actionable) ──
 section("⚠️ 需要立即处理")
 
 if not urgent_issues:
-    st.info("🎉 暂无紧急工单，校园运转良好！")
+    st.info("🎉 暂无紧急工单，社区运转良好！")
 else:
     for issue in urgent_issues[:10]:
         iid = issue["id"]
@@ -281,36 +244,24 @@ else:
                         invalidate_issues()
                         st.rerun()
 
-# ── SLA Overdue Alerts ──
-overdue_issues = []
-try:
-    with get_db() as conn:
-        overdue_rows = conn.execute(
-            "SELECT id, title, category, location, urgency, reported_at, "
-            "CAST(julianday('now') - julianday(reported_at) AS INTEGER) AS days_open "
-            "FROM campus_issues "
-            "WHERE status IN ('待处理', '处理中') "
-            "AND reported_at < date('now', '-7 days') "
-            "ORDER BY days_open DESC LIMIT 8"
-        ).fetchall()
-        overdue_issues = [dict(r) for r in overdue_rows]
-except Exception:  # log and skip
-    _log.warning("SLA overdue query failed", exc_info=True)
+# ── SLA Overdue Alerts (per-urgency deadlines, not a flat 7-day rule) ──
+overdue_issues = get_sla_breaches(limit=8)
 
 if overdue_issues:
     section("⏰ SLA 超时预警")
-    st.caption("以下工单已超过 7 天未处理，可能影响治理健康度评分。")
+    st.caption("以下工单已超过办理时限（极急 6h / 紧急 24h / 普通 72h），请优先处理。")
 
     for oi in overdue_issues[:5]:
         oi_id = oi["id"]
         oi_title = oi.get("title", "")[:35]
         oi_cat = oi.get("category", "")
         oi_loc = oi.get("location", "")
-        oi_days = oi.get("days_open", 0)
+        oi_hours = oi.get("hours_open", 0)
         oi_urg = oi.get("urgency", "")
         oi_reported = oi.get("reported_at", "")[:10]
 
-        level = "🔴" if oi_urg == "紧急" else "🟠" if oi_days and int(oi_days) > 14 else "🟡"
+        level = "🔴" if oi.get("level") == "critical" else "🟠"
+        time_str = f"{oi_hours // 24} 天" if oi_hours >= 24 else f"{oi_hours} 小时"
         with st.container(border=True):
             c1, c2 = st.columns([4, 1.5])
             with c1:
@@ -322,7 +273,7 @@ if overdue_issues:
             with c2:
                 st.markdown(
                     f'<span style="font-size:1.3em;font-weight:800;color:{TOKEN["danger"]};">'
-                    f'{oi_days} 天</span> 未处理',
+                    f'{time_str}</span> 未处理',
                     unsafe_allow_html=True,
                 )
                 sla_note_key = f"_sla_note_{oi_id}"
@@ -332,6 +283,138 @@ if overdue_issues:
                                       processing_note=st.session_state.get(sla_note_key, ""))
                     invalidate_issues()
                     st.rerun()
+
+# ── SLA 升级工单（超时 2×，已升级）──
+escalated_issues = get_escalated_issues(limit=5)
+if escalated_issues:
+    st.markdown("---")
+    section("⏫ SLA 升级工单")
+    st.caption("以下工单超时已达 2 倍时限（极急 12h / 紧急 48h / 普通 144h），已标记升级并尝试邮件通知。")
+    for ei in escalated_issues:
+        st.markdown(
+            f"🔴 **#{ei['id']} {(ei.get('title') or '')[:30]}** · {ei.get('category', '')} "
+            f"· 👷 {ei.get('assignee') or '未指派'} · 已超时 {ei.get('hours_open', 0)} 小时",
+        )
+
+st.markdown("---")
+
+# ── 关联洞察（系统主动发现）──
+try:
+    from agent.reflector import get_proactive_insights as _get_insights
+    _insights = _get_insights()
+    if _insights.get("has_insight"):
+        with st.container(border=True):
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                f'<span style="background:{TOKEN["brand_gradient"]};color:#ffffff;'
+                f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
+                f'padding:2px 10px;border-radius:{TOKEN["radius_full"]};">🤖 AI 主动发现</span>'
+                f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">🧠 智能洞察</span>'
+                f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:auto;">'
+                f'系统自动分析 · 实时更新</span></div>',
+                unsafe_allow_html=True,
+            )
+            # ── Anomaly alerts ──
+            for za in _insights.get("z_anomalies", [])[:2]:
+                level_icon = {"critical": "🔴", "high": "🟠", "moderate": "🟡"}.get(za.get("level", ""), "⚪")
+                st.markdown(
+                    f'{level_icon} **{za["category"]}** 类异常 · 严重度 {za["severity"]}/10 '
+                    f'· 本周 {za["recent"]} 件'
+                    + (f' · 紧急 {za["urgent_pending"]} 件' if za.get("urgent_pending") else ''),
+                )
+            # ── Cross-time trend ──
+            ct = _insights.get("cross_time", {})
+            if ct:
+                trend_icon = "⚠️" if ct.get("is_worsening") else "✅" if ct.get("is_improving") else "📊"
+                st.markdown(
+                    f'{trend_icon} 本周新增 {ct.get("new_this_week", 0)} 件 '
+                    f'({ct.get("new_trend", "→")}) · '
+                    f'解决 {ct.get("resolved_this_week", 0)} 件 '
+                    f'({ct.get("resolved_trend", "→")})'
+                )
+            # ── Upgrade suggestions ──
+            for u in _insights.get("uncovered_upgrades", [])[:2]:
+                st.markdown(
+                    f'🚀 **{u["category"]}** 类 {u["issue_count"]} 件待处理，建议发起治理提案'
+                )
+            st.caption(f'🕐 基于 {datetime.now().strftime("%H:%M")} 数据 · 由系统自动生成')
+except ImportError:
+    _log.warning("Reflector module not available for proactive insights", exc_info=True)
+except Exception:
+    _log.warning("Failed to load proactive insights", exc_info=True)
+
+# ── 🏥 Health Risk Overview (compact) — shared component ──
+try:
+    from data.db_health_alerts import cached_health_risk as _cached_health
+    from ui.health_card import render_health_risk_overview
+    _h = _cached_health()
+    render_health_risk_overview(_h)
+except Exception:
+    _log.warning("Health risk module unavailable", exc_info=True)
+
+st.markdown("---")
+
+# ── 🧠 社区感知 Insights (background engine) ──
+try:
+    from data.db_perception import get_latest_perception, get_perception_status
+    perception = get_latest_perception()
+    if perception:
+        mins_ago = perception.get("minutes_ago")
+        if mins_ago is not None and mins_ago < 60:
+            time_label = f"{mins_ago} 分钟前"
+        elif mins_ago is not None:
+            time_label = f"{mins_ago // 60} 小时前"
+        else:
+            time_label = "刚刚"
+
+        anomaly_count = perception.get("anomaly_count", 0)
+        overall = perception.get("overall_summary", "")
+        findings = perception.get("key_findings", [])[:3]
+
+        alert_color = TOKEN["danger"] if anomaly_count > 0 else TOKEN["success"]
+        alert_icon = "🚨" if anomaly_count > 0 else "✅"
+
+        with st.container(border=True):
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                    f'<span style="background:{TOKEN["brand_gradient"]};color:#ffffff;'
+                    f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
+                    f'padding:2px 10px;border-radius:{TOKEN["radius_full"]};">🛰️ 后台自动扫描</span>'
+                    f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">🧠 社区感知</span>'
+                    f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};">{time_label} 自动扫描</span>'
+                    f'<span style="font-size:0.85em;color:{alert_color};margin-left:auto;font-weight:600;">'
+                    f'{alert_icon} {overall[:50]}</span></div>',
+                    unsafe_allow_html=True,
+                )
+                if findings:
+                    for f_text in findings:
+                        st.markdown(
+                            f'<span style="font-size:0.76em;color:{TOKEN["text_sec"]};">{f_text}</span>',
+                            unsafe_allow_html=True,
+                        )
+            with c2:
+                st.markdown("")
+                if anomaly_count > 0:
+                    st.markdown(
+                        f'<div style="text-align:center;padding-top:8px;">'
+                        f'<div style="font-size:2em;">{alert_icon}</div>'
+                        f'<div style="font-size:1.4em;font-weight:800;color:{alert_color};">{anomaly_count}</div>'
+                        f'<div style="font-size:0.68em;color:{TOKEN["text_muted"]};">项异常</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        f'<div style="text-align:center;padding-top:8px;">'
+                        f'<div style="font-size:2em;">🌿</div>'
+                        f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};">一切正常</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+except Exception:
+    _log.warning("Perception engine unavailable", exc_info=True)
 
 st.markdown("---")
 
@@ -394,7 +477,7 @@ else:
 st.markdown("---")
 
 # ── Activity Timeline (real activity_log) ──
-section("📡 校园动态时间线")
+section("📡 社区动态时间线")
 
 try:
     from data.db_notifications import get_activity_feed, get_activity_summary
@@ -448,7 +531,7 @@ try:
             except Exception:
                 _log.warning("Live generator events unavailable", exc_info=True)
     else:
-        st.caption("暂无校园动态。当学生上报问题或提交提案时，这里会实时更新。")
+        st.caption("暂无社区动态。当居民上报问题或提交提案时，这里会实时更新。")
 except Exception:  # log and skip
     _log.debug("Activity feed skipped", exc_info=True)
 
@@ -520,3 +603,5 @@ if st.session_state.get("_dash_reply_pid"):
         if st.button("取消", width="stretch"):
             st.session_state.pop("_dash_reply_pid", None)
             st.rerun()
+
+methodology_panel()

@@ -1,14 +1,14 @@
 #!/bin/bash
-# CampusInsight Agent — 一键部署脚本
+# CommunityInsight Agent — 一键部署脚本
 set -euo pipefail
 
-APP_NAME="campus-insight"
+APP_NAME="community-insight"
 APP_PORT="${PORT:-8501}"
 
 banner() {
     echo ""
-    echo "  🏛️  校园先知 CampusInsight Agent"
-    echo "  AI 校园治理平台 · 知报议督"
+    echo "  🏘️  社区先知 CommunityInsight Agent"
+    echo "  AI 社区治理平台 · 知报议督"
     echo ""
 }
 

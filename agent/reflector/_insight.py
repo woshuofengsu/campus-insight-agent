@@ -60,7 +60,7 @@ def _build_insight_prompt(associations: dict, user_input: str) -> str:
     up = associations.get("upgrade_paths", [])
     re_ = associations.get("resolution_efficiency", [])
 
-    parts = ["你是一位校园治理数据分析师。以下是根据用户消息自动发现的关联数据：", ""]
+    parts = ["你是一位社区治理数据分析师。以下是根据用户消息自动发现的关联数据：", ""]
 
     if sp:
         items = "\n".join(
@@ -145,7 +145,7 @@ def _build_insight_prompt(associations: dict, user_input: str) -> str:
         "",
         "要求：",
         "- 不要重复列举数据（数据已在上方展示），要解读其深层含义",
-        "- 语气像一个有洞察力的校园治理分析师，看到别人看不到的模式",
+        "- 语气像一个有洞察力的社区治理分析师，看到别人看不到的模式",
         "- 给出 1-2 条最具体、最可操作的下一步建议",
         "- 纯文本，不用 markdown，不用 emoji 前缀",
     ])
@@ -197,7 +197,7 @@ def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
                 {
                     "role": "system",
                     "content": (
-                        "你是一个有洞察力的校园治理数据分析师。用简洁的中文回复，"
+                        "你是一个有洞察力的社区治理数据分析师。用简洁的中文回复，"
                         "不超过180字。重点解读数据背后的含义和趋势，给出可操作的行动建议。"
                     ),
                 },

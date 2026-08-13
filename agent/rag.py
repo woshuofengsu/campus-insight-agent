@@ -1,9 +1,9 @@
 # agent/rag.py
-"""RAG semantic search for the campus knowledge base.
+"""Character n-gram TF-IDF retrieval for the community knowledge base.
 
-Character n-gram TF-IDF (pure Python, zero dependencies). Works well for
-Chinese text without jieba or ML packages. Embeddings cached in SQLite.
-Falls back to keyword LIKE search on failure.
+Pure Python, zero dependencies. Works well for Chinese text without jieba
+or ML packages. Embeddings cached in SQLite. Falls back to keyword LIKE
+search on failure.
 """
 
 import math
@@ -125,7 +125,7 @@ def build_index(force: bool = False):
 
 def semantic_search(query: str, top_k: int = 5,
                     category: str | None = None) -> list[dict]:
-    """Semantic search over the knowledge base using character n-gram TF-IDF.
+    """Retrieve knowledge-base entries using character n-gram TF-IDF.
 
     Returns entries ranked by cosine similarity to the query.
     Falls back to keyword LIKE search if no embeddings are indexed yet.
@@ -229,7 +229,7 @@ def get_rag_context(query: str, top_k: int = 3,
     if not results:
         return ""
 
-    lines = ["以下是校园知识库中与用户问题相关的信息，请基于这些信息回答：", ""]
+    lines = ["以下是社区知识库中与用户问题相关的信息，请基于这些信息回答：", ""]
     for i, r in enumerate(results, 1):
         lines.append(
             f"【{i}】{r['title']}（类别：{r.get('category', '')}，"
@@ -247,9 +247,9 @@ def rag_search(query: str, top_k: int = 5,
     """
     results = semantic_search(query, top_k=top_k, category=category)
     if not results:
-        return f"未找到与「{query}」相关的校园百科信息。"
+        return f"未找到与「{query}」相关的社区知识信息。"
 
-    lines = [f"📚 **语义搜索**：「{query}」— 找到 {len(results)} 条结果\n"]
+    lines = [f"📚 **知识检索**：「{query}」— 找到 {len(results)} 条结果\n"]
     for i, r in enumerate(results, 1):
         score_bar = "█" * min(int(r.get("score", 0) * 20), 10)
         lines.append(

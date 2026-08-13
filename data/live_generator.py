@@ -7,18 +7,22 @@
     生产环境应使用真实用户活动数据替代。
 
 Each day, based on date hash, generates:
-  - 1-3 new campus issues (random but deterministic per date)
+  - 1-3 new community issues (random but deterministic per date)
   - 0-2 auto-resolved old issues (with detailed resolution notes)
   - Increments supporter counts for 1-3 proposals
-  - 0-1 new feedback items (simulating organic student sentiment)
+  - 0-1 new feedback items (simulating organic resident sentiment)
 
-Called during session init to create the illusion of continuous campus activity.
+Called during session init to create the illusion of continuous community activity.
 Uses deterministic hashing so the same date always produces the same events
 (no duplicates across page reloads).
+
+⚠️  默认禁用：比赛/生产环境通过 config.DEMO_LIVE_DATA 开关（默认 False）关闭，
+只有明确设 DEMO_LIVE_DATA=true 时才生成每日合成数据。一次性 seed_all() 不受影响。
 """
 import hashlib
 from datetime import datetime, timedelta
 from data.database import get_db
+from config import DEMO_LIVE_DATA
 
 
 def _daily_seed() -> int:
@@ -36,71 +40,91 @@ def _daily_rng(lo: int, hi: int) -> int:
 
 _ISSUE_TEMPLATES = [
     # title, category, location, urgency, description
-    ("图书馆三楼空调漏水", "设施维修", "图书馆三楼", "普通",
-     "空调出风口持续滴水，地面已有积水，影响读者通行。"),
-    ("食堂一楼筷子消毒柜故障", "设施维修", "一食堂一楼", "紧急",
-     "消毒柜指示灯不亮，餐具无法消毒，用餐高峰期影响大。"),
-    ("操场跑道塑胶起皮", "设施维修", "操场", "普通",
-     "跑道西南段约10米塑胶面层起皮，跑步容易绊倒。"),
-    ("教一楼大厅照明灯不亮", "设施维修", "教一楼大厅", "普通",
-     "大厅南侧两盏顶灯熄灭多日，晚上光线昏暗。"),
-    ("宿舍区垃圾桶溢出未清理", "环境卫生", "宿舍区", "紧急",
-     "5号宿舍楼下垃圾桶已满三天未清理，异味严重。"),
-    ("教学楼走廊墙皮脱落", "设施维修", "教学楼三楼走廊", "普通",
-     "走廊东段墙皮大面积脱落，影响美观且有安全隐患。"),
-    ("食堂油烟排放影响周边宿舍", "环境卫生", "食堂", "普通",
-     "晚饭时段油烟直排，附近宿舍开窗就有油烟味。"),
-    ("校门口共享单车乱停放", "校园管理", "校门口", "普通",
-     "共享单车堵塞人行道，早晚高峰期通行困难。"),
-    ("实验楼电梯异响", "安全隐患", "实验楼", "紧急",
-     "电梯运行时有金属摩擦异响，已持续一周，需紧急检修。"),
-    ("图书馆WiFi信号不稳定", "网络服务", "图书馆", "普通",
-     "三楼自习区WiFi频繁断连，影响在线学习。"),
-    ("教二楼多媒体投影模糊", "教学设备", "教二楼", "普通",
-     "305教室投影仪画面偏黄模糊，影响课件展示效果。"),
-    ("一食堂麻辣烫窗口涨价未公示", "餐饮问题", "一食堂", "普通",
-     "部分同学反映麻辣烫从8元涨到10元，但无任何公示说明。"),
-    ("校园主干道路灯损坏", "设施维修", "校园主干道", "普通",
-     "行政楼至图书馆路段3盏路灯同时熄灭，夜间行走不安全。"),
-    ("操场看台座椅螺丝松动", "安全隐患", "操场看台", "紧急",
-     "东看台前排多个座椅螺丝松动摇晃，运动会前急需维修。"),
-    ("二食堂二楼排烟不畅", "环境卫生", "二食堂二楼", "普通",
-     "高峰期油烟排不出去，整个二楼都是烟味。"),
-    ("宿舍热水供应不稳定", "设施维修", "宿舍区", "紧急",
-     "5号宿舍楼晚间热水时有时无，影响学生洗漱。"),
-    ("教学楼自动售货机吞币", "设施维修", "教学楼一楼", "普通",
-     "教一楼大厅售货机频繁吞币不出货，已有多人投诉。"),
-    ("图书馆自习区占座严重", "校园管理", "图书馆", "普通",
-     "考试周结束后占座现象仍很严重，部分座位长期被占。"),
-    ("校园网网速慢影响选课", "网络服务", "全校", "紧急",
-     "选课高峰期网络延迟极高，页面加载需要5分钟以上。"),
-    ("教学楼厕所门锁损坏", "设施维修", "教三楼二楼男厕", "普通",
-     "第二隔间门锁损坏，无法正常使用。"),
-    ("篮球场地面开裂", "设施维修", "篮球场", "普通",
-     "2号球场地面有裂缝，打球有崴脚风险。"),
-    ("一食堂二楼空调不制冷", "设施维修", "一食堂二楼", "普通",
-     "天气炎热，空调出热风，就餐体验极差。"),
-    ("实验楼天台门锁损坏", "安全隐患", "实验楼", "普通",
-     "天台门锁失效，存在安全隐患。"),
-    ("绿化带水管破裂", "设施维修", "教学区绿化带", "紧急",
-     "水管破裂大量漏水，浪费水资源且影响通行。"),
-    ("图书馆应急灯不亮", "安全隐患", "图书馆二楼", "紧急",
-     "走廊应急指示灯不亮，消防检查不过关。"),
-    ("食堂后厨卫生状况差", "环境卫生", "一食堂后厨", "紧急",
-     "有同学路过看到后厨地面油污严重，需要整改。"),
-    ("教学楼电梯超载报警失灵", "安全隐患", "教一楼电梯", "紧急",
-     "电梯超载不报警，高峰期挤满人仍在运行。"),
-    ("快递站包裹堆积无人管", "校园管理", "校门口快递站", "普通",
-     "快递堆积如山，部分包裹已放置一周无人领取。"),
-    ("宿舍楼防火门常开", "安全隐患", "学生宿舍3号楼", "普通",
-     "防火门被石头顶住常开，违反消防规定。"),
-    ("公共浴室排水堵塞", "设施维修", "学生宿舍公共浴室", "普通",
-     "排水口堵塞，洗澡水漫到更衣区。"),
+    # ── 设施维修 ──
+    ("3号楼2单元电梯运行异响", "设施维修", "3号楼2单元", "紧急",
+     "电梯运行时有明显金属摩擦异响，门关合也迟缓，居民担心安全。"),
+    ("5号楼电梯按钮失灵", "设施维修", "5号楼1单元", "普通",
+     "电梯内多个楼层按钮按下无反应，老人按错楼层干着急。"),
+    ("2号楼货梯门关合夹人隐患", "设施维修", "2号楼货梯", "紧急",
+     "货梯门关合不灵敏，有次差点夹到人，需尽快检修。"),
+    ("12号楼顶层屋面漏水", "设施维修", "12号楼顶层", "紧急",
+     "一下雨顶层就漏水，墙面都发霉了，雨季快到了急需处理。"),
+    ("9号楼2单元厨房管道漏水", "设施维修", "9号楼2单元", "普通",
+     "厨房顶部管道持续渗水，天花板都泡起皮了，怀疑楼上管道老化。"),
+    ("4号楼1单元下水道堵塞", "设施维修", "4号楼1单元", "紧急",
+     "一楼厨房下水道返水，污水流得满地都是，一股恶臭。"),
+    ("小区西侧步道路灯损坏", "设施维修", "西侧步道", "普通",
+     "西侧步道三盏路灯坏了快一周，晚上一片漆黑，老人散步很危险。"),
+    ("6号楼2单元声控灯失灵", "设施维修", "6号楼2单元", "普通",
+     "声控灯坏了，晚上上下楼要打手电，老人夜里很危险。"),
+    ("中心花园健身器材松动", "设施维修", "中心花园健身区", "普通",
+     "好几台健身器材生锈松动，老人锻炼时晃动，有安全隐患。"),
+    ("中心花园儿童滑梯破损", "设施维修", "中心花园", "普通",
+     "儿童滑梯有处塑料开裂，边缘锋利，已经划伤过孩子的手。"),
+    ("南门快递柜屏幕损坏", "设施维修", "南门快递柜", "普通",
+     "南门快递柜屏幕坏了，取件只能等快递员手动操作，排队排得很长。"),
+    # ── 环境卫生 ──
+    ("小区东南角垃圾桶满溢", "环境卫生", "东南角垃圾点", "紧急",
+     "垃圾桶三天没清运，垃圾堆到路边，异味和蚊蝇都来了。"),
+    ("4号楼2单元楼道长期堆物", "环境卫生", "4号楼2单元", "普通",
+     "楼道堆满旧鞋柜和杂物，落满灰尘还有异味，进出都不方便。"),
+    ("中心花园绿化带杂草丛生", "环境卫生", "中心花园", "普通",
+     "绿化带快成野草地了，蚊虫特别多，晚上都不敢带孩子去花园。"),
+    ("小区步道宠物粪便无人清理", "环境卫生", "小区步道", "普通",
+     "遛狗不清理粪便，步道上到处都是，已经踩到过好几次了。"),
+    ("2号楼3单元卫生间反味严重", "环境卫生", "2号楼3单元", "普通",
+     "卫生间长期有下水道反味，夏天尤其严重，影响整栋楼生活。"),
+    # ── 安全隐患 ──
+    ("12号楼前电动车飞线充电", "安全隐患", "12号楼前", "紧急",
+     "有人从五楼拉电线给电动车充电，电线裸露在外，下雨天极其危险。"),
+    ("3号楼楼道杂物堵塞消防通道", "安全隐患", "3号楼2单元楼道", "紧急",
+     "楼道堆满旧家具和纸箱，消防通道被堵了大半，一旦着火逃生通道都没了。"),
+    ("8号楼外墙瓷砖脱落风险", "安全隐患", "8号楼外立面", "紧急",
+     "外墙有几处瓷砖鼓包，摇摇欲坠，楼下就是人行通道，路过提心吊胆。"),
+    ("消防栓前堆满纸箱杂物", "安全隐患", "8号楼1层消防栓", "紧急",
+     "消防栓被一堆废纸箱围住，紧急情况根本没法取用，灭火器也早已过期。"),
+    ("5号楼单元门口电动车堵门", "安全隐患", "5号楼1单元", "普通",
+     "电动车停满单元门口，进出都得侧身，婴儿车和轮椅根本过不去。"),
+    # ── 停车管理 ──
+    ("小区车位不足夜间乱停", "停车管理", "小区主干道", "普通",
+     "晚上回来车位全满，只能停路边，早上又挡住别人出不去，天天吵架。"),
+    ("7号楼前有人私装地锁", "停车管理", "7号楼前空地", "普通",
+     "有人私自安装地锁霸占车位，引发邻里纠纷，公共车位凭什么私有？"),
+    ("外来车辆长期占用车位", "停车管理", "小区东门附近", "普通",
+     "几辆外地牌照车长期占用公共车位，本地居民反而没地方停。"),
+    # ── 噪音扰民 ──
+    ("中心广场广场舞音响音量过大", "噪音扰民", "中心广场", "普通",
+     "晚上7-9点广场舞音响开得震天响，家里孩子写作业都受影响。"),
+    ("6号楼2单元装修噪音超时", "噪音扰民", "6号楼2单元", "普通",
+     "装修队晚上8点还在用电钻，跟规定时间不符，楼里老人和婴儿受不了。"),
+    ("深夜施工噪音扰民", "噪音扰民", "小区北门附近", "普通",
+     "北门外工地深夜还在施工，混凝土搅拌车声音持续到凌晨。"),
+    ("7号楼楼道宠物狗半夜狂叫", "噪音扰民", "7号楼1单元", "普通",
+     "某户养的狗每天半夜狂叫，整栋楼都睡不好，多次沟通无果。"),
+    # ── 物业服务 ──
+    ("物业报修响应慢", "物业服务", "全小区", "普通",
+     "报修快一周了都没人上门，打电话催总说“在安排”，服务效率太低。"),
+    ("楼道卫生打扫不及时", "物业服务", "3号楼", "普通",
+     "楼道一个多月没见保洁来打扫，扶手一层灰，楼梯角落还有烟头。"),
+    ("小区监控多处失效", "物业服务", "小区各出入口", "普通",
+     "东门和北门监控坏了，丢过快递也查不到，居民没有安全感。"),
+    ("小区东门门禁失灵", "物业服务", "东门", "普通",
+     "东门门禁坏了一周，什么人都能进出，治安没保障。"),
+    # ── 邻里矛盾 ──
+    ("楼上空调外机滴水", "邻里矛盾", "5号楼", "普通",
+     "楼上空调外机排水管滴水，滴到楼下窗台和晾晒的衣服上，两家闹得很僵。"),
+    # ── 社区事务 ──
+    ("老年助餐点餐品单一", "社区事务", "社区助餐点", "普通",
+     "助餐点每天就两三个菜，老人反映吃腻了，希望能丰富菜品。"),
+    ("自行车棚堆放僵尸车", "社区事务", "小区自行车棚", "普通",
+     "车棚里堆满废旧自行车和杂物，正常停车的都没位置，建议集中清理。"),
+    ("独居老人多日未出门", "社区事务", "11号楼3单元", "紧急",
+     "独居老人好几天没见出门，邻居敲门无人应，希望社区赶紧上门看看。"),
 ]
 
 _RESOLVE_NAMES = [
-    "后勤维修组", "保洁人员", "信息中心", "电工班",
-    "物业管理处", "校维修队", "外包维修公司",
+    "物业维修班", "保洁人员", "电工班", "物业管理处",
+    "电梯维保公司", "社区网格员", "外包维修公司",
 ]
 
 _RESOLVE_ACTIONS = [
@@ -110,26 +134,32 @@ _RESOLVE_ACTIONS = [
     "维修人员已到现场，正在修复中",
     "已完成维修并验收通过",
     "已清理完毕，恢复正常使用",
-    "问题已修复，感谢同学反馈",
+    "问题已修复，感谢居民反馈",
     "经检查属实，已列入下周维修计划",
     "临时修复已完成，彻底解决需等假期统一施工",
     "已联系厂家，配件在途，预计3天内修复",
 ]
 
 _FEEDBACK_TEMPLATES = [
-    ("食堂菜品价格", "新窗口味道不错，价格也比外面便宜", "正面"),
-    ("食堂菜品价格", "中午高峰期还是太挤了，建议延长供餐时间", "负面"),
-    ("图书馆开放时间", "延长到23:00太好了！感谢学校采纳建议", "正面"),
-    ("校园网速", "最近宿舍WiFi好多了，看来学校在改善", "正面"),
-    ("校园网速", "教五楼信号还是差，希望继续优化", "负面"),
-    ("校园安全", "新装的路灯很亮，晚上走路安心多了", "正面"),
-    ("快递服务", "快递柜什么时候能装好？每天找快递好麻烦", "中性"),
-    ("校园交通", "共享单车清理及时了，校门口终于通了", "正面"),
+    ("电梯安全", "电梯困人太吓人了，希望能彻底修好", "负面"),
+    ("电梯安全", "上周物业派人检修了，最近没再困人", "正面"),
+    ("停车管理", "地锁被清理了，停车终于有点秩序", "正面"),
+    ("停车管理", "晚上还是没地方停，车位根本不够", "负面"),
+    ("停车管理", "错峰停车如果真能落地就好了", "中性"),
+    ("环境卫生", "垃圾桶老满，夏天味道大", "负面"),
+    ("环境卫生", "绿化改造方案公示了，期待", "中性"),
+    ("环境卫生", "宠物便袋箱装上了，遛狗方便多了", "正面"),
+    ("噪音扰民", "广场舞9点后还在跳，分贝仪形同虚设", "负面"),
+    ("噪音扰民", "装修噪音有人管了，网格员上门了", "正面"),
+    ("助餐服务", "助餐点菜品太少，吃腻了", "负面"),
+    ("助餐服务", "送餐上门挺方便，独居老人有口热饭", "正面"),
+    ("物业服务", "报修一周没人来，物业效率太低", "负面"),
+    ("物业服务", "门禁升级了，进出要刷卡，安全感强了", "正面"),
 ]
 
 
 def generate_today_events() -> dict:
-    """Generate today's campus events. Returns summary dict.
+    """Generate today's community events. Returns summary dict.
 
     Called during init_session() — safe to call every page load because
     it checks if today's events have already been generated (by title+date
@@ -149,10 +179,17 @@ def generate_today_events() -> dict:
         "generated": True,  # synthetic data — set to False when real user data is available
     }
 
+    # ── 比赛/生产环境：默认关闭每日合成数据 ──
+    # 只有明确设 DEMO_LIVE_DATA=true 时才生成假工单/假解决/假附议/假反馈。
+    # 一次性 seed_all() 的演示样本不受影响。
+    if not DEMO_LIVE_DATA:
+        result["generated"] = False
+        return result
+
     with get_db() as conn:
         # ── Check if today's events already generated ──
         already_generated = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
+            "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE author = '系统感知' AND date(reported_at) = date(?)",
             (today_str,)
         ).fetchone()
@@ -160,7 +197,7 @@ def generate_today_events() -> dict:
 
         # Also check if any resolutions happened today
         today_resolved = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
+            "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE status = '已解决' AND date(resolved_at) = date(?)",
             (today_str,)
         ).fetchone()
@@ -184,13 +221,13 @@ def generate_today_events() -> dict:
 
                 # Check for duplicate
                 existing = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
+                    "SELECT COUNT(*) as cnt FROM community_issues "
                     "WHERE title = ? AND date(reported_at) = date(?)",
                     (title, report_date),
                 ).fetchone()
                 if existing and existing["cnt"] == 0:
                     conn.execute(
-                        """INSERT INTO campus_issues
+                        """INSERT INTO community_issues
                            (title, category, location, description, urgency, status, reported_at, author)
                            VALUES (?, ?, ?, ?, ?, '待处理', ?, '系统感知')""",
                         (title, cat, loc, f"【自动感知】{desc}（系统于{report_date}自动检测）",
@@ -203,7 +240,7 @@ def generate_today_events() -> dict:
         # ── Auto-resolve 0-2 old issues ──
         if not today_resolved_done:
             pending_issues = conn.execute(
-                "SELECT id, title, category FROM campus_issues "
+                "SELECT id, title, category FROM community_issues "
                 "WHERE status IN ('待处理','处理中') "
                 "AND reported_at < date('now', '-2 days') "
                 "ORDER BY reported_at ASC LIMIT 10"
@@ -215,7 +252,7 @@ def generate_today_events() -> dict:
                 resolver = _RESOLVE_NAMES[(seed + i * 31) % len(_RESOLVE_NAMES)]
                 action = _RESOLVE_ACTIONS[(seed + i * 41) % len(_RESOLVE_ACTIONS)]
                 conn.execute(
-                    "UPDATE campus_issues SET status = '已解决', resolved_at = ?, "
+                    "UPDATE community_issues SET status = '已解决', resolved_at = ?, "
                     "description = COALESCE(description, '') || ? WHERE id = ?",
                     (today_str,
                      f"\n\n【{today_str} · {resolver}】{action}",
@@ -257,7 +294,7 @@ def generate_today_events() -> dict:
             if dup and dup["cnt"] == 0:
                 conn.execute(
                     "INSERT INTO feedback_items (topic, opinion, source, sentiment) VALUES (?,?,?,?)",
-                    (topic, opinion, "学生反馈", sentiment),
+                    (topic, opinion, "居民反馈", sentiment),
                 )
                 result["new_feedback"] += 1
 
@@ -275,7 +312,7 @@ def get_live_summary() -> str:
 
     parts = []
     if events["new_issues"]:
-        parts.append(f"📝 今日自动感知 {events['new_issues']} 件新问题")
+        parts.append(f"📝 今日自动感知 {events['new_issues']} 件新诉求")
     if events["resolved_issues"]:
         parts.append(f"✅ {events['resolved_issues']} 件工单今日解决")
     if events["supporter_bumps"]:

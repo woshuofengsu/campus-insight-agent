@@ -1,4 +1,4 @@
-# CampusInsight Agent — Docker Compose 部署
+# CommunityInsight Agent — Docker Compose 部署
 #
 # 启动:
 #   1. 复制 .env.example 为 .env 并填入 API Key
@@ -13,7 +13,7 @@ version: "3.9"
 services:
   app:
     build: .
-    container_name: campus-insight
+    container_name: community-insight
     ports:
       - "8501:8501"
     env_file:
@@ -32,7 +32,7 @@ services:
   # ── 可选：FastAPI 服务（供外部系统调用） ──
   api:
     build: .
-    container_name: campus-insight-api
+    container_name: community-insight-api
     ports:
       - "18800:18800"
     env_file:

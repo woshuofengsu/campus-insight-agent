@@ -1,18 +1,17 @@
-# ui/pages_teacher/health_mgmt.py
-"""健康管理（教师端）—— 全校健康风险、预警推送、防护建议."""
+# ui/pages_grid/health_mgmt.py
+"""健康管理（网格员端）—— 全小区健康风险、预警推送、防护建议."""
 import streamlit as st
 import altair as alt
 import pandas as pd
-from ui.components import TOKEN, section, stat, tag, configure_altair
+from ui.guard import require_role
+
+require_role("grid")
+
+from ui.components import TOKEN, section, stat, tag, configure_altair, page_header
 import logging
 _log = logging.getLogger(__name__)
 
-st.markdown(
-    f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
-    f'🏥 健康管理</span>',
-    unsafe_allow_html=True,
-)
-st.caption("校园健康风险监测 · 疾病预警推送 · 防护措施建议。")
+page_header("🏥 健康管理", "小区健康风险监测 · 疾病预警推送 · 防护措施建议。")
 
 try:
     from data.db_health_alerts import cached_health_risk
@@ -36,7 +35,7 @@ st.markdown(
     f'box-shadow:{TOKEN["shadow"]};margin-bottom:16px;">'
     f'<div style="font-size:2.5em;">{he}</div>'
     f'<div style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
-    f'全校健康风险：{level_label.get(hl, "—")} · {hs} 分</div>'
+    f'全小区健康风险：{level_label.get(hl, "—")} · {hs} 分</div>'
     f'<div style="font-size:0.88em;color:{TOKEN["text_sec"]};margin-top:4px;">'
     f'{h["advice_summary"]}</div></div>',
     unsafe_allow_html=True,
@@ -51,7 +50,7 @@ with c2:
 with c3:
     stat("天气影响", f"+{h.get('weather_mod_total', 0)}", TOKEN["warning"])
 with c4:
-    stat("人员密度", f"+{h.get('campus_density', {}).get('score', 0)}",
+    stat("人员密度", f"+{h.get('community_density', {}).get('score', 0)}",
          TOKEN["accent"])
 
 st.markdown("---")
@@ -94,7 +93,7 @@ bar_chart = configure_altair(
         y=alt.Y("疾病:N", title=None, sort="-x"),
         color=alt.Color("风险分:Q", scale=alt.Scale(
             domain=[0, 30, 50, 70, 100],
-            range=["#22c55e", "#eab308", "#f97316", "#ef4444", "#dc2626"],
+            range=[TOKEN["success"], "#eab308", TOKEN["warning"], TOKEN["danger"], "#991b1b"],
         ), legend=None),
         tooltip=["疾病", "风险分", "症状", "季节"],
     )
@@ -138,14 +137,14 @@ for d in diseases_sorted:
             # Quick action: push notification placeholder
             if ar >= 50:
                 if st.button("📢 推送提醒", key=f"health_push_{d['name']}", width="stretch"):
-                    st.toast(f"已推送「{d['name']}」防护提醒到全校通知", icon="📢")
+                    st.toast(f"已推送「{d['name']}」防护提醒到全小区通知", icon="📢")
 
-# Campus density section
+# Community density section
 
 st.markdown("---")
-section("🏫 校园人员密度评估")
+section("👥 小区人员密度评估")
 
-cd = h.get("campus_density", {})
+cd = h.get("community_density", {})
 density_score = cd.get("score", 0)
 density_reasons = cd.get("reasons", [])
 
@@ -157,7 +156,7 @@ if density_reasons:
             unsafe_allow_html=True,
         )
 else:
-    st.info("当前校园人员密度正常，无特殊聚集风险。")
+    st.info("当前小区人员密度正常，无特殊聚集风险。")
 
 st.markdown(
     f'<div style="font-size:0.78em;color:{TOKEN["text_muted"]};margin-top:6px;">'
@@ -196,6 +195,6 @@ else:
 st.markdown("---")
 st.markdown(
     f'<div style="text-align:center;font-size:0.78em;color:{TOKEN["text_muted"]};">'
-    f'数据基于季节模型 + 实时天气 + 校园密度评估 · 每30分钟刷新 · {h["evaluated_at"]}</div>',
+    f'数据基于季节模型 + 实时天气 + 小区密度评估 · 每30分钟刷新 · {h["evaluated_at"]}</div>',
     unsafe_allow_html=True,
 )

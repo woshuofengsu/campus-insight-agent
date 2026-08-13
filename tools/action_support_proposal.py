@@ -1,17 +1,17 @@
 # tools/action_support_proposal.py
-"""有话说 — 附议提案."""
+"""邻里议事 — 附议提案."""
 from langchain.tools import tool
 from data.database import support_proposal as _db_support_proposal, get_db
 
 
 @tool
 def support_proposal(proposal_id: int) -> str:
-    """附议（支持）一个校园提案。
+    """附议（支持）一个社区提案。
 
     参数：
     - proposal_id: 提案编号（必填），可在提案列表中查看每个提案的 #编号
 
-    附议后该提案的支持数+1。附议量高的提案会被推送到治理看板，更容易获得校方关注和回应。
+    附议后该提案的支持数+1。附议量高的提案会被推送到治理看板，更容易获得社区/物业关注和回应。
     """
     if not proposal_id or proposal_id <= 0:
         return "⚠️ 请提供有效的提案编号。你可以在提案列表中查看每个提案的 #编号。"
@@ -40,5 +40,5 @@ def support_proposal(proposal_id: int) -> str:
     return (
         f"👍 你附议了提案 #{proposal_id} **{target['title'][:30]}**\n"
         f"当前附议人数：**{new_count}**{milestone}\n"
-        f"分享给同学以获得更多附议。"
+        f"分享给邻居以获得更多附议。"
     )

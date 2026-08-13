@@ -36,8 +36,8 @@ def get_knowledge_base(category: str = "", limit: int = 20) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def get_campus_events(limit: int = 10) -> list[dict]:
-    """Get upcoming and recent campus events from knowledge_base (category='event')."""
+def get_community_events(limit: int = 10) -> list[dict]:
+    """Get upcoming and recent community events from knowledge_base (category='event')."""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM knowledge_base WHERE category IN ('event', 'calendar', 'notice') ORDER BY id DESC LIMIT ?",

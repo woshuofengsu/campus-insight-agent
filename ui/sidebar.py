@@ -1,8 +1,10 @@
 # ui/sidebar.py
 """Sidebar — brand, user card, governance stats, account controls."""
 import streamlit as st
+from config import DEMO_MODE
 from ui.session_state import SS
-from ui.theme import get_theme, theme_toggle
+from ui.theme import theme_toggle
+from ui.components import TOKEN
 from ui.notify import render_sidebar_badge
 from ui.cache import invalidate_all
 from data.db_user import list_users, get_user_by_id
@@ -10,41 +12,50 @@ from data.db_user import list_users, get_user_by_id
 
 def render_sidebar(profile: dict, role: str):
     """Render the full sidebar. Call once per rerun inside main()."""
-    is_dark = get_theme() == "dark"
-    tx = "#e8e8ed" if is_dark else "#1a1a1a"
-    tx2 = "#9898a2" if is_dark else "#6e6e6e"
-    tx3 = "#5e5e6a" if is_dark else "#a0a0a0"
-    bd = "#25252e" if is_dark else "#ebebeb"
-    card = "#18181f" if is_dark else "#ffffff"
-    accent_bg = "rgba(109,107,245,0.10)" if is_dark else "#f0efff"
-    accent_bd = "rgba(109,107,245,0.18)" if is_dark else "#d2d0f8"
-    accent = "#6d6bf5" if is_dark else "#4f46e5"
-    _warn_bg = "rgba(251,191,36,0.08)" if is_dark else "#fffbeb"
-    _dang_bg = "rgba(248,113,113,0.08)" if is_dark else "#fef2f2"
-    _succ_bg = "rgba(52,211,153,0.08)" if is_dark else "#ecfdf5"
-    _warn = "#fbbf24" if is_dark else "#d97706"
-    _dang = "#f87171" if is_dark else "#dc2626"
-    _succ = "#34d399" if is_dark else "#059669"
+    # 大字模式：放大全局根字号（老年友好，浏览器原生缩放之外的显式入口）
+    if st.session_state.get("_large_font"):
+        st.markdown('<style>html { font-size: 18px !important; }</style>', unsafe_allow_html=True)
+
+    tx = TOKEN["sidebar_text"]
+    tx2 = TOKEN["sidebar_text_sec"]
+    tx3 = TOKEN["sidebar_text_muted"]
+    bd = TOKEN["sidebar_border"]
+    card = TOKEN["sidebar_surface"]
+    accent_bg = TOKEN["sidebar_accent_bg"]
+    accent_bd = TOKEN["sidebar_border"]
+    accent = TOKEN["sidebar_accent"]
+    _warn_bg = TOKEN["sidebar_warn_bg"]
+    _dang_bg = TOKEN["sidebar_dang_bg"]
+    _succ_bg = TOKEN["sidebar_succ_bg"]
+    _warn = TOKEN["sidebar_warn"]
+    _dang = TOKEN["sidebar_dang"]
+    _succ = TOKEN["sidebar_succ"]
 
     # ── Brand ──
     st.markdown(
-        f'<div style="padding:14px 0 8px;">'
-        f'<div style="font-size:1.1em;font-weight:700;color:{tx};'
-        f'letter-spacing:-0.01em;">CampusInsight</div>'
-        f'<div style="font-size:0.7em;color:{tx3};margin-top:1px;">'
-        f'{"校园治理平台" if role != "teacher" else "管理后台"}</div>'
-        f'</div>',
+        f'<div style="padding:14px 0 10px;display:flex;align-items:center;gap:10px;">'
+        f'<div style="width:36px;height:36px;border-radius:10px;'
+        f'background:linear-gradient(135deg,{TOKEN["accent"]},{TOKEN["accent2"]});'
+        f'display:flex;align-items:center;justify-content:center;'
+        f'font-size:1.15em;color:#fff;flex-shrink:0;'
+        f'box-shadow:0 4px 12px rgba(79,70,229,0.35);">🏘️</div>'
+        f'<div style="min-width:0;">'
+        f'<div style="font-size:1.05em;font-weight:700;color:{tx};'
+        f'letter-spacing:-0.01em;line-height:1.25;">CommunityInsight</div>'
+        f'<div style="font-size:0.68em;color:{tx3};margin-top:1px;">'
+        f'{"社区治理平台" if role != "grid" else "网格员工作台"}</div>'
+        f'</div></div>',
         unsafe_allow_html=True,
     )
 
     # ── User card ──
     if profile:
-        school = profile.get("school", "")
-        grade = profile.get("grade", "")
-        major = profile.get("major", "")
-        student_id = profile.get("student_id", "")
+        community = profile.get("community", "")
+        building = profile.get("building", "")
+        unit = profile.get("unit", "")
+        resident_id = profile.get("resident_id", "")
         name = profile.get("name", "")
-        role_label = "教师" if role == "teacher" else "学生"
+        role_label = "网格员" if role == "grid" else "居民"
         display_name = name or profile.get("username", "User")
 
         st.markdown(
@@ -54,10 +65,10 @@ def render_sidebar(profile: dict, role: str):
             f'<div style="font-size:0.7em;color:{tx2};line-height:1.5;">'
             f'<span style="background:{accent}18;color:{accent};'
             f'padding:1px 6px;border-radius:99px;font-size:0.85em;">{role_label}</span>'
-            f'{" &middot; " + school if school else ""}'
-            f'{" &middot; " + grade if grade else ""}'
-            f'{"<br>" + major if major and role != "teacher" else ""}'
-            f'{"<br>" + student_id if student_id else ""}'
+            f'{" &middot; " + community if community else ""}'
+            f'{" &middot; " + building if building else ""}'
+            f'{"<br>" + unit if unit and role != "grid" else ""}'
+            f'{"<br>" + resident_id if resident_id else ""}'
             f'</div></div>',
             unsafe_allow_html=True,
         )
@@ -71,7 +82,7 @@ def render_sidebar(profile: dict, role: str):
     resolved = i_stats["by_status"].get("已解决", 0)
     pending = i_stats["by_status"].get("待处理", 0)
 
-    if role == "teacher":
+    if role == "grid":
         from ui.cache import cached_issues
         urgent_issues = cached_issues(urgency="紧急", limit=100)
         urgent_count = len(urgent_issues)
@@ -103,64 +114,75 @@ def render_sidebar(profile: dict, role: str):
                 unsafe_allow_html=True,
             )
 
+    # ── Emergency contacts（老年友好：一键拨打） ──
+    _section_label("紧急联系")
+    c_tel1, c_tel2 = st.columns(2)
+    with c_tel1:
+        st.link_button("📞 网格员", "tel:62319876", width="stretch")
+    with c_tel2:
+        st.link_button("🔧 物业", "tel:62310086", width="stretch")
+
     # ── Notifications ──
     render_sidebar_badge()
 
     # ── Account ──
     _section_label("账户")
 
-    all_users = list_users()
-    if len(all_users) > 1:
-        current_uid = st.session_state.get(SS.login_user_id, 1)
-        user_options = {
-            f'{u["role"].replace("student","[学生]").replace("teacher","[教师]")} '
-            f'{u.get("name","") or u["username"]}'
-            f'{" · " + u.get("school","")[:8] if u.get("school") else ""}': u["id"]
-            for u in all_users
-        }
-        current_label = next((k for k, v in user_options.items() if v == current_uid),
-                             list(user_options.keys())[0])
-        selected_label = st.selectbox(
-            "切换账号", list(user_options.keys()),
-            index=list(user_options.keys()).index(current_label),
-            key="_user_switcher", label_visibility="collapsed",
-        )
-        selected_uid = user_options[selected_label]
-        if selected_uid != current_uid:
-            st.session_state._login_user_id = selected_uid
-            st.session_state.user_profile = get_user_by_id(selected_uid)
-            for k in ["messages", "langchain_memory", "session_ready", "agent", "memory"]:
-                st.session_state.pop(k, None)
-            invalidate_all()
-            st.rerun()
+    # 演示专用：账号切换仅在 DEMO_MODE 开启时显示。正式环境靠「退出→重新登录」隔离双角色，
+    # 避免任何登录用户一键越权切到网格员账号。
+    if DEMO_MODE:
+        all_users = list_users()
+        if len(all_users) > 1:
+            current_uid = st.session_state.get(SS.login_user_id, 1)
+            user_options = {
+                f'{u["role"].replace("resident","[居民]").replace("grid","[网格员]")} '
+                f'{u.get("name","") or u["username"]}'
+                f'{" · " + u.get("community","")[:8] if u.get("community") else ""}': u["id"]
+                for u in all_users
+            }
+            current_label = next((k for k, v in user_options.items() if v == current_uid),
+                                 list(user_options.keys())[0])
+            selected_label = st.selectbox(
+                "切换账号", list(user_options.keys()),
+                index=list(user_options.keys()).index(current_label),
+                key="_user_switcher", label_visibility="collapsed",
+            )
+            selected_uid = user_options[selected_label]
+            if selected_uid != current_uid:
+                st.session_state._login_user_id = selected_uid
+                st.session_state.user_profile = get_user_by_id(selected_uid)
+                for k in ["messages", "langchain_memory", "session_ready", "agent", "memory"]:
+                    st.session_state.pop(k, None)
+                invalidate_all()
+                st.rerun()
 
-    # ── Theme + Logout ──
-    c_t, c_l = st.columns([1, 1])
+    # ── Theme + Font + Logout ──
+    c_t, c_f, c_l = st.columns([1, 1, 1])
     with c_t:
         theme_toggle()
+    with c_f:
+        st.toggle("🔠 大字", key="_large_font", value=st.session_state.get("_large_font", False))
     with c_l:
         if st.button("退出", key="_logout", width="stretch"):
             for k in [SS.login_user_id, "user_profile", "messages",
                       "langchain_memory", "session_ready", "agent", "memory",
-                      "ob_role", "ob_school", "ob_grade", "ob_student_id",
-                      "ob_major", "ob_name"]:
+                      "ob_role", "ob_community", "ob_building", "ob_resident_id",
+                      "ob_unit", "ob_name"]:
                 st.session_state.pop(k, None)
             invalidate_all()
             st.rerun()
 
-    st.caption("知 · 报 · 议 · 督 · 校园治理")
+    st.caption("知 · 报 · 议 · 督 · 社区治理")
 
 
 # ── Internal helpers ──
 
 def _section_label(label: str):
-    tx3 = "#5e5e6a" if get_theme() == "dark" else "#a0a0a0"
-    bd = "#25252e" if get_theme() == "dark" else "#ebebeb"
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px;">'
-        f'<span style="font-size:0.68em;font-weight:600;color:{tx3};'
-        f'text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap;">{label}</span>'
-        f'<div style="flex:1;height:1px;background:{bd};"></div></div>',
+        f'<span style="font-size:0.68em;font-weight:600;color:{TOKEN["sidebar_text_muted"]};'
+        f'letter-spacing:0.06em;white-space:nowrap;">{label}</span>'
+        f'<div style="flex:1;height:1px;background:{TOKEN["sidebar_border"]};"></div></div>',
         unsafe_allow_html=True,
     )
 

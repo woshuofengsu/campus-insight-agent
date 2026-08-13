@@ -2,7 +2,7 @@
 """Agent 推理模块 —— OODA 治理工作流：观察 → 定位 → 决策 → 反思 → 关联
 
 每个 run() 调用执行全部五个阶段，让 Agent 不仅回答问题，还能主动感知
-校园动态、自我纠错、发现关联模式。
+社区动态、自我纠错、发现关联模式。
 """
 import re
 from datetime import datetime
@@ -24,7 +24,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class CampusAgent:
+class CommunityAgent:
     """主编排类 —— OODA 治理工作流"""
 
     def __init__(self, session_state):
@@ -39,7 +39,7 @@ class CampusAgent:
         self._last_thinking = ""   # extracted thinking blocks from last response
         self._last_chain = None    # structured reasoning chain from last run (for UI)
 
-        logger.info(f"CampusAgent initialized with {len(self.tools)} tools")
+        logger.info(f"CommunityAgent initialized with {len(self.tools)} tools")
 
     def _create_llm(self) -> ChatOpenAI:
         """初始化 DeepSeek 模型"""
@@ -280,6 +280,38 @@ class CampusAgent:
                 f"【角色模式：{persona['role']}】{persona['focus_hint']}"
             )
 
+        # Layer 1.5: Semantic tool routing — suggest which tool fits this turn
+        # (semantic route + keyword fallback). Helps the agent call the right tool
+        # even for phrasing not covered by the prompt's trigger-word table.
+        try:
+            from agent.router import route_intent
+            route = route_intent(user_input)
+            if route.get("tool"):
+                parts.append(
+                    f"【本轮建议工具：{route['tool']}（{route['confidence']}置信度/{route['method']}路由）】"
+                )
+        except Exception:
+            logger.debug("Semantic tool routing skipped (non-fatal)", exc_info=True)
+
+        # Layer 1.6: Plan-and-Execute — inject a step plan for complex queries
+        try:
+            from agent.planner import plan_steps
+            steps = plan_steps(user_input)
+            if steps:
+                parts.append("【建议步骤计划】" + " → ".join(steps))
+        except Exception:
+            logger.debug("Planning skipped (non-fatal)", exc_info=True)
+
+        # Layer 1.7: Personal event memory — inject "你最近..." for continuity
+        try:
+            uid = self.memory.user_id
+            from data.db_memory import get_event_summary
+            summary = get_event_summary(uid, limit=3)
+            if summary:
+                parts.append(f"【与你相关】你最近：{summary}")
+        except Exception:
+            logger.debug("Event memory injection skipped (non-fatal)", exc_info=True)
+
         # Layer 2: Time context
         parts.append(
             f"现在是{environment['weekday']}{environment['time_context']}。"
@@ -420,7 +452,17 @@ class CampusAgent:
         raw_response = self._enforce_tool_call(raw_response, user_input,
                                                 intermediate_steps)
 
+        # ── 4.6: Fact verification (anti-hallucination #2) ──
+        # Verify any #ticket/#proposal ids cited in the reply actually exist in
+        # the DB; append a correction note if not (complements enforce_tool_call).
+        raw_response = self._verify_facts(raw_response)
+
         return raw_response
+
+    def _verify_facts(self, response: str) -> str:
+        """Verify cited #ids against the DB. Delegates to agent/verifier.py."""
+        from agent.verifier import verify_facts
+        return verify_facts(response)
 
     def _enforce_tool_call(self, response: str, user_input: str,
                            intermediate_steps: list | None) -> str:

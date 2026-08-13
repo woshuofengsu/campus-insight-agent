@@ -228,7 +228,7 @@ def _real_weather() -> str:
     Uses devapi.qweather.com (free, no real-name auth needed).
     Falls back to mock data on any error (network, invalid key, etc.).
     """
-    from config import HEFENG_API_KEY, CAMPUS_CITY, CAMPUS_CITY_ID
+    from config import HEFENG_API_KEY, COMMUNITY_CITY, COMMUNITY_CITY_ID
 
     if not HEFENG_API_KEY:
         return (
@@ -242,7 +242,7 @@ def _real_weather() -> str:
 
     try:
         days, location_name = fetch_real_weather_days(
-            HEFENG_API_KEY, CAMPUS_CITY_ID, CAMPUS_CITY,
+            HEFENG_API_KEY, COMMUNITY_CITY_ID, COMMUNITY_CITY,
         )
     except Exception:  # ok to fail
         _log.debug("Real weather API request failed, falling back to mock data", exc_info=True)
@@ -297,8 +297,8 @@ def get_today_weather() -> tuple[list[dict] | None, str, bool]:
     Tries real API first, falls back to mock. Used by perception monitor,
     pulse page, and the weather tool. Centralised to avoid duplication.
     """
-    from config import CAMPUS_CITY, CAMPUS_DISTRICT, CAMPUS_CITY_ID
-    location_name = f"{CAMPUS_CITY}{CAMPUS_DISTRICT}"
+    from config import COMMUNITY_CITY, COMMUNITY_DISTRICT, COMMUNITY_CITY_ID
+    location_name = f"{COMMUNITY_CITY}{COMMUNITY_DISTRICT}"
     is_real = False
     days = None
 
@@ -307,7 +307,7 @@ def get_today_weather() -> tuple[list[dict] | None, str, bool]:
         if HEFENG_API_KEY:
             try:
                 days, api_location = fetch_real_weather_days(
-                    HEFENG_API_KEY, CAMPUS_CITY_ID, CAMPUS_CITY,
+                    HEFENG_API_KEY, COMMUNITY_CITY_ID, COMMUNITY_CITY,
                 )
                 location_name = api_location
                 is_real = True

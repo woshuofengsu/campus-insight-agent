@@ -20,23 +20,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # (user_input, expected_tool, expected_persona, description)
 ACCURACY_CASES = [
-    ("教三楼二楼男厕水龙头漏水", "report_issue", "报修助手", "设施报修"),
-    ("最近校园有什么动态", "get_campus_pulse", "校园观察员", "校园脉搏"),
+    ("3号楼二楼水龙头漏水", "report_issue", "接诉助手", "接诉上报"),
+    ("最近社区有什么动态", "get_community_pulse", "社区观察员", "社区脉搏"),
     ("统计最近一周的报修数量", "get_governance_stats", "数据分析师", "治理统计"),
-    ("我建议延长图书馆开放时间", "create_proposal", "议事顾问", "创建提案"),
-    ("今天天气怎么样", "get_weather", "校园观察员", "天气查询"),
+    ("我建议延长活动室开放时间", "create_proposal", "议事顾问", "创建提案"),
+    ("今天天气怎么样", "get_weather", "社区观察员", "天气查询"),
     ("看看有哪些待处理的设施维修", "query_issues", "数据分析师", "工单查询"),
     ("支持提案3", "support_proposal", "议事顾问", "附议"),
-    ("大家对食堂涨价怎么看", "get_topics", "议事顾问", "议题查看"),
-    ("5号宿舍楼空调不制冷了", "report_issue", "报修助手", "宿舍报修"),
+    ("大家对助餐点涨价怎么看", "get_topics", "议事顾问", "议题查看"),
+    ("5号楼空调不制冷了", "report_issue", "接诉助手", "楼栋报修"),
     ("有什么热门提案吗", "get_proposals", "议事顾问", "提案列表"),
-    ("校园脉搏", "get_campus_pulse", "校园观察员", "校园脉搏(短)"),
+    ("社区脉搏", "get_community_pulse", "社区观察员", "社区脉搏(短)"),
     ("帮我查一下我的工单", "query_issues", "数据分析师", "我的工单"),
 ]
 
 # Cases that should trigger pre-fetch awareness
 PREFETCH_CASES = [
-    "校园脉搏",           # get_campus_pulse → should use prefetch
+    "社区脉搏",           # get_community_pulse → should use prefetch
     "最近有什么提案",      # get_proposals → should use prefetch
     "今天天气如何",        # get_weather → should use prefetch
     "治理数据",           # get_governance_stats → should use prefetch
@@ -44,9 +44,9 @@ PREFETCH_CASES = [
 
 # Cases that benefit from reflector/association analysis
 ASSOCIATION_CASES = [
-    ("教三楼二楼男厕水龙头漏水", "空间关联：教三楼附近"),
-    ("操场跑道灯不亮", "空间关联：操场附近"),
-    ("图书馆插座不足", "空间关联：图书馆"),
+    ("3号楼二楼水龙头漏水", "空间关联：3号楼附近"),
+    ("广场步道灯不亮", "空间关联：广场附近"),
+    ("活动室插座不足", "空间关联：活动室"),
 ]
 
 
@@ -66,9 +66,9 @@ def _make_mock_state():
     state = MockSessionState()
     state["messages"] = []
     state["user_profile"] = {
-        "school": "测试大学", "grade": "大三", "major": "计算机科学",
-        "preferences": "[]", "student_id": "test_001", "name": "测试用户",
-        "role": "student", "onboarding_done": 1,
+        "community": "测试大学", "building": "大三", "unit": "计算机科学",
+        "preferences": "[]", "resident_id": "test_001", "name": "测试用户",
+        "role": "resident", "onboarding_done": 1,
     }
     # Mock LangChain memory — ConversationBufferMemory needs chat_memory
     from langchain_classic.memory import ConversationBufferMemory
@@ -112,7 +112,7 @@ def test_tool_discovery():
     tool_names = sorted([t.name for t in tools])
 
     expected = {
-        "report_issue", "query_issues", "get_campus_pulse", "get_governance_stats",
+        "report_issue", "query_issues", "get_community_pulse", "get_governance_stats",
         "get_weather", "create_proposal", "support_proposal", "get_proposals",
         "get_topics", "get_topic_detail", "express_opinion", "collect_feedback",
     }
@@ -152,7 +152,7 @@ def test_ooda_pipeline_latency(quick: bool = False):
     # Phase 5: Association analysis (DB-backed)
     t0 = time.time()
     from agent.reflector import compute_associations
-    assoc = compute_associations("教三楼灯坏了", [])
+    assoc = compute_associations("3号楼灯坏了", [])
     t_associate = time.time() - t0
 
     # Phase 3: Agent executor — skip LLM call, measure just construction
@@ -171,11 +171,11 @@ def test_ooda_pipeline_latency(quick: bool = False):
 
 
 def _create_agent_for_test(state):
-    """Create a CampusAgent instance for testing (no LLM calls)."""
-    from agent.engine import CampusAgent
+    """Create a CommunityAgent instance for testing (no LLM calls)."""
+    from agent.engine import CommunityAgent
     # Suppress LLM creation errors — we only measure build time
     with contextlib.suppress(Exception):
-        return CampusAgent(state)
+        return CommunityAgent(state)
     return None
 
 
@@ -219,7 +219,7 @@ def test_reflector_components():
 
     # 1. Text-action parsing
     t0 = time.time()
-    steps = _parse_text_actions("已为你生成工单 #42，分类为设施维修。校园脉搏显示本周有3个新工单。")
+    steps = _parse_text_actions("已为你生成工单 #42，分类为设施维修。社区脉搏显示本周有3个新工单。")
     t_text_parse = time.time() - t0
 
     # 2. Empty steps → association still works (graceful degradation)
@@ -229,7 +229,7 @@ def test_reflector_components():
 
     # 3. build_reasoning_chain with text fallback
     t0 = time.time()
-    chain = build_reasoning_chain([], "校园脉搏显示3个新工单，天气晴好。", "校园脉搏")
+    chain = build_reasoning_chain([], "社区脉搏显示3个新工单，天气晴好。", "社区脉搏")
     t_chain = time.time() - t0
 
     return {
@@ -265,7 +265,7 @@ def test_memory_operations():
         "init_ms": round(t_init * 1000, 1),
         "add_message_ms": round(t_add * 1000, 1),
         "get_memory_ms": round(t_get * 1000, 1),
-        "profile_school": profile.get("school", ""),
+        "profile_community": profile.get("community", ""),
         "recent_count": len(recent),
     }
 
@@ -313,7 +313,7 @@ def run_full_ablation(quick: bool = False) -> dict:
 def format_report(report: dict) -> str:
     """Format ablation report as markdown."""
     lines = [
-        "# CampusInsight Agent — Ablation 评估报告",
+        "# CommunityInsight Agent — Ablation 评估报告",
         "",
         f"**评估时间**：{report['timestamp']}",
         f"**Python 版本**：{report['python_version']}",
@@ -413,7 +413,7 @@ def format_report(report: dict) -> str:
         f"| Memory 初始化 | {mem['init_ms']}ms |",
         f"| 添加消息 | {mem['add_message_ms']}ms |",
         f"| 获取最近 5 条 | {mem['get_memory_ms']}ms |",
-        f"| 用户画像学校 | {mem['profile_school']} |",
+        f"| 用户画像小区 | {mem['profile_community']} |",
         "",
     ])
 
@@ -454,7 +454,7 @@ def format_report(report: dict) -> str:
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="CampusInsight Ablation Framework")
+    parser = argparse.ArgumentParser(description="CommunityInsight Ablation Framework")
     parser.add_argument("--quick", action="store_true", help="Quick mode (2 cases only)")
     parser.add_argument("--output", type=str, default="", help="Save report to file")
     args = parser.parse_args()
@@ -467,7 +467,7 @@ if __name__ == "__main__":
     seed_all(DB_PATH)
 
     print("=" * 60)
-    print("CampusInsight Agent - Ablation Evaluation Framework")
+    print("CommunityInsight Agent - Ablation Evaluation Framework")
     print("=" * 60)
 
     report = run_full_ablation(quick=args.quick)

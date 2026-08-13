@@ -80,39 +80,39 @@ class TestGovernanceAuditWithData(unittest.TestCase):
         with get_db() as conn:
             # Insert issues with varied status/urgency
             conn.execute(
-                "INSERT INTO campus_issues (title, category, location, description, "
+                "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at, resolved_at) VALUES "
-                "('灯坏了', '设施维修', '教三楼', '走廊灯不亮', '普通', '已解决', 'user1', "
+                "('灯坏了', '设施维修', '3号楼', '楼道灯不亮', '普通', '已解决', 'user1', "
                 "datetime('now', '-3 days'), datetime('now', '-1 day'))"
             )
             conn.execute(
-                "INSERT INTO campus_issues (title, category, location, description, "
+                "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at) VALUES "
-                "('水管漏水', '设施维修', '5号宿舍楼', '严重漏水', '紧急', '处理中', 'user1', "
+                "('水管漏水', '设施维修', '5号楼', '严重漏水', '紧急', '处理中', 'user1', "
                 "datetime('now', '-2 days'))"
             )
             conn.execute(
-                "INSERT INTO campus_issues (title, category, location, description, "
+                "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at) VALUES "
-                "('电线裸露', '安全隐患', '实验楼', '有触电风险', '极急', '待处理', 'user2', "
+                "('电线裸露', '安全隐患', '3号楼', '有触电风险', '极急', '待处理', 'user2', "
                 "datetime('now', '-1 day'))"
             )
             conn.execute(
-                "INSERT INTO campus_issues (title, category, location, description, "
+                "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at) VALUES "
-                "('垃圾未清理', '环境卫生', '一食堂', '垃圾桶满了', '普通', '待处理', 'user2', "
+                "('垃圾未清理', '环境卫生', '助餐点', '垃圾桶满了', '普通', '待处理', 'user2', "
                 "datetime('now', '-10 days'))"  # stale > 7 days
             )
             conn.execute(
-                "INSERT INTO campus_issues (title, category, location, description, "
+                "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at) VALUES "
-                "('网络很慢', '网络服务', '图书馆', 'WiFi连不上', '普通', '待处理', 'user3', "
+                "('网络很慢', '物业服务', '活动室', 'WiFi连不上', '普通', '待处理', 'user3', "
                 "datetime('now', '-5 days'))"
             )
             conn.execute(
-                "INSERT INTO campus_issues (title, category, location, description, "
+                "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at, resolved_at) VALUES "
-                "('投影仪故障', '教学设备', '教五楼', '', '普通', '已解决', 'user3', "
+                "('路灯故障', '设施维修', '5号楼', '', '普通', '已解决', 'user3', "
                 "datetime('now', '-7 days'), datetime('now', '-2 days'))"
             )
 
@@ -120,25 +120,25 @@ class TestGovernanceAuditWithData(unittest.TestCase):
             conn.execute(
                 "INSERT INTO proposals (title, description, category, supporter_count, "
                 "status, author) VALUES "
-                "('延长图书馆时间', '建议延长到23:00', '校园管理', 15, '讨论中', 'user1')"
+                "('延长活动室时间', '建议延长到23:00', '社区事务', 15, '讨论中', 'user1')"
             )
             conn.execute(
                 "INSERT INTO proposals (title, description, category, supporter_count, "
                 "status, author) VALUES "
-                "('增设快递柜', '宿舍楼下需要快递柜', '校园管理', 42, '已采纳', 'user2')"
+                "('增设快递柜', '单元楼下需要快递柜', '社区事务', 42, '已采纳', 'user2')"
             )
             conn.execute(
                 "INSERT INTO proposals (title, description, category, supporter_count, "
                 "status, response_text, author) VALUES "
-                "('改善食堂菜品', '增加素食选项', '餐饮问题', 8, '已回应', "
-                "'已反馈给后勤部门', 'user3')"
+                "('改善助餐点菜品', '增加素食选项', '物业服务', 8, '已回应', "
+                "'已反馈给物业部门', 'user3')"
             )
 
             # Insert discussion topics
             conn.execute(
                 "INSERT INTO discussion_topics (title, description, category, "
                 "created_by_agent, is_active, participant_count) VALUES "
-                "('校园网络质量讨论', '大家对校园网满意吗', '网络服务', 1, 1, 5)"
+                "('社区网络质量讨论', '大家对社区网满意吗', '物业服务', 1, 1, 5)"
             )
 
             conn.commit()
@@ -201,16 +201,16 @@ class TestGovernanceAuditAllResolved(unittest.TestCase):
         with get_db() as conn:
             for i in range(5):
                 conn.execute(
-                    "INSERT INTO campus_issues (title, category, location, "
+                    "INSERT INTO community_issues (title, category, location, "
                     "urgency, status, author, reported_at, resolved_at) VALUES "
-                    "(?, '设施维修', '教三楼', '普通', '已解决', 'user1', "
+                    "(?, '设施维修', '3号楼', '普通', '已解决', 'user1', "
                     "datetime('now', '-3 days'), datetime('now', '-1 day'))",
                     (f"已解决问题{i}",),
                 )
             conn.execute(
                 "INSERT INTO proposals (title, description, category, "
                 "supporter_count, status, author) VALUES "
-                "('已实施提案', 'test', '校园管理', 20, '已实施', 'user1')"
+                "('已实施提案', 'test', '社区事务', 20, '已实施', 'user1')"
             )
             conn.commit()
 
@@ -247,9 +247,9 @@ class TestGovernanceAuditAllPending(unittest.TestCase):
         with get_db() as conn:
             for i in range(8):
                 conn.execute(
-                    "INSERT INTO campus_issues (title, category, location, "
+                    "INSERT INTO community_issues (title, category, location, "
                     "urgency, status, author, reported_at) VALUES "
-                    "(?, '设施维修', '教三楼', '紧急', '待处理', 'user1', "
+                    "(?, '设施维修', '3号楼', '紧急', '待处理', 'user1', "
                     "datetime('now', '-10 days'))",
                     (f"积压问题{i}",),
                 )

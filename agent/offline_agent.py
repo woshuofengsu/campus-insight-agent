@@ -57,16 +57,16 @@ class OfflineAgent:
             return self._respond_pulse()
         if "数据分析师" in role:
             return self._respond_stats(txt)
-        if "报修助手" in role:
+        if "接诉助手" in role:
             return self._respond_report(txt)
         if "议事顾问" in role:
             return self._respond_proposal(txt)
         return None
 
-    # -- 🌊 校园脉搏 — 综合快报 --
+    # -- 🌊 社区脉搏 — 综合快报 --
 
     def _respond_pulse(self) -> str:
-        """校园脉搏 — 调用 get_campus_pulse + get_weather，格式化为自然播报。"""
+        """社区脉搏 — 调用 get_community_pulse + get_weather，格式化为自然播报。"""
         parts = []
 
         # ── 天气 ──
@@ -108,7 +108,7 @@ class OfflineAgent:
             parts.append("")
             parts.append("📡 **本周热点**")
             parts.append(
-                f"校园共收到 **{total}** 件问题上报，"
+                f"小区共收到 **{total}** 件诉求上报，"
                 f"已解决 **{resolved}** 件，**{pending}** 件正在处理中。"
             )
 
@@ -147,10 +147,10 @@ class OfflineAgent:
 
     def _respond_stats(self, txt: str) -> str:
         """治理统计 — 调用 get_governance_stats，包装为分析报告。"""
-        parts = ["📊 **校园治理数据报告**\n"]
+        parts = ["📊 **社区治理数据报告**\n"]
 
         try:
-            from tools.query_campus_issues import get_governance_stats
+            from tools.query_community_issues import get_governance_stats
             raw = str(get_governance_stats.invoke(""))
             parts.append(self._reformat_stats(raw))
         except Exception:
@@ -165,15 +165,15 @@ class OfflineAgent:
 
         # ── 针对性查询 ──
         cat_map = {
-            "设施": "设施维修", "维修": "设施维修", "餐饮": "餐饮问题",
+            "设施": "设施维修", "维修": "设施维修", "停车": "停车管理",
             "卫生": "环境卫生", "环境": "环境卫生", "安全": "安全隐患",
-            "网络": "网络服务", "教学": "教学设备", "设备": "教学设备",
-            "校园": "校园管理", "管理": "校园管理",
+            "噪音": "噪音扰民", "扰民": "噪音扰民", "物业": "物业服务",
+            "邻里": "邻里矛盾", "矛盾": "邻里矛盾", "社区": "社区事务",
         }
         for kw, cn in cat_map.items():
             if kw in txt:
                 try:
-                    from tools.query_campus_issues import query_issues
+                    from tools.query_community_issues import query_issues
                     result = str(query_issues.invoke({"category": cn, "limit": 5}))
                     parts.append(f"\n🔍 **{cn}类工单详情**\n{self._reformat_issue_list(result)}")
                 except Exception:  # best-effort, skip
@@ -226,12 +226,12 @@ class OfflineAgent:
             lines.append("")
             if urgency in ("紧急", "极急"):
                 lines.append(
-                    "⚠️ 该问题已标记为紧急，建议同步拨打后勤管理处电话 "
-                    "（010-12345690，工作时间）加快处理。"
+                    "⚠️ 该诉求已标记为紧急，建议同步电话通知物业/网格员 "
+                    "加快处理。"
                 )
             else:
                 lines.append(
-                    "维修/保洁人员会尽快处理。你随时可以输入「**查看我的工单**」追踪进度。"
+                    "网格员/物业会尽快处理。你随时可以输入「**查看我的工单**」追踪进度。"
                 )
             lines.append("")
             lines.append(self._random_encouragement("report"))
@@ -243,14 +243,14 @@ class OfflineAgent:
             _log.error("report_issue.invoke() failed for title=%r: %s", title, e)
             return (
                 f"⚠️ 上报未能完成：{e}\n\n"
-                f"请稍后重试，或通过顶部导航「🔧 随手报修」页面手动提交。"
+                f"请稍后重试，或通过顶部导航「🔧 接诉即办」页面手动提交。"
             )
 
     # -- 💡 提案 — 查看 + 创建引导 --
 
     def _respond_proposal(self, txt: str) -> str:
         """提案 — 调用 get_proposals + get_topics，展示热门提案。"""
-        parts = ["💡 **校园提案与讨论**\n"]
+        parts = ["💡 **社区提案与讨论**\n"]
 
         try:
             from tools.query_proposals import get_proposals
@@ -291,7 +291,7 @@ class OfflineAgent:
                 "1. **提案标题**（一句话概括）\n"
                 "2. **为什么要提**（背景和理由）\n"
                 "3. **你期望的效果**\n\n"
-                "我会帮你创建提案并发布到「🗳️ 有话说」页面。"
+                "我会帮你创建提案并发布到「🗳️ 邻里议事」页面。"
             )
 
         parts.append(f"\n{self._random_encouragement('proposal')}")
@@ -306,7 +306,7 @@ class OfflineAgent:
         if any(kw in txt for kw in ["谢谢", "感谢", "太好了", "很棒", "不错", "厉害"]):
             return random.choice([
                 "不客气。有需要随时找我。",
-                "谢谢反馈，有校园问题可以问我。",
+                "谢谢反馈，有社区问题可以问我。",
                 "有需要随时找我。",
             ])
 
@@ -320,14 +320,14 @@ class OfflineAgent:
             greeting = random.choice([
                 f"你好{'，' + name if name else ''}。有什么可以帮你的？",
                 f"你好{'，' + name if name else ''}。",
-                f"你好{'，' + name if name else ''}。校园先知在线。",
+                f"你好{'，' + name if name else ''}。社区先知在线。",
             ])
             return (
                 f"{greeting}\n\n"
-                f"我是校园先知，围绕 **知·报·议·督** 四个板块运行：\n\n"
-                f"🌊 **知** · 输入「**校园脉搏**」看本周动态\n"
-                f"🔧 **报** · 发现设施问题直接告诉我，帮你上报\n"
-                f"🗳️ **议** · 说「**我有个提案**」参与校园建设\n"
+                f"我是社区先知，围绕 **知·报·议·督** 四个板块运行：\n\n"
+                f"🌊 **知** · 输入「**社区脉搏**」看本周动态\n"
+                f"🔧 **报** · 发现小区问题直接告诉我，帮你上报\n"
+                f"🗳️ **议** · 说「**我有个提案**」参与小区建设\n"
                 f"📊 **督** · 输入「**治理数据**」查看统计\n\n"
                 f"想了解什么？"
             )
@@ -342,8 +342,8 @@ class OfflineAgent:
 
         # ── 真正的兜底 ──
         hints = [
-            "🌊 输入「校园脉搏」看本周热点",
-            "🔧 直接描述问题，如「教三楼灯坏了」",
+            "🌊 输入「社区脉搏」看本周热点",
+            "🔧 直接描述诉求，如「3号楼电梯坏了」",
             "📊 输入「治理数据」看统计",
             "💡 输入「有什么提案」看热门建议",
         ]
@@ -369,7 +369,7 @@ class OfflineAgent:
                 if i.get("author") == author
             ]
             if not mine:
-                return f"📋 你还没有上报过问题。发现校园设施问题？直接描述，我帮你上报！"
+                return f"📋 你还没有上报过诉求。发现小区设施问题？直接描述，我帮你上报！"
 
             pending = [i for i in mine if i.get("status") in ("待处理", "处理中")]
             resolved = [i for i in mine if i.get("status") == "已解决"]

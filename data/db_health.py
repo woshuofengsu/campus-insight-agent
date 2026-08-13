@@ -9,7 +9,7 @@ def get_avg_resolution_days() -> float | None:
     with get_db() as conn:
         row = conn.execute(
             "SELECT AVG(julianday(resolved_at) - julianday(reported_at)) AS avg_days "
-            "FROM campus_issues WHERE status = '已解决' AND resolved_at IS NOT NULL"
+            "FROM community_issues WHERE status = '已解决' AND resolved_at IS NOT NULL"
         ).fetchone()
         return round(row["avg_days"], 1) if row and row["avg_days"] is not None else None
 
@@ -18,12 +18,12 @@ def get_recent_issue_counts(days: int = 7) -> dict:
     """Count new and resolved issues in the last N days."""
     with get_db() as conn:
         new_row = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM campus_issues "
+            "SELECT COUNT(*) AS cnt FROM community_issues "
             "WHERE reported_at >= datetime('now', ? || ' days')",
             (f"-{days}",),
         ).fetchone()
         resolved_row = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM campus_issues "
+            "SELECT COUNT(*) AS cnt FROM community_issues "
             "WHERE status = '已解决' AND resolved_at >= datetime('now', ? || ' days')",
             (f"-{days}",),
         ).fetchone()
@@ -39,7 +39,7 @@ def get_issues_timeline(days: int = 7) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
             "SELECT DATE(reported_at) as day, COUNT(*) as count "
-            "FROM campus_issues WHERE reported_at >= datetime('now', ? || ' days') "
+            "FROM community_issues WHERE reported_at >= datetime('now', ? || ' days') "
             "GROUP BY DATE(reported_at) ORDER BY day",
             (f"-{days}",),
         ).fetchall()
@@ -47,7 +47,7 @@ def get_issues_timeline(days: int = 7) -> list[dict]:
 
         rows = conn.execute(
             "SELECT DATE(resolved_at) as day, COUNT(*) as count "
-            "FROM campus_issues WHERE status = '已解决' "
+            "FROM community_issues WHERE status = '已解决' "
             "AND resolved_at >= datetime('now', ? || ' days') "
             "GROUP BY DATE(resolved_at) ORDER BY day",
             (f"-{days}",),
@@ -66,7 +66,7 @@ def get_issues_timeline(days: int = 7) -> list[dict]:
 
 
 def compute_health_score() -> dict:
-    """Multi-dimensional campus governance health score.
+    """Multi-dimensional community governance health score.
 
     Returns a dict with:
       - score: 0-100 composite

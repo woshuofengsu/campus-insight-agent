@@ -4,6 +4,7 @@ import base64
 import os
 import streamlit as st
 from agent.memory import MemoryManager
+from ui.components import TOKEN
 
 
 def _get_bg_base64() -> str:
@@ -31,9 +32,9 @@ def render_onboarding(memory: MemoryManager) -> bool:
     has_bg = bool(bg)
 
     # Colors — always light & welcoming
-    text_color = "#0f172a"
-    muted_color = "#64748b"
-    accent = "#4f46e5"
+    text_color = TOKEN["text"]
+    muted_color = TOKEN["text_sec"]
+    accent = TOKEN["accent"]
 
     # Minimal background CSS
     if has_bg:
@@ -63,53 +64,61 @@ def render_onboarding(memory: MemoryManager) -> bool:
 
 
 def _render_step_role(text_color, muted_color, accent):
-    """Step 1: Choose role — student or teacher."""
+    """Step 1: Choose role — resident or grid."""
     # Center with columns
     col_l, col_m, col_r = st.columns([1, 1.5, 1])
     with col_m:
         st.markdown(f"""
         <div style="text-align:center;padding:10vh 0 20px;">
-            <div style="width:52px;height:52px;background:linear-gradient(135deg,{accent},#7c3aed);
+            <div style="width:52px;height:52px;background:linear-gradient(135deg,{accent},{TOKEN["accent2"]});
             border-radius:14px;display:inline-flex;align-items:center;justify-content:center;
             font-size:1.5em;color:#fff;margin-bottom:14px;
-            box-shadow:0 8px 24px rgba(79,70,229,0.35);">🏛</div>
+            box-shadow:0 8px 24px rgba(79,70,229,0.35);">🏘️</div>
             <div style="font-size:1.35em;font-weight:800;color:{text_color};letter-spacing:-0.02em;">
-            校园先知</div>
+            社区先知</div>
             <div style="font-size:0.8em;color:{muted_color};margin-top:2px;">
-            CampusInsight · 知报议督</div>
+            CommunityInsight · 知报议督</div>
             <div style="font-size:0.82em;font-weight:600;color:{text_color};
             margin-top:32px;margin-bottom:20px;">选择你的身份</div>
         </div>
         """, unsafe_allow_html=True)
 
-        c_stu, c_tea = st.columns(2, gap="medium")
+        c_stu, c_tea, c_eld = st.columns(3, gap="medium")
         with c_stu:
-            if st.button("🎓\n\n我是学生", key="ob_role_student", use_container_width=True):
-                st.session_state.ob_role = "student"
+            if st.button("🧑\n\n我是居民", key="ob_role_resident", use_container_width=True):
+                st.session_state.ob_role = "resident"
                 st.rerun()
             st.caption("上报问题 · 提交提案 · 参与讨论")
         with c_tea:
-            if st.button("👨‍🏫\n\n我是教职工", key="ob_role_teacher", use_container_width=True):
-                st.session_state.ob_role = "teacher"
+            if st.button("🦺\n\n我是网格员", key="ob_role_grid", use_container_width=True):
+                st.session_state.ob_role = "grid"
                 st.rerun()
             st.caption("处理工单 · 回复提案 · 发布通知")
+        with c_eld:
+            if st.button("👴\n\n老年关怀版", key="ob_role_elderly", use_container_width=True):
+                st.session_state.ob_role = "elderly"
+                st.rerun()
+            st.caption("大字模式 · 一键呼叫 · 吃药提醒")
 
         # Step dots
         st.markdown(f"""
         <div style="display:flex;justify-content:center;gap:8px;margin-top:32px;">
             <div style="width:8px;height:8px;border-radius:50%;background:{accent};"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:{TOKEN["border_visible"]};"></div>
         </div>
         """, unsafe_allow_html=True)
 
 
 def _render_step_form(memory, role, text_color, muted_color, accent):
     """Step 2: Fill in role-specific profile info."""
-    is_student = role == "student"
-    emoji = "🎓" if is_student else "👨‍🏫"
-    title = "学生信息" if is_student else "教职工信息"
-    subtitle = "填写基本信息" if is_student else "填写工作信息，进入管理后台"
-    btn_label = "开始使用" if is_student else "进入工作台"
+    is_resident = role == "resident"
+    is_elderly = role == "elderly"
+    if is_elderly:
+        emoji, title, subtitle, btn_label = "👴", "老年关怀版", "大字模式 · 操作更简单", "进入关怀版"
+    elif is_resident:
+        emoji, title, subtitle, btn_label = "🧑", "居民信息", "填写基本信息", "开始使用"
+    else:
+        emoji, title, subtitle, btn_label = "🦺", "网格员信息", "填写工作信息，进入网格员工作台", "进入工作台"
 
     # Center with columns
     col_l, col_m, col_r = st.columns([1, 2.2, 1])
@@ -124,26 +133,33 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
         """, unsafe_allow_html=True)
 
         user_name = ""
-        user_major = ""
+        user_unit = ""
+        child_phone = ""
 
-        school = st.text_input("🏫 学校", placeholder="请输入你的大学名称", key="ob_school")
+        community = st.text_input("🏘️ 小区", placeholder="请输入你的小区名称", key="ob_community")
 
-        if is_student:
-            grade = st.selectbox(
-                "📚 年级",
-                ["大一", "大二", "大三", "大四", "研一", "研二", "研三", "博士"],
-                index=None, placeholder="请选择年级", key="ob_grade",
+        if is_resident:
+            building = st.selectbox(
+                "🏢 楼栋",
+                ["1号楼", "2号楼", "3号楼", "4号楼", "5号楼", "6号楼",
+                 "7号楼", "8号楼", "9号楼", "10号楼", "11号楼", "12号楼"],
+                index=None, placeholder="请选择楼栋", key="ob_building",
             )
-            student_id = st.text_input("🔢 学号", placeholder="请输入你的学号", key="ob_student_id")
-            user_major = st.text_input("📖 专业", placeholder="请输入你的专业", key="ob_major")
+            resident_id = st.text_input("🔢 门牌号", placeholder="请输入你的门牌号", key="ob_resident_id")
+            user_unit = st.text_input("🚪 单元房号", placeholder="如：2单元501", key="ob_unit")
             user_name = st.text_input("👤 姓名", placeholder="请输入你的姓名（选填）", key="ob_name")
+        elif is_elderly:
+            building = st.text_input("🏢 楼栋", placeholder="如：11号楼", key="ob_building")
+            resident_id = st.text_input("🔢 门牌号", placeholder="如：3单元301", key="ob_resident_id")
+            user_name = st.text_input("👤 姓名", placeholder="如：张大爷", key="ob_name")
+            child_phone = st.text_input("👨‍👩‍👧 子女电话（紧急联系，选填）", placeholder="如：138xxxx", key="ob_child_phone")
         else:
-            grade = st.selectbox(
+            building = st.selectbox(
                 "🏢 部门",
-                ["学生处", "教务处", "后勤处", "保卫处", "信息中心", "宣传部", "团委", "其他"],
-                index=None, placeholder="请选择所在部门", key="ob_grade",
+                ["居委会", "网格办", "物业", "警务室", "信息中心", "宣传部", "志愿者队", "其他"],
+                index=None, placeholder="请选择所在部门", key="ob_building",
             )
-            student_id = st.text_input("🔢 工号", placeholder="请输入你的工号", key="ob_student_id")
+            resident_id = st.text_input("🔢 工号", placeholder="请输入你的工号", key="ob_resident_id")
             user_name = st.text_input("👤 姓名", placeholder="请输入你的姓名（选填）", key="ob_name")
 
         c_back, c_submit = st.columns([1, 2.2], gap="medium")
@@ -157,41 +173,63 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
         # Step dots
         st.markdown(f"""
         <div style="display:flex;justify-content:center;gap:8px;margin-top:24px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:{TOKEN["border_visible"]};"></div>
             <div style="width:8px;height:8px;border-radius:50%;background:{accent};"></div>
         </div>
         """, unsafe_allow_html=True)
 
     if submitted:
-        if not school:
-            st.warning("请至少填写学校名称")
+        if not community:
+            st.warning("请至少填写小区名称")
             return
 
         memory.update_profile(
-            school=school, grade=grade or "", student_id=student_id or "",
-            major=user_major or "", role=role, name=user_name or "",
+            community=community, building=building or "", resident_id=resident_id or "",
+            unit=user_unit or "", role=role, name=user_name or "",
         )
+
+        # elderly 角色：保存子女紧急联系 + 默认标记独居（可在页面里改）
+        if is_elderly:
+            try:
+                from data.db_elderly import set_emergency_contact, set_living_alone
+                uid = memory.user_id
+                if child_phone.strip():
+                    set_emergency_contact(uid, [{"name": "子女", "relation": "子女", "phone": child_phone.strip()}])
+                set_living_alone(uid, True)
+            except Exception:
+                pass  # 非关键，不影响进入
+
         memory.complete_onboarding()
 
-        if is_student:
+        if is_elderly:
             memory.add_message(
                 "assistant",
-                f"👋 嗨！{school}的{grade or ''}{user_name or user_major or ''}同学，欢迎使用校园先知！\n\n"
-                "我是你的校园治理伙伴，围绕知·报·议·督四个板块运行。\n\n"
-                "🌊 **知** · 输入'校园脉搏'看本周热点\n"
-                "🔧 **报** · 发现校园问题，直接描述即可上报\n"
+                f"👴 欢迎，{user_name or '大爷/阿姨'}！这是您的关怀版页面。\n\n"
+                "大按钮，点一下就行：\n"
+                "🗣️ **一句话上报** · 说出问题就能上报\n"
+                "📞 **一键呼叫** · 子女/网格员/物业\n"
+                "💊 **吃药提醒** · 到点提醒你吃药\n"
+                "🆘 **我出事了** · 红色按钮，有事马上按",
+            )
+        elif is_resident:
+            memory.add_message(
+                "assistant",
+                f"👋 嗨！{community}的{building or ''}{user_name or user_unit or ''}邻居，欢迎使用社区先知！\n\n"
+                "我是你的社区治理伙伴，围绕知·报·议·督四个板块运行。\n\n"
+                "🌊 **知** · 输入'社区脉搏'看本周热点\n"
+                "🔧 **报** · 发现社区诉求，直接描述即可上报\n"
                 "🗳️ **议** · 有想法？'我有个提案'或参与讨论\n"
-                "📊 **督** · 治理透明窗看校园数据全貌\n\n"
-                "输入「校园脉搏」开始体验。",
+                "📊 **督** · 社区治理看板看社区数据全貌\n\n"
+                "输入「社区脉搏」开始体验。",
             )
         else:
             memory.add_message(
                 "assistant",
-                f"👋 欢迎！{school}的{user_name or '老师'}，已进入教职工工作台。\n\n"
-                "这里是校园治理管理后台：\n\n"
-                "📊 **工作台** · 查看校园治理全貌，处理紧急工单\n"
+                f"👋 欢迎！{community}的{user_name or '网格员'}，已进入网格员工作台。\n\n"
+                "这里是社区治理网格员工作台：\n\n"
+                "📊 **工作台** · 查看社区治理全貌，处理紧急工单\n"
                 "📋 **工单管理** · 查看和处理所有上报问题\n"
-                "💡 **提案管理** · 回复和采纳学生提案\n"
+                "💡 **提案管理** · 回复和采纳居民提案\n"
                 "📢 **内容发布** · 发布通知和讨论议题\n\n"
                 "工作台已就绪。",
             )

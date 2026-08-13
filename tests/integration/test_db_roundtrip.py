@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Integration tests for database roundtrip operations.
 
-Tests full CRUD cycles across campus_issues, proposals, notifications,
+Tests full CRUD cycles across community_issues, proposals, notifications,
 and activity_log tables. Validates data integrity, cascade behavior,
 and concurrent read patterns.
 """
@@ -45,7 +45,7 @@ class TestIssueCRUD(unittest.TestCase):
         issue_id = report_issue(
             title="集成测试工单",
             category="设施维修",
-            location="教三楼201",
+            location="3号楼201",
             description="灯管闪烁需要更换",
             urgency="普通",
             author="test_user",
@@ -74,17 +74,17 @@ class TestIssueCRUD(unittest.TestCase):
     def test_query_by_category(self):
         from data.database import report_issue, get_issues
 
-        report_issue("餐饮问题1", "餐饮问题", "一食堂", "", "普通", "user_c")
-        report_issue("餐饮问题2", "餐饮问题", "二食堂", "", "普通", "user_c")
-        report_issue("设施问题", "设施维修", "教三楼", "", "普通", "user_c")
+        report_issue("物业服务1", "物业服务", "助餐点", "", "普通", "user_c")
+        report_issue("物业服务2", "物业服务", "小区广场", "", "普通", "user_c")
+        report_issue("设施问题", "设施维修", "3号楼", "", "普通", "user_c")
 
-        canteen_issues = get_issues(category="餐饮问题", limit=100)
-        self.assertTrue(all(i["category"] == "餐饮问题" for i in canteen_issues))
+        service_issues = get_issues(category="物业服务", limit=100)
+        self.assertTrue(all(i["category"] == "物业服务" for i in service_issues))
 
     def test_query_by_urgency(self):
         from data.database import report_issue, get_issues
 
-        report_issue("紧急问题", "安全隐患", "实验楼", "", "紧急", "user_d")
+        report_issue("紧急问题", "安全隐患", "3号楼", "", "紧急", "user_d")
 
         urgent = get_issues(urgency="紧急", limit=100)
         self.assertTrue(all(i["urgency"] == "紧急" for i in urgent))
@@ -121,7 +121,7 @@ class TestProposalLifecycle(unittest.TestCase):
         prop_id = create_proposal(
             title="集成测试提案",
             description="这是一个集成测试提案的详细描述",
-            category="校园管理",
+            category="社区事务",
             author="test_user",
         )
         self.assertGreater(prop_id, 0)
@@ -135,7 +135,7 @@ class TestProposalLifecycle(unittest.TestCase):
     def test_support_proposal_increments_count(self):
         from data.database import create_proposal, support_proposal, get_proposals
 
-        prop_id = create_proposal("附议测试提案", "描述", "校园管理", author="user_a")
+        prop_id = create_proposal("附议测试提案", "描述", "社区事务", author="user_a")
 
         count1 = support_proposal(prop_id)
         count2 = support_proposal(prop_id)
@@ -151,7 +151,7 @@ class TestProposalLifecycle(unittest.TestCase):
     def test_update_proposal_status(self):
         from data.database import create_proposal, update_proposal_status, get_proposals
 
-        prop_id = create_proposal("状态变更提案", "描述", "校园管理", author="user_b")
+        prop_id = create_proposal("状态变更提案", "描述", "社区事务", author="user_b")
 
         update_proposal_status(prop_id, "已采纳", response_text="很好的建议，采纳！")
 
@@ -163,8 +163,8 @@ class TestProposalLifecycle(unittest.TestCase):
     def test_get_proposals_stats(self):
         from data.database import create_proposal, get_proposals_stats
 
-        create_proposal("统计测试1", "描述", "校园管理", author="user_c")
-        create_proposal("统计测试2", "描述", "餐饮问题", author="user_c")
+        create_proposal("统计测试1", "描述", "社区事务", author="user_c")
+        create_proposal("统计测试2", "描述", "物业服务", author="user_c")
 
         stats = get_proposals_stats()
         self.assertIn("total", stats)
@@ -182,8 +182,8 @@ class TestNotificationFlow(unittest.TestCase):
         from data.database import get_db
         with get_db() as conn:
             conn.execute(
-                "INSERT INTO user_profile (username, name, student_id, role, is_active) "
-                "VALUES ('test_notif_user', '通知测试', 'N99999', 'student', 1)"
+                "INSERT INTO user_profile (username, name, resident_id, role, is_active) "
+                "VALUES ('test_notif_user', '通知测试', 'N99999', 'resident', 1)"
             )
             conn.commit()
 
@@ -262,7 +262,7 @@ class TestActivityLog(unittest.TestCase):
             target_type="issue",
             target_id=1,
             target_title="测试工单",
-            detail="设施维修 · 教三楼",
+            detail="设施维修 · 3号楼",
         )
         self.assertGreater(log_id, 0)
 
@@ -313,7 +313,7 @@ class TestCrossTableConsistency(unittest.TestCase):
         from data.database import create_proposal, update_proposal_status
         from data.db_notifications import notify_proposal_status_change
 
-        prop_id = create_proposal("通知链提案", "描述", "校园管理", author="test_user")
+        prop_id = create_proposal("通知链提案", "描述", "社区事务", author="test_user")
 
         update_proposal_status(prop_id, "已采纳", response_text="采纳了")
         notify_proposal_status_change(prop_id, "已采纳", response_text="采纳了")
@@ -331,7 +331,7 @@ class TestCrossTableConsistency(unittest.TestCase):
         def read_tables():
             try:
                 with get_db() as conn:
-                    conn.execute("SELECT COUNT(*) FROM campus_issues").fetchone()
+                    conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()
                     conn.execute("SELECT COUNT(*) FROM proposals").fetchone()
             except Exception as e:
                 errors.append(str(e))

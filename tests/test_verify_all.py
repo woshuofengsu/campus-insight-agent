@@ -37,16 +37,18 @@ _section_counts = [0, 0]
 
 def test_01_module_compilation():
     """1. Module Compilation (35 modules)"""
-    print('\n=== 1. Module Compilation (35 modules) ===')
+    print('\n=== 1. Module Compilation (53 modules) ===')
     modules = [
         'config', 'agent.prompt', 'agent.engine', 'agent.reflector', 'agent.memory', 'agent.callbacks',
         'agent.helpers', 'agent.weekly_report', 'agent.rag',
-        'data.database', 'data.models', 'data.seed',
-        'data.db_core', 'data.db_user', 'data.db_academic', 'data.db_knowledge',
+        'agent.router', 'agent.verifier', 'agent.planner', 'agent.workers',
+        'data.database', 'data.seed',
+        'data.db_core', 'data.db_user', 'data.db_knowledge',
         'data.db_governance', 'data.db_health', 'data.db_surveillance',
+        'data.db_sla', 'data.db_dispatch', 'data.db_memory', 'data.db_elderly',
         'data.db_notifications', 'data.db_perception', 'data.live_generator',
-        'tools', 'tools.query_weather', 'tools.query_campus_pulse', 'tools.query_proposals',
-        'tools.query_topics', 'tools.query_campus_issues', 'tools.action_report_issue',
+        'tools', 'tools.query_weather', 'tools.query_community_pulse', 'tools.query_proposals',
+        'tools.query_topics', 'tools.query_community_issues', 'tools.action_report_issue',
         'tools.action_create_proposal', 'tools.action_support_proposal', 'tools.action_express_opinion',
         'tools.query_knowledge', 'tools.query_my_issues',
         'ui.components', 'ui.thinking', 'ui.cache', 'ui.onboarding', 'ui.session', 'ui.theme', 'ui.notify',
@@ -74,26 +76,26 @@ def test_02_persona_routing():
     print('\n=== 2. Persona Routing ===')
     from agent.prompt import detect_persona
     p_tests = [
-        ('教三楼灯坏了', '报修助手'), ('最近校园有什么动态', '校园观察员'), ('统计最近报修数量', '数据分析师'),
-        ('我有个建议想提', '议事顾问'), ('今天天气怎么样', '校园观察员'), ('图书馆水龙头漏水', '报修助手'),
-        ('看看治理数据', '数据分析师'), ('我想创建提案', '议事顾问'), ('食堂没电了', '报修助手'),
-        ('大家最近在讨论什么', '校园观察员'), ('统计提案解决情况', '数据分析师'), ('看看提案列表', '数据分析师'),
-        ('你好', None), ('谢谢', None), ('最近有什么新提案', '议事顾问'), ('讨论一下食堂问题', '议事顾问'),
-        ('校园脉搏', '校园观察员'), ('数据分析最近提案趋势', '数据分析师'), ('我要报修', '报修助手'),
+        ('3号楼灯坏了', '接诉助手'), ('最近社区有什么动态', '社区观察员'), ('统计最近报修数量', '数据分析师'),
+        ('我有个建议想提', '议事顾问'), ('今天天气怎么样', '社区观察员'), ('活动室水龙头漏水', '接诉助手'),
+        ('看看治理数据', '数据分析师'), ('我想创建提案', '议事顾问'), ('助餐点没电了', '接诉助手'),
+        ('大家最近在讨论什么', '社区观察员'), ('统计提案解决情况', '数据分析师'), ('看看提案列表', '数据分析师'),
+        ('你好', None), ('谢谢', None), ('最近有什么新提案', '议事顾问'), ('讨论一下助餐点问题', '议事顾问'),
+        ('社区脉搏', '社区观察员'), ('数据分析最近提案趋势', '数据分析师'), ('我要报修', '接诉助手'),
         ('有哪些提案', '议事顾问'), ('附议提案3', '议事顾问'), ('查看工单进度', '数据分析师'),
         ('看看有什么问题', '数据分析师'),
         ('查询所有待处理工单', '数据分析师'),
         # Status-query override: "修好了吗" type queries flip repair→data analyst
         ('我上报的水龙头修好了吗', '数据分析师'),
-        ('食堂灯修好了吗', None),
+        ('助餐点灯修好了吗', None),
         ('工单#42解决了吗', '数据分析师'),
         ('我之前报修的灯泡有进展吗', '数据分析师'),
-        ('三教厕所堵了处理了吗', '数据分析师'),
+        ('3号楼厕所堵了处理了吗', '数据分析师'),
         ('我那个提案有回复吗', '议事顾问'),
         # Genuine repair intents should still route correctly
-        ('教三楼灯坏了', '报修助手'),
-        ('食堂没电了', '报修助手'),
-        ('水龙头漏水了', '报修助手'),
+        ('3号楼灯坏了', '接诉助手'),
+        ('助餐点没电了', '接诉助手'),
+        ('水龙头漏水了', '接诉助手'),
     ]
     p_ok = 0
     for txt, expected in p_tests:
@@ -115,9 +117,9 @@ def test_03_text_action_parsing():
     print('\n=== 3. Text-Action Parsing ===')
     from agent.reflector._parser import parse_text_actions as _parse_text_actions, _TEXT_ACTION_PATTERNS
     t_tests = [
-        ('已为你生成工单 #42，分类为设施维修', 1), ('校园脉搏显示本周有3个新工单', 1),
+        ('已为你生成工单 #42，分类为设施维修', 1), ('社区脉搏显示本周有3个新工单', 1),
         ('天气晴好，适合出行', 1), ('我已创建提案', 1), ('已上报工单 #15，请等待处理', 1),
-        ('今日校园脉搏：3个待处理问题，天气晴', 2), ('这是一个普通回复，没有特殊动作', 0),
+        ('今日社区脉搏：3个待处理问题，天气晴', 2), ('这是一个普通回复，没有特殊动作', 0),
         ('已采纳该提案，感谢你的建议', 1), ('查询工单后发现3条待处理记录', 1),
         ('已报修成功，工单号#99', 1), ('支持该提案，已有73人附议', 1),
     ]
@@ -142,11 +144,11 @@ def test_04_step_summarization():
     s_tests = [
         ('report_issue', {'title': '灯坏了', 'category': '设施维修'}),
         ('query_issues', {'category': '设施维修', 'status': '待处理'}),
-        ('get_campus_pulse', {}), ('get_governance_stats', {}), ('get_weather', {}),
-        ('create_proposal', {'title': '延长图书馆时间'}), ('support_proposal', {'proposal_id': 5}),
+        ('get_community_pulse', {}), ('get_governance_stats', {}), ('get_weather', {}),
+        ('create_proposal', {'title': '延长社区活动室时间'}), ('support_proposal', {'proposal_id': 5}),
         ('get_proposals', {}), ('get_topics', {}), ('get_topic_detail', {'topic_id': 3}),
         ('express_opinion', {}), ('collect_feedback', {}),
-        ('query_knowledge', {'query': '停水通知'}), ('get_school_policy', {'topic': '宿舍管理'}),
+        ('query_knowledge', {'query': '停水通知'}), ('get_community_policy', {'topic': '物业管理'}),
         ('query_my_issues', {}), ('query_my_proposals', {}),
     ]
     s_ok = 0
@@ -178,7 +180,7 @@ def test_05_association_dimensions():
         _fail(f'Missing: {missing_keys}')
     cnt[0] += 1
 
-    chain = build_reasoning_chain([], '校园脉搏显示3个新工单，天气晴好。', '校园脉搏')
+    chain = build_reasoning_chain([], '社区脉搏显示3个新工单，天气晴好。', '社区脉搏')
     if chain.get('steps') and chain.get('associations'):
         cnt[1] += 1; _ok(f'build_reasoning_chain: {len(chain["steps"])} steps + associations')
     else:
@@ -198,7 +200,7 @@ def test_06_system_prompt():
     from agent.reflector._parser import _TEXT_ACTION_PATTERNS
     cnt = [0, 0]  # [total, passed]
 
-    prompt = get_system_prompt({'school': '测试大学', 'grade': '大三', 'major': '计算机'})
+    prompt = get_system_prompt({'community': '测试大学', 'building': '大三', 'unit': '计算机'})
     if '预取' in prompt and 'report_issue' in prompt and len(prompt) > 2000:
         cnt[1] += 1; _ok(f'{len(prompt)} chars, has prefetch + all tools')
     else:
@@ -235,7 +237,7 @@ def test_07_tool_discovery():
 def test_08_database_roundtrip():
     """8. Database Roundtrip"""
     print('\n=== 8. Database Roundtrip ===')
-    db_path = os.path.join(tempfile.gettempdir(), 'test_campus_verify.db')
+    db_path = os.path.join(tempfile.gettempdir(), 'test_community_verify.db')
     from data.database import init_db
     cnt = [0, 0]  # [total, passed]
 
@@ -247,7 +249,7 @@ def test_08_database_roundtrip():
 
         id1 = report_issue('测试灯坏', '设施维修', '教三楼', '测试', '紧急', 'test_user')
         id2 = report_issue('测试漏水', '设施维修', '教三楼', '测试', '普通', 'test_user')
-        id3 = report_issue('测试垃圾', '环境卫生', '食堂', '测试', '普通', 'test_user')
+        id3 = report_issue('测试垃圾', '环境卫生', '小区门口', '测试', '普通', 'test_user')
         if id1 and id2 and id3:
             cnt[1] += 1; _ok(f'Created issues #{id1}, #{id2}, #{id3}')
         else:
@@ -325,7 +327,7 @@ def test_09_prefetch_functions():
     cnt = [0, 0]  # [total, passed]
 
     pulse = _prefetch_pulse()
-    if '校园脉搏' in pulse and '工单' in pulse:
+    if '社区脉搏' in pulse and '工单' in pulse:
         cnt[1] += 1; _ok(f'_prefetch_pulse: {len(pulse)} chars')
     else:
         _fail('_prefetch_pulse: missing expected content')
@@ -360,11 +362,11 @@ def test_09_prefetch_functions():
     cnt[0] += 1
 
     # try_prefetch dispatch
-    r1 = try_prefetch('校园脉搏有什么新动态？')
+    r1 = try_prefetch('社区脉搏有什么新动态？')
     if r1 is not None:
-        cnt[1] += 1; _ok('try_prefetch("校园脉搏") matched')
+        cnt[1] += 1; _ok('try_prefetch("社区脉搏") matched')
     else:
-        _fail('try_prefetch("校园脉搏") returned None')
+        _fail('try_prefetch("社区脉搏") returned None')
     cnt[0] += 1
 
     r2 = try_prefetch('帮我统计治理数据')
@@ -454,7 +456,7 @@ def test_11_proposal_status_response_preservation():
     from data.database import create_proposal, update_proposal_status, get_proposals
     cnt = [0, 0]  # [total, passed]
 
-    pid = create_proposal('测试提案Preserve', '测试', '校园管理', 'test_author')
+    pid = create_proposal('测试提案Preserve', '测试', '社区事务', 'test_author')
     update_proposal_status(pid, '已回应', '官方回复测试文本')
     props = get_proposals(limit=5)
     p = [pr for pr in props if pr['id'] == pid][0]
@@ -584,7 +586,7 @@ def test_14_enhanced_persona_detection():
     cnt = [0, 0]  # [total, passed]
 
     # Confidence scoring — high confidence
-    r_conf = _dp14('教三楼灯坏了漏水故障')
+    r_conf = _dp14('3号楼灯坏了漏水故障')
     if r_conf and r_conf.get('confidence') == 'high' and r_conf.get('matched_count', 0) >= 3:
         cnt[1] += 1; _ok(f'High confidence: conf={r_conf["confidence"]}, matches={r_conf["matched_count"]}')
     else:
@@ -608,8 +610,8 @@ def test_14_enhanced_persona_detection():
     cnt[0] += 1
 
     # Mixed CN/EN input
-    r_mixed = _dp14('wifi坏了教室')
-    if r_mixed and '报修' in r_mixed.get('role', ''):
+    r_mixed = _dp14('wifi坏了楼道')
+    if r_mixed and '接诉' in r_mixed.get('role', ''):
         cnt[1] += 1; _ok(f'Mixed CN/EN: role={r_mixed["role"][:15]}..., conf={r_mixed.get("confidence")}')
     else:
         _fail(f'Mixed CN/EN: {r_mixed}')
@@ -624,7 +626,7 @@ def test_14_enhanced_persona_detection():
     cnt[0] += 1
 
     # Multi-persona blend
-    r_blend = _dp14('统计最近校园动态和提案数据')
+    r_blend = _dp14('统计最近社区动态和提案数据')
     if r_blend and r_blend.get('role'):
         cnt[1] += 1; _ok(f'Multi-persona: role={r_blend["role"][:15]}..., conf={r_blend.get("confidence")}')
     else:
@@ -648,7 +650,7 @@ def test_15_governance_audit_data():
     cnt = [0, 0]  # [total, passed]
 
     with get_db() as conn:
-        issue_count = conn.execute("SELECT COUNT(*) FROM campus_issues").fetchone()[0]
+        issue_count = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
         proposal_count = conn.execute("SELECT COUNT(*) FROM proposals").fetchone()[0]
         topic_count = conn.execute("SELECT COUNT(*) FROM discussion_topics").fetchone()[0]
     if issue_count > 0 and proposal_count > 0 and topic_count > 0:
@@ -754,8 +756,8 @@ def test_17_notification_module():
 
     # Verify counts match DB reality
     with get_db() as conn:
-        actual_total = conn.execute("SELECT COUNT(*) FROM campus_issues").fetchone()[0]
-        actual_pending = conn.execute("SELECT COUNT(*) FROM campus_issues WHERE status='待处理'").fetchone()[0]
+        actual_total = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
+        actual_pending = conn.execute("SELECT COUNT(*) FROM community_issues WHERE status='待处理'").fetchone()[0]
     if counts['total'] == actual_total:
         cnt[1] += 1; _ok(f'Count matches DB: {counts["total"]} == {actual_total}')
     else:

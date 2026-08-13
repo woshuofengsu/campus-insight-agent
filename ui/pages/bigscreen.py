@@ -4,7 +4,7 @@
 Features:
   - Dark command-center theme with glowing accents
   - Scrolling activity ticker at bottom (CSS animation)
-  - Campus district heatmap (CSS grid)
+  - Community district heatmap (CSS grid)
   - Glowing KPI cards with pulse animation on anomalies
   - Real-time clock with seconds (st.components.v1.html)
   - Demo mode: auto-carousel with mock data (?demo=1)
@@ -56,8 +56,8 @@ def _mock_issue_stats():
     return {
         "total": 127, "by_status": {"待处理": 12, "处理中": 8, "已解决": 107},
         "by_category": {
-            "设施维修": 35, "环境卫生": 22, "安全隐患": 8, "网络服务": 19,
-            "餐饮问题": 16, "教学设备": 11, "校园管理": 14, "其他": 2,
+            "设施维修": 35, "环境卫生": 22, "安全隐患": 8, "停车管理": 19,
+            "噪音扰民": 16, "物业服务": 11, "邻里矛盾": 14, "社区事务": 2,
         },
     }
 
@@ -82,16 +82,16 @@ def _mock_timeline():
 def _mock_recent_issues():
     today = datetime.now()
     return [
-        {"id": 127, "title": "校园主干道路面坑洼积水", "status": "待处理", "category": "设施维修", "urgency": "普通", "reported_at": today.strftime("%Y-%m-%d")},
-        {"id": 126, "title": "一食堂餐具清洗不干净", "status": "处理中", "category": "环境卫生", "urgency": "紧急", "reported_at": (today - timedelta(days=1)).strftime("%Y-%m-%d")},
-        {"id": 125, "title": "宿舍区围墙出现裂缝", "status": "处理中", "category": "安全隐患", "urgency": "紧急", "reported_at": (today - timedelta(days=1)).strftime("%Y-%m-%d")},
-        {"id": 124, "title": "图书馆电子资源访问慢", "status": "待处理", "category": "网络服务", "urgency": "普通", "reported_at": (today - timedelta(days=1)).strftime("%Y-%m-%d")},
-        {"id": 123, "title": "教学楼多媒体设备网络不稳定", "status": "处理中", "category": "网络服务", "urgency": "紧急", "reported_at": (today - timedelta(days=2)).strftime("%Y-%m-%d")},
-        {"id": 122, "title": "二食堂二楼空调不制冷", "status": "待处理", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=2)).strftime("%Y-%m-%d")},
-        {"id": 121, "title": "操场看台座椅锈蚀严重", "status": "已解决", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=3)).strftime("%Y-%m-%d")},
-        {"id": 120, "title": "教学楼一楼售货机故障", "status": "已解决", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=3)).strftime("%Y-%m-%d")},
-        {"id": 119, "title": "一食堂麻辣烫涨价问题", "status": "待处理", "category": "餐饮问题", "urgency": "普通", "reported_at": (today - timedelta(days=3)).strftime("%Y-%m-%d")},
-        {"id": 118, "title": "图书馆自习区插座不足", "status": "已解决", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=4)).strftime("%Y-%m-%d")},
+        {"id": 127, "title": "小区主干道路面坑洼积水", "status": "待处理", "category": "设施维修", "urgency": "普通", "reported_at": today.strftime("%Y-%m-%d")},
+        {"id": 126, "title": "助餐点餐具清洗不干净", "status": "处理中", "category": "环境卫生", "urgency": "紧急", "reported_at": (today - timedelta(days=1)).strftime("%Y-%m-%d")},
+        {"id": 125, "title": "小区围墙出现裂缝", "status": "处理中", "category": "安全隐患", "urgency": "紧急", "reported_at": (today - timedelta(days=1)).strftime("%Y-%m-%d")},
+        {"id": 124, "title": "活动室网络不稳定", "status": "待处理", "category": "物业服务", "urgency": "普通", "reported_at": (today - timedelta(days=1)).strftime("%Y-%m-%d")},
+        {"id": 123, "title": "单元楼门禁设备故障", "status": "处理中", "category": "物业服务", "urgency": "紧急", "reported_at": (today - timedelta(days=2)).strftime("%Y-%m-%d")},
+        {"id": 122, "title": "助餐点空调不制冷", "status": "待处理", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=2)).strftime("%Y-%m-%d")},
+        {"id": 121, "title": "小区广场座椅锈蚀严重", "status": "已解决", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=3)).strftime("%Y-%m-%d")},
+        {"id": 120, "title": "单元楼门厅售货机故障", "status": "已解决", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=3)).strftime("%Y-%m-%d")},
+        {"id": 119, "title": "助餐点菜品涨价问题", "status": "待处理", "category": "社区事务", "urgency": "普通", "reported_at": (today - timedelta(days=3)).strftime("%Y-%m-%d")},
+        {"id": 118, "title": "活动室插座不足", "status": "已解决", "category": "设施维修", "urgency": "普通", "reported_at": (today - timedelta(days=4)).strftime("%Y-%m-%d")},
     ]
 
 def _mock_feedback_stats():
@@ -360,14 +360,14 @@ st.markdown(f"""
 <div class="fade-up" style="margin-bottom:8px;">
     <div style="font-size:1.8em;font-weight:800;color:{C["text"]};letter-spacing:-0.02em;
         display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.3em;">🏛️</span>
-        校园治理数据看板
+        <span style="font-size:1.3em;">🏘️</span>
+        社区治理数据看板
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;
             background:{C["success"]};box-shadow:0 0 8px {C["success_glow"]};margin-left:4px;"
             title="系统在线"></span>
     </div>
     <div style="font-size:0.75em;color:{C["text_muted"]};margin-top:2px;letter-spacing:0.05em;">
-        CAMPUSINSIGHT · 知报议督 · 治理闭环
+        COMMUNITYINSIGHT · 知报议督 · 治理闭环
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -500,30 +500,30 @@ with col_side:
 
 st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{C["border_glow"]},transparent);margin:16px 0;"></div>', unsafe_allow_html=True)
 
-# BOTTOM ROW: campus heatmap + recent issues
+# BOTTOM ROW: community heatmap + recent issues
 
 col_heat, col_recent = st.columns([1, 1])
 
 with col_heat:
-    st.markdown('<div class="section-title">🗺️ 校园问题热力分布</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🗺️ 社区诉求热力分布</div>', unsafe_allow_html=True)
 
     by_cat = issue_stats.get("by_category", {})
     # Build intensity map data
-    campus_areas = {
-        "教学区": by_cat.get("教学设备", 0) + by_cat.get("网络服务", 0) // 2,
-        "图书馆": by_cat.get("设施维修", 0) // 3 + by_cat.get("网络服务", 0) // 3,
-        "食堂": by_cat.get("餐饮问题", 0) + by_cat.get("环境卫生", 0) // 3,
-        "宿舍区": by_cat.get("设施维修", 0) // 3 + by_cat.get("网络服务", 0) // 3 + by_cat.get("安全隐患", 0) // 3,
-        "运动场": by_cat.get("设施维修", 0) // 4,
+    community_areas = {
+        "单元楼": by_cat.get("设施维修", 0) + by_cat.get("物业服务", 0) // 2,
+        "活动室": by_cat.get("设施维修", 0) // 3 + by_cat.get("物业服务", 0) // 3,
+        "助餐点": by_cat.get("社区事务", 0) + by_cat.get("环境卫生", 0) // 3,
+        "楼栋区": by_cat.get("设施维修", 0) // 3 + by_cat.get("物业服务", 0) // 3 + by_cat.get("安全隐患", 0) // 3,
+        "小广场": by_cat.get("设施维修", 0) // 4,
         "主干道": by_cat.get("设施维修", 0) // 4 + by_cat.get("环境卫生", 0) // 3,
-        "行政楼": by_cat.get("校园管理", 0),
-        "校医院": by_cat.get("安全隐患", 0) // 3,
+        "物业中心": by_cat.get("社区事务", 0),
+        "卫生站": by_cat.get("安全隐患", 0) // 3,
         "绿化区": by_cat.get("环境卫生", 0) // 3,
-        "停车场": by_cat.get("设施维修", 0) // 4,
-        "快递站": by_cat.get("校园管理", 0) // 2,
-        "活动中心": by_cat.get("校园管理", 0) // 2 + by_cat.get("其他", 0),
+        "停车场": by_cat.get("停车管理", 0),
+        "快递站": by_cat.get("社区事务", 0) // 2,
+        "活动中心": by_cat.get("社区事务", 0),
     }
-    max_heat = max(campus_areas.values()) if any(campus_areas.values()) else 1
+    max_heat = max(community_areas.values()) if any(community_areas.values()) else 1
 
     def heat_color(count, max_val):
         if max_val == 0: return (C["surface_raised"], C["text_muted"])
@@ -545,7 +545,7 @@ with col_heat:
         f'<div class="heat-cell" style="background:{heat_color(v, max_heat)[0]};color:{heat_color(v, max_heat)[1]};">'
         f'<div style="font-size:1em;">{v}</div>'
         f'<div style="font-size:0.7em;opacity:0.7;">{k}</div></div>'
-        for k, v in campus_areas.items()
+        for k, v in community_areas.items()
     )
     st.markdown(f'<div class="heat-grid">{heat_cells}</div>', unsafe_allow_html=True)
 
@@ -611,9 +611,9 @@ for i in recent_issues[:6]:
     )
 
 ticker_events += [
-    "💡 提案 #8「延长图书馆开放时间」获 73 人附议",
-    "✅ 工单 #118「图书馆插座不足」已解决",
-    "📢 新通知「秋季学期校历」已发布",
+    "💡 提案 #8「延长活动室开放时间」获 73 人附议",
+    "✅ 工单 #118「活动室插座不足」已解决",
+    "📢 新通知「社区活动安排」已发布",
     "🎉 提案 #3「增设快递柜」已进入实施阶段",
 ]
 # Duplicate for continuous scroll
@@ -633,7 +633,7 @@ st.markdown(f"""
 
 st.markdown(f"""
 <div style="text-align:center;font-size:0.65em;color:{C["text_muted"]};margin-top:8px;">
-    CampusInsight · Campus Monitor · Real-time Monitoring
+    CommunityInsight · Community Monitor · Real-time Monitoring
     · {now.strftime("%Y-%m-%d %H:%M:%S")}
     {'''<br/><span style="color:#f59e0b;font-weight:600;">演示模式 · 模拟数据</span>''' if _using_mock else ""}
 </div>

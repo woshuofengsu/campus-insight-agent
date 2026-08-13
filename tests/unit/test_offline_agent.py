@@ -20,10 +20,10 @@ def _make_mock_st():
     mock_st.langchain_memory.chat_memory.messages = []
     mock_st._login_user_profile = {
         "name": "测试用户",
-        "student_id": "2024001",
-        "school": "测试大学",
-        "grade": "大三",
-        "major": "计算机",
+        "resident_id": "2024001",
+        "community": "测试大学",
+        "building": "大三",
+        "unit": "计算机",
     }
     return mock_st
 
@@ -51,8 +51,8 @@ class TestOfflineAgentRoute(unittest.TestCase):
             pass
 
     def test_route_observer_to_pulse(self):
-        persona = {"role": "🌊 校园观察员", "focus_hint": "test", "confidence": "high"}
-        result = self.agent._route(persona, "校园脉搏")
+        persona = {"role": "🌊 社区观察员", "focus_hint": "test", "confidence": "high"}
+        result = self.agent._route(persona, "社区脉搏")
         self.assertIsNotNone(result)
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 50)
@@ -64,8 +64,8 @@ class TestOfflineAgentRoute(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_route_repair_to_report(self):
-        persona = {"role": "🔧 报修助手", "focus_hint": "test", "confidence": "high"}
-        result = self.agent._route(persona, "教三楼灯坏了")
+        persona = {"role": "🔧 接诉助手", "focus_hint": "test", "confidence": "high"}
+        result = self.agent._route(persona, "3号楼灯坏了")
         self.assertIsNotNone(result)
         self.assertIsInstance(result, str)
 
@@ -115,17 +115,17 @@ class TestOfflineAgentGeneral(unittest.TestCase):
     def test_greeting_response(self):
         result = self.agent._handle_general("你好")
         self.assertIsNotNone(result)
-        self.assertIn("校园", result)
+        self.assertIn("社区", result)
 
     def test_hi_response(self):
         result = self.agent._handle_general("在吗")
         self.assertIsNotNone(result)
-        self.assertIn("校园", result)
+        self.assertIn("社区", result)
 
     def test_intro_question(self):
         result = self.agent._handle_general("你是谁")
         self.assertIsNotNone(result)
-        self.assertIn("校园先知", result)
+        self.assertIn("社区先知", result)
 
     def test_help_question(self):
         result = self.agent._handle_general("怎么用")
@@ -249,7 +249,7 @@ class TestOfflineAgentStats(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_stats_with_canteen_filter(self):
-        result = self.agent._respond_stats("餐饮问题有多少")
+        result = self.agent._respond_stats("物业服务有多少")
         self.assertIsInstance(result, str)
 
 
@@ -276,16 +276,16 @@ class TestOfflineAgentReport(unittest.TestCase):
             pass
 
     def test_report_returns_success(self):
-        result = self.agent._respond_report("教三楼走廊灯坏了")
+        result = self.agent._respond_report("3号楼楼道灯坏了")
         self.assertIsInstance(result, str)
         self.assertIn("✅", result)
 
     def test_report_contains_issue_id(self):
-        result = self.agent._respond_report("教三楼灯不亮了")
+        result = self.agent._respond_report("3号楼灯不亮了")
         self.assertIn("#", result)
 
     def test_report_extracts_location(self):
-        result = self.agent._respond_report("图书馆空调不制冷了")
+        result = self.agent._respond_report("活动室空调不制冷了")
         self.assertIsInstance(result, str)
         self.assertIn("✅", result)
 
@@ -294,7 +294,7 @@ class TestOfflineAgentReport(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_report_with_encouragement(self):
-        result = self.agent._respond_report("教三楼水龙头漏水")
+        result = self.agent._respond_report("3号楼水龙头漏水")
         self.assertTrue("已上报" in result or "查看我的工单" in result or "追踪进度" in result)
 
 
@@ -362,12 +362,12 @@ class TestOfflineAgentRun(unittest.TestCase):
             pass
 
     def test_run_pulse_returns_response(self):
-        result = self.agent.run("校园脉搏")
+        result = self.agent.run("社区脉搏")
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 50)
 
     def test_run_repair_returns_response(self):
-        result = self.agent.run("教三楼灯坏了")
+        result = self.agent.run("3号楼灯坏了")
         self.assertIsInstance(result, str)
         self.assertIn("✅", result)
 
@@ -430,8 +430,8 @@ class TestOfflineAgentHelpers(unittest.TestCase):
         self.assertTrue(author is None or isinstance(author, str))
 
     def test_extract_location(self):
-        loc = self.agent._extract_location("教三楼灯坏了")
-        self.assertEqual(loc, "教三楼")
+        loc = self.agent._extract_location("3号楼灯坏了")
+        self.assertEqual(loc, "3号楼")
 
     def test_extract_weather_line(self):
         text = "📌 今天 周一 ☀️ 晴天\n    气温：15°C ~ 25°C"
@@ -443,7 +443,7 @@ class TestOfflineAgentHelpers(unittest.TestCase):
         self.assertTrue(len(result) > 0)
 
     def test_reformat_stats(self):
-        raw = "📊 校园治理数据总览\n\n  📝 问题总数：10\n  ⏳ 待处理：5\n  ✅ 已解决：5"
+        raw = "📊 社区治理数据总览\n\n  📝 问题总数：10\n  ⏳ 待处理：5\n  ✅ 已解决：5"
         result = self.agent._reformat_stats(raw)
         self.assertIsInstance(result, str)
 

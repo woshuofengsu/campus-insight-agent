@@ -2,7 +2,7 @@
 """SQL-heavy association computation — spatial / temporal / recurrence / anomaly detection.
 
 Extracted from the monolithic reflector.py. This module is the "heavy lifter":
-it runs up to 10 SQL queries per turn to find patterns across campus_issues,
+it runs up to 10 SQL queries per turn to find patterns across community_issues,
 proposals, and discussion_topics.
 """
 import logging
@@ -17,8 +17,9 @@ _logger = logging.getLogger("agent.reflector")
 # ── Constants (shared with _parser.py via reflector/__init__.py) ──
 
 _LOCATION_PATTERNS = [
-    r"教\d+楼", r"图书馆", r"食堂", r"宿舍\d*号楼", r"操场", r"体育馆",
-    r"实验楼", r"行政楼", r"[一二三四五六七八九十]食堂", r"\d+号宿舍楼", r"\d+栋",
+    r"[一二三四五六七八九十\d]+号楼", r"[一二三四五六七八九十\d]+单元",
+    r"[一二三四五六七八九十\d]+栋", r"小区", r"车库", r"楼道", r"天台",
+    r"电梯间", r"活动室", r"助餐点", r"快递柜", r"垃圾站", r"充电桩",
 ]
 
 _STOP_WORDS: set[str] = {
@@ -73,7 +74,7 @@ def _cross_time_comparison(conn) -> dict:
             SUM(CASE WHEN status = '已解决'
                      AND resolved_at > date('now', '-14 days')
                      AND resolved_at <= date('now', '-7 days') THEN 1 ELSE 0 END) AS resolved_last_week
-        FROM campus_issues
+        FROM community_issues
     """).fetchone()
     if not row:
         return {}
@@ -124,7 +125,7 @@ def _z_score_anomalies(conn) -> list[dict]:
             ROUND(AVG(CASE WHEN reported_at > date('now', '-28 days')
                        AND reported_at <= date('now', '-7 days') THEN 1 ELSE 0 END), 1) * 3 AS baseline_3wk,
             COUNT(CASE WHEN urgency='紧急' AND status != '已解决' THEN 1 END) AS urgent_pending
-        FROM campus_issues
+        FROM community_issues
         WHERE reported_at > date('now', '-28 days')
         GROUP BY category
         HAVING recent > 0
@@ -168,7 +169,7 @@ def _detect_upgrade_paths(conn) -> list[dict]:
     """
     rows = conn.execute("""
         SELECT ci.category, COUNT(*) as issue_count
-        FROM campus_issues ci
+        FROM community_issues ci
         WHERE ci.status IN ('待处理', '处理中')
         GROUP BY ci.category
         HAVING COUNT(*) >= 3
@@ -200,7 +201,7 @@ def _detect_upgrade_paths(conn) -> list[dict]:
 # -- 3. Main association computation
 
 def compute_associations(user_input: str, steps: list[dict], db_path: str = "") -> dict:
-    """Run SQL queries against campus DB to find spatial/temporal/recurrence associations.
+    """Run SQL queries against community DB to find spatial/temporal/recurrence associations.
 
     Returns a dictionary with 10 analysis dimensions. Non-critical — failures
     are logged and the caller receives an empty result set.
@@ -255,7 +256,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
         # ── 1. Spatial clustering ──
         for loc in locations:
             for r in conn.execute(
-                "SELECT id, title, status, category, reported_at, location FROM campus_issues "
+                "SELECT id, title, status, category, reported_at, location FROM community_issues "
                 "WHERE location LIKE ? AND status != '已解决' "
                 "ORDER BY reported_at DESC LIMIT 5", (f"%{loc}%",),
             ).fetchall():
@@ -267,7 +268,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
         if categories:
             placeholders = ",".join("?" for _ in categories)
             rows = conn.execute(
-                f"SELECT category, COUNT(*) as cnt FROM campus_issues "
+                f"SELECT category, COUNT(*) as cnt FROM community_issues "
                 f"WHERE category IN ({placeholders}) AND reported_at > date('now', '-7 days') "
                 f"GROUP BY category",
                 categories,
@@ -277,7 +278,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
         # ── 3. Recurrence detection ──
         for kw in keywords:
             for r in conn.execute(
-                "SELECT id, title, status, category, reported_at FROM campus_issues "
+                "SELECT id, title, status, category, reported_at FROM community_issues "
                 "WHERE title LIKE ? AND status = '已解决' "
                 "ORDER BY reported_at DESC LIMIT 3", (f"%{kw}%",),
             ).fetchall():
@@ -330,7 +331,7 @@ def _anomaly_detection_query(conn) -> list[dict]:
             SUM(CASE WHEN reported_at > date('now', '-7 days') THEN 1 ELSE 0 END) AS recent,
             ROUND(SUM(CASE WHEN reported_at > date('now', '-35 days')
                       AND reported_at <= date('now', '-7 days') THEN 1 ELSE 0 END) / 4.0, 1) AS baseline_avg
-        FROM campus_issues
+        FROM community_issues
         WHERE reported_at > date('now', '-35 days')
         GROUP BY category
         HAVING recent > baseline_avg * 1.5 AND recent >= 3
@@ -349,8 +350,8 @@ def _correlation_query(conn) -> list[dict]:
     """Categories that co-occur in the same locations."""
     rows = conn.execute("""
         SELECT a.category AS cat_a, b.category AS cat_b, COUNT(*) AS co_count
-        FROM campus_issues a
-        JOIN campus_issues b ON a.location = b.location AND a.id < b.id
+        FROM community_issues a
+        JOIN community_issues b ON a.location = b.location AND a.id < b.id
             AND a.location != '' AND b.location != ''
         WHERE a.category != b.category
         GROUP BY cat_a, cat_b
@@ -366,7 +367,7 @@ def _correlation_query(conn) -> list[dict]:
 def _linked_proposals_query(conn) -> list[dict]:
     """Proposals addressing the top hot-issue categories."""
     top_cats = conn.execute("""
-        SELECT category FROM campus_issues
+        SELECT category FROM community_issues
         WHERE status != '已解决'
         GROUP BY category ORDER BY COUNT(*) DESC LIMIT 3
     """).fetchall()
@@ -389,7 +390,7 @@ def _resolution_efficiency_query(conn) -> list[dict]:
         SELECT category,
             COUNT(*) AS resolved_count,
             ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) AS avg_days
-        FROM campus_issues
+        FROM community_issues
         WHERE status = '已解决' AND resolved_at IS NOT NULL
         GROUP BY category
         ORDER BY avg_days DESC
@@ -428,23 +429,14 @@ def get_proactive_insights(db_path: str = "") -> dict:
             urgent_count = 0
             stale_count = 0
             try:
-                row = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
-                    "WHERE urgency='紧急' AND status != '已解决'"
-                ).fetchone()
-                urgent_count = row["cnt"] if row else 0
+                # SLA 分级口径统一走 data/db_sla.py（极急6h / 紧急24h / 普通72h），
+                # 顺带修正此前只统计「紧急」而漏掉「极急」的问题。
+                from data.db_sla import get_sla_summary
+                _sla = get_sla_summary()
+                urgent_count = _sla.get("urgent_pending", 0)
+                stale_count = _sla.get("total_overdue", 0)
             except Exception:  # best-effort, skip
-                _logger.debug("Failed to query urgent count for proactive insights", exc_info=True)
-                pass
-            try:
-                row = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
-                    "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-                ).fetchone()
-                stale_count = row["cnt"] if row else 0
-            except Exception:  # best-effort, skip
-                _logger.debug("Failed to query stale count for proactive insights", exc_info=True)
-                pass
+                _logger.debug("Failed to query SLA counts for proactive insights", exc_info=True)
 
         has_insight = bool(z_anomalies or cross_time or upgrade_paths or resolution_efficiency)
         summary_parts: list[str] = []
@@ -492,7 +484,7 @@ def get_proactive_insights(db_path: str = "") -> dict:
             "stale_count": stale_count,
             "summary_text": "\n".join(
                 f"- {p}" for p in summary_parts
-            ) if summary_parts else "✅ 暂无异常洞察，校园治理运行平稳",
+            ) if summary_parts else "✅ 暂无异常洞察，社区治理运行平稳",
             "summary_parts": summary_parts,
         }
     except Exception as e:

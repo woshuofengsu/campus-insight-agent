@@ -1,10 +1,15 @@
-# ui/pages_teacher/insights.py
+# ui/pages_grid/insights.py
 """📈 数据洞察 — 7 维关联分析：异常检测、空间热点、解决效率、升级路径."""
 import streamlit as st
 import altair as alt
 import pandas as pd
-from ui.components import TOKEN, tag, configure_altair
+from ui.guard import require_role
+
+require_role("grid")
+
+from ui.components import TOKEN, tag, configure_altair, page_header, methodology_panel
 from data.database import get_db
+from data.db_sla import get_sla_breaches
 
 # ── Reuse reflector's battle-tested analysis functions ──
 import logging
@@ -16,12 +21,9 @@ from agent.reflector import (
 )
 
 # ── Page Render ──
-st.markdown(
-    f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
-    f'📈 数据洞察</span>',
-    unsafe_allow_html=True,
-)
-st.caption("基于 OODA 反射器的 7 维关联分析，自动发现校园治理中的隐藏模式和趋势。")
+page_header("📈 数据洞察", "基于 OODA 反射器的 7 维关联分析，自动发现社区治理中的隐藏模式和趋势。")
+
+methodology_panel()
 
 # -- 🤖 治理周报 — 一键生成 --
 st.markdown("---")
@@ -33,7 +35,7 @@ with c_rpt:
         f'🤖 治理周报</span>',
         unsafe_allow_html=True,
     )
-    st.caption("自动分析校园治理数据，生成包含执行摘要、异常预警、趋势分析的结构化周报。")
+    st.caption("自动分析社区治理数据，生成包含执行摘要、异常预警、趋势分析的结构化周报。")
 with c_btn:
     generate_btn = st.button(
         "🔄 生成周报", key="gen_weekly_report", width="stretch",
@@ -41,7 +43,7 @@ with c_btn:
     )
 
 if generate_btn:
-    with st.spinner("🤖 正在分析校园治理数据并生成周报..."):
+    with st.spinner("🤖 正在分析社区治理数据并生成周报..."):
         from agent.weekly_report import generate_weekly_report
         report = generate_weekly_report(include_llm_summary=True)
         st.session_state._weekly_report = report
@@ -52,6 +54,16 @@ else:
 
 report = st.session_state._weekly_report
 if report:
+    # ── 发送到邮箱（QQ SMTP；凭据在 .env，未配置则提示）──
+    if st.button("📧 发送到邮箱", key="send_report_email"):
+        from data.email_notify import send_email, is_configured
+        if not is_configured():
+            st.warning("未配置 SMTP 邮箱（.env 中的 SMTP_USER / SMTP_PASS），无法发送。")
+        elif send_email(f"[社区先知] {report.get('title', '社区治理周报')}", report.get("markdown", "")):
+            st.success("📧 周报已发送到邮箱。")
+        else:
+            st.warning("邮件发送失败，请检查 .env 中的 SMTP 配置（QQ 邮箱需使用授权码）。")
+
     # ── Executive summary card ──
     if report.get("exec_summary"):
         st.markdown(
@@ -74,13 +86,14 @@ if report:
         # KPI quick glance
         kpi = data.get("kpi", {})
         if kpi:
-            k1, k2, k3, k4, k5 = st.columns(5)
+            k1, k2, k3 = st.columns(3)
             with k1:
                 st.metric("📝 总工单", kpi.get("total", 0))
             with k2:
                 st.metric("⏳ 待处理", kpi.get("pending", 0))
             with k3:
                 st.metric("🔥 紧急", kpi.get("urgent", 0))
+            k4, k5 = st.columns(2)
             with k4:
                 st.metric("📥 本周新增", kpi.get("week_new", 0))
             with k5:
@@ -102,7 +115,7 @@ if report:
 st.markdown("---")
 
 # ── Helper: run analysis once ──
-@st.cache_data(ttl=60, show_spinner="正在分析校园治理数据...")
+@st.cache_data(ttl=60, show_spinner="正在分析社区治理数据...")
 def _run_insight_analysis():
     """Run all 7 analysis dimensions and return structured results."""
     try:
@@ -115,7 +128,7 @@ def _run_insight_analysis():
             spatial_raw = conn.execute("""
                 SELECT location, COUNT(*) as cnt,
                        SUM(CASE WHEN urgency='紧急' THEN 1 ELSE 0 END) as urgent_cnt
-                FROM campus_issues
+                FROM community_issues
                 WHERE status IN ('待处理', '处理中') AND location != ''
                 GROUP BY location
                 ORDER BY cnt DESC LIMIT 8
@@ -127,7 +140,7 @@ def _run_insight_analysis():
                 SELECT category,
                        COUNT(*) AS resolved_count,
                        ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) AS avg_days
-                FROM campus_issues
+                FROM community_issues
                 WHERE status = '已解决' AND resolved_at IS NOT NULL
                 GROUP BY category
                 HAVING resolved_count >= 2
@@ -139,8 +152,8 @@ def _run_insight_analysis():
             recurrence_raw = conn.execute("""
                 SELECT a.title AS unresolved_title, a.category, a.location, a.status,
                        b.title AS resolved_title, b.resolved_at
-                FROM campus_issues a
-                JOIN campus_issues b ON a.category = b.category
+                FROM community_issues a
+                JOIN community_issues b ON a.category = b.category
                     AND a.id != b.id AND b.status = '已解决'
                 WHERE a.status IN ('待处理', '处理中')
                     AND a.location = b.location
@@ -151,8 +164,8 @@ def _run_insight_analysis():
             # Category correlations: co-occurring in same location
             corr_raw = conn.execute("""
                 SELECT a.category AS cat_a, b.category AS cat_b, COUNT(*) AS co_count
-                FROM campus_issues a
-                JOIN campus_issues b ON a.location = b.location AND a.id < b.id
+                FROM community_issues a
+                JOIN community_issues b ON a.location = b.location AND a.id < b.id
                     AND a.location != '' AND b.location != ''
                 WHERE a.category != b.category
                 GROUP BY cat_a, cat_b
@@ -160,16 +173,8 @@ def _run_insight_analysis():
             """).fetchall()
             correlations = [dict(r) for r in corr_raw]
 
-            # Overdue SLA: pending > 7 days
-            overdue_raw = conn.execute("""
-                SELECT id, title, category, location, urgency, reported_at,
-                       CAST(julianday('now') - julianday(reported_at) AS INTEGER) AS days_open
-                FROM campus_issues
-                WHERE status IN ('待处理', '处理中')
-                  AND reported_at < date('now', '-7 days')
-                ORDER BY days_open DESC LIMIT 10
-            """).fetchall()
-            overdues = [dict(r) for r in overdue_raw]
+            # Overdue SLA — 分级口径（极急6h / 紧急24h / 普通72h），统一走 data/db_sla.py
+            overdues = get_sla_breaches(limit=10)
 
             # Category breakdown with urgency mix
             cat_breakdown_raw = conn.execute("""
@@ -179,7 +184,7 @@ def _run_insight_analysis():
                        SUM(CASE WHEN status='处理中' THEN 1 ELSE 0 END) AS in_progress,
                        SUM(CASE WHEN status='已解决' THEN 1 ELSE 0 END) AS resolved,
                        SUM(CASE WHEN urgency='紧急' THEN 1 ELSE 0 END) AS urgent
-                FROM campus_issues
+                FROM community_issues
                 GROUP BY category
                 ORDER BY total DESC
             """).fetchall()
@@ -254,23 +259,24 @@ with alert_cols[1]:
 
 with alert_cols[2]:
     overdues = data["overdues"]
-    urgent_overdue = [o for o in overdues if o.get("urgency") == "紧急"]
+    critical_overdue = [o for o in overdues if o.get("level") == "critical"]
     st.metric(
         "⏰ SLA 超时",
-        f"{len(overdues)} 件滞留 > 7天",
-        delta=f"🔴 {len(urgent_overdue)} 件紧急" if urgent_overdue else "无紧急滞留",
+        f"{len(overdues)} 件超时",
+        delta=f"🔴 {len(critical_overdue)} 件紧急" if critical_overdue else "无紧急超时",
     )
     if overdues:
         for o in overdues[:4]:
-            days = o.get("days_open", 0)
-            urg = "🔴" if o.get("urgency") == "紧急" else "🟡"
+            hours = o.get("hours_open", 0)
+            time_str = f"{hours // 24} 天" if hours >= 24 else f"{hours} 小时"
+            urg = "🔴" if o.get("level") == "critical" else "🟡"
             st.markdown(
                 f'{urg} #{o["id"]} {o.get("title", "")[:22]} — '
-                f'<span style="color:{TOKEN["danger"]};font-weight:600;">{days} 天</span>',
+                f'<span style="color:{TOKEN["danger"]};font-weight:600;">{time_str}</span>',
                 unsafe_allow_html=True,
             )
     else:
-        st.caption("✅ 所有工单均在 7 天内处理。")
+        st.caption("✅ 所有工单均在时效内处理。")
 
 st.markdown("---")
 
@@ -432,18 +438,20 @@ st.markdown("---")
 # -- Row 5: Overdue SLA Detail Table --
 if data["overdues"]:
     st.markdown("### ⏰ SLA 超时明细")
-    st.caption("以下工单已逾期超过 7 天未解决，需立即关注。")
+    st.caption("以下工单已超时未解决（按紧急度分级口径），需立即关注。")
 
     for o in data["overdues"][:8]:
         oid = o["id"]
-        days = o.get("days_open", "?")
+        hours = o.get("hours_open", 0)
+        time_str = f"{hours // 24} 天" if hours >= 24 else f"{hours} 小时"
         title = o.get("title", "")[:40]
         cat = o.get("category", "")
         loc = o.get("location", "")
         urg = o.get("urgency", "")
         reported = o.get("reported_at", "")[:10]
+        o_level = o.get("level", "")
 
-        level = "🔴" if urg == "紧急" else "🟠" if days and days > 14 else "🟡"
+        level = "🔴" if o_level == "critical" else "🟡"
         with st.container(border=True):
             c1, c2 = st.columns([5, 1])
             with c1:
@@ -453,12 +461,12 @@ if data["overdues"]:
                 )
                 st.caption(
                     f'{cat} · 📍 {loc} · 🕐 {reported} · '
-                    f'<span style="color:{TOKEN["danger"]};font-weight:600;">逾期 {days} 天</span>',
+                    f'<span style="color:{TOKEN["danger"]};font-weight:600;">超时 {time_str}</span>',
                     unsafe_allow_html=True,
                 )
             with c2:
-                st.caption(f"已滞留")
+                st.caption("已滞留")
                 st.markdown(
-                    f'<span style="font-size:1.5em;font-weight:800;color:{TOKEN["danger"]};">{days}天</span>',
+                    f'<span style="font-size:1.3em;font-weight:800;color:{TOKEN["danger"]};">{time_str}</span>',
                     unsafe_allow_html=True,
                 )

@@ -21,13 +21,53 @@ class PerceptionMonitor:
         self._check_issue_hotspots()
         self._check_resolved_issues()
         self._check_health_risk()
+        self._check_auto_dispatch()
+        self._check_escalation()
+        self._check_elderly_safety()
 
         if self.alerts:
             logger.info(f"Perception check: {len(self.alerts)} alert(s) generated")
         return self.alerts
 
+    def _check_elderly_safety(self):
+        """独居老人安全检测：超时未互动 → 通知网格员留意（24h 去重）。"""
+        try:
+            from data.db_elderly import notify_inactive_elders
+            notified = notify_inactive_elders(24)
+            if notified:
+                logger.info(f"Elderly safety: {notified} inactive elder(s) notified")
+        except Exception as e:
+            logger.warning(f"Elderly safety check failed: {e}")
+
+    def _check_escalation(self):
+        """SLA 升级：将超时 2× 的工单标记为「已升级」并触发邮件通知（best-effort）。"""
+        try:
+            from data.db_sla import escalate_overdue_issues
+            escalated = escalate_overdue_issues(limit=20)
+            if escalated:
+                summary = "、".join(f"#{e['id']}" for e in escalated[:3])
+                logger.info(f"SLA escalation: {len(escalated)} issue(s) escalated ({summary})")
+        except Exception as e:
+            logger.warning(f"SLA escalation check failed: {e}")
+
+    def _check_auto_dispatch(self):
+        """战线二 — 主动派单：扫描未派单开放工单，按类别自动派给网格员。
+
+        Best-effort: 无网格员或无未派单工单时静默跳过，不产生告警。
+        """
+        try:
+            from data.db_dispatch import discover_and_dispatch
+            dispatched = discover_and_dispatch(limit=20)
+            if dispatched:
+                summary = "、".join(
+                    f"#{d['issue_id']}→{d['assignee']}" for d in dispatched[:3]
+                )
+                logger.info(f"Auto-dispatch: {len(dispatched)} issue(s) assigned ({summary})")
+        except Exception as e:
+            logger.warning(f"Auto-dispatch check failed: {e}")
+
     def _check_weather(self):
-        """Check for severe weather that could affect campus safety."""
+        """Check for severe weather that could affect community safety."""
         try:
             from tools.query_weather import get_today_weather
             days, _, _ = get_today_weather()
@@ -102,7 +142,7 @@ class PerceptionMonitor:
             logger.warning(f"Issue hotspot check failed: {e}")
 
     def _check_health_risk(self):
-        """Check campus health risk and alert if level is high or critical."""
+        """Check community health risk and alert if level is high or critical."""
         try:
             from data.db_health_alerts import HealthRiskEngine
             engine = HealthRiskEngine()
@@ -115,9 +155,9 @@ class PerceptionMonitor:
                 if top_disease:
                     disease_info = f"主要风险：{top_disease['title']}。{top_disease['message'][:80]}"
                 self.alerts.append({
-                    "title": "校园健康预警",
+                    "title": "社区健康预警",
                     "message": (
-                        f"当前校园健康风险等级：{level}（{report['overall_score']}分）。"
+                        f"当前社区健康风险等级：{level}（{report['overall_score']}分）。"
                         f"{disease_info}"
                         f"{report['advice_summary']}"
                     ),
@@ -127,7 +167,7 @@ class PerceptionMonitor:
             logger.warning(f"Health risk check failed: {e}")
 
     def _check_resolved_issues(self):
-        """Detect recently resolved issues to notify students of progress."""
+        """Detect recently resolved issues to notify residents of progress."""
         try:
             issues = get_issues(limit=20)
             if not issues:
@@ -145,7 +185,7 @@ class PerceptionMonitor:
                 self.alerts.append({
                     "title": "问题解决通知",
                     "message": (
-                        f"今天有 {len(recently_resolved)} 个校园问题已解决：{titles}。"
+                        f"今天有 {len(recently_resolved)} 件社区诉求已解决：{titles}。"
                         f"感谢大家的参与！"
                     ),
                     "emoji": "✅",

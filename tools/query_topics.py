@@ -12,7 +12,7 @@ from data.database import (
 
 @tool
 def get_topics() -> str:
-    """查看当前校园热议的民意议题。这些议题由AI根据校园近期情况自动发起，或由管理员手动发布。
+    """查看当前社区热议的民意议题。这些议题由AI根据社区近期情况自动发起，或由网格员手动发布。
 
     返回活跃议题列表，每个议题包含标题、参与人数、部分观点摘要。
     你也可以对任何议题发表自己的意见。
@@ -22,14 +22,14 @@ def get_topics() -> str:
     if not topics:
         return (
             "📢 当前暂无活跃的民意议题。\n"
-            "AI 会自动根据校园近期热点发起议题讨论。你也可以在'有话说'板块创建提案来表达你的想法！"
+            "AI 会自动根据社区近期热点发起议题讨论。你也可以在'邻里议事'板块创建提案来表达你的想法！"
         )
 
     lines = ["🗳️ **民意广场 · 正在热议**", ""]
 
     for i, t in enumerate(topics, 1):
         summary = get_opinion_summary(t["id"])
-        source_tag = "系统自动发起" if t.get("created_by_agent") else "👤 管理员发布"
+        source_tag = "系统自动发起" if t.get("created_by_agent") else "👤 网格员发布"
         lines.append(
             f"{i}. **{t['title'][:35]}**\n"
             f"   {source_tag} · {summary['total_opinions']} 人参与讨论\n"
@@ -40,7 +40,7 @@ def get_topics() -> str:
         if summary["recent_opinions"]:
             lines.append(f"   💬 最新观点：")
             for op in summary["recent_opinions"][:2]:
-                label = op.get("participant_label", "学生")
+                label = op.get("participant_label", "居民")
                 content = op.get("content", "")[:50]
                 lines.append(f"     · {label}：{content}...")
         lines.append("")
@@ -67,7 +67,7 @@ def get_topic_detail(topic_id: int) -> str:
         return f"⚠️ 未找到编号为 #{topic_id} 的议题。"
 
     t = summary["topic"]
-    source_tag = "系统自动发起" if t.get("created_by_agent") else "👤 管理员发布"
+    source_tag = "系统自动发起" if t.get("created_by_agent") else "👤 网格员发布"
 
     lines = [
         f"🗳️ **{t['title']}**",
@@ -81,7 +81,7 @@ def get_topic_detail(topic_id: int) -> str:
     opinions = get_opinions_by_topic(topic_id, limit=20)
     if opinions:
         for op in opinions:
-            label = op.get("participant_label", "学生")
+            label = op.get("participant_label", "居民")
             content = op.get("content", "")
             lines.append(f"· **{label}**：{content}")
     else:
@@ -94,7 +94,7 @@ def get_topic_detail(topic_id: int) -> str:
 
 
 def _discover_hot_topic() -> dict | None:
-    """Analyze recent campus data to discover potential hot topics.
+    """Analyze recent community data to discover potential hot topics.
 
     Called by the perception engine to auto-generate discussion topics
     when certain patterns are detected (e.g., same category spikes,
@@ -118,24 +118,28 @@ def _discover_hot_topic() -> dict | None:
         if count >= 5:
             topic_templates = {
                 "设施维修": {
-                    "title": f"校园设施维修频发——{cat}问题集中讨论",
-                    "description": f"近期收到{count}件设施维修相关上报。你觉得学校设施维护存在哪些问题？有什么改进建议？",
+                    "title": f"小区设施维修频发——{cat}问题集中讨论",
+                    "description": f"近期收到{count}件设施维修相关上报。你觉得小区设施维护存在哪些问题？有什么改进建议？",
                 },
                 "环境卫生": {
-                    "title": "校园环境卫生问题引发关注",
+                    "title": "小区环境卫生问题引发关注",
                     "description": f"近期收到{count}件环境卫生相关反馈。哪些区域的卫生状况需要改善？你有什么建议？",
                 },
                 "安全隐患": {
-                    "title": "校园安全隐患，你我共同关注",
-                    "description": f"近期上报了{count}件安全隐患问题。你注意到校园里有哪些不安全的地方吗？",
+                    "title": "小区安全隐患，你我共同关注",
+                    "description": f"近期上报了{count}件安全隐患问题。你注意到小区里有哪些不安全的地方吗？",
                 },
-                "餐饮问题": {
-                    "title": "食堂餐饮问题集中反馈",
-                    "description": f"近期收到{count}件餐饮相关反馈。你觉得食堂在哪些方面需要改进？菜品价格、种类、还是服务？",
+                "停车管理": {
+                    "title": "停车难问题集中反馈",
+                    "description": f"近期收到{count}件停车管理相关反馈。你觉得小区停车存在哪些问题？有什么改进建议？",
                 },
-                "网络服务": {
-                    "title": "校园网络服务满意度调查",
-                    "description": f"近期收到{count}件网络相关反馈。你遇到的网络问题有哪些？对校园网络有什么建议？",
+                "噪音扰民": {
+                    "title": "噪音扰民问题引发关注",
+                    "description": f"近期收到{count}件噪音扰民相关反馈。你觉得小区里有哪些噪音困扰？有什么解决办法？",
+                },
+                "物业服务": {
+                    "title": "物业服务满意度调查",
+                    "description": f"近期收到{count}件物业服务相关反馈。你对物业服务有什么建议？",
                 },
             }
             template = topic_templates.get(cat, {

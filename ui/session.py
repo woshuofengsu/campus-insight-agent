@@ -59,8 +59,8 @@ def init_session():
             from agent.offline_agent import OfflineAgent
             st.session_state.agent = OfflineAgent(st.session_state)
         else:
-            from agent.engine import CampusAgent
-            st.session_state.agent = CampusAgent(st.session_state)
+            from agent.engine import CommunityAgent
+            st.session_state.agent = CommunityAgent(st.session_state)
 
     agent = st.session_state.agent
     memory = agent.memory

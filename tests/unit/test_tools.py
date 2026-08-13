@@ -57,10 +57,10 @@ class TestReportIssue(unittest.TestCase):
     def test_minimal_title_creates_issue(self):
         from tools.action_report_issue import report_issue
         result = report_issue.invoke({
-            "title": "教三楼灯坏了",
+            "title": "3号楼灯坏了",
             "category": "设施维修",
-            "location": "教三楼",
-            "description": "走廊灯不亮",
+            "location": "3号楼",
+            "description": "楼道灯不亮",
             "urgency": "普通",
         })
         self.assertIn("✅", result)
@@ -70,14 +70,14 @@ class TestReportIssue(unittest.TestCase):
         """When both category and urgency are provided, skip LLM classification."""
         from tools.action_report_issue import report_issue
         result = report_issue.invoke({
-            "title": "食堂饭菜问题",
-            "category": "餐饮问题",
-            "location": "一食堂",
+            "title": "楼道堆放杂物",
+            "category": "物业服务",
+            "location": "3号楼2单元",
             "description": "",
             "urgency": "紧急",
         })
         self.assertIn("✅", result)
-        self.assertIn("餐饮问题", result)
+        self.assertIn("物业服务", result)
         self.assertIn("紧急", result)
 
     def test_keyword_classify_fallback(self):
@@ -85,9 +85,11 @@ class TestReportIssue(unittest.TestCase):
         self.assertEqual(_keyword_classify("灯坏了", ""), "设施维修")
         self.assertEqual(_keyword_classify("垃圾没清理", ""), "环境卫生")
         self.assertEqual(_keyword_classify("电线裸露有火灾风险", ""), "安全隐患")
-        self.assertEqual(_keyword_classify("电脑坏了", ""), "教学设备")
-        self.assertEqual(_keyword_classify("网速太慢", ""), "网络服务")
-        self.assertEqual(_keyword_classify("食堂饭菜有问题", ""), "餐饮问题")
+        self.assertEqual(_keyword_classify("停车位被占了", ""), "停车管理")
+        self.assertEqual(_keyword_classify("广场舞噪音太大", ""), "噪音扰民")
+        self.assertEqual(_keyword_classify("物业保洁不到位", ""), "物业服务")
+        self.assertEqual(_keyword_classify("邻里纠纷", ""), "邻里矛盾")
+        self.assertEqual(_keyword_classify("老人助餐服务", ""), "社区事务")
         self.assertEqual(_keyword_classify("完全不知道是什么类别", ""), "其他")
 
     def test_keyword_urgency_fallback(self):
@@ -100,19 +102,19 @@ class TestReportIssue(unittest.TestCase):
 
     def test_validate_location_dorm_no_location(self):
         from tools.action_report_issue import validate_location
-        err = validate_location("宿舍灯坏了", "")
+        err = validate_location("楼道灯坏了", "")
         self.assertIsNotNone(err)
-        self.assertIn("宿舍", err)
+        self.assertIn("楼栋", err)
 
     def test_validate_location_dorm_with_location(self):
         from tools.action_report_issue import validate_location
-        err = validate_location("宿舍灯坏了", "5号楼302")
+        err = validate_location("楼道灯坏了", "3号楼2单元")
         self.assertIsNone(err)
 
     def test_validate_location_exempt(self):
         from tools.action_report_issue import validate_location
-        # Toilets, corridors, playgrounds are exempt from room number requirement
-        err = validate_location("厕所漏水", "")
+        # Outdoor/common areas (广场, 花园) are exempt from location requirement
+        err = validate_location("7号楼前广场积水", "")
         self.assertIsNone(err)
 
     def test_classify_cache_hit(self):
@@ -131,7 +133,7 @@ class TestReportIssue(unittest.TestCase):
         import re
         result = report_issue.invoke({
             "title": "测试上报唯一标题xyz",
-            "category": "校园管理",
+            "category": "社区事务",
             "location": "测试地点",
             "description": "测试",
             "urgency": "普通",
@@ -140,9 +142,9 @@ class TestReportIssue(unittest.TestCase):
         self.assertTrue(re.search(r'#\d+', result))
 
 
-# -- 2. get_campus_pulse — campus pulse query --
+# -- 2. get_community_pulse — community pulse query --
 
-class TestCampusPulse(unittest.TestCase):
+class TestCommunityPulse(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -153,18 +155,18 @@ class TestCampusPulse(unittest.TestCase):
         _cleanup_test_db(cls._db_path)
 
     def test_returns_non_empty_string(self):
-        from tools.query_campus_pulse import get_campus_pulse
-        result = get_campus_pulse.invoke("")
+        from tools.query_community_pulse import get_community_pulse
+        result = get_community_pulse.invoke("")
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 20)
 
     def test_contains_expected_sections(self):
-        from tools.query_campus_pulse import get_campus_pulse
-        result = get_campus_pulse.invoke("")
-        self.assertIn("校园", result)
+        from tools.query_community_pulse import get_community_pulse
+        result = get_community_pulse.invoke("")
+        self.assertIn("社区", result)
 
     def test_generator_produces_valid_text(self):
-        from tools.query_campus_pulse import _generate_pulse_text
+        from tools.query_community_pulse import _generate_pulse_text
         text = _generate_pulse_text()
         self.assertIsInstance(text, str)
         self.assertTrue(len(text) > 50)
@@ -183,19 +185,19 @@ class TestQueryIssues(unittest.TestCase):
         _cleanup_test_db(cls._db_path)
 
     def test_empty_db_returns_no_results_message(self):
-        from tools.query_campus_issues import query_issues
+        from tools.query_community_issues import query_issues
         result = query_issues.invoke({"category": "", "status": "", "limit": 5})
         self.assertIsInstance(result, str)
         # Should indicate no results (DB is empty)
         self.assertTrue("暂无" in result or "安好" in result or "没有" in result)
 
     def test_with_category_filter(self):
-        from tools.query_campus_issues import query_issues
+        from tools.query_community_issues import query_issues
         result = query_issues.invoke({"category": "设施维修", "status": "", "limit": 5})
         self.assertIsInstance(result, str)
 
     def test_with_status_filter(self):
-        from tools.query_campus_issues import query_issues
+        from tools.query_community_issues import query_issues
         result = query_issues.invoke({"category": "", "status": "待处理", "limit": 5})
         self.assertIsInstance(result, str)
 
@@ -213,7 +215,7 @@ class TestGovernanceStats(unittest.TestCase):
         _cleanup_test_db(cls._db_path)
 
     def test_empty_db_shows_zero_state(self):
-        from tools.query_campus_issues import get_governance_stats
+        from tools.query_community_issues import get_governance_stats
         result = get_governance_stats.invoke("")
         self.assertIsInstance(result, str)
         # Empty DB should show "暂无" or "良好"
@@ -221,7 +223,7 @@ class TestGovernanceStats(unittest.TestCase):
 
     def test_after_reporting_shows_data(self):
         from tools.action_report_issue import report_issue
-        from tools.query_campus_issues import get_governance_stats
+        from tools.query_community_issues import get_governance_stats
         report_issue.invoke({
             "title": "测试统计用",
             "category": "设施维修",
@@ -341,7 +343,7 @@ class TestCreateProposal(unittest.TestCase):
         result = create_proposal.invoke({
             "title": "这是一个独特标题用于测试",
             "description": "这是一个详细的提案描述",
-            "category": "校园管理",
+            "category": "社区事务",
         })
         self.assertIn("✅", result)
         self.assertIn("#", result)
@@ -415,12 +417,12 @@ class TestQueryKnowledge(unittest.TestCase):
 
     def test_returns_string_for_query(self):
         from tools.query_knowledge import query_knowledge
-        result = query_knowledge.invoke({"query": "食堂营业时间"})
+        result = query_knowledge.invoke({"query": "助餐点营业时间"})
         self.assertIsInstance(result, str)
 
-    def test_get_school_policy_returns_string(self):
-        from tools.query_knowledge import get_school_policy
-        result = get_school_policy.invoke({"topic": "宿舍管理规定"})
+    def test_get_community_policy_returns_string(self):
+        from tools.query_knowledge import get_community_policy
+        result = get_community_policy.invoke({"topic": "居民公约"})
         self.assertIsInstance(result, str)
 
 
@@ -467,13 +469,13 @@ class TestCollectFeedback(unittest.TestCase):
         _cleanup_test_db(cls._db_path)
 
     def test_empty_topic_returns_error(self):
-        from tools.query_campus_issues import collect_feedback
+        from tools.query_community_issues import collect_feedback
         result = collect_feedback.invoke({"topic": ""})
         self.assertIn("❌", result)
 
     def test_demo_data_for_unknown_topic(self):
-        from tools.query_campus_issues import collect_feedback
-        result = collect_feedback.invoke({"topic": "食堂"})
+        from tools.query_community_issues import collect_feedback
+        result = collect_feedback.invoke({"topic": "停车"})
         self.assertIn("演示数据", result)
 
 

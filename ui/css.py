@@ -30,59 +30,59 @@ GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale
     }
 
     [data-testid="stChatMessage"] {
-        background: var(--c-surface, #fff); border: 1px solid var(--c-border, #ebebeb);
-        padding: 10px 14px; margin: 6px auto 6px 0; max-width: 92%; border-radius: 6px;
+        background: var(--c-surface, #ffffff); border: 1px solid var(--c-border, #e9e5df);
+        padding: 10px 14px; margin: 6px auto 6px 0; max-width: 92%; border-radius: 10px;
     }
     [data-testid="stChatMessage"][aria-label*="user"] {
-        background: var(--c-accent-bg, #f0efff); border-color: var(--c-accent-border, #d2d0f8);
-        border-radius: 6px; margin-left: auto; margin-right: 0; max-width: 85%;
+        background: var(--c-accent-bg, #eef0ff); border-color: var(--c-accent-border, #cfd4f8);
+        border-radius: 10px; margin-left: auto; margin-right: 0; max-width: 85%;
     }
     [data-testid="stChatMessage"][aria-label*="assistant"] {
-        background: var(--c-surface, #fff); border-color: var(--c-border, #ebebeb); border-radius: 6px;
+        background: var(--c-surface, #ffffff); border-color: var(--c-border, #e9e5df); border-radius: 10px;
     }
-    [data-testid="stChatMessage"] img { width: 28px !important; height: 28px !important; border-radius: 4px; }
+    [data-testid="stChatMessage"] img { width: 28px !important; height: 28px !important; border-radius: 6px; }
     [data-testid="stChatMessage"] [data-testid="stCaptionContainer"] {
-        font-size: 0.72em; color: var(--c-text-muted, #a0a0a0); margin-top: 4px;
+        font-size: 0.72em; color: var(--c-text-muted, #9c958a); margin-top: 4px;
     }
 
     .stButton > button {
-        border-radius: 4px !important; font-weight: 500 !important; font-size: 0.8em !important;
-        transition: all 0.15s ease !important; border: 1px solid var(--c-border-visible, #dcdcdc) !important;
+        border-radius: 8px !important; font-weight: 500 !important; font-size: 0.8em !important;
+        transition: all 0.15s ease !important; border: 1px solid var(--c-border-visible, #d8d3cb) !important;
         box-shadow: none !important; min-height: 32px !important;
     }
-    .stButton > button:hover { border-color: var(--c-accent-border, #d2d0f8) !important; box-shadow: none !important; }
-    .stButton > button[kind="primary"] { border-color: transparent !important; background: var(--c-accent, #4f46e5) !important; }
-    .stButton > button[kind="primary"]:hover { background: #4338ca !important; filter: none !important; }
+    .stButton > button:hover { border-color: var(--c-accent-border, #cfd4f8) !important; box-shadow: none !important; }
+    .stButton > button[kind="primary"] { border: none !important; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important; box-shadow: 0 4px 12px rgba(79,70,229,0.28) !important; }
+    .stButton > button[kind="primary"]:hover { background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%) !important; filter: none !important; }
 
     .stRadio [role="radiogroup"] { gap: 6px; }
     .stRadio label {
-        border: 1px solid var(--c-border, #ebebeb); border-radius: 6px;
+        border: 1px solid var(--c-border, #e9e5df); border-radius: 10px;
         padding: 4px 12px; font-size: 0.82em; transition: all 0.15s ease;
     }
-    .stRadio label:hover { border-color: var(--c-accent-border, #d2d0f8); background: var(--c-accent-bg, #f0efff); }
+    .stRadio label:hover { border-color: var(--c-accent-border, #cfd4f8); background: var(--c-accent-bg, #eef0ff); }
 
     .stSelectbox > div > div, .stTextInput > div > div > input, .stTextArea textarea {
-        border-radius: 4px !important; border-color: var(--c-border, #ebebeb) !important;
+        border-radius: 8px !important; border-color: var(--c-border, #e9e5df) !important;
     }
     .stSelectbox > div > div:focus-within,
     .stTextInput > div > div > input:focus,
     .stTextArea textarea:focus {
         box-shadow: 0 0 0 1px rgba(79,70,229,0.15) !important;
-        border-color: var(--c-accent-border, #d2d0f8) !important;
+        border-color: var(--c-accent-border, #cfd4f8) !important;
     }
 
-    .stExpander { border-radius: 6px !important; box-shadow: none !important; border: 1px solid var(--c-border, #ebebeb) !important; }
+    .stExpander { border-radius: 10px !important; box-shadow: none !important; border: 1px solid var(--c-border, #e9e5df) !important; }
     .stTabs [data-baseweb="tab"] { font-size: 0.84em !important; font-weight: 500 !important; padding: 8px 16px !important; }
     .stTabs [data-baseweb="tab"][aria-selected="true"] { color: var(--c-accent, #4f46e5) !important; }
-    hr { border-color: var(--c-border, #ebebeb) !important; margin: 16px 0 !important; border-width: 0.5px !important; }
+    hr { border-color: var(--c-border, #e9e5df) !important; margin: 16px 0 !important; border-width: 0.5px !important; }
 
     [data-testid="stMetric"] {
-        background: var(--c-surface, #fff); border: 1px solid var(--c-border, #ebebeb);
-        border-radius: 6px; padding: 12px 16px; box-shadow: var(--c-shadow-sm, 0 1px 2px rgba(0,0,0,0.04));
+        background: var(--c-surface, #ffffff); border: 1px solid var(--c-border, #e9e5df);
+        border-radius: 10px; padding: 12px 16px; box-shadow: var(--c-shadow-sm, 0 1px 2px rgba(31,29,25,0.05));
     }
-    [data-testid="stVerticalBlockBorderWrapper"] { border-radius: 6px !important; border-color: var(--c-border, #ebebeb) !important; }
-    [data-testid="stToast"] { border-radius: 6px !important; font-size: 0.88em !important; }
-    [data-testid="stStatus"] { border-radius: 6px !important; border: 1px solid var(--c-border, #ebebeb) !important; }
+    [data-testid="stVerticalBlockBorderWrapper"] { border-radius: 10px !important; border-color: var(--c-border, #e9e5df) !important; }
+    [data-testid="stToast"] { border-radius: 10px !important; font-size: 0.88em !important; }
+    [data-testid="stStatus"] { border-radius: 10px !important; border: 1px solid var(--c-border, #e9e5df) !important; }
 
     @media (min-width: 1025px) {
         .block-container { max-width: 88rem !important; padding-left: 2.5rem !important; padding-right: 2.5rem !important; }

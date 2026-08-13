@@ -3,7 +3,7 @@
 
 Audits four dimensions (issue management, proposal engagement, citizen
 participation, hotspots). Scoring: resolution rate baseline 80%, emergency
-penalty 5 pts/unresolved urgent (cap 25), staleness penalty 3 pts/>7d pending
+penalty 5 pts/unresolved urgent (cap 25), staleness penalty 3 pts/SLA breach
 (cap 20), unresponded proposal penalty 8 pts (cap 40), adoption bonus, and
 participation floor.
 """
@@ -26,7 +26,7 @@ def run_governance_audit() -> str:
         with get_db() as conn:
             # ── 1. Issue Management ──
             issue_summary = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM campus_issues GROUP BY status"
+                "SELECT status, COUNT(*) as cnt FROM community_issues GROUP BY status"
             ).fetchall()
             total_i = sum(r["cnt"] for r in issue_summary)
             by_status = {r["status"]: r["cnt"] for r in issue_summary}
@@ -34,17 +34,10 @@ def run_governance_audit() -> str:
             processing = by_status.get("处理中", 0)
             resolved = by_status.get("已解决", 0)
 
-            urgent = conn.execute(
-                "SELECT COUNT(*) as cnt FROM campus_issues "
-                "WHERE urgency='紧急' AND status != '已解决'"
-            ).fetchone()
-            urgent_unresolved = urgent["cnt"] if urgent else 0
-
-            stale = conn.execute(
-                "SELECT COUNT(*) as cnt FROM campus_issues "
-                "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-            ).fetchone()
-            stale_count = stale["cnt"] if stale else 0
+            from data.db_sla import get_sla_summary
+            _sla = get_sla_summary()
+            urgent_unresolved = _sla.get("urgent_pending", 0)
+            stale_count = _sla.get("total_overdue", 0)
 
             issue_score = 100.0
             if total_i > 0:
@@ -63,7 +56,7 @@ def run_governance_audit() -> str:
             if avg_resolution_days is not None:
                 lines.append(f"   ⏱️ 平均解决时间：{avg_resolution_days} 天")
             if stale_count > 0:
-                lines.append(f"   ⚠️ 积压 {stale_count} 件超过7天未处理")
+                lines.append(f"   ⚠️ 积压 {stale_count} 件超时未处理")
 
             # ── 2. Proposal Engagement ──
             prop_summary = conn.execute(
@@ -102,7 +95,7 @@ def run_governance_audit() -> str:
             total_topics = topic_rows["cnt"] if topic_rows else 0
             total_participants = (topic_rows["total_parts"] or 0) if topic_rows else 0
             unique_authors_row = conn.execute(
-                "SELECT COUNT(DISTINCT author) as cnt FROM campus_issues"
+                "SELECT COUNT(DISTINCT author) as cnt FROM community_issues"
             ).fetchone()
             unique_authors = unique_authors_row["cnt"] if unique_authors_row else 0
 
@@ -123,7 +116,7 @@ def run_governance_audit() -> str:
 
             # ── 4. Hotspots ──
             cat_rows = conn.execute(
-                "SELECT category, COUNT(*) as cnt FROM campus_issues "
+                "SELECT category, COUNT(*) as cnt FROM community_issues "
                 "WHERE status != '已解决' GROUP BY category ORDER BY cnt DESC LIMIT 3"
             ).fetchall()
             if cat_rows:

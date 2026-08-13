@@ -101,8 +101,8 @@ CSS = """<style>
 </style>"""
 
 TASKS = [
-    (os.path.join(BASE, "创意说明书.md"), "校园先知 · 创意说明书"),
-    (os.path.join(BASE, "技术实现报告.md"), "校园先知 · 技术实现报告"),
+    (os.path.join(BASE, "创意说明书.md"), "社区先知 · 创意说明书"),
+    (os.path.join(BASE, "技术实现报告.md"), "社区先知 · 技术实现报告"),
 ]
 
 # Regex for table alignment separator row: e.g. |---|:---:|----|
@@ -295,13 +295,13 @@ def build(md_file, title):
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{title} — 校园先知 CampusInsight Agent</title>
+<title>{title} — 社区先知 CommunityInsight Agent</title>
 {CSS}
 </head>
 <body>
 {body}
 <div class="footer">
-校园先知 CampusInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
 作者：步承泽
 </div>
 </body>

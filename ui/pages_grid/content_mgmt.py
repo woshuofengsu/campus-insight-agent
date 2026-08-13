@@ -1,19 +1,18 @@
-# ui/pages_teacher/content_mgmt.py
+# ui/pages_grid/content_mgmt.py
 """📢 内容发布 — 发布通知、创建议题、管理已发布内容."""
 import streamlit as st
-from ui.components import TOKEN
+from ui.guard import require_role
+
+require_role("grid")
+
+from ui.components import TOKEN, page_header
 from ui.cache import cached_knowledge_base, cached_active_topics, invalidate_content
 from data.database import get_db, create_topic, close_topic
 from data.db_notifications import broadcast_notification
 import logging
 _log = logging.getLogger(__name__)
 
-st.markdown(
-    f'<span style="font-size:1.2em;font-weight:800;color:{TOKEN["text"]};">'
-    f'📢 内容发布</span>',
-    unsafe_allow_html=True,
-)
-st.caption("发布校园通知和讨论议题，管理已发布的内容。")
+page_header("📢 内容发布", "发布社区通知和讨论议题，管理已发布的内容。")
 
 # ── Persistent success feedback (survives st.rerun) ──
 feedback = st.session_state.pop("_content_pub_feedback", None)
@@ -58,7 +57,7 @@ if pub_tab == "📝 发布通知":
             invalidate_content()
             n = broadcast_notification("notice", f"📢 {notice_title}", notice_content[:150])
             st.session_state["_content_pub_feedback"] = \
-                f"✅ 通知「{notice_title}」已发布，已推送给 {n} 名学生"
+                f"✅ 通知「{notice_title}」已发布，已推送给 {n} 名居民"
             for k in ["_notice_title", "_notice_content", "_notice_keywords", "_notice_cat"]:
                 st.session_state.pop(k, None)
             st.rerun()
@@ -69,7 +68,7 @@ else:
     topic_title = st.text_input("议题标题", placeholder="输入议题标题...", key="_topic_title")
     topic_cat = st.selectbox(
         "分类",
-        ["校园管理", "教学事务", "生活服务", "学生权益", "其他"],
+        ["社区事务", "社区活动", "生活服务", "居民权益", "其他"],
         key="_topic_cat",
     )
     topic_desc = st.text_area("议题简介", placeholder="描述议题背景和讨论要点...", height=150, key="_topic_desc")
@@ -84,7 +83,7 @@ else:
             invalidate_content()
             n = broadcast_notification("topic", f"💬 新议题：{topic_title}", topic_desc[:150])
             st.session_state["_content_pub_feedback"] = \
-                f"✅ 议题「{topic_title}」已创建（#{tid}），已推送给 {n} 名学生"
+                f"✅ 议题「{topic_title}」已创建（#{tid}），已推送给 {n} 名居民"
             for k in ["_topic_title", "_topic_desc", "_topic_cat"]:
                 st.session_state.pop(k, None)
             st.rerun()

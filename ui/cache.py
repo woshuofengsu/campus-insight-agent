@@ -9,7 +9,7 @@ from data.database import (
     get_proposals,
     get_proposals_stats,
     get_active_topics,
-    get_campus_events,
+    get_community_events,
     compute_health_score,
     get_opinions_by_topic,
     get_knowledge_base,
@@ -51,8 +51,8 @@ def cached_active_topics(limit=20):
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def cached_campus_events(limit=10):
-    return get_campus_events(limit=limit)
+def cached_community_events(limit=10):
+    return get_community_events(limit=limit)
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -126,7 +126,7 @@ def invalidate_content():
     """Clear knowledge-base, topic, and event caches (content publishing)."""
     cached_knowledge_base.clear()
     cached_active_topics.clear()
-    cached_campus_events.clear()       # 通知/事件类内容发布后需要刷新
+    cached_community_events.clear()       # 通知/事件类内容发布后需要刷新
     cached_feedback_stats.clear()      # 反馈汇总可能关联新议题
 
 

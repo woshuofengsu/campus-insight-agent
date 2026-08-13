@@ -1,15 +1,33 @@
 # data/db_governance.py
-"""Governance tables — campus_issues, proposals, discussion_topics, topic_opinions."""
+"""Governance tables — community_issues, proposals, discussion_topics, topic_opinions."""
+import hashlib
 import logging
-from data.db_core import get_db, resolve_author
+from data.db_core import get_db
 
 _log = logging.getLogger(__name__)
+
+# 匿名上报的伪名盐值——与密码盐无关，仅用于生成稳定的匿名标识
+_ANON_SALT = "community-insight-anon-2026"
+
+
+def anonymized_author(identity: str) -> str:
+    """Generate a stable pseudonymous author label for anonymous reports.
+
+    Hashes the reporter's identity (reporter_id / resident_id) so the public
+    author field never leaks the real identity, while the same reporter's
+    anonymous reports still share one consistent label — traceable for the
+    closed loop, unlinkable to the real person by other residents.
+    """
+    if not identity:
+        return "匿名居民"
+    digest = hashlib.sha256(f"{_ANON_SALT}:{identity}".encode("utf-8")).hexdigest()[:8]
+    return f"匿名居民#{digest}"
 
 
 def _resolve_author(author: str = "") -> str:
     """Auto-fill author from current user profile if empty.
 
-    Priority: student_id → school+grade → name → login_id fallback → "匿名"
+    Priority: resident_id → community+building → name → login_id fallback → "匿名"
     Must match ui.components.resolve_author() logic so that issues reported
     via the Agent are visible on the "我的" page.
     """
@@ -18,13 +36,13 @@ def _resolve_author(author: str = "") -> str:
     try:
         from data.db_user import get_current_user
         profile = get_current_user()
-        sid = (profile.get("student_id") or "").strip()
-        if sid:
-            return sid
-        school = (profile.get("school") or "").strip()
-        grade = (profile.get("grade") or "").strip()
-        if school:
-            return f"{school}{grade}" if grade else school
+        rid = (profile.get("resident_id") or "").strip()
+        if rid:
+            return rid
+        community = (profile.get("community") or "").strip()
+        building = (profile.get("building") or "").strip()
+        if community:
+            return f"{community}{building}" if building else community
         name = (profile.get("name") or "").strip()
         if name:
             return name
@@ -48,20 +66,56 @@ def _resolve_author(author: str = "") -> str:
     return "匿名"
 
 
-# ── Campus Issues ──
+# ── Community Issues ──
+
+def _resolve_reporter_id() -> int | None:
+    """Resolve the current user's id for reporter tracking (privacy-safe).
+
+    Kept separate from author display: reporter_id enables closed-loop
+    notification even when the author field is anonymized.
+    """
+    try:
+        from data.db_user import get_current_user
+        profile = get_current_user()
+        return profile.get("id")
+    except Exception:  # log and skip
+        _log.debug("_resolve_reporter_id: failed to resolve current user", exc_info=True)
+        return None
+
 
 def report_issue(title: str, category: str, location: str = "",
                  description: str = "", urgency: str = "普通",
-                 author: str = "") -> int:
-    """Report a campus issue. Returns the new issue ID."""
+                 author: str = "", suggested_category: str = "",
+                 reporter_id: int | None = None,
+                 anonymous: bool = False) -> int:
+    """Report a community issue. Returns the new issue ID.
+
+    Args:
+        suggested_category: the AI's raw classification (stored for grid-manager review)
+        reporter_id: submitting user's id — auto-resolved if omitted
+        anonymous: if True, the public author field stores a stable pseudonym
+            (anonymized_author) instead of the real identity. The reporter_id is
+            still stored separately for closed-loop notification.
+    """
+    if reporter_id is None:
+        reporter_id = _resolve_reporter_id()
     with get_db() as conn:
-        author = _resolve_author(author)
+        if anonymous:
+            author = anonymized_author(f"user:{reporter_id}" if reporter_id else "")
+        else:
+            author = _resolve_author(author)
         cur = conn.execute(
-            "INSERT INTO campus_issues (title, category, location, description, urgency, author) VALUES (?,?,?,?,?,?)",
-            (title, category, location, description, urgency, author),
+            "INSERT INTO community_issues "
+            "(title, category, location, description, urgency, author, "
+            " suggested_category, reporter_id) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (title, category, location, description, urgency, author,
+             suggested_category, reporter_id),
         )
         conn.commit()
         iid = cur.lastrowid
+    _log.info("report_issue #%d created (reporter_id=%s, category=%s, suggested=%s)",
+              iid, reporter_id, category, suggested_category or category)
     # Log activity
     try:
         from data.db_notifications import log_activity
@@ -69,14 +123,20 @@ def report_issue(title: str, category: str, location: str = "",
                      f"{category} · {location}" if location else category)
     except Exception:  # log and skip
         _log.debug("log_activity failed for report_issue #%d (non-critical)", iid)
+    # Cross-session event memory (personalization)
+    try:
+        from data.db_memory import remember_event
+        remember_event(reporter_id, "report_issue", f"上报了工单 #{iid}「{title[:20]}」")
+    except Exception:
+        _log.debug("remember_event failed for report_issue #%d", iid)
     return iid
 
 
 def get_issues(category: str | None = None, status: str | None = None,
                urgency: str | None = None, limit: int = 20) -> list[dict]:
-    """Query campus issues with optional filters."""
+    """Query community issues with optional filters."""
     with get_db() as conn:
-        query = "SELECT * FROM campus_issues WHERE 1=1"
+        query = "SELECT * FROM community_issues WHERE 1=1"
         params: list = []
         if category:
             query += " AND category = ?"
@@ -97,14 +157,14 @@ def get_issues_stats() -> dict:
     """Get issue statistics for dashboard: counts by category and status."""
     with get_db() as conn:
         by_category = conn.execute(
-            "SELECT category, COUNT(*) as cnt FROM campus_issues GROUP BY category"
+            "SELECT category, COUNT(*) as cnt FROM community_issues GROUP BY category"
         ).fetchall()
         by_status = conn.execute(
-            "SELECT status, COUNT(*) as cnt FROM campus_issues GROUP BY status"
+            "SELECT status, COUNT(*) as cnt FROM community_issues GROUP BY status"
         ).fetchall()
-        total = conn.execute("SELECT COUNT(*) as cnt FROM campus_issues").fetchone()
+        total = conn.execute("SELECT COUNT(*) as cnt FROM community_issues").fetchone()
         today_new = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE date(reported_at) = date('now', 'localtime')"
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE date(reported_at, 'localtime') = date('now', 'localtime')"
         ).fetchone()
         return {
             "total": total["cnt"] if total else 0,
@@ -118,8 +178,28 @@ def get_my_issues(author: str, limit: int = 50) -> list[dict]:
     """Get issues reported by a specific author."""
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM campus_issues WHERE author = ? ORDER BY reported_at DESC LIMIT ?",
+            "SELECT * FROM community_issues WHERE author = ? ORDER BY reported_at DESC LIMIT ?",
             (author, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_my_anonymous_issues(reporter_id: int, limit: int = 50) -> list[dict]:
+    """Get the caller's own anonymous issues, resolved by reporter_id.
+
+    Anonymous issues store a pseudonymous author (匿名居民#hash), so the resident
+    cannot find them via the normal author-string matching. This queries by
+    reporter_id instead — returning only the caller's own anonymous issues without
+    exposing any real identity to other residents.
+    """
+    if not reporter_id:
+        return []
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM community_issues WHERE reporter_id = ? "
+            "AND (author = '匿名' OR author LIKE '匿名居民#%') "
+            "ORDER BY reported_at DESC LIMIT ?",
+            (reporter_id, limit),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -138,10 +218,10 @@ def get_my_stats(author: str) -> dict:
     """Get participation stats for a specific author."""
     with get_db() as conn:
         total_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE author = ?", (author,),
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE author = ?", (author,),
         ).fetchone()
         resolved_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE author = ? AND status = '已解决'", (author,),
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE author = ? AND status = '已解决'", (author,),
         ).fetchone()
         total_proposals = conn.execute(
             "SELECT COUNT(*) as cnt FROM proposals WHERE author = ?", (author,),
@@ -158,40 +238,45 @@ def get_my_stats(author: str) -> dict:
 
 
 def update_issue_status(issue_id: int, status: str, actor: str = "",
-                       processing_note: str = "", assignee: str = "") -> None:
-    """Update the status of a campus issue. Notifies reporter + logs activity.
+                       processing_note: str = "", assignee: str = "",
+                       assignee_id: int | None = None) -> None:
+    """Update the status of a community issue. Notifies reporter + logs activity.
 
     Args:
         issue_id: the issue to update
         status: new status (待处理/处理中/已解决)
         actor: who performed the action (for activity log)
-        processing_note: optional note from the teacher about the resolution/action
-        assignee: optional assignee name (who is handling this issue)
+        processing_note: optional note from the grid about the resolution/action
+        assignee: optional assignee display name (who is handling this issue)
+        assignee_id: optional assignee user id — the stable key for "my todo" filtering
     """
     with get_db() as conn:
         # Fetch issue info before update for notification + activity
         issue = conn.execute(
-            "SELECT title, author, category, location FROM campus_issues WHERE id = ?",
+            "SELECT title, author, category, location FROM community_issues WHERE id = ?",
             (issue_id,),
         ).fetchone()
 
         if status == "已解决":
             conn.execute(
-                "UPDATE campus_issues SET status = ?, resolved_at = CURRENT_TIMESTAMP, "
+                "UPDATE community_issues SET status = ?, resolved_at = CURRENT_TIMESTAMP, "
+                "satisfaction = '', satisfaction_reason = '', "
                 "processing_note = CASE WHEN ? != '' THEN ? ELSE processing_note END, "
-                "assignee = CASE WHEN ? != '' THEN ? ELSE assignee END "
+                "assignee = CASE WHEN ? != '' THEN ? ELSE assignee END, "
+                "assignee_id = CASE WHEN ? IS NOT NULL THEN ? ELSE assignee_id END "
                 "WHERE id = ?",
                 (status, processing_note, processing_note,
-                 assignee, assignee, issue_id),
+                 assignee, assignee, assignee_id, assignee_id, issue_id),
             )
         else:
             conn.execute(
-                "UPDATE campus_issues SET status = ?, resolved_at = NULL, "
+                "UPDATE community_issues SET status = ?, resolved_at = NULL, "
                 "processing_note = CASE WHEN ? != '' THEN ? ELSE processing_note END, "
-                "assignee = CASE WHEN ? != '' THEN ? ELSE assignee END "
+                "assignee = CASE WHEN ? != '' THEN ? ELSE assignee END, "
+                "assignee_id = CASE WHEN ? IS NOT NULL THEN ? ELSE assignee_id END "
                 "WHERE id = ?",
                 (status, processing_note, processing_note,
-                 assignee, assignee, issue_id),
+                 assignee, assignee, assignee_id, assignee_id, issue_id),
             )
         conn.commit()
 
@@ -206,7 +291,7 @@ def update_issue_status(issue_id: int, status: str, actor: str = "",
                 "待处理": "重新打开",
             }
             log_activity(
-                actor or "教师", action_map.get(status, "更新工单"),
+                actor or "网格员", action_map.get(status, "更新工单"),
                 "issue", issue_id, issue_title,
                 f"{issue['category']} · {issue['location']}" if issue["location"] else issue["category"],
             )
@@ -214,16 +299,143 @@ def update_issue_status(issue_id: int, status: str, actor: str = "",
             _log.debug("notify/log_activity failed for issue #%d status change (non-critical)", issue_id)
 
 
+def set_satisfaction(issue_id: int, value: str, reason: str = "",
+                     reopen_on_dissatisfied: bool = True) -> str:
+    """Record a resident's satisfaction for a resolved issue.
+
+    Args:
+        value: "满意" | "不满意"
+        reason: optional free-text reason (especially for "不满意"), stored and
+            surfaced to the grid manager so dissatisfaction is actionable.
+        reopen_on_dissatisfied: if "不满意", move the issue to "待复核" for the
+            grid manager to confirm/驳回 (no longer auto-reopens unilaterally).
+
+    Returns the final status ("已解决" if satisfied, "待复核" if dissatisfied).
+    """
+    value = value if value in ("满意", "不满意") else "满意"
+    reason = (reason or "").strip()
+    with get_db() as conn:
+        if value == "不满意" and reopen_on_dissatisfied:
+            # 进入待复核，由网格员确认是否重开（堵住居民单方面刷单）
+            conn.execute(
+                "UPDATE community_issues SET satisfaction = ?, satisfaction_reason = ?, "
+                "status = '待复核' WHERE id = ?",
+                (value, reason, issue_id),
+            )
+            final_status = "待复核"
+        else:
+            conn.execute(
+                "UPDATE community_issues SET satisfaction = ?, satisfaction_reason = ? WHERE id = ?",
+                (value, reason, issue_id),
+            )
+            final_status = "已解决"
+        conn.commit()
+    _log.info("set_satisfaction #%d -> %s (reason=%r, status=%s)",
+              issue_id, value, reason, final_status)
+    # Cross-session event memory (personalization)
+    try:
+        from data.db_memory import remember_event
+        with get_db() as conn:
+            _row = conn.execute(
+                "SELECT reporter_id FROM community_issues WHERE id = ?", (issue_id,)
+            ).fetchone()
+        if _row and _row["reporter_id"]:
+            remember_event(_row["reporter_id"], "satisfaction", f"对工单 #{issue_id} 评价为{value}")
+    except Exception:
+        _log.debug("remember_event failed for set_satisfaction #%d", issue_id)
+    return final_status
+
+
+def review_dissatisfaction(issue_id: int, reopen: bool) -> str:
+    """Grid manager reviews a resident's "不满意" rating.
+
+    reopen=True  → 确认重开（status='待处理'，保留不满意原因供追踪）。
+    reopen=False → 驳回（status='已解决'，保留评价但不重开）。
+
+    Returns the resulting status.
+    """
+    new_status = "待处理" if reopen else "已解决"
+    with get_db() as conn:
+        if reopen:
+            conn.execute(
+                "UPDATE community_issues SET status = '待处理', resolved_at = NULL WHERE id = ?",
+                (issue_id,),
+            )
+        else:
+            conn.execute(
+                "UPDATE community_issues SET status = '已解决', resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (issue_id,),
+            )
+        conn.commit()
+    _log.info("review_dissatisfaction #%d -> %s (reopen=%s)", issue_id, new_status, reopen)
+    try:
+        from data.db_notifications import notify_issue_status_change, log_activity
+        notify_issue_status_change(issue_id, new_status)
+        log_activity("网格员", "复核满意度" if reopen else "驳回不满意",
+                     "issue", issue_id, "", new_status)
+    except Exception:
+        _log.debug("notify/log_activity failed for review_dissatisfaction #%d", issue_id)
+    return new_status
+
+
+def get_satisfaction_stats() -> dict:
+    """Aggregate satisfaction across resolved issues (for grid-manager dashboard)."""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT "
+                "SUM(CASE WHEN satisfaction = '满意' THEN 1 ELSE 0 END) AS satisfied, "
+                "SUM(CASE WHEN satisfaction = '不满意' THEN 1 ELSE 0 END) AS dissatisfied "
+                "FROM community_issues WHERE satisfaction != ''"
+            ).fetchone()
+            satisfied = row["satisfied"] or 0
+            dissatisfied = row["dissatisfied"] or 0
+            total = satisfied + dissatisfied
+            return {
+                "satisfied": satisfied,
+                "dissatisfied": dissatisfied,
+                "total": total,
+                "rate": round(satisfied / total * 100, 1) if total else None,
+            }
+    except Exception:
+        _log.warning("get_satisfaction_stats failed", exc_info=True)
+        return {"satisfied": 0, "dissatisfied": 0, "total": 0, "rate": None}
+
+
+def get_dissatisfaction_reasons(limit: int = 10) -> list[dict]:
+    """Return recently-dissatisfied issues with their reasons (for grid workbench).
+
+    Surfaces the free-text reason residents leave on a 「不满意」 rating, so the
+    grid manager can act on the concrete cause instead of just the count.
+    """
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT id, title, category, author, satisfaction_reason, resolved_at "
+                "FROM community_issues "
+                "WHERE satisfaction = '不满意' "
+                "ORDER BY resolved_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        _log.warning("get_dissatisfaction_reasons failed", exc_info=True)
+        return []
+
+
 # ── Proposals ──
 
 def create_proposal(title: str, description: str, category: str = "其他",
-                     author: str = "") -> int:
-    """Create a new campus proposal. Returns the new proposal ID."""
+                     author: str = "", reporter_id: int | None = None) -> int:
+    """Create a new community proposal. Returns the new proposal ID."""
+    if reporter_id is None:
+        reporter_id = _resolve_reporter_id()
     with get_db() as conn:
         author = _resolve_author(author)
         cur = conn.execute(
-            "INSERT INTO proposals (title, description, category, author) VALUES (?,?,?,?)",
-            (title, description, category, author),
+            "INSERT INTO proposals (title, description, category, author, reporter_id) "
+            "VALUES (?,?,?,?,?)",
+            (title, description, category, author, reporter_id),
         )
         conn.commit()
         pid = cur.lastrowid
@@ -268,7 +480,7 @@ def support_proposal(proposal_id: int, actor: str = "") -> int:
         new_count = row["supporter_count"] if row else 0
     try:
         from data.db_notifications import log_activity
-        log_activity(actor or "同学", "附议提案", "proposal", proposal_id,
+        log_activity(actor or "居民", "附议提案", "proposal", proposal_id,
                      row["title"] if row else "", f"共 {new_count} 人附议")
     except Exception:  # log and skip
         _log.debug("log_activity failed for support_proposal #%d (non-critical)", proposal_id)
@@ -304,7 +516,7 @@ def update_proposal_status(proposal_id: int, status: str,
                 "已回应": "回复提案", "已采纳": "采纳提案", "已实施": "实施提案",
             }
             log_activity(
-                actor or "教师", action_map.get(status, "更新提案"),
+                actor or "网格员", action_map.get(status, "更新提案"),
                 "proposal", proposal_id, prop["title"], prop["category"],
             )
         except Exception:  # log and skip
@@ -378,7 +590,7 @@ def increment_topic_participants(topic_id: int) -> int:
 
 # ── Topic Opinions ──
 
-def add_opinion(topic_id: int, content: str, participant_label: str = "匿名学生") -> int:
+def add_opinion(topic_id: int, content: str, participant_label: str = "匿名居民") -> int:
     """Add an opinion to a discussion topic. Returns the opinion ID."""
     with get_db() as conn:
         cur = conn.execute(

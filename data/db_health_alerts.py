@@ -1,5 +1,5 @@
 # data/db_health_alerts.py
-"""🏥 疾病防治模块 — 季节模型 + 天气关联 + 校园密度 + 风险评分.
+"""🏥 疾病防治模块 — 季节模型 + 天气关联 + 社区人流密度 + 风险评分.
 
   数据来源与模拟说明 / Data Provenance:
   ─────────────────────────────────────────────────────────────────
@@ -9,7 +9,7 @@
        中国北方地区季节性传染病流行趋势，提取各月份疾病基线风险。
     2. 天气关联 — 温度骤降、湿度变化、空气质量事件与呼吸道/胃肠道疾病
        发病率的已知统计相关性。
-    3. 校园密度 — 考试周、开学季等人员聚集场景下的传播风险推断。
+    3. 社区人流密度 — 流感高发季、换季时节等人员聚集场景下的传播风险推断。
   综合风险评分 = 季节基线 × 天气修正 + 密度修正 → 4级风险等级。
 
   ⚠️ 重要提示：本模块输出仅供参考，不构成医疗建议。
@@ -21,7 +21,7 @@
 Architecture:
   SeasonModel       — month-based disease risk priors (northern China)
   WeatherCorrelator — temperature-drop / humidity triggers
-  CampusDensity     — exam weeks, event density → transmission risk
+  CommunityDensity     — exam weeks, event density → transmission risk
   HealthRiskEngine  — aggregates above into 4-tier risk levels
 
 Usage:
@@ -45,24 +45,24 @@ _SEASON_DISEASES = {
     # 全年基础风险 — 任何时候都需要关注
     (1, 12): [
         ("甲型流感", 35, "高热、咳嗽、咽痛、全身酸痛、乏力",
-         "秋冬高发，建议接种流感疫苗。教室每日通风，出现症状及时就医并佩戴口罩"),
+         "秋冬高发，建议接种流感疫苗。单元楼每日通风，出现症状及时就医并佩戴口罩"),
         ("乙型流感", 25, "发热、咳嗽、咽痛、肌肉酸痛、乏力",
          "症状通常较甲流轻，但仍需注意休息、多饮水、及时就医"),
     ],
     # 冬春季高发 (11月-3月)
     (11, 3): [
         ("甲型流感·高峰", 75, "高热、咳嗽、咽痛、全身酸痛、乏力",
-         "流感高峰期！接种疫苗是最佳预防手段，教室每日通风，出现症状及时就医"),
+         "流感高峰期！接种疫苗是最佳预防手段，单元楼每日通风，出现症状及时就医"),
         ("乙型流感·高峰", 45, "发热、咳嗽、咽痛、肌肉酸痛、乏力",
          "乙流高峰通常略晚于甲流，注意休息、多饮水、及时就医"),
         ("呼吸道感染", 60, "鼻塞、流涕、咳嗽、低热",
          "注意保暖，多喝温水，避免长时间待在密闭空调房"),
         ("诺如病毒感染", 40, "呕吐、腹泻、腹痛",
-         "注意手部卫生，不共用餐具，食堂加强食品安全管理"),
+         "注意手部卫生，不共用餐具，助餐点加强食品安全管理"),
     ],
     (3, 5): [
         ("过敏性鼻炎", 55, "打喷嚏、流清涕、鼻痒、眼痒",
-         "花粉季减少户外活动，关闭宿舍窗户，必要时使用抗过敏药物"),
+         "花粉季减少户外活动，关闭单元楼窗户，必要时使用抗过敏药物"),
         ("过敏性哮喘", 20, "喘息、胸闷、咳嗽",
          "随身携带药物，避免接触花粉和粉尘，出现喘息及时就医"),
         ("水痘", 30, "发热、皮疹、瘙痒",
@@ -70,15 +70,15 @@ _SEASON_DISEASES = {
     ],
     (6, 9): [
         ("急性胃肠炎", 50, "恶心、呕吐、腹痛、腹泻",
-         "注意饮食卫生，不食用来历不明外卖，食堂加强冷链管理"),
+         "注意饮食卫生，不食用来历不明外卖，助餐点加强冷链管理"),
         ("中暑", 45, "头晕、恶心、大量出汗或皮肤干热",
-         "避免高温时段户外活动，多饮水，宿舍保持通风"),
+         "避免高温时段户外活动，多饮水，单元楼保持通风"),
         ("登革热", 10, "高热、头痛、肌肉关节痛、皮疹",
-         "清理积水、防蚊灭蚊，南方校区需特别注意"),
+         "清理积水、防蚊灭蚊，南方小区需特别注意"),
     ],
     (9, 11): [
         ("季节性流感（秋冬季）", 65, "含甲型/乙型流感，突发高热、咳嗽、咽痛、肌肉酸痛",
-         "接种流感疫苗是最佳预防手段，教室每日通风30分钟以上"),
+         "接种流感疫苗是最佳预防手段，单元楼每日通风30分钟以上"),
         ("普通感冒", 50, "鼻塞、流涕、打喷嚏、轻微咽痛",
          "注意天气变化及时增减衣物，保持充足睡眠增强免疫力"),
     ],
@@ -177,15 +177,15 @@ def _get_weather_risk_modifiers() -> dict:
             "breakdown": modifiers}
 
 
-# -- 3. Campus Density Model --
+# -- 3. Community Density Model --
 
-def _get_campus_density_risk() -> dict:
-    """Estimate campus crowding → disease transmission risk.
+def _get_community_density_risk() -> dict:
+    """Estimate community crowding → disease transmission risk.
 
     Two-layer model:
       1. Time-aware: hour-of-day × day-of-week → zone-based density
-         (teaching buildings, canteens, library, dorms)
-      2. Calendar events: exam periods, semester start, holiday returns
+         (unit buildings, meal points, activity rooms)
+      2. Calendar events: seasonal peaks, transitions, holiday returns
     """
     now = datetime.now()
     month = now.month
@@ -200,104 +200,104 @@ def _get_campus_density_risk() -> dict:
     # -- Layer 1: Time-of-day × Day-of-week density --
 
     if is_weekend:
-        # Weekend: relaxed but dorms + library still active
+        # Weekend: relaxed but units + activity rooms still active
         if 9 <= hour < 12:
             density_score += 5
-            reasons.append("周末上午，图书馆/自习室中等密集")
+            reasons.append("周末上午，活动室中等密集")
         elif 12 <= hour < 13:
             density_score += 6
-            reasons.append("周末午餐时段，食堂中等密集")
+            reasons.append("周末午餐时段，助餐点中等密集")
         elif 13 <= hour < 18:
             density_score += 4
-            reasons.append("周末下午，校园整体人流分散")
+            reasons.append("周末下午，小区整体人流分散")
         elif 18 <= hour < 19:
             density_score += 5
             reasons.append("周末晚餐时段")
         elif 19 <= hour < 22:
             density_score += 5
-            reasons.append("周末晚间，宿舍区活跃")
+            reasons.append("周末晚间，楼栋区活跃")
         else:
             density_score += 2
-            reasons.append("周末深夜，校园低密度")
+            reasons.append("周末深夜，小区低密度")
     else:
-        # Weekday: follows class schedule
+        # Weekday: follows daily commute rhythm
         if 7 <= hour < 8:
             density_score += 8
-            reasons.append("早高峰，教学楼/食堂人流集中")
+            reasons.append("早高峰，单元楼/助餐点人流集中")
         elif 8 <= hour < 12:
             density_score += 12
-            reasons.append("上午课程时段，教学楼人员密集")
+            reasons.append("上午时段，单元楼人员密集")
         elif 12 <= hour < 13:
             density_score += 10
-            reasons.append("午餐高峰，食堂人员高度密集")
+            reasons.append("午餐高峰，助餐点人员高度密集")
         elif 13 <= hour < 14:
             density_score += 6
             reasons.append("午休时段，人员分散")
         elif 14 <= hour < 17:
             density_score += 12
-            reasons.append("下午课程时段，教学楼人员密集")
+            reasons.append("下午时段，单元楼人员密集")
         elif 17 <= hour < 18:
             density_score += 8
-            reasons.append("课间活动，校园人流中等")
+            reasons.append("休闲活动，社区人流中等")
         elif 18 <= hour < 19:
             density_score += 10
-            reasons.append("晚餐高峰，食堂人员密集")
+            reasons.append("晚餐高峰，助餐点人员密集")
         elif 19 <= hour < 22:
             density_score += 10
-            reasons.append("晚间自习，图书馆/教室中等密集")
+            reasons.append("晚间休闲活动，活动室/单元楼中等密集")
         elif 22 <= hour < 24:
             density_score += 6
-            reasons.append("晚间，宿舍区活跃")
+            reasons.append("晚间，楼栋区活跃")
         else:
             density_score += 2
-            reasons.append("深夜，校园低密度")
+            reasons.append("深夜，小区低密度")
 
     # Weekday bonus for known high-traffic times
     if not is_weekend:
-        # Monday morning = class start, full campus
+        # Monday morning rush, full community
         if weekday == 0 and 7 <= hour < 12:
             density_score += 3
-            reasons.append("周一早高峰，全校满课")
+            reasons.append("周一早高峰，全小区人流集中")
 
-    # -- Layer 2: Calendar events (exam periods, etc.) --
+    # -- Layer 2: Calendar events (seasonal peaks, etc.) --
 
-    # Exam periods (approximate for Chinese universities)
-    exam_windows = [
-        ((12, 25), (1, 10)),   # fall semester finals
-        ((6, 20), (7, 5)),     # spring semester finals
+    # Seasonal crowding peaks (winter flu / summer transition)
+    peak_windows = [
+        ((12, 25), (1, 10)),   # winter peak
+        ((6, 20), (7, 5)),     # summer peak
     ]
-    for (sm, sd), (em, ed) in exam_windows:
+    for (sm, sd), (em, ed) in peak_windows:
         if (month == sm and day >= sd) or (month == em and day <= ed):
             density_score += 15
-            reasons.append("考试周，图书馆/教室人员高度密集")
+            reasons.append("流感高发季，活动室/单元楼人员高度密集")
             break
 
-    # Pre-exam crunch (2 weeks before exams)
-    pre_exam_windows = [
-        ((12, 10), (1, 10)),   # fall pre+exam
-        ((6, 5), (7, 5)),      # spring pre+exam
+    # Pre-peak buildup (2 weeks before seasonal peak)
+    pre_peak_windows = [
+        ((12, 10), (1, 10)),   # winter pre+peak
+        ((6, 5), (7, 5)),      # summer pre+peak
     ]
-    in_exam = False
-    for (sm, sd), (em, ed) in exam_windows:
+    in_peak = False
+    for (sm, sd), (em, ed) in peak_windows:
         if (month == sm and day >= sd) or (month == em and day <= ed):
-            in_exam = True
+            in_peak = True
             break
-    if not in_exam:
-        for (sm, sd), (em, ed) in pre_exam_windows:
+    if not in_peak:
+        for (sm, sd), (em, ed) in pre_peak_windows:
             if (month == sm and day >= sd) or (month == em and day <= ed):
                 density_score += 8
-                reasons.append("期末备考期，自习场所人员密集")
+                reasons.append("换季时节，活动室人员密集")
                 break
 
-    # Beginning of semester
+    # Season transitions
     if (month == 9 and 1 <= day <= 15) or (month == 2 and 20 <= day <= 28):
         density_score += 10
-        reasons.append("开学季，人员流动频繁")
+        reasons.append("换季时节，人员流动频繁")
 
     # Holiday returns (National Day, May Day)
     if (month == 10 and 5 <= day <= 10) or (month == 5 and 1 <= day <= 7):
         density_score += 5
-        reasons.append("长假返校，人员流动增加")
+        reasons.append("长假返程，人员流动增加")
 
     # Cap at 30
     density_score = min(30, density_score)
@@ -308,7 +308,7 @@ def _get_campus_density_risk() -> dict:
 # -- 4. Health Risk Engine — aggregates all signals --
 
 class HealthRiskEngine:
-    """Aggregate seasonal, weather, and campus-density signals into risk scores."""
+    """Aggregate seasonal, weather, and community-density signals into risk scores."""
 
     def __init__(self):
         self.now = datetime.now()
@@ -324,7 +324,7 @@ class HealthRiskEngine:
                 "overall_score": 0-100,
                 "diseases": [...],
                 "weather_modifiers": {...},
-                "campus_density": {...},
+                "community_density": {...},
                 "alerts": [...],
                 "advice_summary": str,
             }
@@ -335,8 +335,8 @@ class HealthRiskEngine:
         # ── Layer 2: Weather modifiers
         weather = _get_weather_risk_modifiers()
 
-        # ── Layer 3: Campus density
-        density = _get_campus_density_risk()
+        # ── Layer 3: Community density
+        density = _get_community_density_risk()
 
         # ── Compute per-disease risk ──
         # v2: Blend seasonal model with real national surveillance data.
@@ -406,13 +406,13 @@ class HealthRiskEngine:
         if weather["total_modifier"] >= 15:
             advice_parts.append("🌡️ 近期天气变化较大，注意增减衣物")
         if density["score"] >= 10:
-            advice_parts.append("🏫 人员密集期，建议佩戴口罩、勤洗手")
+            advice_parts.append("👥 人员密集期，建议佩戴口罩、勤洗手")
         if level in ("high", "critical"):
-            advice_parts.append("⚠️ 请各班级辅导员转发健康提醒给学生")
+            advice_parts.append("⚠️ 请各网格员转发健康提醒给居民")
         if any(d["adjusted_risk"] >= 50 for d in diseases):
-            advice_parts.append("💉 建议未接种流感疫苗的同学尽快接种")
+            advice_parts.append("💉 建议未接种流感疫苗的居民尽快接种")
 
-        advice_summary = "；".join(advice_parts) if advice_parts else "🌿 当前校园健康风险较低，保持良好卫生习惯即可。"
+        advice_summary = "；".join(advice_parts) if advice_parts else "🌿 当前社区健康风险较低，保持良好卫生习惯即可。"
 
         # ── Surveillance data source note ──
         surv_summary = {}
@@ -435,10 +435,10 @@ class HealthRiskEngine:
             "weather_details": weather["details"],
             "weather_mod_total": weather["total_modifier"],
             "weather_breakdown": weather["breakdown"],
-            "campus_density": density,
+            "community_density": density,
             "advice_summary": advice_summary,
             "surveillance": surv_summary,       # CDC data status
-            "source_note": "基于国家疾控局月度公报 × 季节模型 × 实时天气模拟 · 仅供参考，不构成医疗建议",
+            "source_note": "基于国家疾控局月度公报（近似值） × 季节模型 × 实时天气模拟 · 仅供参考，不构成医疗建议",
             "evaluated_at": self.now.strftime("%Y-%m-%d %H:%M"),
             "weekday": self.weekday,
         }

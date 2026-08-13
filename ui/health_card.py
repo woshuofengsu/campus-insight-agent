@@ -4,7 +4,7 @@
 提供两个可复用的渲染函数，供 health.py、pulse.py、dashboard.py 等页面使用：
 
   render_health_risk_overview(h: dict) → None
-    紧凑概览卡片 — 用于 pulse.py（校园脉搏）和 dashboard.py（教师工作台）。
+    紧凑概览卡片 — 用于 pulse.py（社区脉搏）和 dashboard.py（网格员工作台）。
     显示：风险等级、评分、渐变风险条、Top 告警、综合建议、天气关联因子。
 
   render_disease_detail_cards(h: dict) → None
@@ -30,7 +30,7 @@ def render_health_risk_overview(h: dict) -> None:
     h_score = h["overall_score"]
 
     level_label = {
-        "low": "低风险 · 校园健康",
+        "low": "低风险 · 社区健康",
         "moderate": "注意防护",
         "high": "警示 · 加强预防",
         "critical": "高危 · 立即行动",
@@ -82,7 +82,7 @@ def render_health_risk_overview(h: dict) -> None:
         f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
         f'<span style="font-size:2em;">🏥</span>'
         f'<div style="flex:1;">'
-        f'<span style="font-size:1.05em;font-weight:700;color:{TOKEN["text"]};">校园健康风险</span>'
+        f'<span style="font-size:1.05em;font-weight:700;color:{TOKEN["text"]};">社区健康风险</span>'
         f'<span style="font-size:0.78em;color:{bar_color};margin-left:10px;font-weight:600;">'
         f'{h_emoji} {h_label}</span>'
         f'</div>'

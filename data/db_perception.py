@@ -1,10 +1,10 @@
 # data/db_perception.py
-"""🧠 背景感知模块 — 定期扫描校园数据，生成感知洞察.
+"""🧠 背景感知模块 — 定期扫描社区数据，生成感知洞察.
 
 触发机制:
   - 任意用户访问任意页面 → init_session() → 检查距上次扫描是否超过阈值
   - 超过阈值 → 自动执行感知扫描 → 结果存入 perception_log
-  - 感知结果在「校园脉搏」页和教师「工作台」展示
+  - 感知结果在「社区脉搏」页和网格员「工作台」展示
 
 感知管线:
   1. 趋势分析 — 本周 vs 上周工单量/分类对比
@@ -25,8 +25,8 @@ DEFAULT_SCAN_INTERVAL_MINUTES = 30
 # ── 异常检测阈值 ──
 ANOMALY_SPIKE_RATIO = 2.5    # 某分类当日新增 > 日均 × 2.5 → 异常
 ANOMALY_MIN_COUNT = 3        # 至少达到此数量才触发异常
-SLA_WARNING_DAYS = 7         # 超期预警天数
-SLA_CRITICAL_DAYS = 14       # 严重超期天数
+# SLA 超期口径已收敛到 data/db_sla.py（极急6h / 紧急24h / 普通72h），
+# 此处不再维护独立的 SLA_WARNING_DAYS / SLA_CRITICAL_DAYS 常量。
 
 
 def _now() -> str:
@@ -94,25 +94,25 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
     with get_db() as conn:
         # -- 1. 基础数据采集 --
-        total = conn.execute("SELECT COUNT(*) as cnt FROM campus_issues").fetchone()["cnt"]
+        total = conn.execute("SELECT COUNT(*) as cnt FROM community_issues").fetchone()["cnt"]
         pending = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE status IN ('待处理','处理中')"
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE status IN ('待处理','处理中')"
         ).fetchone()["cnt"]
         today_new = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE date(reported_at) = ?", (today_str,)
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE date(reported_at) = ?", (today_str,)
         ).fetchone()["cnt"]
         today_resolved = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE status='已解决' AND date(resolved_at) = ?",
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE status='已解决' AND date(resolved_at) = ?",
             (today_str,),
         ).fetchone()["cnt"]
 
         # -- 2. 趋势分析 — 本周 vs 上周 --
         this_week_new = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues WHERE date(reported_at) >= ?",
+            "SELECT COUNT(*) as cnt FROM community_issues WHERE date(reported_at) >= ?",
             (week_ago,),
         ).fetchone()["cnt"]
         this_week_resolved = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
+            "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE status='已解决' AND date(resolved_at) >= ?",
             (week_ago,),
         ).fetchone()["cnt"]
@@ -120,12 +120,12 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         # 上周同期 (14天前到7天前)
         two_weeks_ago = _n_days_ago(14)
         last_week_new = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
+            "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE date(reported_at) >= ? AND date(reported_at) < ?",
             (two_weeks_ago, week_ago),
         ).fetchone()["cnt"]
         last_week_resolved = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
+            "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE status='已解决' AND date(resolved_at) >= ? AND date(resolved_at) < ?",
             (two_weeks_ago, week_ago),
         ).fetchone()["cnt"]
@@ -148,7 +148,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
         # 3a. 分类激增检测：今日各分类 vs 近7天日均
         today_cats = conn.execute(
-            "SELECT category, COUNT(*) as cnt FROM campus_issues "
+            "SELECT category, COUNT(*) as cnt FROM community_issues "
             "WHERE date(reported_at) = ? GROUP BY category",
             (today_str,),
         ).fetchall()
@@ -158,7 +158,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             today_cnt = row["cnt"]
             # 近7天该分类日均
             week_total = conn.execute(
-                "SELECT COUNT(*) as cnt FROM campus_issues "
+                "SELECT COUNT(*) as cnt FROM community_issues "
                 "WHERE category = ? AND date(reported_at) >= ? AND date(reported_at) < ?",
                 (cat, week_ago, today_str),
             ).fetchone()["cnt"]
@@ -176,7 +176,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
         # 3b. 地点激增
         today_locs = conn.execute(
-            "SELECT location, COUNT(*) as cnt FROM campus_issues "
+            "SELECT location, COUNT(*) as cnt FROM community_issues "
             "WHERE date(reported_at) = ? AND location != '' GROUP BY location",
             (today_str,),
         ).fetchall()
@@ -186,7 +186,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             today_cnt = row["cnt"]
             if today_cnt >= ANOMALY_MIN_COUNT:
                 week_total = conn.execute(
-                    "SELECT COUNT(*) as cnt FROM campus_issues "
+                    "SELECT COUNT(*) as cnt FROM community_issues "
                     "WHERE location = ? AND date(reported_at) >= ? AND date(reported_at) < ?",
                     (loc, week_ago, today_str),
                 ).fetchone()["cnt"]
@@ -201,32 +201,24 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                         "level": "warning",
                     })
 
-        # -- 4. 积压预警 — SLA 超期工单 --
-        overdue_warning = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
-            "WHERE status IN ('待处理','处理中') "
-            "AND reported_at < date('now', ?)",
-            (f'-{SLA_WARNING_DAYS} days',),
-        ).fetchone()["cnt"]
-        overdue_critical = conn.execute(
-            "SELECT COUNT(*) as cnt FROM campus_issues "
-            "WHERE status IN ('待处理','处理中') "
-            "AND reported_at < date('now', ?)",
-            (f'-{SLA_CRITICAL_DAYS} days',),
-        ).fetchone()["cnt"]
+        # -- 4. 积压预警 — SLA 超期工单（分级口径统一走 data/db_sla.py）--
+        from data.db_sla import get_sla_summary
+        _sla = get_sla_summary()
+        overdue_critical = _sla["critical_overdue"]   # 极急/紧急 超时
+        overdue_warning = _sla["normal_overdue"]      # 普通 超时
 
         if overdue_critical > 0:
             anomalies.append({
                 "type": "sla_critical",
                 "count": overdue_critical,
-                "message": f"{overdue_critical} 件工单超过 {SLA_CRITICAL_DAYS} 天未处理",
+                "message": f"{overdue_critical} 件紧急工单已超时未处理",
                 "level": "critical",
             })
         elif overdue_warning > 2:
             anomalies.append({
                 "type": "sla_warning",
                 "count": overdue_warning,
-                "message": f"{overdue_warning} 件工单超过 {SLA_WARNING_DAYS} 天未处理",
+                "message": f"{overdue_warning} 件普通工单已超时未处理",
                 "level": "warning",
             })
 
@@ -262,11 +254,11 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             )
         elif trend == "declining":
             key_findings.append(
-                f"📉 近7天新增工单 {this_week_new} 件，较上周（{last_week_new} 件）下降，校园运转改善"
+                f"📉 近7天新增工单 {this_week_new} 件，较上周（{last_week_new} 件）下降，社区运转改善"
             )
         else:
             key_findings.append(
-                f"📊 近7天新增工单 {this_week_new} 件，与上周持平，校园运转平稳"
+                f"📊 近7天新增工单 {this_week_new} 件，与上周持平，社区运转平稳"
             )
 
         if resolution_rate >= 70:
@@ -282,7 +274,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
         if total_fb > 0:
             mood = "积极" if sentiment_ratio >= 60 else "一般" if sentiment_ratio >= 40 else "需要关注"
-            key_findings.append(f"💬 近7天学生反馈情绪：{mood}（正面率 {sentiment_ratio}%）")
+            key_findings.append(f"💬 近7天居民反馈情绪：{mood}（正面率 {sentiment_ratio}%）")
 
         # Anomaly findings
         for a in anomalies:
@@ -290,15 +282,15 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
         # Overall summary (1-line)
         if not anomalies and trend in ("stable", "declining"):
-            overall = f"🌿 校园运转正常 · {today_new} 件新增 · 解决率 {resolution_rate}%"
+            overall = f"🌿 社区运转正常 · {today_new} 件新增 · 解决率 {resolution_rate}%"
         elif anomalies:
             crits = [a for a in anomalies if a["level"] == "critical"]
             if crits:
                 overall = f"🚨 {crits[0]['message'][:40]} · 共 {len(anomalies)} 项需关注"
             else:
-                overall = f"⚠️ {len(anomalies)} 项异常需关注 · 校园基本正常"
+                overall = f"⚠️ {len(anomalies)} 项异常需关注 · 社区基本正常"
         else:
-            overall = f"📊 校园运转平稳 · {today_new} 件新增 · 待处理 {pending} 件"
+            overall = f"📊 社区运转平稳 · {today_new} 件新增 · 待处理 {pending} 件"
 
         # -- 8. 持久化 --
         details = {

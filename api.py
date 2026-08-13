@@ -1,6 +1,6 @@
-# api.py — CampusInsight Agent REST API
+# api.py — CommunityInsight Agent REST API
 """FastAPI 后端，把所有 Agent 工具暴露为 REST 端点。
-扣子 AI 通过 OpenAPI 插件调用这些接口 → 读取校园治理数据 + 智能对话。
+扣子 AI 通过 OpenAPI 插件调用这些接口 → 读取社区治理数据 + 智能对话。
 
 启动方式：
   pip install fastapi uvicorn
@@ -12,6 +12,7 @@
   或部署到云服务器
 """
 
+import logging
 import sys
 import os
 from contextlib import asynccontextmanager
@@ -27,6 +28,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 # -- DB Lazy Init — 防御性初始化，确保任何路径都不会漏掉 --
+
+_log = logging.getLogger(__name__)
+_auth_warned = False
+
+
+def _warn_no_auth():
+    """One-shot warning when the API is running in open (keyless) mode."""
+    global _auth_warned
+    if not _auth_warned:
+        _log.warning(
+            "COMMUNITY_API_KEY 未配置，API 处于开放模式（所有端点公开）。"
+            "公网部署（ngrok/云服务器）请务必在 .env 设置密钥，否则任何人可调用 Agent 并消耗额度。"
+        )
+        _auth_warned = True
+
 
 _db_initialized = False
 
@@ -54,8 +70,8 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="CampusInsight Agent API",
-    description="校园先知 CampusInsight — 校园微治理平台对外 API。",
+    title="CommunityInsight Agent API",
+    description="社区先知 CommunityInsight — 社区微治理平台对外 API。",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -80,16 +96,17 @@ async def _auth_middleware(request: Request, call_next):
 
     Checks Authorization: Bearer <key> or X-API-Key: <key> header.
     Public endpoints (health, docs) are always allowed.
-    If CAMPUS_API_KEY is not configured, all endpoints are public.
+    If COMMUNITY_API_KEY is not configured, all endpoints are public.
     """
-    from config import CAMPUS_API_KEY
+    from config import COMMUNITY_API_KEY
 
     # Public paths — always allowed
     if request.url.path in _PUBLIC_PATHS or request.url.path.startswith("/docs"):
         return await call_next(request)
 
     # No API key configured — open mode
-    if not CAMPUS_API_KEY:
+    if not COMMUNITY_API_KEY:
+        _warn_no_auth()
         return await call_next(request)
 
     # Check auth headers
@@ -102,7 +119,7 @@ async def _auth_middleware(request: Request, call_next):
     elif api_key_header:
         token = api_key_header
 
-    if token != CAMPUS_API_KEY:
+    if token != COMMUNITY_API_KEY:
         return JSONResponse(
             status_code=401,
             content={"success": False, "error": "Invalid or missing API key"},
@@ -140,7 +157,7 @@ class ExpressOpinionRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="用户消息", min_length=1)
-    student_id: str = Field(default="", description="学号/工号")
+    resident_id: str = Field(default="", description="门牌号/工号")
 
 
 # -- Health --
@@ -150,7 +167,7 @@ def health_check():
     """健康检查"""
     return {
         "status": "ok",
-        "service": "CampusInsight Agent",
+        "service": "CommunityInsight Agent",
         "version": "2.0.0",
         "timestamp": datetime.now().isoformat(),
     }
@@ -174,15 +191,15 @@ def get_weather():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Campus Pulse --
+# -- Community Pulse --
 
-@app.get("/api/campus-pulse", tags=["校园脉搏"])
-def get_campus_pulse():
-    """校园脉搏——本周热点、提案、议题、治理快照"""
+@app.get("/api/community-pulse", tags=["社区脉搏"])
+def get_community_pulse():
+    """社区脉搏——本周热点、提案、议题、治理快照"""
     try:
         from data.database import (
             get_issues, get_proposals, get_active_topics,
-            get_campus_events, compute_health_score,
+            get_community_events, compute_health_score,
         )
         from datetime import timedelta
 
@@ -211,7 +228,7 @@ def get_campus_pulse():
         topics = get_active_topics(limit=3)
         hot_topics = [{"id": t["id"], "title": t["title"]} for t in topics]
 
-        events = get_campus_events(limit=5)
+        events = get_community_events(limit=5)
         upcoming = [
             {"title": e["title"], "content": e.get("content", "")[:100]}
             for e in events
@@ -258,7 +275,7 @@ def list_issues(
     urgency: Optional[str] = Query(None, description="紧急程度"),
     limit: int = Query(20, ge=1, le=200),
 ):
-    """查询校园问题工单列表"""
+    """查询社区诉求工单列表"""
     try:
         from data.database import get_issues
         issues = get_issues(category=category, status=status, limit=limit)
@@ -308,7 +325,7 @@ def get_issue_stats():
 
 @app.post("/api/issues", tags=["工单"])
 def report_issue(req: ReportIssueRequest):
-    """上报校园问题"""
+    """上报社区诉求"""
     try:
         from tools.action_report_issue import (
             _auto_classify, _auto_urgency, validate_location,
@@ -356,7 +373,7 @@ def list_proposals(
     sort_by: str = Query("supporters"),
     limit: int = Query(20, ge=1, le=200),
 ):
-    """查询校园提案列表"""
+    """查询社区提案列表"""
     try:
         from data.database import get_proposals, get_proposals_stats
         proposals = get_proposals(category=category, sort_by=sort_by, limit=limit)
@@ -386,7 +403,7 @@ def list_proposals(
 
 @app.post("/api/proposals", tags=["提案"])
 def create_proposal(req: CreateProposalRequest):
-    """创建校园改进提案"""
+    """创建社区改进提案"""
     try:
         from data.database import create_proposal as _db_create, get_proposals
 
@@ -516,7 +533,7 @@ def express_opinion(topic_id: int, req: ExpressOpinionRequest):
             raise HTTPException(status_code=404, detail=f"议题 #{topic_id} 不存在")
 
         add_opinion(topic_id=topic_id, content=req.content.strip(),
-                     participant_label="匿名学生")
+                     participant_label="匿名居民")
         summary = get_opinion_summary(topic_id)
 
         return {
@@ -564,23 +581,16 @@ def get_governance_audit():
 
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM campus_issues GROUP BY status"
+                "SELECT status, COUNT(*) as cnt FROM community_issues GROUP BY status"
             ).fetchall()
             by_status = {r["status"]: r["cnt"] for r in rows}
             total_i = sum(by_status.values())
             resolved = by_status.get("已解决", 0)
 
-            urgent = conn.execute(
-                "SELECT COUNT(*) as cnt FROM campus_issues "
-                "WHERE urgency='紧急' AND status != '已解决'"
-            ).fetchone()
-            urgent_u = urgent["cnt"] if urgent else 0
-
-            stale = conn.execute(
-                "SELECT COUNT(*) as cnt FROM campus_issues "
-                "WHERE status IN ('待处理','处理中') AND reported_at < date('now', '-7 days')"
-            ).fetchone()
-            stale_n = stale["cnt"] if stale else 0
+            from data.db_sla import get_sla_summary
+            _sla = get_sla_summary()
+            urgent_u = _sla.get("urgent_pending", 0)
+            stale_n = _sla.get("total_overdue", 0)
 
             p_rows = conn.execute(
                 "SELECT status, COUNT(*) as cnt FROM proposals GROUP BY status"
@@ -658,8 +668,8 @@ def _get_agent():
     fake_st["chat_history"] = []
     fake_st["user_profile"] = {}
 
-    from agent.engine import CampusAgent
-    _agent = CampusAgent(fake_st)
+    from agent.engine import CommunityAgent
+    _agent = CommunityAgent(fake_st)
     return _agent
 
 
@@ -672,11 +682,11 @@ def agent_chat(req: ChatRequest):
     """
     try:
         agent = _get_agent()
-        if req.student_id:
+        if req.resident_id:
             agent.memory.st["user_profile"] = {
-                "name": req.student_id,
-                "student_id": req.student_id,
-                "school": "校园先知",
+                "name": req.resident_id,
+                "resident_id": req.resident_id,
+                "community": "社区先知",
             }
 
         response = agent.run(req.message)
@@ -702,11 +712,11 @@ def agent_chat_offline(req: ChatRequest):
         fake_st = FakeSession()
         fake_st["chat_history"] = []
         fake_st["user_profile"] = {}
-        if req.student_id:
+        if req.resident_id:
             fake_st["user_profile"] = {
-                "name": req.student_id,
-                "student_id": req.student_id,
-                "school": "校园先知",
+                "name": req.resident_id,
+                "resident_id": req.resident_id,
+                "community": "社区先知",
             }
 
         agent = OfflineAgent(fake_st)
@@ -745,10 +755,10 @@ def get_feedback(topic: Optional[str] = Query(None)):
 def export_openapi():
     """导出 OpenAPI 3.0 schema，可直接导入扣子插件"""
     schema = app.openapi()
-    schema["info"]["title"] = "CampusInsight Agent"
+    schema["info"]["title"] = "CommunityInsight Agent"
     schema["info"]["description"] = (
-        "校园先知 —— 校园微治理平台。提供工单上报/查询、提案管理、"
-        "议题讨论、天气、校园脉搏、治理健康度、智能对话等能力。"
+        "社区先知 —— 社区微治理平台。提供诉求上报/查询、提案管理、"
+        "议题讨论、天气、社区脉搏、治理健康度、智能对话等能力。"
     )
     return schema
 
@@ -759,13 +769,13 @@ if __name__ == "__main__":
     import uvicorn
     import argparse
 
-    parser = argparse.ArgumentParser(description="CampusInsight Agent API")
+    parser = argparse.ArgumentParser(description="CommunityInsight Agent API")
     parser.add_argument("--port", type=int, default=18800)
     parser.add_argument("--host", type=str, default="0.0.0.0")
     args = parser.parse_args()
 
     print(f"""
-   CampusInsight Agent API v2.0
+   CommunityInsight Agent API v2.0
    http://{args.host}:{args.port}
    文档: http://localhost:{args.port}/docs
    OpenAPI: http://localhost:{args.port}/openapi.json
