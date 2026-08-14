@@ -1,22 +1,19 @@
-# data/live_generator.py
-"""Time-driven data generator — makes demo data feel "alive".
+"""按日期驱动生成演示数据，让 demo 看起来是「活的」。
 
-⚠️  SYNTHETIC DATA — FOR DEMO / DEVELOPMENT USE ONLY:
+注意：合成数据，仅用于演示/开发。
     本模块生成的所有事件（问题上报、工单解决、附议增加、反馈条目）
-    均为合成数据 (synthetic / simulated)，用于演示和开发环境。
-    生产环境应使用真实用户活动数据替代。
+    都是合成数据，生产环境要用真实用户活动数据替代。
 
-Each day, based on date hash, generates:
-  - 1-3 new community issues (random but deterministic per date)
-  - 0-2 auto-resolved old issues (with detailed resolution notes)
-  - Increments supporter counts for 1-3 proposals
-  - 0-1 new feedback items (simulating organic resident sentiment)
+每天按日期哈希生成：
+  - 1-3 条新工单（随机但同一天结果固定）
+  - 自动解决 0-2 条老工单（带处理备注）
+  - 给 1-3 条提案加附议数
+  - 0-1 条新反馈（模拟居民真实情绪）
 
-Called during session init to create the illusion of continuous community activity.
-Uses deterministic hashing so the same date always produces the same events
-(no duplicates across page reloads).
+会话初始化时调用，制造「社区一直在运转」的错觉。
+用确定性哈希，同一天生成的事件永远一样（刷新页面不会重复）。
 
-⚠️  默认禁用：比赛/生产环境通过 config.DEMO_LIVE_DATA 开关（默认 False）关闭，
+默认禁用：比赛/生产环境通过 config.DEMO_LIVE_DATA 开关（默认 False）关闭，
 只有明确设 DEMO_LIVE_DATA=true 时才生成每日合成数据。一次性 seed_all() 不受影响。
 """
 import hashlib
@@ -26,21 +23,21 @@ from config import DEMO_LIVE_DATA
 
 
 def _daily_seed() -> int:
-    """Deterministic pseudo-random seed from today's date."""
+    """用今天的日期算一个确定性的伪随机种子。"""
     today = datetime.now().strftime("%Y-%m-%d")
     return int(hashlib.md5(today.encode()).hexdigest()[:8], 16)
 
 
 def _daily_rng(lo: int, hi: int) -> int:
-    """Return a deterministic integer in [lo, hi) for today."""
+    """今天用：返回 [lo, hi) 里的一个确定整数。"""
     return lo + (_daily_seed() % (hi - lo))
 
 
-# ── Issue templates (rotated daily, 30+ templates for variety) ──
+# 工单模板（按天轮换，30 多条保证不重样）
 
 _ISSUE_TEMPLATES = [
-    # title, category, location, urgency, description
-    # ── 设施维修 ──
+    # 字段顺序: 标题, 分类, 地点, 紧急度, 描述
+    # 设施维修
     ("3号楼2单元电梯运行异响", "设施维修", "3号楼2单元", "紧急",
      "电梯运行时有明显金属摩擦异响，门关合也迟缓，居民担心安全。"),
     ("5号楼电梯按钮失灵", "设施维修", "5号楼1单元", "普通",
@@ -63,7 +60,7 @@ _ISSUE_TEMPLATES = [
      "儿童滑梯有处塑料开裂，边缘锋利，已经划伤过孩子的手。"),
     ("南门快递柜屏幕损坏", "设施维修", "南门快递柜", "普通",
      "南门快递柜屏幕坏了，取件只能等快递员手动操作，排队排得很长。"),
-    # ── 环境卫生 ──
+    # 环境卫生
     ("小区东南角垃圾桶满溢", "环境卫生", "东南角垃圾点", "紧急",
      "垃圾桶三天没清运，垃圾堆到路边，异味和蚊蝇都来了。"),
     ("4号楼2单元楼道长期堆物", "环境卫生", "4号楼2单元", "普通",
@@ -74,7 +71,7 @@ _ISSUE_TEMPLATES = [
      "遛狗不清理粪便，步道上到处都是，已经踩到过好几次了。"),
     ("2号楼3单元卫生间反味严重", "环境卫生", "2号楼3单元", "普通",
      "卫生间长期有下水道反味，夏天尤其严重，影响整栋楼生活。"),
-    # ── 安全隐患 ──
+    # 安全隐患
     ("12号楼前电动车飞线充电", "安全隐患", "12号楼前", "紧急",
      "有人从五楼拉电线给电动车充电，电线裸露在外，下雨天极其危险。"),
     ("3号楼楼道杂物堵塞消防通道", "安全隐患", "3号楼2单元楼道", "紧急",
@@ -85,14 +82,14 @@ _ISSUE_TEMPLATES = [
      "消防栓被一堆废纸箱围住，紧急情况根本没法取用，灭火器也早已过期。"),
     ("5号楼单元门口电动车堵门", "安全隐患", "5号楼1单元", "普通",
      "电动车停满单元门口，进出都得侧身，婴儿车和轮椅根本过不去。"),
-    # ── 停车管理 ──
+    # 停车管理
     ("小区车位不足夜间乱停", "停车管理", "小区主干道", "普通",
      "晚上回来车位全满，只能停路边，早上又挡住别人出不去，天天吵架。"),
     ("7号楼前有人私装地锁", "停车管理", "7号楼前空地", "普通",
      "有人私自安装地锁霸占车位，引发邻里纠纷，公共车位凭什么私有？"),
     ("外来车辆长期占用车位", "停车管理", "小区东门附近", "普通",
      "几辆外地牌照车长期占用公共车位，本地居民反而没地方停。"),
-    # ── 噪音扰民 ──
+    # 噪音扰民
     ("中心广场广场舞音响音量过大", "噪音扰民", "中心广场", "普通",
      "晚上7-9点广场舞音响开得震天响，家里孩子写作业都受影响。"),
     ("6号楼2单元装修噪音超时", "噪音扰民", "6号楼2单元", "普通",
@@ -101,7 +98,7 @@ _ISSUE_TEMPLATES = [
      "北门外工地深夜还在施工，混凝土搅拌车声音持续到凌晨。"),
     ("7号楼楼道宠物狗半夜狂叫", "噪音扰民", "7号楼1单元", "普通",
      "某户养的狗每天半夜狂叫，整栋楼都睡不好，多次沟通无果。"),
-    # ── 物业服务 ──
+    # 物业服务
     ("物业报修响应慢", "物业服务", "全小区", "普通",
      "报修快一周了都没人上门，打电话催总说“在安排”，服务效率太低。"),
     ("楼道卫生打扫不及时", "物业服务", "3号楼", "普通",
@@ -110,10 +107,10 @@ _ISSUE_TEMPLATES = [
      "东门和北门监控坏了，丢过快递也查不到，居民没有安全感。"),
     ("小区东门门禁失灵", "物业服务", "东门", "普通",
      "东门门禁坏了一周，什么人都能进出，治安没保障。"),
-    # ── 邻里矛盾 ──
+    # 邻里矛盾
     ("楼上空调外机滴水", "邻里矛盾", "5号楼", "普通",
      "楼上空调外机排水管滴水，滴到楼下窗台和晾晒的衣服上，两家闹得很僵。"),
-    # ── 社区事务 ──
+    # 社区事务
     ("老年助餐点餐品单一", "社区事务", "社区助餐点", "普通",
      "助餐点每天就两三个菜，老人反映吃腻了，希望能丰富菜品。"),
     ("自行车棚堆放僵尸车", "社区事务", "小区自行车棚", "普通",
@@ -159,14 +156,12 @@ _FEEDBACK_TEMPLATES = [
 
 
 def generate_today_events() -> dict:
-    """Generate today's community events. Returns summary dict.
+    """生成今天的社区事件，返回汇总 dict。
 
-    Called during init_session() — safe to call every page load because
-    it checks if today's events have already been generated (by title+date
-    dedup for issues, and by checking if any were already resolved today).
+    init_session() 里调用——每次页面加载都可以安全调，因为它会先检查今天的
+    事件是不是已经生成过（工单按 标题+日期 去重，解决记录看今天有没有解决过）。
 
-    Returns dict includes a ``generated`` boolean flag so consumers can
-    distinguish synthetic data from real user activity.
+    返回的 dict 带 ``generated`` 布尔标记，调用方可以区分合成数据和真实用户活动。
     """
     seed = _daily_seed()
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -176,10 +171,10 @@ def generate_today_events() -> dict:
         "supporter_bumps": 0,
         "new_feedback": 0,
         "day": today_str,
-        "generated": True,  # synthetic data — set to False when real user data is available
+        "generated": True,  # 合成数据 — 有真实用户数据时改成 False
     }
 
-    # ── 比赛/生产环境：默认关闭每日合成数据 ──
+    # 比赛/生产环境默认关闭每日合成数据
     # 只有明确设 DEMO_LIVE_DATA=true 时才生成假工单/假解决/假附议/假反馈。
     # 一次性 seed_all() 的演示样本不受影响。
     if not DEMO_LIVE_DATA:
@@ -187,7 +182,7 @@ def generate_today_events() -> dict:
         return result
 
     with get_db() as conn:
-        # ── Check if today's events already generated ──
+        # 看看今天的事件是不是已经生成过了
         already_generated = conn.execute(
             "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE author = '系统感知' AND date(reported_at) = date(?)",
@@ -195,7 +190,7 @@ def generate_today_events() -> dict:
         ).fetchone()
         today_already_done = (already_generated and already_generated["cnt"] > 0)
 
-        # Also check if any resolutions happened today
+        # 顺便看看今天有没有解决过工单
         today_resolved = conn.execute(
             "SELECT COUNT(*) as cnt FROM community_issues "
             "WHERE status = '已解决' AND date(resolved_at) = date(?)",
@@ -204,22 +199,22 @@ def generate_today_events() -> dict:
         today_resolved_done = (today_resolved and today_resolved["cnt"] > 0)
 
         if today_already_done and today_resolved_done:
-            # Already generated today, skip but still count
+            # 今天已经生成过了，跳过但把数量记上
             result["new_issues"] = already_generated["cnt"]
             result["resolved_issues"] = today_resolved["cnt"]
             return result
 
-        # ── Generate 1-3 new issues ──
+        # 生成 1-3 条新工单
         if not today_already_done:
-            new_count = _daily_rng(1, 4)  # 1-3 new issues per day
+            new_count = _daily_rng(1, 4)  # 每天 1-3 条新工单
             for i in range(new_count):
                 idx = (seed + i * 73 + i * i * 17) % len(_ISSUE_TEMPLATES)
                 title, cat, loc, urgency, desc = _ISSUE_TEMPLATES[idx]
-                # Add slight date variation (0-2 days ago)
+                # 日期稍微错开点（0-2 天前）
                 day_offset = (seed + i * 37) % 3
                 report_date = (datetime.now() - timedelta(days=day_offset)).strftime("%Y-%m-%d")
 
-                # Check for duplicate
+                # 查重，别生成重复的
                 existing = conn.execute(
                     "SELECT COUNT(*) as cnt FROM community_issues "
                     "WHERE title = ? AND date(reported_at) = date(?)",
@@ -237,7 +232,7 @@ def generate_today_events() -> dict:
 
         conn.commit()
 
-        # ── Auto-resolve 0-2 old issues ──
+        # 自动解决 0-2 条老工单
         if not today_resolved_done:
             pending_issues = conn.execute(
                 "SELECT id, title, category FROM community_issues "
@@ -262,7 +257,7 @@ def generate_today_events() -> dict:
 
         conn.commit()
 
-        # ── Bump supporter counts for 1-3 proposals ──
+        # 给 1-3 条提案加附议数
         active_proposals = conn.execute(
             "SELECT id, supporter_count FROM proposals "
             "WHERE status = '讨论中' ORDER BY supporter_count DESC LIMIT 10"
@@ -271,7 +266,7 @@ def generate_today_events() -> dict:
         bump_count = min((seed % 3) + 1, len(active_proposals))
         for i in range(bump_count):
             pid = active_proposals[i]["id"]
-            bump = (seed + i * 53 + i * 7) % 6 + 1  # +1 to +6
+            bump = (seed + i * 53 + i * 7) % 6 + 1  # 每次加 1 到 6
             conn.execute(
                 "UPDATE proposals SET supporter_count = supporter_count + ? WHERE id = ?",
                 (bump, pid),
@@ -280,12 +275,12 @@ def generate_today_events() -> dict:
 
         conn.commit()
 
-        # ── Generate 0-1 feedback items ──
-        fb_count = seed % 2  # 0 or 1
+        # 生成 0-1 条反馈
+        fb_count = seed % 2  # 0 或 1
         for i in range(fb_count):
             idx = (seed + i * 91) % len(_FEEDBACK_TEMPLATES)
             topic, opinion, sentiment = _FEEDBACK_TEMPLATES[idx]
-            # Check duplicate
+            # 查重
             dup = conn.execute(
                 "SELECT COUNT(*) as cnt FROM feedback_items "
                 "WHERE opinion = ? AND topic = ?",
@@ -304,7 +299,7 @@ def generate_today_events() -> dict:
 
 
 def get_live_summary() -> str:
-    """Return a human-readable summary of today's auto-generated events."""
+    """把今天自动生成的事件拼成一段人话总结。"""
     events = generate_today_events()
     if (events["new_issues"] == 0 and events["resolved_issues"] == 0
             and events["supporter_bumps"] == 0):

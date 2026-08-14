@@ -1,9 +1,8 @@
 # ui/prefetch.py
-"""Intent-based data prefetch — provides real DB data as context to the agent.
+"""按意图预取数据 — 把真实数据库内容当上下文喂给 agent。
 
-Each prefetch function detects a user intent from keywords and returns
-pre-formatted context data. This ensures the AI has real data to work with
-even when the LLM decides not to call tools.
+每个预取函数用关键词判断用户意图，返回格式化好的上下文。
+这样就算 LLM 这轮不想调工具，手里也至少有真数据可用。
 """
 import logging
 from collections.abc import Callable
@@ -27,7 +26,7 @@ PREFETCH_SIGNALS: list[tuple[list[str], str]] = [
 
 
 def _prefetch_pulse() -> str:
-    """Pre-fetch community pulse data from DB."""
+    """从库里预取社区脉搏数据。"""
     try:
         issues = get_issues(status="待处理", limit=5)
         proposals = get_proposals(sort_by="supporters", limit=5)
@@ -56,12 +55,12 @@ def _prefetch_pulse() -> str:
 
         return "\n".join(lines)
     except Exception as e:
-        _logger.warning("_prefetch_pulse failed: %s", e)
+        _logger.warning("_prefetch_pulse 挂了: %s", e)
         return ""
 
 
 def _prefetch_stats() -> str:
-    """Pre-fetch governance stats from DB."""
+    """从库里预取治理统计。"""
     try:
         health = compute_health_score()
         recent = get_recent_issue_counts(7)
@@ -85,12 +84,12 @@ def _prefetch_stats() -> str:
 
         return "\n".join(lines)
     except Exception as e:
-        _logger.warning("_prefetch_stats failed: %s", e)
+        _logger.warning("_prefetch_stats 挂了: %s", e)
         return ""
 
 
 def _prefetch_weather() -> str:
-    """Pre-fetch weather data."""
+    """预取天气数据。"""
     try:
         from tools.query_weather import get_today_weather
         days, location_name, is_real = get_today_weather()
@@ -108,12 +107,12 @@ def _prefetch_weather() -> str:
             )
         return "\n".join(lines)
     except Exception as e:
-        _logger.warning("_prefetch_weather failed: %s", e)
+        _logger.warning("_prefetch_weather 挂了: %s", e)
         return ""
 
 
 def _prefetch_proposals() -> str:
-    """Pre-fetch proposal list."""
+    """预取提案列表。"""
     try:
         proposals = get_proposals(sort_by="supporters", limit=8)
         if not proposals:
@@ -127,17 +126,17 @@ def _prefetch_proposals() -> str:
             )
         return "\n".join(lines)
     except Exception as e:
-        _logger.warning("_prefetch_proposals failed: %s", e)
+        _logger.warning("_prefetch_proposals 挂了: %s", e)
         return ""
 
 
 def _prefetch_topics() -> str:
-    """Pre-fetch discussion topics with batched opinion counts (no N+1)."""
+    """预取讨论议题，意见数批量查（避免 N+1）。"""
     try:
         topics = get_active_topics(limit=5)
         if not topics:
             return ""
-        # Batch query — single DB round-trip instead of 1 + N
+        # 批量查一次搞定，别一条议题查一次
         topic_ids = [t["id"] for t in topics]
         summaries = get_opinion_summaries_batch(topic_ids)
         lines = ["## 议题数据快照（系统预取）", ""]
@@ -150,12 +149,12 @@ def _prefetch_topics() -> str:
             )
         return "\n".join(lines)
     except Exception as e:
-        _logger.warning("_prefetch_topics failed: %s", e)
+        _logger.warning("_prefetch_topics 挂了: %s", e)
         return ""
 
 
 def _prefetch_query_issues() -> str:
-    """Pre-fetch recent issues."""
+    """预取最近工单。"""
     try:
         issues = get_issues(limit=8)
         if not issues:
@@ -171,11 +170,11 @@ def _prefetch_query_issues() -> str:
             )
         return "\n".join(lines)
     except Exception as e:
-        _logger.warning("_prefetch_query_issues failed: %s", e)
+        _logger.warning("_prefetch_query_issues 挂了: %s", e)
         return ""
 
 
-# Name → function mapping
+# 名字 → 函数的映射表
 PREFETCH_FUNCTIONS: dict[str, Callable[[], str]] = {
     "_prefetch_pulse": _prefetch_pulse,
     "_prefetch_stats": _prefetch_stats,
@@ -187,9 +186,9 @@ PREFETCH_FUNCTIONS: dict[str, Callable[[], str]] = {
 
 
 def try_prefetch(user_input: str) -> str | None:
-    """Check user input against prefetch signals and return pre-fetched context.
+    """拿用户输入去对预取信号，命中就返回预取好的上下文。
 
-    Returns None if no match or pre-fetch failed.
+    没命中或预取失败就返回 None。
     """
     txt = user_input.strip()
     if len(txt) < 2:

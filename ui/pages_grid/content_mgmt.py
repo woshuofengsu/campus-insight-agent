@@ -1,4 +1,3 @@
-# ui/pages_grid/content_mgmt.py
 """📢 内容发布 — 发布通知、创建议题、管理已发布内容."""
 import streamlit as st
 from ui.guard import require_role
@@ -14,7 +13,7 @@ _log = logging.getLogger(__name__)
 
 page_header("📢 内容发布", "发布社区通知和讨论议题，管理已发布的内容。")
 
-# ── Persistent success feedback (survives st.rerun) ──
+# 发布成功的提示要跨 rerun 保留
 feedback = st.session_state.pop("_content_pub_feedback", None)
 if feedback:
     st.success(feedback)
@@ -107,7 +106,7 @@ with col1:
             title = entry.get("title", "")[:30]
             content = entry.get("content", "")[:60]
 
-            # Check if this entry is pending delete confirmation
+            # 看这条是不是正等删除确认
             confirming = st.session_state.get(_confirm_delete_key) == eid
 
             with st.container(border=True):
@@ -144,9 +143,9 @@ with col1:
 with col2:
     st.markdown("**💬 议题管理**")
 
-    # Show active topics first, then recently closed
+    # 进行中的议题排前面，再补最近结束的
     active_topics = cached_active_topics(limit=10)
-    # Also fetch recently closed topics
+    # 顺带拉最近结束的议题
     closed_topics = []
     try:
         with get_db() as conn:
@@ -155,8 +154,8 @@ with col2:
                 "ORDER BY ended_at DESC LIMIT 5"
             ).fetchall()
             closed_topics = [dict(r) for r in rows]
-    except Exception:  # best-effort, skip
-        _log.debug("non-critical failure", exc_info=True)
+    except Exception:  # 尽力而为，失败就跳过
+        _log.debug("非致命错误", exc_info=True)
         pass
 
     all_topics = list(active_topics) + list(closed_topics)

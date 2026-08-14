@@ -16,7 +16,7 @@ def support_proposal(proposal_id: int) -> str:
     if not proposal_id or proposal_id <= 0:
         return "⚠️ 请提供有效的提案编号。你可以在提案列表中查看每个提案的 #编号。"
 
-    # Verify proposal exists (direct SQL lookup, not O(n) scan)
+    # 确认提案存在（直接 SQL 查，别 O(n) 遍历）
     with get_db() as conn:
         row = conn.execute(
             "SELECT id, title FROM proposals WHERE id = ?", (proposal_id,)
@@ -28,7 +28,7 @@ def support_proposal(proposal_id: int) -> str:
 
     new_count = _db_support_proposal(proposal_id)
 
-    # Milestone messages
+    # 附议里程碑文案
     milestone = ""
     if new_count == 10:
         milestone = " -- 已达成 10 人附议"

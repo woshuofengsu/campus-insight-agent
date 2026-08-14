@@ -1,4 +1,4 @@
-# api.py — CommunityInsight Agent REST API
+# api.py — 对外 REST API
 """FastAPI 后端，把所有 Agent 工具暴露为 REST 端点。
 扣子 AI 通过 OpenAPI 插件调用这些接口 → 读取社区治理数据 + 智能对话。
 
@@ -27,14 +27,14 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-# -- DB Lazy Init — 防御性初始化，确保任何路径都不会漏掉 --
+# 数据库懒初始化，保证不管走哪条路径都不会漏
 
 _log = logging.getLogger(__name__)
 _auth_warned = False
 
 
 def _warn_no_auth():
-    """One-shot warning when the API is running in open (keyless) mode."""
+    """API 在无密钥开放模式下运行时，只提醒一次。"""
     global _auth_warned
     if not _auth_warned:
         _log.warning(
@@ -48,7 +48,7 @@ _db_initialized = False
 
 
 def _ensure_db():
-    """Ensure DB is initialized. Safe to call multiple times — idempotent."""
+    """确保数据库已初始化，重复调用也安全（幂等）。"""
     global _db_initialized
     if _db_initialized:
         return
@@ -60,11 +60,11 @@ def _ensure_db():
     _db_initialized = True
 
 
-# -- FastAPI App --
+# FastAPI 应用
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    """Startup: init DB + seed data. Shutdown: nothing needed."""
+    """启动时初始化 DB 并灌种子数据；关停不用做什么。"""
     _ensure_db()
     yield
 
@@ -86,30 +86,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Public endpoints (no auth required) ──
+# 公开端点（不需要鉴权）
 _PUBLIC_PATHS = {"/api/health", "/docs", "/redoc", "/openapi.json", "/"}
 
 
 @app.middleware("http")
 async def _auth_middleware(request: Request, call_next):
-    """API key authentication middleware.
+    """API key 鉴权中间件。
 
-    Checks Authorization: Bearer <key> or X-API-Key: <key> header.
-    Public endpoints (health, docs) are always allowed.
-    If COMMUNITY_API_KEY is not configured, all endpoints are public.
+    支持 Authorization: Bearer <key> 或 X-API-Key: <key> 两种头；
+    健康检查、文档这类公开端点永远放行；
+    没配 COMMUNITY_API_KEY 时所有端点都是公开的。
     """
     from config import COMMUNITY_API_KEY
 
-    # Public paths — always allowed
+    # 公开路径，直接放行
     if request.url.path in _PUBLIC_PATHS or request.url.path.startswith("/docs"):
         return await call_next(request)
 
-    # No API key configured — open mode
+    # 没配密钥，开放模式
     if not COMMUNITY_API_KEY:
         _warn_no_auth()
         return await call_next(request)
 
-    # Check auth headers
+    # 检查鉴权头
     auth_header = request.headers.get("Authorization", "")
     api_key_header = request.headers.get("X-API-Key", "")
 
@@ -130,12 +130,12 @@ async def _auth_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def _db_init_middleware(request: Request, call_next):
-    """Ensure DB is initialized before every request (idempotent, ~0 cost)."""
+    """每次请求前都确保 DB 已初始化（幂等，开销约等于零）。"""
     _ensure_db()
     return await call_next(request)
 
 
-# -- Request Models --
+# 请求模型
 
 class ReportIssueRequest(BaseModel):
     title: str = Field(..., description="问题标题", min_length=2)
@@ -160,7 +160,7 @@ class ChatRequest(BaseModel):
     resident_id: str = Field(default="", description="门牌号/工号")
 
 
-# -- Health --
+# 健康检查
 
 @app.get("/api/health", tags=["系统"])
 def health_check():
@@ -173,7 +173,7 @@ def health_check():
     }
 
 
-# -- Weather --
+# 天气
 
 @app.get("/api/weather", tags=["天气"])
 def get_weather():
@@ -191,7 +191,7 @@ def get_weather():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Community Pulse --
+# 社区脉搏
 
 @app.get("/api/community-pulse", tags=["社区脉搏"])
 def get_community_pulse():
@@ -266,7 +266,7 @@ def get_community_pulse():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Issues --
+# 工单
 
 @app.get("/api/issues", tags=["工单"])
 def list_issues(
@@ -365,7 +365,7 @@ def report_issue(req: ReportIssueRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Proposals --
+# 提案
 
 @app.get("/api/proposals", tags=["提案"])
 def list_proposals(
@@ -459,7 +459,7 @@ def support_proposal(proposal_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Topics --
+# 议题
 
 @app.get("/api/topics", tags=["议题"])
 def list_topics(limit: int = Query(10, ge=1, le=50)):
@@ -467,7 +467,7 @@ def list_topics(limit: int = Query(10, ge=1, le=50)):
     try:
         from data.database import get_active_topics, get_opinion_summaries_batch
         topics = get_active_topics(limit=limit)
-        # Batch query — single DB round-trip instead of 1+N
+        # 批量查询，一次 SQL 搞定，避免 1+N 次查询
         topic_ids = [t["id"] for t in topics]
         summaries = get_opinion_summaries_batch(topic_ids)
         result = []
@@ -547,7 +547,7 @@ def express_opinion(topic_id: int, req: ExpressOpinionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Governance --
+# 治理
 
 @app.get("/api/governance/health", tags=["治理"])
 def get_governance_health():
@@ -626,31 +626,30 @@ def get_governance_audit():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- AI Chat — 核心端点 --
+# AI 对话——核心端点
 
 class FakeSession(dict):
-    """Session-like object that supports both dict and attribute access.
+    """模拟 Streamlit 的 session_state，dict 和属性两种访问都要支持。
 
-    Streamlit's session_state uses attribute-style access (st.xxx), so
-    FakeSession must support both st["key"] (dict) and st.key (attribute).
+    session_state 里既会 st["key"] 也会 st.key，所以两种写法都得能用。
     """
 
     def __getattr__(self, key: str):
-        """Support st.key access — raises AttributeError on missing keys."""
+        """支持 st.key 这种读法，键不存在就抛 AttributeError。"""
         try:
             return self[key]
         except KeyError:
             raise AttributeError(f"FakeSession has no attribute '{key}'")
 
     def __setattr__(self, key: str, value):
-        """Support st.key = value — only for non-dunder keys."""
+        """支持 st.key = value 这种写法，下划线开头的键走正常属性。"""
         if key.startswith("_"):
             super().__setattr__(key, value)
         else:
             self[key] = value
 
     def __contains__(self, key):
-        """Support 'key' in st check that Streamlit session_state relies on."""
+        """支持 'key' in st 判断，session_state 内部会用到。"""
         if isinstance(key, str) and key.startswith("_"):
             return key in self.__dict__
         return super().__contains__(key)
@@ -729,7 +728,7 @@ def agent_chat_offline(req: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- Feedback --
+# 反馈
 
 @app.get("/api/feedback", tags=["反馈"])
 def get_feedback(topic: Optional[str] = Query(None)):
@@ -749,7 +748,7 @@ def get_feedback(topic: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -- OpenAPI 导出（扣子插件用） --
+# 导出 OpenAPI（扣子插件要用）
 
 @app.get("/openapi.json", tags=["系统"], include_in_schema=False)
 def export_openapi():
@@ -763,7 +762,7 @@ def export_openapi():
     return schema
 
 
-# -- Entrypoint --
+# 入口
 
 if __name__ == "__main__":
     import uvicorn

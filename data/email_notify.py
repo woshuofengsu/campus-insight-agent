@@ -1,4 +1,3 @@
-# data/email_notify.py
 """邮件通知 — QQ 邮箱 SMTP 发送（最佳努力，失败静默记录日志）。
 
 凭据通过 config.SMTP_* 从 .env 读取，绝不硬编码；未配置时直接跳过发送。
@@ -29,7 +28,7 @@ def send_email(subject: str, body: str, to: str = "") -> bool:
         to: 收件人；留空则用 config.SMTP_TO，再留空则发给自己（SMTP_USER）
     """
     if not is_configured():
-        _log.debug("SMTP not configured, skipping email notification")
+        _log.debug("SMTP 没配置，跳过邮件通知")
         return False
     recipient = to or SMTP_TO or SMTP_USER
     try:
@@ -40,8 +39,8 @@ def send_email(subject: str, body: str, to: str = "") -> bool:
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as server:
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, [recipient], msg.as_string())
-        _log.info("Email sent to %s (subject=%r)", recipient, subject)
+        _log.info("邮件已发给 %s (subject=%r)", recipient, subject)
         return True
     except Exception:
-        _log.warning("Email send failed (subject=%r)", subject, exc_info=True)
+        _log.warning("邮件发送失败 (subject=%r)", subject, exc_info=True)
         return False

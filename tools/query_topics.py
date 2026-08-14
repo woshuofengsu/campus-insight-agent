@@ -36,7 +36,7 @@ def get_topics() -> str:
             f"   {t.get('description', '')[:60]}..."
         )
 
-        # Show a few recent opinions
+        # 每条议题带几条最新观点
         if summary["recent_opinions"]:
             lines.append(f"   💬 最新观点：")
             for op in summary["recent_opinions"][:2]:
@@ -94,26 +94,24 @@ def get_topic_detail(topic_id: int) -> str:
 
 
 def _discover_hot_topic() -> dict | None:
-    """Analyze recent community data to discover potential hot topics.
+    """分析最近的社区数据，找有没有能聊起来的热点。
 
-    Called by the perception engine to auto-generate discussion topics
-    when certain patterns are detected (e.g., same category spikes,
-    recurring complaints).
+    感知引擎调它来自动发起议题：某类诉求扎堆、反复出现等
+    情况命中时就会生成。
 
-    Returns a dict with title/description/category if a hot topic is found,
-    or None if nothing notable.
+    有热点就返回 {title, description, category}，没有就 None。
     """
     issues = get_issues(limit=50)
     if not issues:
         return None
 
-    # Find category spikes
+    # 统计各类别数量，找扎堆的
     cat_counts: dict[str, int] = {}
     for issue in issues:
         cat = issue.get("category", "其他")
         cat_counts[cat] = cat_counts.get(cat, 0) + 1
 
-    # If any category has >= 5 recent issues, it's a hot topic
+    # 某类最近有 5 件以上就算热点
     for cat, count in cat_counts.items():
         if count >= 5:
             topic_templates = {

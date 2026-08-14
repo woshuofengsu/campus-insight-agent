@@ -1,4 +1,3 @@
-# ui/pages_grid/dashboard.py
 """📊 工作台 — 网格员端首页：KPI、紧急工单、趋势、热门提案."""
 import logging
 from datetime import datetime
@@ -26,17 +25,17 @@ def _now_short() -> str:
     return f"{now.year}年{now.month}月{now.day}日 {weekdays[now.weekday()]}"
 
 
-# ── Page Render ──
+# 页面渲染
 memory = st.session_state.get("memory")
 if memory is not None:
     profile = memory.get_user_profile()
 else:
     profile = {}
 community = profile.get("community", "小区")
-dept = profile.get("building", "")       # grid: department stored in building field
+dept = profile.get("building", "")       # 网格员端：部门存在 building 字段里
 display_name = profile.get("name", "") or profile.get("unit", "")
 
-# ── Weather widget (lightweight) ──
+# 天气小部件
 weather_html = ""
 try:
     from tools.query_weather import get_today_weather
@@ -48,8 +47,8 @@ try:
             f'{d["emoji"]} {d["condition"]} {d["temp_low"]}~{d["temp_high"]}°C '
             f'💧{d["rain_prob"]}%</span>'
         )
-except Exception:  # log and skip
-    _log.debug("Weather fetch failed", exc_info=True)
+except Exception:  # 记日志跳过
+    _log.debug("拉取天气失败", exc_info=True)
 
 st.markdown(
     f'<div style="margin-bottom:4px;">'
@@ -64,7 +63,7 @@ st.markdown(
 st.caption(f"欢迎回来，{display_name or dept or '网格员'}。")
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:8px 0 16px;"></div>', unsafe_allow_html=True)
 
-# ── 🎯 今日待办（核心动作前置：网格员第一眼看到"要做什么"，而非"发生了什么"）──
+# 今日待办：先让网格员看到要做什么，而不是发生了什么
 _sla_todo = get_sla_summary()
 _todo_urgent = cached_issues(urgency="紧急", status=None, limit=100)
 _todo_pending_props = sum(1 for p in cached_proposals(sort_by="supporters", limit=200)
@@ -91,7 +90,7 @@ with st.container(border=True):
 
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
-# ── KPI Row ──
+# KPI 行
 stats = cached_issues_stats()
 p_stats = cached_proposals_stats()
 health = cached_health_score()
@@ -101,7 +100,7 @@ in_progress_count = stats["by_status"].get("处理中", 0)
 resolved_count = stats["by_status"].get("已解决", 0)
 today_new = stats.get("today_new", 0)
 
-# ── KPI Strip (3-col nested: 2+2+1, stacks to 3 rows on mobile) ──
+# KPI 条：3 列嵌套，手机上堆成 3 行
 grade = health.get("grade", "-")
 c1, c2, c3 = st.columns(3)
 with c1:
@@ -119,7 +118,7 @@ with c3:
 
 st.markdown(f'<div style="height:1px;background:{TOKEN["border"]};margin:12px 0 16px;"></div>', unsafe_allow_html=True)
 
-# ── Dissatisfaction reasons (满意度透传) ──
+# 不满意反馈透传
 _diss = get_dissatisfaction_reasons(limit=5)
 if _diss:
     with st.expander(f"😞 不满意反馈（{len(_diss)} 条）"):
@@ -130,7 +129,7 @@ if _diss:
                 + (f" — {_reason}" if _reason else " —（未填写原因）")
             )
 
-# ── 老年关怀：SOS 求助 + 重点关注老人（血压/用药依从） ──
+# 老年关怀：SOS 求助 + 重点关注老人
 try:
     from data.db_elderly import get_pending_sos, mark_sos_done, get_elderly_overview
     _sos = get_pending_sos()
@@ -161,9 +160,9 @@ try:
                 )
                 st.caption(f"🩺 最近血压 {_bp_txt} · 💊 {_adh_txt}")
 except Exception:
-    _log.debug("elderly care section unavailable", exc_info=True)
+    _log.debug("养老关怀模块不可用", exc_info=True)
 
-# ── Urgent Issues (Actionable) ──
+# 紧急工单（可直接操作）
 section("⚠️ 需要立即处理")
 
 if not urgent_issues:
@@ -199,7 +198,7 @@ else:
                         st.write(desc)
             with c_right:
                 st.markdown("<div style='margin-top:4px;'></div>", unsafe_allow_html=True)
-                # Quick processing note
+                # 快捷处理备注
                 quick_note_key = f"_urgent_note_{iid}"
                 st.text_input("备注", key=quick_note_key, placeholder="可选备注…", label_visibility="collapsed")
                 if status == "待处理":
@@ -244,7 +243,7 @@ else:
                         invalidate_issues()
                         st.rerun()
 
-# ── SLA Overdue Alerts (per-urgency deadlines, not a flat 7-day rule) ──
+# SLA 超时预警：按紧急度分级时限，不是一刀切 7 天
 overdue_issues = get_sla_breaches(limit=8)
 
 if overdue_issues:
@@ -284,7 +283,7 @@ if overdue_issues:
                     invalidate_issues()
                     st.rerun()
 
-# ── SLA 升级工单（超时 2×，已升级）──
+# SLA 升级工单：超时两倍自动升级
 escalated_issues = get_escalated_issues(limit=5)
 if escalated_issues:
     st.markdown("---")
@@ -298,7 +297,7 @@ if escalated_issues:
 
 st.markdown("---")
 
-# ── 关联洞察（系统主动发现）──
+# 关联洞察：系统主动发现
 try:
     from agent.reflector import get_proactive_insights as _get_insights
     _insights = _get_insights()
@@ -314,7 +313,7 @@ try:
                 f'系统自动分析 · 实时更新</span></div>',
                 unsafe_allow_html=True,
             )
-            # ── Anomaly alerts ──
+            # 异常告警
             for za in _insights.get("z_anomalies", [])[:2]:
                 level_icon = {"critical": "🔴", "high": "🟠", "moderate": "🟡"}.get(za.get("level", ""), "⚪")
                 st.markdown(
@@ -322,7 +321,7 @@ try:
                     f'· 本周 {za["recent"]} 件'
                     + (f' · 紧急 {za["urgent_pending"]} 件' if za.get("urgent_pending") else ''),
                 )
-            # ── Cross-time trend ──
+            # 跨周趋势
             ct = _insights.get("cross_time", {})
             if ct:
                 trend_icon = "⚠️" if ct.get("is_worsening") else "✅" if ct.get("is_improving") else "📊"
@@ -332,29 +331,29 @@ try:
                     f'解决 {ct.get("resolved_this_week", 0)} 件 '
                     f'({ct.get("resolved_trend", "→")})'
                 )
-            # ── Upgrade suggestions ──
+            # 升级建议
             for u in _insights.get("uncovered_upgrades", [])[:2]:
                 st.markdown(
                     f'🚀 **{u["category"]}** 类 {u["issue_count"]} 件待处理，建议发起治理提案'
                 )
             st.caption(f'🕐 基于 {datetime.now().strftime("%H:%M")} 数据 · 由系统自动生成')
 except ImportError:
-    _log.warning("Reflector module not available for proactive insights", exc_info=True)
+    _log.warning("Reflector 模块没装，主动洞察出不来", exc_info=True)
 except Exception:
-    _log.warning("Failed to load proactive insights", exc_info=True)
+    _log.warning("加载主动洞察失败", exc_info=True)
 
-# ── 🏥 Health Risk Overview (compact) — shared component ──
+# 健康风险概览（公共组件，精简版）
 try:
     from data.db_health_alerts import cached_health_risk as _cached_health
     from ui.health_card import render_health_risk_overview
     _h = _cached_health()
     render_health_risk_overview(_h)
 except Exception:
-    _log.warning("Health risk module unavailable", exc_info=True)
+    _log.warning("健康风险模块不可用", exc_info=True)
 
 st.markdown("---")
 
-# ── 🧠 社区感知 Insights (background engine) ──
+# 社区感知：后台引擎跑出来的结果
 try:
     from data.db_perception import get_latest_perception, get_perception_status
     perception = get_latest_perception()
@@ -414,17 +413,17 @@ try:
                         unsafe_allow_html=True,
                     )
 except Exception:
-    _log.warning("Perception engine unavailable", exc_info=True)
+    _log.warning("感知引擎不可用", exc_info=True)
 
 st.markdown("---")
 
-# ── Recently Resolved (achievement visibility) ──
+# 最近已解决（让人看到成果）
 section("✅ 最近已解决")
 recently_resolved = cached_issues(status="已解决", limit=8)
 if not recently_resolved:
     st.caption("暂无已解决的工单。")
 else:
-    # Show as a compact horizontal strip of resolved cards
+    # 已解决卡片紧凑横排
     for ri in recently_resolved[:6]:
         ri_id = ri["id"]
         ri_title = ri.get("title", "")[:30]
@@ -446,7 +445,7 @@ else:
 
 st.markdown("---")
 
-# ── 7-Day Trend Chart ──
+# 近 7 天趋势图
 section("📈 最近7天趋势")
 timeline = cached_issues_timeline(days=7)
 if timeline:
@@ -476,7 +475,7 @@ else:
 
 st.markdown("---")
 
-# ── Activity Timeline (real activity_log) ──
+# 动态时间线（真实 activity_log）
 section("📡 社区动态时间线")
 
 try:
@@ -494,7 +493,7 @@ try:
             st.metric("💡 今日提案", f'{act_summary["today_proposals"]} 件')
 
     if feed:
-        # Compact activity feed
+        # 精简动态流
         action_icons = {
             "上报问题": "📝", "解决问题": "✅", "开始处理": "🔄", "重新打开": "🔓",
             "提交提案": "💡", "附议提案": "👍", "回复提案": "💬",
@@ -519,7 +518,7 @@ try:
                 unsafe_allow_html=True,
             )
 
-        # Fallback: if no real activity from feed, use live_generator
+        # 动态为空就退回 live_generator 生成
         if len(feed) == 0:
             try:
                 from data.live_generator import generate_today_events
@@ -529,13 +528,13 @@ try:
                                + f'新增 {live_events.get("new_issues", 0)} 件'
                                + f' · 解决 {live_events.get("resolved_issues", 0)} 件')
             except Exception:
-                _log.warning("Live generator events unavailable", exc_info=True)
+                _log.warning("live generator 事件拿不到", exc_info=True)
     else:
         st.caption("暂无社区动态。当居民上报问题或提交提案时，这里会实时更新。")
-except Exception:  # log and skip
-    _log.debug("Activity feed skipped", exc_info=True)
+except Exception:  # 记日志跳过
+    _log.debug("动态流跳过了", exc_info=True)
 
-# ── Top Proposals ──
+# 热门提案
 section("💡 热门提案 TOP 5")
 proposals = cached_proposals(sort_by="supporters", limit=5)
 if not proposals:
@@ -582,7 +581,7 @@ else:
                         invalidate_proposals()
                         st.rerun()
 
-# ── Dashboard reply modal ──
+# 回复提案的输入区
 if st.session_state.get("_dash_reply_pid"):
     pid = st.session_state["_dash_reply_pid"]
     st.markdown("---")

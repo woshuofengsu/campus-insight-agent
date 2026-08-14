@@ -1,27 +1,26 @@
 # ui/session_state.py
-"""Typed access layer for st.session_state keys.
+"""st.session_state 键的带类型访问层。
 
-All session_state key constants are defined HERE — nowhere else should
-raw string keys be used. This prevents typos (e.g. "_login_user_id" vs
-"_login_user_Id") and makes key discovery trivial.
+所有 session_state 键的常量都只在这里定义，别处不许再用裸字符串，
+防止手滑打错（比如 "_login_user_id" 和 "_login_user_Id"），找键也方便。
 
-Usage:
+用法：
     from ui.session_state import SS, session
-    uid = SS.login_user_id          # reads st.session_state
-    SS.login_user_id = 42           # writes st.session_state
-    SS.setdefault("_tour_step", 0)  # setdefault pattern
+    uid = SS.login_user_id          # 读 st.session_state
+    SS.login_user_id = 42           # 写 st.session_state
+    SS.setdefault("_tour_step", 0)  # setdefault 用法
 
-For dynamic keys (those that embed an id), use the `key()` method:
+动态键（里面要嵌 id 的）用 key() 方法：
     SS.key("_batch", issue_id)      # → "_batch_42"
 """
 
 import streamlit as st
 
 
-# Key Constants — single source of truth
+# 键常量 — 唯一的定义处
 
 class _Keys:
-    """Namespace for all session_state key constants."""
+    """所有 session_state 键常量的命名空间。"""
 
     agent: str = "_agent"
     memory: str = "_memory"
@@ -72,7 +71,7 @@ class _Keys:
 
     @staticmethod
     def key(prefix: str, entity_id: int) -> str:
-        """Generic dynamic key: SS.key('_batch', 42) → '_batch_42'."""
+        """动态键：SS.key('_batch', 42) → '_batch_42'。"""
         return f"{prefix}_{entity_id}"
 
     @staticmethod
@@ -108,16 +107,16 @@ class _Keys:
         return f"_confirm_delete_{entity_id}"
 
 
-# Single canonical instance
+# 唯一的实例
 SS = _Keys()
 
 
-# Typed Accessor
+# 带类型的访问器
 
 class _Session:
-    """Typed property access to frequently-used session_state values.
+    """常用 session_state 值的属性化访问。
 
-    Use `session.login_user_id` instead of `st.session_state.get("_login_user_id", 0)`.
+    用 `session.login_user_id` 代替 `st.session_state.get("_login_user_id", 0)`。
     """
 
     @property
@@ -153,22 +152,22 @@ class _Session:
         st.session_state[SS.community_theme] = value
 
     def get(self, key: str, default=None):
-        """Typed get — prefer specific properties for common keys."""
+        """带类型的 get，常用键优先用上面的属性。"""
         return st.session_state.get(key, default)
 
     def setdefault(self, key: str, default) -> None:
-        """Set a key in session_state if not already present."""
+        """键不存在时才写入 session_state。"""
         if key not in st.session_state:
             st.session_state[key] = default
 
     def pop(self, key: str, default=None):
-        """Pop a key from session_state (useful for one-shot flags)."""
+        """从 session_state 弹出键（一次性标记用）。"""
         return st.session_state.pop(key, default) if key in st.session_state else default
 
     def clear_key(self, key: str) -> None:
-        """Safely remove a key from session_state."""
+        """安全删除 session_state 里的键。"""
         st.session_state.pop(key, None)
 
 
-# Singleton instance for property access
+# 单例，供属性访问
 session = _Session()

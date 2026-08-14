@@ -1,14 +1,13 @@
-# ui/pages/bigscreen.py
 """📺 治理大屏 — 竞赛演示专用，指挥中心风格.
 
-Features:
-  - Dark command-center theme with glowing accents
-  - Scrolling activity ticker at bottom (CSS animation)
-  - Community district heatmap (CSS grid)
-  - Glowing KPI cards with pulse animation on anomalies
-  - Real-time clock with seconds (st.components.v1.html)
-  - Demo mode: auto-carousel with mock data (?demo=1)
-  - Auto-refresh every 30s (configurable via ?refresh=N)
+功能：
+  - 深色指挥中心主题，带发光描边
+  - 底部滚动动态跑马灯（CSS 动画）
+  - 社区片区热力分布（CSS grid）
+  - KPI 卡片发光，有异常会脉冲闪烁
+  - 实时时钟带秒（st.components.v1.html）
+  - 演示模式：模拟数据自动轮播（?demo=1）
+  - 每 30 秒自动刷新（可用 ?refresh=N 改）
 """
 import logging
 import streamlit as st
@@ -20,7 +19,7 @@ _log = logging.getLogger(__name__)
 
 from ui.theme import get_theme
 
-# Dual theme colors — dark command-center vs light enterprise dashboard
+# 两套配色：深色指挥中心 / 浅色企业看板
 _is_dark = get_theme() == "dark"
 
 if _is_dark:
@@ -50,7 +49,7 @@ else:
         "show_glow": False, "show_grid": False,
     }
 
-# ── Mock data for demo mode ──
+# 演示模式的模拟数据
 
 def _mock_issue_stats():
     return {
@@ -97,13 +96,12 @@ def _mock_recent_issues():
 def _mock_feedback_stats():
     return {"total": 89, "positive": 52, "negative": 21, "neutral": 16}
 
-# ── CSS — Theme-aware command center / enterprise dashboard ──
+# CSS：按主题切指挥中心 / 企业看板样式
 
 def _inject_bigscreen_css(c: dict) -> None:
-    """Inject theme-aware bigscreen CSS stylesheet.
+    """注入大屏的 CSS 样式。
 
-    Extracted from inline st.markdown for readability and maintainability.
-    All color values are resolved from the ``c`` dict before injection.
+    从 st.markdown 里拆出来的，好维护；颜色都从 c 字典里取。
     """
     _grid_bg = (
         ".stApp::before {"
@@ -251,7 +249,7 @@ def _inject_bigscreen_css(c: dict) -> None:
 
 _inject_bigscreen_css(C)
 
-# Data loading — real data first, mock only for demo or empty DB
+# 先加载真实数据，演示模式或空库才用模拟数据
 
 _using_mock = False
 
@@ -268,8 +266,8 @@ try:
     recent_issues = cached_issues(limit=10)
     if issue_stats.get("total", 0) == 0:
         _using_mock = True
-except Exception:  # log and skip
-    _log.warning("Data loading failed, falling back to mock data", exc_info=True)
+except Exception:  # 记日志跳过
+    _log.warning("数据加载失败，退回 mock 数据", exc_info=True)
     _using_mock = True
 
 if _using_mock:
@@ -293,7 +291,7 @@ has_anomaly = pending > 10
 
 now = datetime.now()
 
-# Clock colors — theme-aware
+# 时钟配色跟随主题
 _clock_text = C["text"]
 _clock_muted = C["text_muted"]
 _clock_bg = "transparent"
@@ -346,7 +344,7 @@ st.components.v1.html(f"""
 </html>
 """, height=52)
 
-# DEMO MODE BADGE
+# 演示模式角标
 
 if _using_mock:
     st.markdown(
@@ -354,7 +352,7 @@ if _using_mock:
         unsafe_allow_html=True,
     )
 
-# HEADER
+# 页头
 
 st.markdown(f"""
 <div class="fade-up" style="margin-bottom:8px;">
@@ -374,7 +372,7 @@ st.markdown(f"""
 
 st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{C["border_glow"]},transparent);margin:12px 0;"></div>', unsafe_allow_html=True)
 
-# KPI ROW — 6 glowing cards with animated numbers
+# KPI 一行 6 个发光卡片
 
 resolution_rate = health.get("resolution_rate", 0)
 avg_days = health.get("avg_days", 0) or 0
@@ -402,7 +400,7 @@ for idx, (label, value, suffix, color, style, sub) in enumerate(kpi_data):
 </div>
 """, unsafe_allow_html=True)
 
-# MAIN GRID: trend chart + health ring + pipeline
+# 主网格：趋势图 + 健康环 + 流转
 
 col_main, col_side = st.columns([3, 2])
 
@@ -448,7 +446,7 @@ with col_main:
 with col_side:
     st.markdown('<div class="section-title">🏥 健康仪表</div>', unsafe_allow_html=True)
 
-    # Health ring + resolution pipeline side by side
+    # 健康环和解决流转并排
     c_ring, c_pipe = st.columns([1, 1.5])
 
     with c_ring:
@@ -489,7 +487,7 @@ with col_side:
 </div>
 """, unsafe_allow_html=True)
 
-    # Avg resolution speed
+    # 平均解决周期
     st.markdown(f"""
 <div style="margin-top:8px;font-size:0.75em;color:{C["text_muted"]};text-align:center;">
     ⏱️ 平均解决周期：<strong style="color:{C["warning"] if avg_days > 3 else C["success"]};">{avg_days} 天</strong>
@@ -500,7 +498,7 @@ with col_side:
 
 st.markdown(f'<div style="height:1px;background:linear-gradient(90deg,transparent,{C["border_glow"]},transparent);margin:16px 0;"></div>', unsafe_allow_html=True)
 
-# BOTTOM ROW: community heatmap + recent issues
+# 底部：热力分布 + 最近工单
 
 col_heat, col_recent = st.columns([1, 1])
 
@@ -508,7 +506,7 @@ with col_heat:
     st.markdown('<div class="section-title">🗺️ 社区诉求热力分布</div>', unsafe_allow_html=True)
 
     by_cat = issue_stats.get("by_category", {})
-    # Build intensity map data
+    # 按类别粗略估算各片区的热度
     community_areas = {
         "单元楼": by_cat.get("设施维修", 0) + by_cat.get("物业服务", 0) // 2,
         "活动室": by_cat.get("设施维修", 0) // 3 + by_cat.get("物业服务", 0) // 3,
@@ -529,13 +527,13 @@ with col_heat:
         if max_val == 0: return (C["surface_raised"], C["text_muted"])
         intensity = count / max_val
         if intensity >= 0.7:
-            r, g, b = 239, 68, 68  # red
+            r, g, b = 239, 68, 68  # 红
             alpha = 0.35 + intensity * 0.5
         elif intensity >= 0.4:
-            r, g, b = 245, 158, 11  # amber
+            r, g, b = 245, 158, 11  # 橙
             alpha = 0.25 + intensity * 0.4
         elif intensity > 0:
-            r, g, b = 59, 130, 246  # blue
+            r, g, b = 59, 130, 246  # 蓝
             alpha = 0.15 + intensity * 0.35
         else:
             return (C["surface_raised"], C["text_muted"])
@@ -549,7 +547,7 @@ with col_heat:
     )
     st.markdown(f'<div class="heat-grid">{heat_cells}</div>', unsafe_allow_html=True)
 
-    # Category annotation
+    # 类别说明
     if by_cat:
         top_cat = max(by_cat, key=by_cat.get)
         top_count = by_cat[top_cat]
@@ -580,7 +578,7 @@ with col_recent:
 </div>
 """, unsafe_allow_html=True)
 
-# ANOMALY ALERT BAR
+# 异常预警条
 
 if has_anomaly or urgent_count > 0:
     alerts = []
@@ -600,7 +598,7 @@ if has_anomaly or urgent_count > 0:
 </div>
 """, unsafe_allow_html=True)
 
-# BOTTOM TICKER — scrolling activity feed
+# 底部跑马灯：滚动动态
 
 ticker_events = []
 for i in recent_issues[:6]:
@@ -616,7 +614,7 @@ ticker_events += [
     "📢 新通知「社区活动安排」已发布",
     "🎉 提案 #3「增设快递柜」已进入实施阶段",
 ]
-# Duplicate for continuous scroll
+# 复制一份才能无缝循环滚动
 ticker_events = ticker_events + ticker_events
 
 ticker_html = "".join(
@@ -629,7 +627,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# FOOTER
+# 页脚
 
 st.markdown(f"""
 <div style="text-align:center;font-size:0.75em;color:{C["text_muted"]};margin-top:8px;">

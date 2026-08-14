@@ -1,5 +1,5 @@
-# tests/test_deepseek_compat.py
-"""Verify DeepSeek API compatibility with OpenAI format + function calling.
+# DeepSeek 兼容性验证脚本
+"""验证 DeepSeek API 兼容 OpenAI 格式 + 函数调用。
 
 需要真实 DeepSeek API（消耗额度 + 网络）。默认被 pytest 跳过（-m integration_api
 才跑），避免无 key/断网时全量测试挂掉。
@@ -15,7 +15,7 @@ pytestmark = pytest.mark.integration_api
 
 
 def test_basic_chat():
-    """Test 1: Basic chat completion works."""
+    """测试1：普通对话补全能不能通。"""
     client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
     response = client.chat.completions.create(
         model=DEEPSEEK_MODEL,
@@ -28,7 +28,7 @@ def test_basic_chat():
 
 
 def test_function_calling():
-    """Test 2: Function calling (tools parameter) works."""
+    """测试2：函数调用（tools 参数）能不能用。"""
     client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
     tools = [
@@ -70,7 +70,7 @@ def test_function_calling():
 
 
 def test_langchain_chatopenai():
-    """Test 3: LangChain ChatOpenAI works with DeepSeek base_url."""
+    """测试3：LangChain ChatOpenAI 接 DeepSeek base_url 能不能用。"""
     from langchain_openai import ChatOpenAI
 
     llm = ChatOpenAI(

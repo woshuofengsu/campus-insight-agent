@@ -1,4 +1,3 @@
-# ui/pages_elderly/notify.py
 """🔊 听通知 — 大字通知列表 + TTS 朗读."""
 import streamlit as st
 

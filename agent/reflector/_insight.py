@@ -1,9 +1,8 @@
 # agent/reflector/_insight.py
-"""LLM-powered insight generation from association data.
+"""用 LLM 把关联数据生成洞察。
 
-When the association engine finds significant patterns (anomalies, trends,
-upgrade paths), this module generates a human-readable interpretation via
-a lightweight LLM call.
+关联引擎找到显著模式（异常、趋势、升级路径）时，
+这个模块用一次轻量 LLM 调用生成人话解读。
 """
 import logging
 import time
@@ -12,22 +11,22 @@ from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
 _logger = logging.getLogger("agent.reflector")
 
-_INSIGHT_LLM = None  # lazy singleton — created on first use
+_INSIGHT_LLM = None  # 懒加载单例——第一次用的时候才建
 
 
-# -- 1. LLM client (lazy singleton)
+# 1. LLM 客户端（懒加载单例）
 
 def _get_insight_llm():
-    """Lazy-init a lightweight LLM client for insight generation.
+    """懒初始化一个轻量 LLM 客户端，专门生成洞察。
 
-    Separate from the main agent's LLM — only used for post-hoc analysis.
-    Returns None if API key is not configured.
+    和主 Agent 的 LLM 分开——只做事后分析用。
+    没配 API key 就返回 None。
     """
     global _INSIGHT_LLM
     if _INSIGHT_LLM is not None:
         return _INSIGHT_LLM
     if not DEEPSEEK_API_KEY:
-        _INSIGHT_LLM = False  # sentinel: tried but not available
+        _INSIGHT_LLM = False  # 哨兵值：试过了，但没有
         return None
     try:
         from openai import OpenAI
@@ -37,18 +36,18 @@ def _get_insight_llm():
         )
         return _INSIGHT_LLM
     except Exception:
-        _logger.debug("Failed to initialize insight LLM client", exc_info=True)
+        _logger.debug("初始化洞察 LLM 客户端失败", exc_info=True)
         _INSIGHT_LLM = False
         return None
 
 
-# -- 2. Prompt builder
+# 2. Prompt 组装
 
 def _build_insight_prompt(associations: dict, user_input: str) -> str:
-    """Build a focused prompt for the LLM insight generator.
+    """给 LLM 洞察生成器拼一个聚焦的 prompt。
 
-    Now includes: cross-time comparison, z-score anomalies with severity,
-    upgrade path suggestions, and resolution efficiency data.
+    现在包含：跨周对比、带严重度的 z-score 异常、升级路径建议、
+    解决效率数据。
     """
     sp = associations.get("spatial", [])
     tm = associations.get("temporal", [])
@@ -153,14 +152,14 @@ def _build_insight_prompt(associations: dict, user_input: str) -> str:
     return "\n".join(parts)
 
 
-# -- 3. LLM insight generation
+# 3. LLM 洞察生成
 
 def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
-    """Try to generate a nuanced LLM insight. Returns None if unavailable/fails.
+    """试着生成一条有深度的 LLM 洞察，不行/失败就返回 None。
 
-    Only called when associations are significant enough to warrant analysis.
-    Enhanced threshold: z-anomalies with severity >= 5, upgrade paths with
-    uncovered categories, cross-time worsening trends, or classic triggers.
+    只在关联足够显著值得分析时才调。
+    阈值加强过：z 异常严重度 ≥5、有未覆盖类别的升级路径、
+    跨周恶化趋势，或者经典触发条件。
     """
     sp = associations.get("spatial", [])
     tm = associations.get("temporal", [])
@@ -170,7 +169,7 @@ def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
     up = associations.get("upgrade_paths", [])
     ct = associations.get("cross_time", {})
 
-    # Enhanced significance threshold
+    # 加强后的显著度阈值
     significant = (
         len(sp) >= 3
         or any(t.get("cnt", 0) >= 5 for t in tm)
@@ -209,24 +208,23 @@ def _generate_llm_insight(associations: dict, user_input: str) -> str | None:
         elapsed = time.time() - start
         text = (resp.choices[0].message.content or "").strip() if resp.choices else ""
         if text:
-            _logger.info("LLM insight generated in %.1fs (%d chars)", elapsed, len(text))
+            _logger.info("LLM 洞察生成耗时 %.1fs（%d 字）", elapsed, len(text))
             return text
     except Exception:
-        # Silent fallback — LLM insight is a bonus, not critical
-        _logger.debug("LLM insight generation failed", exc_info=True)
+        # 静默兜底——LLM 洞察是加分项，不是必须的
+        _logger.debug("LLM 洞察生成失败", exc_info=True)
         pass
 
     return None
 
 
-# -- 4. Insight text builder (LLM + structured fallback)
+# 4. 洞察文本组装（LLM + 结构化兜底）
 
 def build_insight_text(associations: dict, user_input: str = "") -> str:
-    """Build insight text: try LLM first, fall back to structured template.
+    """组装洞察文本：先试 LLM，不行就用结构化模板。
 
-    The LLM insight provides nuanced interpretation ("what does this pattern mean?")
-    while the template provides structured data display. Both are shown in the
-    insight panel — LLM text first (if available), then data cards.
+    LLM 洞察负责解释"这个模式说明什么"，模板负责摆数据。
+    两者都显示在洞察面板——LLM 文本在前（有的话），数据卡片在后。
     """
     parts: list[str] = []
     sp = associations.get("spatial", [])
@@ -240,12 +238,12 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
     za = associations.get("z_anomalies", [])
     up = associations.get("upgrade_paths", [])
 
-    # ── Layer 1: LLM interpretation (the "why") ──
+    # 第 1 层：LLM 解读（回答"为什么"）
     llm_insight = _generate_llm_insight(associations, user_input)
     if llm_insight:
         parts.append(f"🧠 **深度解读**：{llm_insight}")
 
-    # ── Layer 2: Z-score anomaly detection ──
+    # 第 2 层：z-score 异常检测
     if za:
         level_icons = {"critical": "🔴", "high": "🟠", "moderate": "🟡"}
         za_items = [
@@ -257,7 +255,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
         ]
         parts.append(f"🔬 **统计异常检测**（z-score 法）：{'；'.join(za_items)}")
 
-    # ── Layer 3: Classic anomaly detection (ratio-based) ──
+    # 第 3 层：经典异常检测（比例法）
     elif an:
         an_items = [
             f"「{a['category']}」本周 {a['recent']} 件 (周均 {a['baseline_avg']}，激增 +{a['spike']})"
@@ -265,7 +263,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
         ]
         parts.append(f"⚠️ **异常检测**：{'；'.join(an_items)}")
 
-    # ── Layer 4: Cross-time comparison ──
+    # 第 4 层：跨周对比
     if ct:
         new_str = f"新增 {ct['new_this_week']} 件 ({ct['new_trend']})"
         resolved_str = f"解决 {ct['resolved_this_week']} 件 ({ct['resolved_trend']})"
@@ -276,7 +274,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
         )
         parts.append(f"📅 **本周 vs 上周**：{new_str}，{resolved_str}，{net_label}")
 
-    # ── Layer 5: Upgrade path recommendations ──
+    # 第 5 层：升级路径建议
     if up:
         up_items = []
         for u in up[:3]:
@@ -284,7 +282,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
             up_items.append(f"「{u['category']}」{u['issue_count']} 件待处理 → {has_prop}")
         parts.append(f"🚀 **治理升级路径**：{'；'.join(up_items)}")
 
-    # ── Layer 6: Data summary — spatial ──
+    # 第 6 层：数据摘要——空间
     if sp:
         loc_names = sorted({(r.get("location") or r.get("title", ""))[:20] for r in sp})
         titles = [r["title"] for r in sp[:5]]
@@ -294,7 +292,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
             f"包括：{'、'.join(titles)}"
         )
 
-    # ── Layer 7: Data summary — temporal ──
+    # 第 7 层：数据摘要——时间
     for t in tm:
         cat, cnt = t.get("category", ""), t.get("cnt", 0)
         parts.append(
@@ -302,7 +300,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
             f"{'，呈上升趋势' if cnt >= 5 else ''}"
         )
 
-    # ── Layer 8: Recurrence warning ──
+    # 第 8 层：复发预警
     if rc:
         rts = [r["title"] for r in rc[:3]]
         parts.append(
@@ -310,7 +308,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
             f"包括：{'、'.join(rts)}。建议关注是否存在根本性原因未解决。"
         )
 
-    # ── Layer 9: Cross-category correlation ──
+    # 第 9 层：跨类别关联
     if cr:
         cr_items = [
             f"「{c['cat_a']}」↔「{c['cat_b']}」({c['co_count']} 次共现)"
@@ -318,7 +316,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
         ]
         parts.append(f"🔗 **类别关联**：{'；'.join(cr_items)}")
 
-    # ── Layer 10: Linked proposals ──
+    # 第 10 层：相关提案
     if lp:
         lp_items = [
             f"#{p['id']} {p['title'][:25]} (👍{p['supporter_count']})"
@@ -329,7 +327,7 @@ def build_insight_text(associations: dict, user_input: str = "") -> str:
             f"这些提案正在解决同类问题，你可以关注或附议！"
         )
 
-    # ── Layer 11: Resolution efficiency ──
+    # 第 11 层：解决效率
     if re_:
         if len(re_) >= 2:
             worst = re_[0]

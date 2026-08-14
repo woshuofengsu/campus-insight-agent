@@ -1,9 +1,9 @@
 # agent/weekly_report.py
 """治理周报生成器 — 自动分析社区治理数据并生成结构化周报。
 
-Reuses reflector analysis functions (z-score, cross-time, upgrade paths).
-Compiles executive summary (LLM), KPI snapshot, anomaly alerts, trend analysis,
-resolution efficiency, upgrade paths, spatial hotspots, and recurrence risks.
+复用 reflector 的分析函数（z-score 异常、跨周对比、升级路径），
+拼出执行摘要（LLM）、KPI 快照、异常提醒、趋势分析、解决效率、
+升级路径、空间热点和复发风险。
 """
 
 import logging
@@ -15,11 +15,11 @@ from data.db_core import get_db
 
 _logger = logging.getLogger("agent.weekly_report")
 
-# ── Reuse reflector analysis (imports deferred to avoid circular deps at module level) ──
+# 复用 reflector 的分析（延迟 import，避免模块级循环依赖）
 
 
 def _run_all_analysis():
-    """Run all reflector analysis dimensions. Returns structured dict."""
+    """跑一遍 reflector 的全部分析维度，返回结构化字典。"""
     from agent.reflector import (
         _z_score_anomalies,
         _cross_time_comparison,
@@ -37,7 +37,7 @@ def _run_all_analysis():
             result["cross_time"] = _cross_time_comparison(conn)
             result["upgrade_paths"] = _detect_upgrade_paths(conn)
 
-            # ── Overall KPIs ──
+            # 总体 KPI
             total = conn.execute("SELECT COUNT(*) as c FROM community_issues").fetchone()
             pending = conn.execute(
                 "SELECT COUNT(*) as c FROM community_issues WHERE status='待处理'"
@@ -74,7 +74,7 @@ def _run_all_analysis():
                 ) if total and resolved else 0,
             }
 
-            # ── Category breakdown (this week) ──
+            # 本周分类明细
             cat_rows = conn.execute("""
                 SELECT category, COUNT(*) as cnt
                 FROM community_issues
@@ -84,7 +84,7 @@ def _run_all_analysis():
             """).fetchall()
             result["category_breakdown"] = [dict(r) for r in cat_rows]
 
-            # ── Spatial hotspots ──
+            # 空间热点
             spatial_rows = conn.execute("""
                 SELECT location, COUNT(*) as cnt,
                        SUM(CASE WHEN urgency='紧急' THEN 1 ELSE 0 END) as urgent_cnt
@@ -95,7 +95,7 @@ def _run_all_analysis():
             """).fetchall()
             result["spatial_hotspots"] = [dict(r) for r in spatial_rows]
 
-            # ── Resolution efficiency ──
+            # 解决效率
             eff_rows = conn.execute("""
                 SELECT category,
                        COUNT(*) AS resolved_count,
@@ -108,14 +108,14 @@ def _run_all_analysis():
             """).fetchall()
             result["resolution_efficiency"] = [dict(r) for r in eff_rows]
 
-            # ── SLA overdue（分级口径统一走 data/db_sla.py）──
+            # SLA 超时（分级口径统一走 data/db_sla.py）
             from data.db_sla import get_sla_breaches
             result["sla_overdue"] = [
                 {**s, "days_open": s.get("hours_open", 0) // 24}
                 for s in get_sla_breaches(limit=8)
             ]
 
-            # ── Proposals summary ──
+            # 提案汇总
             prop_total = conn.execute("SELECT COUNT(*) as c FROM proposals").fetchone()
             prop_active = conn.execute(
                 "SELECT COUNT(*) as c FROM proposals WHERE status='讨论中'"
@@ -135,18 +135,18 @@ def _run_all_analysis():
                 "top": [dict(r) for r in top_props],
             }
 
-            # ── Health score ──
+            # 健康度评分
             from data.db_health import compute_health_score
             result["health"] = compute_health_score()
 
     except Exception as e:
-        _logger.warning("Analysis query failed: %s", e)
+        _logger.warning("分析查询失败：%s", e)
         result["error"] = str(e)
 
     return result
 
 
-# ── LLM Executive Summary ──
+# LLM 执行摘要
 
 _EXEC_LLM = None
 
@@ -166,13 +166,13 @@ def _get_llm():
         )
         return _EXEC_LLM
     except Exception:
-        _logger.debug("Failed to initialize executive summary LLM client", exc_info=True)
+        _logger.debug("初始化执行摘要 LLM 客户端失败", exc_info=True)
         _EXEC_LLM = False
         return None
 
 
 def _build_exec_summary_prompt(data: dict) -> str:
-    """Build the executive summary prompt from structured analysis data."""
+    """根据结构化分析数据拼执行摘要的 prompt。"""
     kpi = data.get("kpi", {})
     ct = data.get("cross_time", {})
     za = data.get("z_anomalies", [])
@@ -263,7 +263,7 @@ def _build_exec_summary_prompt(data: dict) -> str:
 
 
 def _generate_exec_summary(data: dict) -> str:
-    """Generate LLM-powered executive summary. Returns empty string if unavailable."""
+    """让 LLM 生成执行摘要，用不了就返回空字符串。"""
     client = _get_llm()
     if not client:
         return ""
@@ -284,19 +284,19 @@ def _generate_exec_summary(data: dict) -> str:
         elapsed = time.time() - start
         text = (resp.choices[0].message.content or "").strip() if resp.choices else ""
         if text:
-            _logger.info("Executive summary generated in %.1fs", elapsed)
+            _logger.info("执行摘要生成耗时 %.1fs", elapsed)
             return text
     except Exception as e:
-        _logger.warning("Executive summary generation failed: %s", e)
+        _logger.warning("执行摘要生成失败：%s", e)
 
     return ""
 
 
-# ── Formatting ──
+# 排版输出
 
 
 def _format_report(data: dict, exec_summary: str) -> str:
-    """Build the full markdown report from analysis data + executive summary."""
+    """用分析数据和执行摘要拼出完整的 markdown 周报。"""
     now = datetime.now()
     lines = [
         f"# 📊 社区治理周报",
@@ -306,7 +306,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
         "",
     ]
 
-    # ── Executive Summary ──
+    # 执行摘要
     if exec_summary:
         lines.append("## 🧠 执行摘要")
         lines.append("")
@@ -315,7 +315,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
         lines.append("---")
         lines.append("")
 
-    # ── KPI Dashboard ──
+    # KPI 仪表盘
     kpi = data.get("kpi", {})
     health = data.get("health", {})
     lines.append("## 📈 KPI 仪表盘")
@@ -333,7 +333,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
     lines.append(f"| 🏥 治理健康度 | {health.get('score', 'N/A')} 分 · {health.get('grade', 'N/A')} |")
     lines.append("")
 
-    # ── Cross-time comparison ──
+    # 跨周对比
     ct = data.get("cross_time", {})
     if ct:
         lines.append("---")
@@ -350,7 +350,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
         lines.append(f"| 净变化 | {ct.get('net_this_week', '?')} | {ct.get('net_last_week', '?')} | {net_label} |")
         lines.append("")
 
-    # ── Anomaly alerts ──
+    # 异常提醒
     za = data.get("z_anomalies", [])
     if za:
         lines.append("---")
@@ -367,7 +367,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             )
         lines.append("")
 
-    # ── SLA Overdue ──
+    # SLA 超时
     sla = data.get("sla_overdue", [])
     if sla:
         lines.append("---")
@@ -385,7 +385,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             )
         lines.append("")
 
-    # ── Spatial hotspots ──
+    # 空间热点
     spatial = data.get("spatial_hotspots", [])
     if spatial:
         lines.append("---")
@@ -397,7 +397,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             lines.append(f"- **{s['location']}**：{s['cnt']} 件待处理 {urgent_str}")
         lines.append("")
 
-    # ── Upgrade paths ──
+    # 升级路径
     up = data.get("upgrade_paths", [])
     if up:
         lines.append("---")
@@ -409,7 +409,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             lines.append(f"- **{u['category']}**：{u['issue_count']} 件待处理 → {has}")
         lines.append("")
 
-    # ── Category breakdown ──
+    # 分类明细
     cat = data.get("category_breakdown", [])
     if cat:
         lines.append("---")
@@ -422,7 +422,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             lines.append(f"| {c['category']} | {c['cnt']} |")
         lines.append("")
 
-    # ── Resolution efficiency ──
+    # 解决效率
     eff = data.get("resolution_efficiency", [])
     if eff:
         lines.append("---")
@@ -436,7 +436,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             lines.append(f"| {flag} {e['category']} | {e['resolved_count']} | {e['avg_days']} 天 |")
         lines.append("")
 
-    # ── Top proposals ──
+    # 热门提案
     props = data.get("proposals_summary", {})
     top = props.get("top", [])
     if top:
@@ -449,7 +449,7 @@ def _format_report(data: dict, exec_summary: str) -> str:
             lines.append(f"- {status_icon} **{p['title'][:30]}** · 👍{p['supporter_count']} · {p['status']}")
         lines.append("")
 
-    # ── Footer ──
+    # 结尾
     lines.append("---")
     lines.append("")
     lines.append(f"*报告由 CommunityInsight 自动生成于 {now.strftime('%Y-%m-%d %H:%M')}*")
@@ -458,17 +458,17 @@ def _format_report(data: dict, exec_summary: str) -> str:
     return "\n".join(lines)
 
 
-# ── Public API ──
+# 对外接口
 
 
 def generate_weekly_report(include_llm_summary: bool = True) -> dict:
-    """Generate a complete AI governance weekly report.
+    """生成一份完整的治理周报。
 
-    Returns a dict with:
-        - 'data': the raw analysis data (dict)
-        - 'exec_summary': LLM-generated executive summary (str, may be empty)
-        - 'markdown': formatted markdown report (str)
-        - 'title': report title with date
+    返回字典：
+        - 'data': 原始分析数据（dict）
+        - 'exec_summary': LLM 生成的执行摘要（str，可能为空）
+        - 'markdown': 排好版的 markdown 周报（str）
+        - 'title': 带日期的周报标题
     """
     data = _run_all_analysis()
 

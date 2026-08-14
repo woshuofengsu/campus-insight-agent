@@ -1,4 +1,4 @@
-"""Fix all section numbering in tech report — sequential renumber."""
+"""把技术报告里所有章节号重排一遍，改成连续编号。"""
 import re, os
 
 NUM_MAP = {
@@ -26,7 +26,7 @@ for i, line in enumerate(lines):
 with open(fpath, 'w', encoding='utf-8') as f:
     f.writelines(lines)
 
-# Print result
+# 打印结果
 for i, line in enumerate(lines):
     for cn in NUM_MAP:
         if line.startswith(f'## {cn}、'):

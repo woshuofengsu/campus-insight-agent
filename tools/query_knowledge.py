@@ -30,7 +30,7 @@ def query_knowledge(query: str) -> str:
     try:
         return rag_search(query, top_k=5)
     except Exception as e:
-        _log.debug("rag_search failed: %s", e, exc_info=True)
+        _log.debug("rag_search 挂了: %s", e, exc_info=True)
         return f"⚠️ 社区知识搜索暂不可用：{e}\n请稍后重试。"
 
 
@@ -57,5 +57,5 @@ def get_community_policy(topic: str) -> str:
             lines.append(f"**{i}. {r['title']}** `相关度 {r.get('score', 0):.2f}`\n{r['content']}\n")
         return "\n".join(lines)
     except Exception as e:
-        _log.debug("semantic_search (get_community_policy) failed: %s", e, exc_info=True)
+        _log.debug("semantic_search（get_community_policy）挂了: %s", e, exc_info=True)
         return f"⚠️ 规章检索暂不可用：{e}"

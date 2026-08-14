@@ -1,5 +1,4 @@
-# data/db_core.py
-"""Database core — connection management and shared helpers."""
+"""数据库核心 — 连接管理和公共小工具。"""
 import hashlib
 import hmac as _hmac
 import os
@@ -13,11 +12,11 @@ _PBKDF2_ITERATIONS = 100_000
 
 
 def _hash_password(password: str) -> str:
-    """Hash password with PBKDF2-SHA256 + random 16-byte salt.
+    """用 PBKDF2-SHA256 + 随机 16 字节盐给密码加盐哈希。
 
-    Format:  pbkdf2:sha256:100000$<salt_hex>$<hash_hex>
+    格式:  pbkdf2:sha256:100000$<salt_hex>$<hash_hex>
 
-    The salt is random per-password — no static secret in source code.
+    每个密码的盐都是随机生成的，源码里不写死任何密钥。
     """
     if not password:
         return ""
@@ -27,20 +26,20 @@ def _hash_password(password: str) -> str:
 
 
 def _verify_password(password: str, stored: str) -> bool:
-    """Verify a password against the stored hash.
+    """校验密码和存储的 hash 是否匹配。
 
-    Handles migration: old SHA-256 hashes (no '$' separator) are verified
-    against the legacy static-salt scheme and should be re-hashed on next write.
+    兼容迁移：老版 SHA-256 hash（没有 '$' 分隔符）按旧的固定盐方案校验，
+    下次写入时会重新哈希成新格式。
     """
     if not stored:
         return not password
 
-    # Legacy format: plain SHA-256 hex (no '$')
+    # 老格式：纯 SHA-256 hex（没有 '$'）
     if "$" not in stored:
         old = hashlib.sha256(f"campus-insight-salt-2026:{password}".encode()).hexdigest()
         return _hmac.compare_digest(old, stored) if old and stored else old == stored
 
-    # New format: pbkdf2:sha256:<iter>$<salt_hex>$<hash_hex>
+    # 新格式：pbkdf2:sha256:<iter>$<salt_hex>$<hash_hex>
     try:
         _, salt_hex, hash_hex = stored.split("$")
         salt = bytes.fromhex(salt_hex)
@@ -50,7 +49,7 @@ def _verify_password(password: str, stored: str) -> bool:
         return False
 
 
-# ── Schema versioning ──
+# 表结构版本管理
 _SCHEMA_CURRENT_VERSION = 10
 
 
@@ -78,10 +77,10 @@ def _set_schema_version(conn, version: int, name: str):
     )
 
 
-# ── Migration steps (ordered; each raises on real failure instead of silently passing) ──
+# 迁移步骤（按顺序执行；真失败会抛异常，不会悄悄跳过）
 
 def _m1_rename_issues_table(conn):
-    """v1: legacy `campus_issues` → `community_issues` (idempotent)."""
+    """v1：老表 `campus_issues` → `community_issues`（可重复执行）。"""
     has_old = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='campus_issues'"
     ).fetchone()
@@ -93,7 +92,7 @@ def _m1_rename_issues_table(conn):
 
 
 def _m2_rename_profile_fields(conn):
-    """v2: user_profile campus-era fields → community naming (idempotent)."""
+    """v2：user_profile 里校园时代的字段名改成社区命名（可重复执行）。"""
     renames = [("student_id", "resident_id"), ("school", "community"),
                ("grade", "building"), ("major", "unit")]
     cols = [r[1] for r in conn.execute("PRAGMA table_info(user_profile)")]
@@ -103,7 +102,7 @@ def _m2_rename_profile_fields(conn):
 
 
 def _m3_add_missing_columns(conn):
-    """v3: add columns that may not exist in older DBs (idempotent via PRAGMA)."""
+    """v3：老库里可能缺的列补上（用 PRAGMA 查，可重复执行）。"""
     wanted = [
         ("community_issues", "author", "TEXT DEFAULT ''"),
         ("proposals", "author", "TEXT DEFAULT ''"),
@@ -128,7 +127,7 @@ def _m3_add_missing_columns(conn):
 
 
 def _m4_migrate_role_values(conn):
-    """v4: legacy role values student→resident, teacher→grid (+ demo usernames)."""
+    """v4：旧角色值迁移 student→resident、teacher→grid（顺带改 demo 用户名）。"""
     conn.execute("UPDATE user_profile SET role='resident' WHERE role='student'")
     conn.execute("UPDATE user_profile SET role='grid' WHERE role='teacher'")
     conn.execute("UPDATE user_profile SET username='demo_resident' WHERE username='demo_student'")
@@ -136,7 +135,7 @@ def _m4_migrate_role_values(conn):
 
 
 def _m5_legacy_single_user_username(conn):
-    """v5: backfill a username for legacy single-user DB (id=1, no username)."""
+    """v5：给老的单用户库（id=1 没用户名）补一个用户名。"""
     legacy = conn.execute(
         "SELECT id, username, name, resident_id, role FROM user_profile WHERE id = 1"
     ).fetchone()
@@ -158,21 +157,21 @@ def _m5_legacy_single_user_username(conn):
 
 
 def _m6_add_assignee_id(conn):
-    """v6: add assignee_id to community_issues (dispatch by user id, not name)."""
+    """v6：community_issues 加 assignee_id（按用户 ID 派单，不再用名字）。"""
     cols = [r[1] for r in conn.execute("PRAGMA table_info(community_issues)")]
     if "assignee_id" not in cols:
         conn.execute("ALTER TABLE community_issues ADD COLUMN assignee_id INTEGER")
 
 
 def _m7_add_escalated_at(conn):
-    """v7: add escalated_at to community_issues (SLA escalation timestamp)."""
+    """v7：community_issues 加 escalated_at（SLA 升级时间戳）。"""
     cols = [r[1] for r in conn.execute("PRAGMA table_info(community_issues)")]
     if "escalated_at" not in cols:
         conn.execute("ALTER TABLE community_issues ADD COLUMN escalated_at TIMESTAMP")
 
 
 def _m8_create_event_memory(conn):
-    """v8: create event_memory (cross-session event log for personalization)."""
+    """v8：建 event_memory 表（跨会话事件日志，供个性化用）。"""
     conn.execute(
         "CREATE TABLE IF NOT EXISTS event_memory ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
@@ -182,7 +181,7 @@ def _m8_create_event_memory(conn):
 
 
 def _m9_create_elderly_profile(conn):
-    """v9: create elderly_profile (health/meds/contacts + safety-checkin state)."""
+    """v9：建 elderly_profile 表（健康/用药/联系人 + 安全打卡状态）。"""
     conn.execute(
         "CREATE TABLE IF NOT EXISTS elderly_profile ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL UNIQUE, "
@@ -195,7 +194,7 @@ def _m9_create_elderly_profile(conn):
 
 
 def _m10_create_sos_log(conn):
-    """v10: create sos_log (emergency SOS requests from elderly users)."""
+    """v10：建 sos_log 表（老人紧急 SOS 求助）。"""
     conn.execute(
         "CREATE TABLE IF NOT EXISTS sos_log ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
@@ -205,7 +204,7 @@ def _m10_create_sos_log(conn):
 
 
 def _apply_base_schema(conn):
-    """Create the base tables (idempotent). Always runs after pre-base migration."""
+    """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS user_profile (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -340,12 +339,11 @@ def _apply_base_schema(conn):
 
 
 def init_db(db_path: str):
-    """Initialize the database — create tables and apply versioned migrations.
+    """初始化数据库 — 建表并跑版本化迁移。
 
-    Schema changes are tracked in `schema_version` (current version) and
-    `schema_migrations` (audit log). Migrations run in order and, on a real
-    failure, raise instead of silently passing — so a mid-state upgrade is
-    visible in the logs rather than guessed at.
+    结构变更记录在 `schema_version`（当前版本）和 `schema_migrations`（审计日志）
+    两张表里。迁移按顺序执行，真失败会直接抛异常而不是悄悄跳过——升级到一半
+    卡住也能从日志看出来，不用靠猜。
     """
     global _DB_PATH
     _DB_PATH = db_path
@@ -358,8 +356,7 @@ def init_db(db_path: str):
     _create_schema_version_table(conn)
     current = _get_schema_version(conn)
 
-    # Pre-base migration (must run before CREATE TABLE so the table rename wins
-    # over a fresh community_issues created by the base schema).
+    # pre-base 迁移（必须在建表之前跑，否则重命名会被基础建表的新表盖掉）
     pre = [(1, "rename_campus_issues_to_community_issues", _m1_rename_issues_table)]
     for version, name, fn in pre:
         if version <= current:
@@ -393,7 +390,7 @@ def init_db(db_path: str):
 
 
 def get_connection() -> sqlite3.Connection:
-    """Get a raw SQLite connection. Prefer `with get_db() as conn:` for safety."""
+    """拿一个裸的 SQLite 连接。一般建议用 `with get_db() as conn:` 更安全。"""
     if not _DB_PATH:
         raise RuntimeError(
             "Database not initialized. Call init_db(db_path) before any database operations."
@@ -406,9 +403,9 @@ def get_connection() -> sqlite3.Connection:
 
 @contextmanager
 def get_db():
-    """Context manager for safe database connections — auto-closes on exit.
+    """上下文管理器，安全的数据库连接 — 用完自动关闭。
 
-    Usage:
+    用法:
         with get_db() as conn:
             rows = conn.execute("SELECT ...").fetchall()
     """

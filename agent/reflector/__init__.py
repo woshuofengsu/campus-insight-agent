@@ -1,11 +1,11 @@
 # agent/reflector/__init__.py
-"""Post-response association reasoning engine ("反射器").
+"""回复后的关联推理引擎（"反射器"）。
 
-Package structure (split from a 1024-line monolith):
-  __init__.py      — Public API + backward-compat re-exports
-  _parser.py       — Step parsing, text-action fallback, trivial-input gate
-  _associations.py — SQL-heavy association computation, proactive insights
-  _insight.py      — LLM-powered natural-language insight generation
+从原来 1024 行的单文件拆出来的包：
+  __init__.py      — 对外 API + 兼容旧名的再导出
+  _parser.py       — 步骤解析、文本动作兜底、闲聊输入闸门
+  _associations.py — 重 SQL 的关联计算、主动洞察
+  _insight.py      — LLM 生成自然语言的洞察
 """
 import logging
 
@@ -33,19 +33,18 @@ from config import DB_PATH
 
 _logger = logging.getLogger("agent.reflector")
 
-# ── Backward-compat aliases (old code used underscore-prefixed names) ──
+# 兼容旧名字的别名（老代码用的带下划线的名字）
 _normalize_tool_input = normalize_tool_input
 _summarize_step = summarize_step
 _parse_text_actions = parse_text_actions
 
 
-# -- 1. Response enrichment
+# 1. 回复增强
 
 def enrich_response(raw_response: str, associations: dict) -> str:
-    """Append association insights to the agent's response if meaningful.
+    """有意义的关联洞察就追加到 Agent 回复后面。
 
-    Only skips when the response already contains our exact insight header
-    (prevents double-appending on re-processing).
+    回复里已经带我们的洞察标题就跳过（防止重复处理时加两遍）。
     """
     if not associations.get("has_insight"):
         return raw_response or ""
@@ -60,27 +59,27 @@ def enrich_response(raw_response: str, associations: dict) -> str:
     )
 
 
-# -- 2. Main entry point
+# 2. 主入口
 
 def build_reasoning_chain(
     intermediate_steps: list, raw_response: str, user_input: str,
 ) -> dict:
-    """Main entry point: parse steps, compute associations, enrich response.
+    """主入口：解析步骤、算关联、增强回复。
 
-    Strategy:
-    1. Try LangChain intermediate_steps (formal tool calls) first.
-    2. If empty, fall back to text-action parsing (pattern-matching in response).
-    3. Append a final "reflect" step for the agent's text answer.
-    4. Skip heavy SQL if input is trivial small-talk.
+    策略：
+    1. 先试 LangChain 的 intermediate_steps（正式工具调用）。
+    2. 为空就退回文本动作解析（在回复里做模式匹配）。
+    3. 最后补一个"反思"步骤放 Agent 的文字回答。
+    4. 输入是闲聊的话跳过重的 SQL。
     """
     raw, ui = raw_response or "", user_input or ""
     steps = parse_intermediate_steps(intermediate_steps)
 
-    # Fallback: if no formal tool calls captured, parse the text response
+    # 兜底：没抓到正式工具调用，就从文本回复里解析
     if not steps and raw.strip():
         steps = parse_text_actions(raw)
 
-    # Append a final step for the agent's text response (the "reflect" phase)
+    # 补最后一步：Agent 的文字回复（"反思"阶段）
     if raw.strip():
         steps.append({
             "phase": "reflect",
@@ -91,7 +90,7 @@ def build_reasoning_chain(
             "summary": f"生成回复（{len(raw)} 字）",
         })
 
-    # ── Trivial-input gate: skip heavy association analysis for small-talk ──
+    # 闲聊闸门：小打小闹的输入不跑重的关联分析
     if is_trivial_input(ui) and not intermediate_steps:
         return {
             "steps": steps,
@@ -101,7 +100,7 @@ def build_reasoning_chain(
         }
 
     assoc = compute_associations(ui, steps, DB_PATH)
-    # Populate insight_text after association computation
+    # 关联算完再填 insight_text
     if assoc.get("has_insight"):
         assoc["insight_text"] = build_insight_text(assoc, user_input=ui)
 

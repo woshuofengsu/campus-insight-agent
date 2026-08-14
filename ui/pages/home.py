@@ -1,5 +1,4 @@
-# ui/pages/home.py
-"""Chat — community governance assistant."""
+"""聊天 — 社区治理助手。"""
 import time
 import logging
 import streamlit as st
@@ -18,7 +17,7 @@ _log = logging.getLogger(__name__)
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
 
-# ── Perception check (idle-based) ──
+# 感知检查：太久没互动就自动扫一遍社区动态
 now = time.time()
 last_check = st.session_state.get("last_check_time") or 0
 last_interaction = st.session_state.get("last_interaction") or 0
@@ -33,11 +32,11 @@ if last_interaction and (now - last_interaction) > threshold and (now - last_che
         memory.add_message("assistant", alert_msg)
         reminder(alert["title"], alert["message"])
 
-# ── Header (对话 Agent 主角) ──
+# 页头
 page_header("对话", "用自然语言上报问题、查看社区动态、参与提案讨论。", "社区助手")
 ooda_nav("home")
 
-# ── Quick Report — 一句话快捷上报（无需等待 AI 对话）──
+# 快捷上报：一句话搞定，不用等 AI 慢慢聊
 profile = memory.get_user_profile()
 _author = resolve_author(profile)
 
@@ -65,7 +64,7 @@ def _do_quick_report():
         invalidate_issues()
         st.toast(f"已提交 #{issue_id}")
     except Exception as e:
-        _log.debug("non-critical failure", exc_info=True)
+        _log.debug("非致命错误", exc_info=True)
         st.session_state._home_report_error = f"上报失败：{e}"
         st.session_state._home_report_ok = ""
 
@@ -93,11 +92,11 @@ if st.session_state.get("_home_report_error"):
 if st.session_state.get("_home_report_ok"):
     st.success(st.session_state.pop("_home_report_ok"))
 
-# ── Split layout: chat (left 3) + panel (right 1) ──
+# 分栏：左边聊天占 3，右边面板占 1
 chat_col, panel_col = st.columns([3, 1])
 
 with panel_col:
-    # ── Quick Actions ──
+    # 快捷操作
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">'
         f'<div style="width:3px;height:14px;border-radius:2px;'
@@ -123,7 +122,7 @@ with panel_col:
 
     st.markdown("---")
 
-    # ── System Status ──
+    # 系统状态
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">'
         f'<div style="width:3px;height:14px;border-radius:2px;'
@@ -146,9 +145,9 @@ with panel_col:
             unsafe_allow_html=True,
         )
     except Exception:
-        _log.warning("Failed to load stats for system status panel", exc_info=True)
+        _log.warning("加载系统状态面板的统计失败", exc_info=True)
 
-    # ── Notification badge ──
+    # 未读消息角标
     try:
         user_id = session.login_user_id
         from data.db_notifications import get_unread_count, get_notifications, mark_all_read
@@ -161,10 +160,10 @@ with panel_col:
                 unsafe_allow_html=True,
             )
     except Exception:
-        _log.warning("Failed to load notification badge", exc_info=True)
+        _log.warning("加载通知角标失败", exc_info=True)
 
 with chat_col:
-    # ── Chat messages ──
+    # 聊天记录
     chat_container = st.container(height=440, border=False)
 
     with chat_container:
@@ -205,7 +204,7 @@ with chat_col:
                     if ago:
                         st.caption(ago)
 
-    # ── Chat input ──
+    # 输入框
     user_input = st.chat_input("输入你的问题，如「社区脉搏」、「3号楼灯坏了」...")
 
     if user_input:

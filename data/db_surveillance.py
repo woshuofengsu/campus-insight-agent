@@ -1,5 +1,4 @@
-# data/db_surveillance.py
-"""🦠 国家传染病监测数据层 — 疾控趋势近似数据 + 季节模型融合.
+"""国家传染病监测数据层 — 疾控趋势近似数据 + 季节模型融合。
 
 数据来源:
   国家疾控局 (ndcpa.gov.cn) 每月发布《全国法定传染病疫情概况》
@@ -11,9 +10,9 @@
   get_surveillance_trend()— 返回各疾病近12个月的发病趋势 (0-100 标准化)
   blend_risk()            — 融合季节模型 + 真实监测数据 → 最终风险分
 
-Why this matters for the competition:
+为什么这对比赛很重要:
   硬编码的季节模型（"1月流感高发"）没有数据支撑。接入国家监测数据后:
-  - base_risk 从 if-else 升级为 data-driven
+  - base_risk 从 if-else 升级为数据驱动
   - 评委问"数据来源"时: "基于国家疾控局月度公报趋势的近似演示值，近12个月发病率z-score标准化"
   - 趋势可视化: 可以画"全国流感发病趋势 vs 本校风险评估"对比图
 """
@@ -21,7 +20,7 @@ import json
 from datetime import datetime
 from data.db_core import get_db
 
-# -- 1. Fallback Data — 近12个月国家法定传染病报告数据 --
+# 1. 兜底数据：近12个月国家法定传染病报告数据
 #
 # 数据口径: 全国丙类传染病月发病数（近似值，基于公开发布的公报规律）
 # 来源: 国家疾控局 ndcpa.gov.cn 月度《全国法定传染病疫情概况》
@@ -29,10 +28,10 @@ from data.db_core import get_db
 # 实际公报中发病数是精确整数，这里使用数量级近似的值来呈现趋势。
 # 比赛中如需精确值，将每月公报的官方数字填入即可——接口兼容。
 #
-# Schema: (disease, year, month, national_cases, national_deaths)
+# 字段: (disease, year, month, national_cases, national_deaths)
 
 _SURVEILLANCE_FALLBACK: list[tuple[str, int, int, int, int]] = [
-    # ── 甲型流感 (Influenza A) ──
+    # 甲型流感
     # 2025-2026 流感季: 11月抬升 → 12-1月高峰 → 3月回落 → 6-9月低谷
     ("甲型流感", 2025, 7,  11000, 0),
     ("甲型流感", 2025, 8,  9000, 0),
@@ -48,7 +47,7 @@ _SURVEILLANCE_FALLBACK: list[tuple[str, int, int, int, int]] = [
     ("甲型流感", 2026, 6,  10000, 0),
     ("甲型流感", 2026, 7,  11000, 0),
 
-    # ── 乙型流感 (Influenza B) ──
+    # 乙型流感
     # 乙流高峰通常略晚于甲流: 1-3月为主
     ("乙型流感", 2025, 7,  7000, 0),
     ("乙型流感", 2025, 8,  6000, 0),
@@ -64,7 +63,7 @@ _SURVEILLANCE_FALLBACK: list[tuple[str, int, int, int, int]] = [
     ("乙型流感", 2026, 6,  6000, 0),
     ("乙型流感", 2026, 7,  6000, 0),
 
-    # ── 感染性腹泻 (Infectious Diarrhea) ──
+    # 感染性腹泻
     # 夏秋季高发: 6-9月
     ("感染性腹泻", 2025, 7,  125000, 0),
     ("感染性腹泻", 2025, 8,  135000, 0),
@@ -82,13 +81,12 @@ _SURVEILLANCE_FALLBACK: list[tuple[str, int, int, int, int]] = [
 ]
 
 
-# -- 2. Seed function — 写入 health_surveillance 表 --
+# 2. 种子函数：写入 health_surveillance 表
 
 def seed_surveillance(force: bool = False):
-    """Populate health_surveillance table with fallback data.
+    """用兜底数据填充 health_surveillance 表。
 
-    Only seeds if the table is empty, unless force=True.
-    Called from data/seed.py or at engine init time.
+    表空才写入，除非 force=True 强制重灌。在 data/seed.py 或引擎初始化时调用。
     """
     with get_db() as conn:
         existing = conn.execute(
@@ -97,7 +95,7 @@ def seed_surveillance(force: bool = False):
         if existing["cnt"] > 0 and not force:
             return {"seeded": 0, "msg": f"Already has {existing['cnt']} records, skipping"}
 
-        # Clear if forcing
+        # 强制模式先清空表
         if force:
             conn.execute("DELETE FROM health_surveillance")
 
@@ -114,18 +112,17 @@ def seed_surveillance(force: bool = False):
         return {"seeded": inserted, "msg": f"Inserted {inserted} surveillance records"}
 
 
-# -- 3. Trend extraction — 将原始发病数映射到 0-100 风险分 --
+# 3. 趋势提取：把原始发病数映射成 0-100 风险分
 
 def _normalize_to_risk(cases: int, hist_min: int, hist_max: int) -> float:
-    """Map a case count to 0-100 scale using historical min/max.
+    """按历史最小/最大值，把发病数映射到 0-100。
 
-    Uses a log-scale mapping so that the 0-100 range is more evenly distributed
-    (linear would compress most months into the bottom 20% of the range).
+    用对数刻度：线性映射会把大部分月份压到 0-20 的区间里，对数更均匀。
     """
     import math
     if hist_max <= hist_min:
         return 50.0
-    # Log-scale: dampens extreme peaks so moderate months still register
+    # 对数刻度：压一下极端峰值，普通月份也能显示出差异
     log_cases = math.log(max(cases, 1))
     log_min = math.log(max(hist_min, 1))
     log_max = math.log(max(hist_max, 1))
@@ -136,18 +133,18 @@ def _normalize_to_risk(cases: int, hist_min: int, hist_max: int) -> float:
 
 
 def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
-    """Return surveillance-based risk scores for each tracked disease.
+    """返回各追踪疾病的监测风险分。
 
     Args:
-        month: Target month (1-12). Defaults to current month.
+        month: 目标月份（1-12）。默认当前月。
 
     Returns:
         {
             "甲型流感": {
                 "current_cases": 195000, "trend_risk": 92.3,
                 "hist_min": 15000, "hist_max": 305000,
-                "trend_direction": "peak",    # "rising" | "peak" | "falling" | "trough"
-                "month_over_month": +125000,  # change vs previous month
+                "trend_direction": "peak",    # 取值: rising/peak/falling/trough
+                "month_over_month": +125000,  # 环比上月的增量
                 "data_source": "国家疾控局月度公报（近似值）",
             },
             ...
@@ -157,14 +154,14 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
         month = datetime.now().month
 
     with get_db() as conn:
-        # Get ALL surveillance records for computing historical range
+        # 取全部记录，用来算历史范围
         all_rows = conn.execute(
             "SELECT disease, report_year, report_month, national_cases, national_deaths "
             "FROM health_surveillance ORDER BY disease, report_year, report_month"
         ).fetchall()
 
     if not all_rows:
-        # Table not seeded yet — try seeding now
+        # 表还没数据，先灌一遍
         seed_surveillance()
         with get_db() as conn:
             all_rows = conn.execute(
@@ -174,7 +171,7 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
         if not all_rows:
             return {}
 
-    # Group by disease
+    # 按病种分组
     by_disease: dict[str, list[dict]] = {}
     for r in all_rows:
         by_disease.setdefault(r["disease"], []).append({
@@ -186,12 +183,12 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
     for disease, records in by_disease.items():
         records.sort(key=lambda x: (x["year"], x["month"]))
 
-        # Historical range for normalization
+        # 归一化要用的历史范围
         all_cases = [r["cases"] for r in records]
         hist_min = min(all_cases)
         hist_max = max(all_cases)
 
-        # Find current month's data (closest match in the last 12 months)
+        # 找当前月份的数据（最近 12 个月内最接近的）
         current_record = None
         prev_record = None
         for i, r in enumerate(records):
@@ -201,7 +198,7 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
                     prev_record = records[i - 1]
                 break
 
-        # If exact month not found, use most recent
+        # 没有当月数据就取最近一条
         if current_record is None and records:
             current_record = records[-1]
             if len(records) > 1:
@@ -212,7 +209,7 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
 
         trend_risk = _normalize_to_risk(current_record["cases"], hist_min, hist_max)
 
-        # Determine trend direction
+        # 判断趋势方向
         mom_change = 0
         if prev_record:
             mom_change = current_record["cases"] - prev_record["cases"]
@@ -242,32 +239,31 @@ def get_surveillance_trend(month: int | None = None) -> dict[str, dict]:
     return result
 
 
-# -- 4. Blending — 融合季节模型 + 真实监测数据 --
+# 4. 融合：季节模型 + 真实监测数据
 
 def blend_risk(disease_name: str, seasonal_base: float,
                surveillance_weight: float = 0.6) -> tuple[float, dict]:
-    """Blend seasonal model prior with real surveillance data.
+    """把季节模型的先验分和真实监测数据融合。
 
-    Formula:
+    公式:
       blended = seasonal_base * (1 - w) + surveillance_risk * w
 
-    Default w=0.6 → 60% real data, 40% season model.
-    This means:
-      - In peak flu season WITH high national cases → score stays high (both agree)
-      - In peak flu season with LOW national cases → score drops (data overrides model)
-      - In off-season with SURGING cases → score rises (early warning!)
+    默认 w=0.6 → 六成信真实数据、四成信季节模型。效果:
+      - 流感季且全国发病高 → 分数保持高位（两边一致）
+      - 流感季但全国发病低 → 分数下调（数据压过模型）
+      - 非流感季却发病猛涨 → 分数上抬（提前预警！）
 
     Args:
-        disease_name: e.g. "甲型流感", "乙型流感", "感染性腹泻"
-        seasonal_base: The original base_risk from season model (0-100)
-        surveillance_weight: How much to trust real data (0-1, default 0.6)
+        disease_name: 疾病名，如 "甲型流感"、"乙型流感"、"感染性腹泻"
+        seasonal_base: 季节模型原来的 base_risk（0-100）
+        surveillance_weight: 真实数据的权重（0-1，默认 0.6）
 
     Returns:
-        (blended_risk: float, meta: dict with debug info)
+        (blended_risk: float, meta: 带调试信息的 dict)
     """
     trends = get_surveillance_trend()
 
-    # Name mapping: health engine names → surveillance data names
+    # 健康引擎的病名 → 监测数据的病名映射
     name_map = {
         "甲型流感": "甲型流感",
         "季节性流感（秋冬季）": "甲型流感",
@@ -288,7 +284,7 @@ def blend_risk(disease_name: str, seasonal_base: float,
     }
 
     if trend is None:
-        # No surveillance data for this disease — fall back to pure season model
+        # 这种病没有监测数据，退回纯季节模型
         meta["surveillance_risk"] = None
         meta["blended_risk"] = seasonal_base
         meta["fallback_reason"] = "no_surveillance_data"
@@ -309,13 +305,10 @@ def blend_risk(disease_name: str, seasonal_base: float,
     return blended, meta
 
 
-# -- 5. Convenience: full trend snapshot for UI display --
+# 5. 便捷函数：给 UI 展示用的趋势快照
 
 def get_surveillance_summary() -> dict:
-    """Return a human-readable summary of current surveillance status.
-
-    Used by health pages to show "based on real CDC data" badge.
-    """
+    """给健康页返回一段人话总结，用来显示「基于国家疾控数据」的小徽章。"""
     trends = get_surveillance_trend()
     if not trends:
         return {

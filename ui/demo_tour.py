@@ -144,7 +144,7 @@ def render_tour_guide():
             st.session_state._tour_step = 1
             st.rerun()
     else:
-        # Tour is active
+        # 导览进行中
         step_data = TOUR_STEPS[tour_step - 1]
 
         with st.sidebar:
@@ -168,7 +168,7 @@ def render_tour_guide():
 
         if step_data.get("suggested_input"):
             st.info(f"💡 **试试输入：** `{step_data['suggested_input']}`")
-            # Quick copy button
+            # 一键复制到输入框的按钮
             if st.button("📋 填入", key="_tour_copy_input"):
                 st.session_state._tour_copied = step_data["suggested_input"]
                 st.rerun()

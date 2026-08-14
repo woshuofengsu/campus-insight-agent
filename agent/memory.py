@@ -1,9 +1,9 @@
 # agent/memory.py
-"""Memory system: working (session), long-term (SQLite), knowledge (SQLite).
+"""记忆系统：工作记忆（会话）、长期记忆（SQLite）、知识库（SQLite）。
 
-Memory pruning: working memory capped at MAX_WORKING_MESSAGES (sliding window).
-LangChain ConversationBufferMemory is trimmed to MAX_LANGCHAIN_MESSAGES exchanges
-to prevent unbounded token growth in long sessions.
+记忆裁剪：工作记忆最多留 MAX_WORKING_MESSAGES 条（滑动窗口）；
+LangChain 的 ConversationBufferMemory 截到 MAX_LANGCHAIN_MESSAGES 轮，
+防止长会话里 token 无限膨胀。
 """
 import json
 import logging
@@ -14,22 +14,22 @@ from data.database import get_current_user, update_user_profile, set_onboarding_
 
 _logger = logging.getLogger("agent.memory")
 
-# ── Pruning limits ──
-MAX_WORKING_MESSAGES = 60      # keep last 60 messages in session_state
-MAX_LANGCHAIN_MESSAGES = 20    # keep last 10 exchanges (20 messages) for LLM context
+# 裁剪上限
+MAX_WORKING_MESSAGES = 60      # 会话里最多留 60 条消息
+MAX_LANGCHAIN_MESSAGES = 20    # 给 LLM 的上下文最多留 10 轮（20 条）
 
 
 class MemoryManager:
-    """Three-tier memory: working (session), long-term (SQLite), knowledge (SQLite).
+    """三层记忆：工作（会话）、长期（SQLite）、知识库（SQLite）。
 
-    Stores user_id per-session so each user gets isolated profile and history.
+    user_id 存在会话里，每个用户的历史和个人资料互不干扰。
     """
 
     def __init__(self, session_state: Any):
-        """Initialize with Streamlit session_state."""
+        """用 Streamlit 的 session_state 初始化。"""
         self.st = session_state
 
-        # Ensure session state keys exist
+        # 确保会话状态里的键都存在
         if "messages" not in self.st:
             self.st.messages = []
         if "user_profile" not in self.st:
@@ -40,7 +40,7 @@ class MemoryManager:
             self.st.last_interaction = None
         if "tool_registry" not in self.st:
             self.st.tool_registry = []
-        # LangChain memory: create once, reuse across turns
+        # LangChain 记忆：只建一次，多轮复用
         if "langchain_memory" not in self.st:
             self.st.langchain_memory = ConversationBufferMemory(
                 memory_key="chat_history",
@@ -49,18 +49,18 @@ class MemoryManager:
                 output_key="output",
             )
 
-    # ── User identity ──
+    # 用户身份
 
     @property
     def user_id(self) -> int:
-        """The currently logged-in user's ID."""
+        """当前登录用户的 ID。"""
         return self.st.get("_login_user_id", 1)
 
     def refresh_profile(self):
-        """Re-read user profile from DB after a switch or update."""
+        """切换账号或资料更新后，从数据库重新读一遍用户资料。"""
         self.st.user_profile = get_current_user()
 
-    # ── Working Memory (session_state.messages) ──
+    # 工作记忆（session_state.messages）
 
     def get_working_memory(self) -> list[dict]:
         return self.st.messages
@@ -72,26 +72,26 @@ class MemoryManager:
             "content": content,
             "timestamp": datetime.now().isoformat(),
         })
-        # Update last_interaction for idle detection
+        # 更新最后交互时间，空闲检测要用
         import time
         self.st.last_interaction = time.time()
 
-        # ── Prune working memory if over limit ──
+        # 超了上限就裁剪工作记忆
         if len(self.st.messages) > MAX_WORKING_MESSAGES:
             excess = len(self.st.messages) - MAX_WORKING_MESSAGES
             self.st.messages = self.st.messages[excess:]
-            _logger.debug("Pruned %d old messages from working memory (now %d)",
+            _logger.debug("清理工作记忆里的旧消息（共 %d 条，现在剩 %d 条）",
                           excess, len(self.st.messages))
 
     def get_conversation_history(self, last_n: int = 20) -> list[dict]:
-        """Get last N messages for LangChain context."""
+        """取最近 N 条消息给 LangChain 当上下文。"""
         return self.st.messages[-last_n:]
 
     def _prune_langchain_memory(self):
-        """Trim LangChain ConversationBufferMemory to prevent unbounded token growth.
+        """裁剪 LangChain 的 ConversationBufferMemory，防止 token 无限涨。
 
-        Keeps only the last MAX_LANGCHAIN_MESSAGES messages (10 exchanges).
-        Called before each agent invocation so the LLM prompt stays compact.
+        只留最近 MAX_LANGCHAIN_MESSAGES 条消息（10 轮对话）。
+        每次调 Agent 前先裁一遍，prompt 才不会越堆越长。
         """
         try:
             lc_memory = self.st.langchain_memory
@@ -99,19 +99,19 @@ class MemoryManager:
             if len(buf) > MAX_LANGCHAIN_MESSAGES:
                 excess = len(buf) - MAX_LANGCHAIN_MESSAGES
                 lc_memory.chat_memory.messages = lc_memory.chat_memory.messages[excess:]
-                _logger.debug("Pruned %d old messages from LangChain memory (now %d)",
+                _logger.debug("清理 LangChain 记忆里的旧消息（共 %d 条，现在剩 %d 条）",
                               excess, len(lc_memory.chat_memory.messages))
         except Exception:
-            _logger.debug("Failed to prune LangChain memory messages", exc_info=True)
-            pass  # non-critical — if pruning fails, memory just grows
+            _logger.debug("清理 LangChain 记忆失败", exc_info=True)
+            pass  # 非关键——裁失败最多就是记忆多占点地方
 
-    # ── Long-Term Memory (SQLite user_profile) ──
+    # 长期记忆（SQLite user_profile）
 
     def get_user_profile(self) -> dict:
-        """Get user profile, syncing from DB if needed.
+        """取用户资料，必要时从数据库同步。
 
-        Uses try/except because Streamlit's session_state proxy may raise
-        AttributeError even after an ``"in"`` containment check passes.
+        这里用 try/except 是因为 Streamlit 的 session_state 代理比较坑：
+        就算 in 检查通过了，取值还是可能抛 AttributeError。
         """
         try:
             profile = self.st.user_profile
@@ -122,14 +122,14 @@ class MemoryManager:
         return self.st.user_profile
 
     def update_profile(self, **kwargs):
-        """Update user profile in both session and DB."""
+        """更新用户资料，会话和数据库都改。"""
         uid = kwargs.pop("user_id", self.user_id)
         update_user_profile(user_id=uid, **kwargs)
-        # Refresh session state
+        # 刷新会话里的资料
         self.st.user_profile = get_current_user()
 
     def complete_onboarding(self):
-        """Mark onboarding as done for the current user."""
+        """把当前用户的引导流程标记为已完成。"""
         set_onboarding_done(self.user_id)
         self.st.user_profile = get_current_user()
 
@@ -137,7 +137,7 @@ class MemoryManager:
         profile = self.get_user_profile()
         return bool(profile.get("onboarding_done", False))
 
-    # ── Tool Registry ──
+    # 工具注册表
 
     def register_tools(self, tool_names: list[str]):
         self.st.tool_registry = tool_names
@@ -145,12 +145,12 @@ class MemoryManager:
     def get_tool_registry(self) -> list[str]:
         return self.st.tool_registry
 
-    # ── LangChain Integration ──
+    # LangChain 对接
 
     def get_langchain_memory(self) -> ConversationBufferMemory:
-        """Return the persistent LangChain ConversationBufferMemory (stored in session_state).
+        """返回常驻的 LangChain ConversationBufferMemory（存在 session_state 里）。
 
-        Prunes old messages before returning to keep the LLM context compact.
+        返回前先裁掉旧消息，LLM 上下文才不会越堆越长。
         """
         self._prune_langchain_memory()
         return self.st.langchain_memory

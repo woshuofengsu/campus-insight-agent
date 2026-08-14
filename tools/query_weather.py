@@ -7,9 +7,9 @@ from config import USE_REAL_WEATHER
 
 _log = logging.getLogger(__name__)
 
-# ── Beijing seasonal weather patterns (mock data, swap with real API in production) ──
+# 北京分季节的天气模板（模拟数据，上线换成真实 API）
 _SEASONAL_WEATHER = {
-    # month: (temp_low_range, temp_high_range, common_conditions)
+    # 格式：月份: (低温范围, 高温范围, 常见天气列表)
     (12,1,2):  ((-10, -2), (0, 6),   [("晴天","☀️"),("多云","⛅"),("小雪","❄️"),("大风","🌬️")]),
     (3,4,5):   ((3, 12),   (15, 25), [("晴天","☀️"),("多云","⛅"),("小雨","🌧️"),("扬沙","💨")]),
     (6,7,8):   ((20, 25),  (30, 36), [("晴天","☀️"),("多云","⛅"),("雷阵雨","⛈️"),("暴雨","🌊")]),
@@ -21,12 +21,12 @@ def _get_seasonal_config(month: int):
     for months, (t_low_range, t_high_range, conditions) in _SEASONAL_WEATHER.items():
         if month in months:
             return (t_low_range, t_high_range), conditions
-    return ((-5, 25), (5, 30)), [("晴天","☀️"),("多云","⛅")]  # fallback
+    return ((-5, 25), (5, 30)), [("晴天","☀️"),("多云","⛅")]  # 兜底默认值
 
 
 def _mock_weather():
-    """Generate mock weather data based on Beijing seasonal patterns.
-    Replace with HeFeng/OpenWeatherMap API in production (set USE_REAL_WEATHER=True).
+    """按北京季节规律生成模拟天气数据。
+    上线时换成和风/OpenWeatherMap 的 API（把 USE_REAL_WEATHER 设成 True）。
     """
     today = datetime.now()
     temps, conditions = _get_seasonal_config(today.month)
@@ -62,7 +62,7 @@ def _mock_weather():
     return days
 
 
-# ── Shared helpers (used by both chat tool and dashboard) ──
+# 共用的辅助函数（聊天工具和看板都用）
 
 _CONDITION_EMOJI = {
     "晴": "☀️", "少云": "🌤️", "晴间多云": "⛅", "多云": "⛅",
@@ -73,7 +73,7 @@ _CONDITION_EMOJI = {
 
 
 def _make_advice(condition: str, precip: float) -> str:
-    """Generate human-readable activity advice from weather condition."""
+    """根据天气情况生成出行建议文案。"""
     if condition in ("暴雨", "雷阵雨"):
         return "减少外出，注意防雷"
     elif condition in ("大雨", "中雨", "小雨"):
@@ -91,22 +91,21 @@ def _make_advice(condition: str, precip: float) -> str:
 
 def fetch_real_weather_days(api_key: str, city_id: str,
                              city_name: str = "") -> tuple[list[dict], str]:
-    """Fetch 3-day weather from 和风天气 API and return structured day dicts.
+    """从和风天气 API 拉 3 天天气，返回结构化的天数据字典。
 
-    Returns (days_list, location_name).  Raises on any failure so callers
-    can fall back to mock data gracefully.
+    返回 (days_list, location_name)。任何失败都会抛异常，
+    让调用方自己优雅地退回模拟数据。
 
-    This is the shared entry-point used by both the chat tool and the
-    dashboard widget — keeps API call logic in one place.
+    聊天工具和看板组件都走这个入口，API 调用逻辑只写一份。
     """
     import requests
     from config import HEFENG_API_HOST
 
-    # Base host: use per-account host if set (Console V4, post-2025),
-    # otherwise fall back to the shared dev host.
+    # 优先用账号自己的 host（控制台 V4，2025 年后），
+    # 没配就用公共的开发 host
     api_host = HEFENG_API_HOST or "devapi.qweather.com"
 
-    # ── Step 1: Resolve city name → location ID ──
+    # 第一步：城市名换成 location ID
     location_id = city_id
     location_name = city_name or "北京"
     try:
@@ -120,17 +119,17 @@ def fetch_real_weather_days(api_key: str, city_id: str,
         if geo_data.get("code") == "200" and geo_data.get("location"):
             loc = geo_data["location"][0]
             location_id = loc["id"]
-            # Build display name e.g. "北京市海淀区"
+            # 拼展示用的地名，比如"北京市海淀区"
             adm1 = loc.get("adm1", "")
             adm2 = loc.get("adm2", "")
             name = loc.get("name", "")
             parts = [p for p in (adm1, adm2, name) if p]
             if parts:
                 location_name = "".join(parts)
-    except Exception:  # log and skip
-        _log.debug("GPS location lookup failed, using defaults from config")
+    except Exception:  # 记个日志跳过
+        _log.debug("GPS 定位失败，先用 config 里的默认位置")
 
-    # ── Step 2: Fetch 3-day weather ──
+    # 第二步：拉 3 天天气
     weather_url = f"https://{api_host}/v7/weather/3d"
     weather_resp = requests.get(
         weather_url,
@@ -144,11 +143,11 @@ def fetch_real_weather_days(api_key: str, city_id: str,
 
     daily = weather_data.get("daily", [])
     if not daily:
-        raise RuntimeError("Empty daily forecast")
+        raise RuntimeError("天气预报数据为空")
 
-    # ── Step 3: Build structured day dicts (same shape as _mock_weather) ──
+    # 第三步：拼结构化数据（字段和 _mock_weather 保持一致）
     weekday_map = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-    # Map wind scale numbers to readable labels
+    # 风力等级数字转成中文说法
     wind_scale_labels = {"1": "微风", "2": "轻风", "3": "微风", "4": "和风",
                          "5": "清风", "6": "强风", "7": "疾风"}
 
@@ -159,7 +158,7 @@ def fetch_real_weather_days(api_key: str, city_id: str,
             dt = datetime.strptime(date_str, "%Y-%m-%d")
             wd = weekday_map[dt.weekday()]
         except Exception:
-            _log.debug("Failed to parse weather date string", exc_info=True)
+            _log.debug("解析天气日期字符串失败", exc_info=True)
             wd = ""
 
         cond = d.get("textDay", "未知")
@@ -223,10 +222,10 @@ def get_weather() -> str:
 
 
 def _real_weather() -> str:
-    """Fetch real-time weather from 和风天气 free dev API.
+    """从和风天气免费开发 API 拉实时天气。
 
-    Uses devapi.qweather.com (free, no real-name auth needed).
-    Falls back to mock data on any error (network, invalid key, etc.).
+    用的是 devapi.qweather.com（免费，不用实名认证）。
+    网络、key 不对等任何报错都会退回模拟数据。
     """
     from config import HEFENG_API_KEY, COMMUNITY_CITY, COMMUNITY_CITY_ID
 
@@ -244,11 +243,11 @@ def _real_weather() -> str:
         days, location_name = fetch_real_weather_days(
             HEFENG_API_KEY, COMMUNITY_CITY_ID, COMMUNITY_CITY,
         )
-    except Exception:  # ok to fail
-        _log.debug("Real weather API request failed, falling back to mock data", exc_info=True)
+    except Exception:  # 失败就失败吧
+        _log.debug("真实天气 API 请求失败，退回 mock 数据", exc_info=True)
         return _fallback_weather("天气API请求失败，已切换为模拟数据")
 
-    # ── Format response string ──
+    # 拼返回文案
     lines = ["🌤️ 天气预报："]
     lines.append(f"  🟢 {_get_data_source_note(real=True)}")
     alerts = []
@@ -272,7 +271,7 @@ def _real_weather() -> str:
 
 
 def _fallback_weather(reason: str = "") -> str:
-    """Graceful fallback: use mock data when real API fails."""
+    """真实接口挂了就用模拟数据兜底。"""
     days = _mock_weather()
     lines = ["🌤️ 天气预报："]
     if reason:
@@ -292,10 +291,10 @@ def _fallback_weather(reason: str = "") -> str:
 
 
 def get_today_weather() -> tuple[list[dict] | None, str, bool]:
-    """Unified weather entry point — returns (days, location_name, is_real).
+    """统一天气入口 — 返回 (days, location_name, is_real)。
 
-    Tries real API first, falls back to mock. Used by perception monitor,
-    pulse page, and the weather tool. Centralised to avoid duplication.
+    先试真实 API，不行退回模拟。感知监控、脉搏页、天气工具都用它，
+    逻辑集中起来免得各写一份。
     """
     from config import COMMUNITY_CITY, COMMUNITY_DISTRICT, COMMUNITY_CITY_ID
     location_name = f"{COMMUNITY_CITY}{COMMUNITY_DISTRICT}"
@@ -311,21 +310,21 @@ def get_today_weather() -> tuple[list[dict] | None, str, bool]:
                 )
                 location_name = api_location
                 is_real = True
-            except Exception:  # log and skip
-                _log.debug("Hefeng API location lookup failed, falling back to mock data")
+            except Exception:  # 记个日志跳过
+                _log.debug("Hefeng API 定位失败，退回 mock 数据")
 
     if days is None:
         try:
             days = _mock_weather()
         except Exception:
-            _log.debug("Mock weather generation failed", exc_info=True)
+            _log.debug("mock 天气生成失败", exc_info=True)
             days = None
 
     return days, location_name, is_real
 
 
 def _get_data_source_note(real: bool = False) -> str:
-    """Return a note about the current data source."""
+    """返回当前数据来源的说明。"""
     if real:
         return "数据来源：和风天气实时API"
     return "模拟数据（北京季节模式）— 接入和风天气API可获取实时数据"

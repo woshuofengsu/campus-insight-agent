@@ -1,4 +1,3 @@
-# ui/pages/mine.py
 """👤 我的 — 个人参与足迹、影响力统计."""
 import streamlit as st
 from ui.cache import cached_my_issues, cached_my_proposals, cached_my_stats, invalidate_issues
@@ -12,7 +11,7 @@ if memory is not None:
 else:
     profile = {}
 
-# Derive author identity from profile — must match database._resolve_author()
+# 从档案取身份，必须和 database._resolve_author() 保持一致
 author = resolve_author(profile)
 
 page_header("👤 我的", "个人参与记录与统计")
@@ -21,7 +20,7 @@ ooda_nav("mine")
 
 
 def _submit_satisfaction(issue_id: int, value: str):
-    """Record resident satisfaction for a resolved issue; refresh caches."""
+    """记录居民对已解决工单的评价，顺便刷新缓存。"""
     reason = (st.session_state.get(f"sat_reason_{issue_id}") or "").strip()
     try:
         new_status = set_satisfaction(issue_id, value, reason=reason)
@@ -31,7 +30,7 @@ def _submit_satisfaction(issue_id: int, value: str):
         else:
             st.session_state["_sat_feedback"] = "✅ 已记录「满意」，感谢你的反馈！"
         st.session_state.pop(f"sat_reason_{issue_id}", None)
-    except Exception as e:  # non-critical — surface, don't crash
+    except Exception as e:  # 非关键错误，提示出来就行，别崩
         st.session_state["_sat_feedback"] = f"评价提交失败：{e}"
 
 
@@ -88,7 +87,7 @@ with st.container(border=True):
     with col4:
         stat("提案被采纳", str(stats["adopted_proposals"]), TOKEN["success"])
 
-    # Impact summary（治理化表述：聚焦「你推动了什么」，不做排行榜式等级）
+    # 影响力总结（治理化表述：聚焦「你推动了什么」，不做排行榜式等级）
     if stats["total_issues"] + stats["total_proposals"] > 0:
         resolved = stats["resolved_issues"]
         adopted = stats["adopted_proposals"]
@@ -114,7 +113,7 @@ if not my_issues:
     if st.button("🔧 去上报诉求", type="primary", width="stretch"):
         st.switch_page("ui/pages/issues.py")
 else:
-    # Status summary
+    # 状态统计
     pending_count = len([i for i in my_issues if i.get("status") == "待处理"])
     processing_count = len([i for i in my_issues if i.get("status") == "处理中"])
     resolved_count = len([i for i in my_issues if i.get("status") == "已解决"])
@@ -154,7 +153,7 @@ else:
 
 st.markdown("---")
 
-# ── 匿名工单（隐私闭环：按 reporter_id 追溯，不暴露真实身份） ──
+# 匿名工单：按 reporter_id 追溯，不暴露真实身份
 _reporter_id = (profile or {}).get("id")
 _anon_issues = get_my_anonymous_issues(_reporter_id, limit=20) if _reporter_id else []
 if _anon_issues:

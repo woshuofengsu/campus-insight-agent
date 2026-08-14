@@ -1,4 +1,3 @@
-# data/db_demo_worker.py
 """演示闭环机器人 — 自动把新工单走完「处理中→已解决→通知居民」。
 
 让「接诉即办」的「办」在演示里真的转：居民上报后，机器人自动接单、处理、办结，
@@ -39,7 +38,7 @@ def process_new_issues(limit: int = 1, min_age_minutes: int = 3) -> int:
             update_issue_status(iid, "处理中", actor="演示网格员", processing_note="已接单，正在处理。")
             update_issue_status(iid, "已解决", actor="演示网格员", processing_note="已处理完成。")
             processed += 1
-            _log.info("demo worker resolved issue #%d", iid)
+            _log.info("demo worker 已解决工单 #%d", iid)
     except Exception:
-        _log.warning("demo worker failed", exc_info=True)
+        _log.warning("demo worker 处理失败", exc_info=True)
     return processed

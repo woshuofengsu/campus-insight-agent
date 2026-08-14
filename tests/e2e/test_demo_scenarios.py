@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""End-to-end demo scenario tests — full pipeline from user input to agent response.
+"""端到端演示场景测试 — 从用户输入到 agent 回复的完整流程。
 
-Runs 6 competition demo scenarios using OfflineAgent (no LLM dependency):
-  1. Resident reports a facility issue → ticket created with ID
-  2. Community pulse query → weather + hotspots + proposals
-  3. Create proposal → support → status change
-  4. Query my issues → find resolved → closed-loop confirmation
-  5. Governance audit → four-dimension scoring → action items
-  6. LLM unavailable → OfflineAgent takeover → graceful degradation
+用 OfflineAgent 跑 6 个比赛演示场景（不依赖 LLM）：
+  1. 居民报修 → 生成带 ID 的工单
+  2. 查社区脉搏 → 天气 + 热点 + 提案
+  3. 创建提案 → 附议 → 状态变更
+  4. 查我的工单 → 发现已解决 → 闭环确认
+  5. 治理审计 → 四维度评分 → 行动建议
+  6. LLM 不可用 → OfflineAgent 接管 → 优雅降级
 
-All scenarios use the OfflineAgent so they can run in CI without API keys.
+场景全走 OfflineAgent，CI 里没有 API key 也能跑。
 """
 import sys
 import os
@@ -49,7 +49,7 @@ def _cleanup_test_db(db_path):
 
 
 class TestDemoScenarios(unittest.TestCase):
-    """Six demo scenarios that competition judges would evaluate."""
+    """评委大概率会看的 6 个演示场景。"""
 
     @classmethod
     def setUpClass(cls):
@@ -61,92 +61,92 @@ class TestDemoScenarios(unittest.TestCase):
     def tearDownClass(cls):
         _cleanup_test_db(cls._db_path)
 
-    # -- Scenario 1: 居民报修 → 自动分类 → 生成工单 → 确认工单号 --
+    # 场景1：居民报修 → 自动分类 → 生成工单 → 确认工单号
 
     def test_scenario_1_resident_repair(self):
-        """Resident reports a facility issue, gets ticket ID back."""
-        # Step 1: Resident describes a problem
+        """居民报修设施问题，拿回工单号。"""
+        # 第一步：居民描述问题
         response1 = self.agent.run("3号楼二楼楼道的灯不亮了，晚上走路很危险")
         self.assertIsInstance(response1, str)
         self.assertIn("✅", response1, "Should confirm issue creation")
         self.assertIn("#", response1, "Should include issue ID")
 
-        # Step 2: Resident checks their issues (may not match due to offline author resolution)
+        # 第二步：查自己的工单（离线模式下作者解析可能对不上，不强求）
         response2 = self.agent.run("查看我的工单")
         self.assertIsInstance(response2, str)
         self.assertTrue(len(response2) > 10, "My issues query should return something")
 
-    # -- Scenario 2: 社区脉搏 → 天气+热点+提案 三合一 --
+    # 场景2：社区脉搏 → 天气+热点+提案 三合一
 
     def test_scenario_2_community_pulse(self):
-        """Community pulse delivers weather, hotspots, and proposals."""
+        """社区脉搏要带出天气、热点和提案。"""
         response = self.agent.run("社区脉搏")
         self.assertIsInstance(response, str)
         self.assertTrue(len(response) > 80, "Pulse should be substantial")
 
-        # Should contain weather info
+        # 得有天气信息
         self.assertTrue("🌤️" in response or "天气" in response, "Should have weather")
 
-        # Should contain hotspot section
+        # 得有热点板块
         self.assertIn("热点", response)
 
-    # -- Scenario 3: 创建提案 → 附议 → 状态变更 --
+    # 场景3：创建提案 → 附议 → 状态变更
 
     def test_scenario_3_proposal_lifecycle(self):
-        """Create proposal, check it appears, and support flow."""
-        # Step 1: Express intent to create a proposal
+        """创建提案、确认它出现、走一遍附议流程。"""
+        # 第一步：表达想创建提案的意图
         response1 = self.agent.run(
             "我觉得应该延长活动室开放时间到晚上11点，方便大家活动"
         )
         self.assertIsInstance(response1, str)
         self.assertTrue(len(response1) > 20)
 
-        # Step 2: Browse proposals
+        # 第二步：浏览提案
         response2 = self.agent.run("看看大家提了什么好建议")
         self.assertIsInstance(response2, str)
 
-        # Step 3: Check "my proposals"
+        # 第三步：查"我的提案"
         response3 = self.agent.run("我的提案")
         self.assertIsInstance(response3, str)
 
-    # -- Scenario 4: 查询我的工单 → 发现已解决 → 闭环确认 --
+    # 场景4：查询我的工单 → 发现已解决 → 闭环确认
 
     def test_scenario_4_closed_loop(self):
-        """Query my issues, check status, closed-loop confirmation."""
-        # First report an issue to have data
+        """查我的工单、看状态、闭环确认。"""
+        # 先报一个单，让库里有点数据
         self.agent.run("3号楼水龙头漏水需要维修")
 
-        # Then check "my issues"
+        # 再去查"我的工单"
         response = self.agent.run("我的工单处理得怎么样了")
         self.assertIsInstance(response, str)
         self.assertTrue(len(response) > 10)
 
-    # -- Scenario 5: 治理审计 → 四维度评分 → 行动建议 --
+    # 场景5：治理审计 → 四维度评分 → 行动建议
 
     def test_scenario_5_governance_audit(self):
-        """Governance audit with four-dimension scoring."""
+        """治理审计要出四维度评分。"""
         from agent.governance_audit import run_governance_audit
 
         report = run_governance_audit()
         self.assertIsInstance(report, str)
         self.assertTrue(len(report) > 50)
 
-        # Should contain four dimensions
+        # 四个维度都得有
         self.assertIn("工单管理", report)
         self.assertIn("提案参与", report)
         self.assertIn("公民参与", report)
 
-        # Should have health score and grade
+        # 得有健康度和评级
         self.assertIn("治理健康度", report)
 
-        # Should have report card
+        # 得有分维度评分卡
         self.assertIn("分维度评分", report)
 
-    # -- Scenario 6: LLM不可用 → OfflineAgent接管 → 优雅降级 --
+    # 场景6：LLM 不可用 → OfflineAgent 接管 → 优雅降级
 
     def test_scenario_6_offline_fallback(self):
-        """OfflineAgent handles all persona types without LLM."""
-        # Test all four personas work in offline mode
+        """不靠 LLM，OfflineAgent 也能扛住所有角色类型。"""
+        # 四种角色加寒暄都得能跑
         tests = [
             ("社区脉搏", "observer"),
             ("统计治理数据", "analyst"),
@@ -165,31 +165,31 @@ class TestDemoScenarios(unittest.TestCase):
                 self.assertTrue(len(response) > 5,
                     f"Response too short for '{scenario_type}': {response[:50]}")
 
-    # -- Multi-turn conversation simulation --
+    # 多轮对话模拟
 
     def test_multi_turn_conversation(self):
-        """Simulate a natural multi-turn conversation."""
-        # Turn 1: Greeting
+        """模拟一段自然的连续对话。"""
+        # 第1轮：打招呼
         r1 = self.agent.run("你好")
         self.assertIn("社区", r1)
 
-        # Turn 2: Community pulse
+        # 第2轮：社区脉搏
         r2 = self.agent.run("社区脉搏")
         self.assertTrue(len(r2) > 50)
 
-        # Turn 3: Report an issue
+        # 第3轮：报修
         r3 = self.agent.run("活动室空调不制冷了")
         self.assertIn("✅", r3)
 
-        # Turn 4: Check my issues
+        # 第4轮：查我的工单
         r4 = self.agent.run("我的工单")
         self.assertIsInstance(r4, str)
 
-        # Turn 5: Thanks
+        # 第5轮：道谢
         r5 = self.agent.run("谢谢")
         self.assertTrue(len(r5) > 5)
 
-        # Conversation should have tracked at least 5 turns
+        # 对话轮数至少记了 5 次
         self.assertGreaterEqual(self.agent._conversation_turns, 5)
 
 

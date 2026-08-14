@@ -19,20 +19,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 
 
 SCENARIOS: list[tuple[str, str, str]] = [
-    # ── standard：常见说法（关键词表内） ──
+    # standard：常见说法（关键词表内）
     ("standard", "3号楼电梯困人了", "report_issue"),
     ("standard", "社区脉搏", "get_community_pulse"),
     ("standard", "今天天气怎么样", "get_weather"),
     ("standard", "看看有哪些提案", "get_proposals"),
     ("standard", "我的工单进展如何", "query_my_issues"),
     ("standard", "统计一下解决率", "get_governance_stats"),
-    # ── unseen：变体说法（部分在表内） ──
+    # unseen：变体说法（部分在表内）
     ("unseen", "我家楼道灯忽闪忽闪的", "report_issue"),
     ("unseen", "车轱辘陷坑里了", "report_issue"),
     ("unseen", "电梯一开一合吱吱响", "report_issue"),
     ("unseen", "水龙头拧不紧了", "report_issue"),
     ("unseen", "想看看最近小区有啥新鲜事", "get_community_pulse"),
-    # ── generic：关键词表外的全新说法（只有 LLM 语义能判） ──
+    # generic：关键词表外的全新说法（只有 LLM 语义能判）
     ("generic", "我家门口地砖翘起来了", "report_issue"),
     ("generic", "楼道里老有股难闻的味", "report_issue"),
     ("generic", "小区喷水池不喷了", "report_issue"),
@@ -45,7 +45,7 @@ SCENARIOS: list[tuple[str, str, str]] = [
 
 
 def _fact_check_cases() -> list[tuple[str, list[int]]]:
-    """(response, expected_bad_ids)"""
+    """(回复文本, 预期的幻觉编号列表)"""
     return [
         ("已为你生成工单 #12345，请留意处理。", [12345]),
         ("你的工单 #1 进展正常。", []),
@@ -54,7 +54,7 @@ def _fact_check_cases() -> list[tuple[str, list[int]]]:
 
 
 def run_eval(mode: str = "keyword") -> dict:
-    """Run intent-routing evaluation.
+    """跑意图路由评测。
 
     mode="keyword" 只走关键词层（离线，零成本）；
     mode="llm" 走完整 route_intent（LLM 主决策 + 关键词兜底）。
@@ -96,7 +96,7 @@ def run_eval(mode: str = "keyword") -> dict:
 
 
 def run_fact_check_eval() -> dict:
-    """Run fact-verification evaluation against a temp DB seeded with issue #1."""
+    """对着只种了 1 号工单的临时库跑事实校验评测。"""
     import tempfile
     from data.db_core import init_db
     from data.db_governance import report_issue

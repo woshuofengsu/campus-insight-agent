@@ -1,4 +1,4 @@
-"""Build clean print-friendly HTML from competition markdown files."""
+"""把比赛用的 markdown 转成适合打印的干净 HTML。"""
 import re
 import os
 
@@ -105,7 +105,7 @@ TASKS = [
     (os.path.join(BASE, "技术实现报告.md"), "社区先知 · 技术实现报告"),
 ]
 
-# Regex for table alignment separator row: e.g. |---|:---:|----|
+# 匹配表格对齐分隔行，比如 |---|:---:|----|
 _RE_SEP = re.compile(r"^:?-+?:?$")
 
 
@@ -113,12 +113,12 @@ def md2html(text):
     lines_out = []
     paragraphs = []
 
-    # State machines
+    # 各种状态累积器
     table_rows = []
-    prev_row = None        # row before a potential separator (candidate header)
+    prev_row = None        # 分隔行前面那行，可能是表头
     in_code = False
-    list_items = []        # accumulating <li> strings
-    meta_lines = []        # accumulating metadata blockquote lines
+    list_items = []        # 攒 <li> 字符串
+    meta_lines = []        # 攒元信息引用块的行
 
     def flush_meta():
         nonlocal meta_lines
@@ -163,7 +163,7 @@ def md2html(text):
     for line in text.split("\n"):
         stripped = line.strip()
 
-        # -- code blocks --
+        # 代码块
         if stripped.startswith("```"):
             flush_all()
             if in_code:
@@ -179,19 +179,19 @@ def md2html(text):
             )
             continue
 
-        # -- blank line: flush inline accumulators --
+        # 空行：把攒的内容一次性吐出来
         if not stripped:
             flush_all()
             lines_out.append("")
             continue
 
-        # -- HR --
+        # 分隔线
         if stripped == "---":
             flush_all()
             lines_out.append("<hr>")
             continue
 
-        # -- headings --
+        # 标题
         heading = False
         for level, tag in [(4, "h4"), (3, "h3"), (2, "h2"), (1, "h1")]:
             prefix = "#" * level + " "
@@ -203,7 +203,7 @@ def md2html(text):
         if heading:
             continue
 
-        # -- blockquote (consecutive -> single .meta or blockquote) --
+        # 连续的引用块合并成一个 .meta 卡片或 blockquote
         if line.startswith("> "):
             flush_list()
             flush_paragraphs()
@@ -211,47 +211,46 @@ def md2html(text):
             meta_lines.append(_inline(line[2:]))
             continue
 
-        # End of consecutive blockquote region
+        # 引用块区域结束
         if meta_lines:
-            # Determine: if at the start of doc (lines_out is mostly empty), use meta card
-            # Check if this is likely the header metadata region
+            # 文档开头（前面基本没内容）就当元信息卡片，否则是正文里的引用
             content_so_far = "".join(lines_out).strip()
             if not content_so_far or content_so_far.startswith("<h1"):
-                # metadata card
+                # 元信息卡片
                 body = "<br>".join(meta_lines)
                 lines_out.append(f'<div class="meta">{body}</div>')
             else:
-                # regular blockquote later in doc
+                # 文档后面的普通引用块
                 body = "<br>".join(meta_lines)
                 lines_out.append(f"<blockquote>{body}</blockquote>")
             meta_lines = []
 
-        # -- table rows --
+        # 表格行
         if stripped.startswith("|") and stripped.endswith("|"):
             flush_list()
             flush_paragraphs()
             cells = [c.strip() for c in stripped.split("|")[1:-1]]
 
-            # Is this a separator row?
+            # 是不是分隔行？
             if all(_RE_SEP.match(c) for c in cells):
-                # Mark the previous row as header
+                # 把上一行升级成表头
                 if prev_row is not None:
                     table_rows[-1] = prev_row.replace("<td>", "<th>").replace("</td>", "</th>")
                 prev_row = None
                 continue
 
-            # Regular row
+            # 普通数据行
             tags = ["<td>", "</td>"]
             row_html = "".join(f"<td>{_inline(c)}</td>" for c in cells)
             table_rows.append(f"<tr>{row_html}</tr>")
-            prev_row = row_html  # remember for potential header promotion
+            prev_row = row_html  # 记住这行，下一条可能是分隔行
             continue
 
-        # Non-table: flush pending table
+        # 不是表格内容了，把攒着的表格先输出
         if table_rows:
             flush_table()
 
-        # -- list items --
+        # 列表项
         list_match = re.match(r"^(\d+)[\.\、]\s+(.+)", stripped)
         if list_match:
             flush_paragraphs()
@@ -263,14 +262,14 @@ def md2html(text):
             list_items.append(_inline(re.sub(r"^[-*]\s+", "", stripped)))
             continue
 
-        # End of list region
+        # 列表区域结束
         if list_items:
             flush_list()
 
-        # -- regular paragraph --
+        # 普通段落
         paragraphs.append(_inline(line))
 
-    # End of file — flush everything
+    # 文件读完，把剩下的全输出
     flush_all()
 
     return "\n".join(lines_out)

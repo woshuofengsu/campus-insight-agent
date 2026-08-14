@@ -1,4 +1,3 @@
-# ui/pages_grid/issues_mgmt.py
 """📋 工单管理 — 表格视图、筛选、批量操作、指派、时效统计."""
 import csv
 import io
@@ -16,7 +15,7 @@ from data.db_sla import get_sla_summary
 
 _log = logging.getLogger(__name__)
 
-# ── Page Render ──
+# 页面渲染
 page_header("📋 工单管理", "查看、筛选、处理所有社区诉求上报。")
 
 # 当前网格员身份（用于「我的待办」过滤：优先按 assignee_id 主键，旧数据回退姓名）
@@ -25,7 +24,7 @@ _profile = _memory.get_user_profile() if _memory is not None else {}
 _my_id = (_profile or {}).get("id")
 _my_name = (_profile.get("name") or "").strip() or (_profile.get("unit") or "").strip()
 
-# ── Status filter ──
+# 状态筛选
 status_choice = st.radio(
     "状态筛选",
     ["全部", "⏳ 待处理", "🔄 处理中", "🧐 待复核", "✅ 已解决"],
@@ -37,7 +36,7 @@ _STATUS_MAP = {"全部": None, "⏳ 待处理": "待处理", "🔄 处理中": "
                "🧐 待复核": "待复核", "✅ 已解决": "已解决"}
 status_val = _STATUS_MAP.get(status_choice)
 
-# ── Filters (2+2 grid: stacks to 4 rows on mobile) ──
+# 筛选：2+2 网格，手机上堆成 4 行
 c1, c2 = st.columns(2)
 with c1:
     cat_choice = st.selectbox(
@@ -60,7 +59,7 @@ with c4:
     batch_mode = st.toggle("🔲 批量", key="_issues_batch_mode")
     show_mine = st.toggle("👷 我的待办", key="_issues_mine_filter")
 
-# ── Fetch data ──
+# 拉数据
 cat_val = None if cat_choice == "全部" else cat_choice
 urgency_val = None if urgency_choice == "全部" else urgency_choice
 
@@ -78,7 +77,7 @@ if show_mine:
         or (i.get("assignee_id") is None and (i.get("assignee") or "").strip() == _my_name)
     ]
 
-# ── Sort: urgent first, then by status priority (待处理 > 处理中 > 已解决), then newest first ──
+# 排序：紧急优先，再按状态优先级，最后新的在前
 _STATUS_PRIORITY = {"待处理": 0, "处理中": 1, "已解决": 2}
 issues.sort(key=lambda x: (
     0 if x.get("urgency") == "紧急" else 1,
@@ -87,13 +86,12 @@ issues.sort(key=lambda x: (
 ))
 
 
-# -- AI Category Suggestion (real LLM; keyword fallback lives inside _llm_classify) --
+# AI 分类建议（真 LLM；关键词兜底在 _llm_classify 里）
 def _suggest_category(title: str, description: str = "", stored: str = "") -> str:
-    """Suggest a category via the shared AI classifier. Returns '' if uncertain.
+    """用公共 AI 分类器建议类别，拿不准就返回空串。
 
-    Prefers the persisted ``suggested_category`` (captured at report time by the
-    real LLM); for legacy rows it falls back to a fresh LLM classification (which
-    itself degrades to keywords on API failure).
+    优先用上报时 LLM 存的 suggested_category；老数据没有就现场重新分类
+    （LLM 挂了还会退化到关键词匹配）。
     """
     if stored:
         return stored
@@ -101,12 +99,12 @@ def _suggest_category(title: str, description: str = "", stored: str = "") -> st
         from tools.action_report_issue import _llm_classify
         cat, _ = _llm_classify(title, description)
         return cat
-    except Exception:  # log and skip — no suggestion is better than a wrong one
-        _log.debug("AI category suggestion unavailable for '%s'", title)
+    except Exception:  # 出错就跳过，瞎建议还不如不建议
+        _log.debug("AI 分类建议对 '%s' 不可用", title)
         return ""
 
 
-# ── Grid processing stats ──
+# 网格员处理统计
 with st.expander("📊 我的处理统计", expanded=False):
     try:
         with get_db() as conn:
@@ -124,14 +122,14 @@ with st.expander("📊 我的处理统计", expanded=False):
             ).fetchone()
             week_processed = my_week["cnt"] if my_week else 0
 
-            # Avg resolution time this month
+            # 本月平均解决时长
             avg_days_row = conn.execute(
                 "SELECT ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) as avg_days "
                 "FROM community_issues WHERE status = '已解决' AND resolved_at > date('now', '-30 days')"
             ).fetchone()
             avg_days = avg_days_row["avg_days"] if avg_days_row and avg_days_row["avg_days"] is not None else None
     except Exception:
-        _log.warning("Failed to load grid processing stats", exc_info=True)
+        _log.warning("加载网格员处理统计失败", exc_info=True)
         today_processed, week_processed, avg_days = 0, 0, None
 
     mc1, mc2, mc3 = st.columns(3)
@@ -142,13 +140,13 @@ with st.expander("📊 我的处理统计", expanded=False):
     with mc3:
         st.metric("月均解决时间", f"{avg_days} 天" if avg_days else "—")
 
-# ── Stats bar ──
+# 统计条
 stats = cached_issues_stats()
 pending_c = stats["by_status"].get("待处理", 0)
 progress_c = stats["by_status"].get("处理中", 0)
 resolved_c = stats["by_status"].get("已解决", 0)
 
-# ── SLA summary (per-urgency deadlines, not a flat 7-day rule) ──
+# SLA 概览：按紧急度分级时限
 _sla = get_sla_summary()
 urgent_unresolved = _sla["urgent_pending"]
 overdue_total = _sla["total_overdue"]
@@ -207,7 +205,7 @@ with c_export:
             width="stretch",
         )
 
-# ── Quick Response Templates ──
+# 常用回复模板
 with st.expander("📋 常用回复模板", expanded=False):
     templates = {
         "已派维修": "已通知物业维修组前往处理，预计24小时内完成。",
@@ -239,9 +237,9 @@ with st.expander("📋 常用回复模板", expanded=False):
 st.markdown("---")
 
 
-# ── Actions handler ──
+# 操作处理
 def _resolve_assignee_id(name: str) -> int | None:
-    """Resolve a grid worker's user id from their display name (for manual dispatch)."""
+    """根据姓名找到网格员的用户 id（手动派单用）。"""
     if not name:
         return None
     from data.db_user import list_users
@@ -270,7 +268,7 @@ def _available_actions(status: str) -> list[tuple[str, str]]:
 
 
 def _batch_set_status(selected_ids: list[int], new_status: str, note: str = ""):
-    """Bulk update status for selected issues."""
+    """批量更新选中工单的状态。"""
     count = 0
     for iid in selected_ids:
         update_issue_status(iid, new_status, processing_note=note)
@@ -279,16 +277,16 @@ def _batch_set_status(selected_ids: list[int], new_status: str, note: str = ""):
     return count
 
 
-# ── Resolve author for display ──
+# 展示用的上报人
 def _resolve_author_display(author: str) -> str:
     if not author:
         return "匿名"
     return author
 
 
-# ── Compute processing time ──
+# 计算处理时长
 def _compute_days(reported_at: str, resolved_at: str = "") -> tuple[int | None, int | None]:
-    """Return (days_open, days_to_resolve)."""
+    """返回（已开启天数, 解决天数）。"""
     days_open = None
     days_to_resolve = None
     try:
@@ -302,7 +300,7 @@ def _compute_days(reported_at: str, resolved_at: str = "") -> tuple[int | None, 
     return days_open, days_to_resolve
 
 
-# ── Batch action bar ──
+# 批量操作栏
 if batch_mode and issues:
     selected_ids: list[int] = []
     for issue in issues:
@@ -318,7 +316,7 @@ if batch_mode and issues:
                 f'✅ 已选 {n} 条</span>',
                 unsafe_allow_html=True,
             )
-            # Batch note
+            # 批量备注
             batch_note = st.text_input(
                 "批量处理备注", key="_batch_note",
                 placeholder="可选：为所选工单添加统一备注…",
@@ -362,7 +360,7 @@ if batch_mode and issues:
 
 
 def _clear_batch():
-    """Clear all batch checkboxes."""
+    """清空所有批量勾选。"""
     for k in list(st.session_state.keys()):
         if k.startswith("_batch_") and k != "_batch_note":
             st.session_state[k] = False
@@ -370,11 +368,11 @@ def _clear_batch():
         del st.session_state["_batch_note"]
 
 
-# ── Table ──
+# 工单表格
 if not issues:
     st.info("暂无匹配的工单。")
 else:
-    # ── Column headers ──
+    # 列标题
     col_hdr = st.columns([3, 2, 1.5, 1.5, 2])
     with col_hdr[0]:
         st.caption("📋 工单信息")
@@ -417,7 +415,7 @@ else:
             else:
                 c_main, c_assignee, c_time, c_suggest, c_act = st.columns([3, 1.5, 1.2, 1.2, 2])
 
-            # ── Column 1: Main info ──
+            # 第 1 列：工单信息
             with c_main:
                 st.markdown(
                     f'{urgency_icon} <strong>#{iid} {title}</strong>'
@@ -433,13 +431,13 @@ else:
                     detail_parts.append(f'✅ {resolved_at}')
                 st.caption(' · '.join(detail_parts))
 
-            # ── Column 2: Author + Assignee ──
+            # 第 2 列：上报人 + 指派人
             with c_assignee:
                 st.caption(f"上报：{_resolve_author_display(author)}")
                 if assignee:
                     st.caption(f"👷 {assignee}")
 
-            # ── Column 3: Processing time ──
+            # 第 3 列：时效
             with c_time:
                 if status == "已解决" and days_to_resolve is not None:
                     time_color = TOKEN["success"] if days_to_resolve <= 3 else TOKEN["warning"] if days_to_resolve <= 7 else TOKEN["danger"]
@@ -463,7 +461,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-            # ── Column 4: Suggested category ──
+            # 第 4 列：建议分类
             with c_suggest:
                 suggested_cat = _suggest_category(title, desc, suggested_cat)
                 if suggested_cat and suggested_cat != cat:
@@ -477,16 +475,16 @@ else:
                 elif suggested_cat == cat:
                     st.caption("🤖 一致")
 
-            # ── Column 5: Actions ──
+            # 第 5 列：操作
             with c_act:
                 if not batch_mode:
-                    # Detail dialog trigger
+                    # 详情按钮
                     detail_key = f"_detail_{iid}"
                     if st.button("📄 详情", key=f"detail_btn_{iid}", width="stretch"):
                         st.session_state[detail_key] = not st.session_state.get(detail_key, False)
                         st.rerun()
 
-            # ── Detail expander (below the row) ──
+            # 详情折叠区（在行下方）
             detail_key = f"_detail_{iid}"
             if st.session_state.get(detail_key, False):
                 with st.container(border=True):
@@ -511,7 +509,7 @@ else:
                         st.markdown("**📝 处理备注**：")
                         st.success(proc_note)
 
-                    # Activity history
+                    # 处理记录
                     st.markdown("**📜 处理记录**：")
                     try:
                         with get_db() as conn:
@@ -532,10 +530,10 @@ else:
                             else:
                                 st.caption("暂无处理记录")
                     except Exception:
-                        _log.debug("non-critical failure", exc_info=True)
+                        _log.debug("非致命错误", exc_info=True)
                         st.caption("处理记录暂不可用")
 
-                    # ── 处理操作（st.form 收敛，消除 session_state 手动清理） ──
+                    # 处理操作：st.form 收敛，不用手动清 session_state
                     st.markdown("---")
                     st.markdown("**🔧 处理操作**")
 

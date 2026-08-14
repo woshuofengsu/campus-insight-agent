@@ -1,12 +1,11 @@
-# data/db_notifications.py
-"""Notification system — persistent notifications for the feedback loop.
+"""通知系统 — 闭环反馈用的持久化站内通知。
 
-Triggers:
-  - Grid updates issue status → notifies the reporter
-  - Grid responds/adopts proposal → notifies the author
-  - Health alerts → notifies all users (future)
+触发点:
+  - 网格员更新工单状态 → 通知上报人
+  - 网格员回复/采纳提案 → 通知提案人
+  - 健康告警 → 通知所有用户（以后做）
 
-Displayed in sidebar badge + notification center page.
+侧边栏角标 + 通知中心页面展示。
 """
 import logging
 
@@ -15,11 +14,9 @@ from data.db_core import get_db
 _log = logging.getLogger(__name__)
 
 
-# ── Create ──
-
 def create_notification(user_id: int, type_: str, title: str,
                         content: str = "", related_id: int | None = None) -> int:
-    """Create a notification for a specific user. Returns the new notification ID."""
+    """给某个用户发一条通知，返回新通知的 ID。"""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO notifications (user_id, type, title, content, related_id) "
@@ -32,7 +29,7 @@ def create_notification(user_id: int, type_: str, title: str,
 
 def broadcast_notification(type_: str, title: str,
                            content: str = "", related_id: int | None = None) -> int:
-    """Broadcast a notification to all active resident users. Returns count of recipients."""
+    """广播给所有启用的居民用户，返回收件人数。"""
     with get_db() as conn:
         residents = conn.execute(
             "SELECT id FROM user_profile WHERE role = 'resident' AND is_active = 1"
@@ -51,10 +48,9 @@ def broadcast_notification(type_: str, title: str,
 
 def notify_issue_status_change(issue_id: int, new_status: str,
                                 reporter_username: str = "") -> None:
-    """When grid changes issue status, notify the reporter.
+    """网格员改工单状态时，通知上报人。
 
-    Resolves the reporter from the issue's author field, then looks up
-    the user by that author name/resident_id.
+    先按工单的 author/reporter_id 字段找到上报人，再查用户表拿到通知对象。
     """
     with get_db() as conn:
         issue = conn.execute(
@@ -67,8 +63,8 @@ def notify_issue_status_change(issue_id: int, new_status: str,
         author = (issue["author"] or "").strip()
         reporter_id = issue["reporter_id"]
 
-        # Resolve reporter: prefer reporter_id (robust + privacy-safe for anonymous
-        # reports), fall back to author-string matching for legacy rows.
+        # 找上报人：优先用 reporter_id（匿名上报也稳、不泄露隐私），
+        # 老数据没有就用 author 字符串去匹配。
         reporter = None
         if reporter_id:
             reporter = conn.execute(
@@ -85,8 +81,8 @@ def notify_issue_status_change(issue_id: int, new_status: str,
             ).fetchone()
 
         if not reporter:
-            _log.debug("notify_issue_status_change: reporter not found for #%d", issue_id)
-            return  # can't find the reporter — skip notification
+            _log.debug("notify_issue_status_change: 工单 #%d 找不到上报人", issue_id)
+            return  # 找不到上报人，跳过通知
 
         status_cn = {
             "处理中": ("🔄 处理中", f"你上报的「{issue_title}」已被受理，正在处理中。"),
@@ -106,7 +102,7 @@ def notify_issue_status_change(issue_id: int, new_status: str,
 
 def notify_proposal_status_change(proposal_id: int, new_status: str,
                                    response_text: str = "") -> None:
-    """When grid responds/adopts proposal, notify the author."""
+    """网格员回复/采纳提案时，通知提案人。"""
     with get_db() as conn:
         prop = conn.execute(
             "SELECT title, author, reporter_id FROM proposals WHERE id = ?", (proposal_id,)
@@ -133,7 +129,7 @@ def notify_proposal_status_change(proposal_id: int, new_status: str,
             ).fetchone()
 
         if not proposer:
-            _log.debug("notify_proposal_status_change: proposer not found for #%d", proposal_id)
+            _log.debug("notify_proposal_status_change: 提案 #%d 找不到提案人", proposal_id)
             return
 
         status_config = {
@@ -163,11 +159,9 @@ def notify_proposal_status_change(proposal_id: int, new_status: str,
         )
 
 
-# ── Query ──
-
 def get_notifications(user_id: int, unread_only: bool = False,
                       limit: int = 50) -> list[dict]:
-    """Get notifications for a user, newest first."""
+    """查用户的通知，新的在前。"""
     with get_db() as conn:
         if unread_only:
             rows = conn.execute(
@@ -185,7 +179,7 @@ def get_notifications(user_id: int, unread_only: bool = False,
 
 
 def get_unread_count(user_id: int) -> int:
-    """Get count of unread notifications for a user."""
+    """查用户未读通知数。"""
     with get_db() as conn:
         row = conn.execute(
             "SELECT COUNT(*) as cnt FROM notifications "
@@ -196,7 +190,7 @@ def get_unread_count(user_id: int) -> int:
 
 
 def mark_read(notification_id: int) -> None:
-    """Mark a single notification as read."""
+    """把单条通知标成已读。"""
     with get_db() as conn:
         conn.execute(
             "UPDATE notifications SET is_read = 1 WHERE id = ?",
@@ -206,7 +200,7 @@ def mark_read(notification_id: int) -> None:
 
 
 def mark_all_read(user_id: int) -> int:
-    """Mark all notifications for a user as read. Returns count of updated rows."""
+    """把用户所有通知标成已读，返回更新的行数。"""
     with get_db() as conn:
         cur = conn.execute(
             "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0",
@@ -216,12 +210,10 @@ def mark_all_read(user_id: int) -> int:
         return cur.rowcount
 
 
-# ── Activity Log ──
-
 def log_activity(actor: str, action: str, target_type: str = "",
                  target_id: int | None = None, target_title: str = "",
                  detail: str = "") -> int:
-    """Record an activity for the timeline. Returns the new log ID."""
+    """记一条动态，供时间线用。返回新日志 ID。"""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO activity_log (actor, action, target_type, target_id, "
@@ -233,7 +225,7 @@ def log_activity(actor: str, action: str, target_type: str = "",
 
 
 def get_activity_feed(limit: int = 20) -> list[dict]:
-    """Get recent activity, newest first."""
+    """查最近动态，新的在前。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?",
@@ -243,7 +235,7 @@ def get_activity_feed(limit: int = 20) -> list[dict]:
 
 
 def get_activity_summary() -> dict:
-    """Get today's activity counts."""
+    """查今天的动态计数。"""
     with get_db() as conn:
         today_issues = conn.execute(
             "SELECT COUNT(*) as cnt FROM activity_log "
@@ -268,15 +260,14 @@ def get_activity_summary() -> dict:
 
 
 def seed_activity_from_existing() -> dict:
-    """Backfill activity_log from existing community_issues and proposals.
+    """用现有的 community_issues 和 proposals 回填 activity_log。
 
-    Idempotent — skips entries that already have corresponding log records.
-    Returns counts of what was created.
+    幂等——已有对应日志记录的条目会跳过。返回各类创建的数量。
     """
     result = {"issues": 0, "resolutions": 0, "proposals": 0}
 
     with get_db() as conn:
-        # ── Issue reports ──
+        # 工单上报
         issues = conn.execute(
             "SELECT id, title, author, category, location, status, "
             "reported_at, resolved_at FROM community_issues "
@@ -289,7 +280,7 @@ def seed_activity_from_existing() -> dict:
             title = issue["title"] or ""
             detail = f'{issue["category"]} · {issue["location"]}' if issue["location"] else issue["category"]
 
-            # Check if activity already logged
+            # 看这条是不是已经记过日志了
             existing = conn.execute(
                 "SELECT COUNT(*) as cnt FROM activity_log "
                 "WHERE target_type = 'issue' AND target_id = ? AND action = '上报问题'",
@@ -304,7 +295,7 @@ def seed_activity_from_existing() -> dict:
                 )
                 result["issues"] += 1
 
-            # ── Resolutions ──
+            # 工单解决
             if issue["status"] == "已解决" and issue["resolved_at"]:
                 existing_res = conn.execute(
                     "SELECT COUNT(*) as cnt FROM activity_log "
@@ -321,7 +312,7 @@ def seed_activity_from_existing() -> dict:
 
         conn.commit()
 
-        # ── Proposals ──
+        # 提案
         proposals = conn.execute(
             "SELECT id, title, author, category, status, response_text, created_at "
             "FROM proposals WHERE author IS NOT NULL AND author != ''"
@@ -347,7 +338,7 @@ def seed_activity_from_existing() -> dict:
                 )
                 result["proposals"] += 1
 
-            # ── Proposal responses ──
+            # 提案回复/采纳
             if prop["status"] in ("已回应", "已采纳") and prop["response_text"]:
                 action = "采纳提案" if prop["status"] == "已采纳" else "回复提案"
                 existing_resp = conn.execute(

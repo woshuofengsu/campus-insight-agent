@@ -1,13 +1,11 @@
-# data/db_user.py
-"""User profile CRUD — multi-user support with authentication.
+"""用户资料增删改查 — 支持多用户和登录鉴权。
 
-All functions accept an optional user_id parameter. When omitted, they resolve
-the current user from:
+所有函数都接受可选的 user_id 参数；不传时按下面的顺序找当前用户：
 
-  1. Explicit override:  set_active_user_id()  (for API / non-UI contexts)
-  2. Streamlit session_state._login_user_id    (for UI)
+  1. 显式指定: set_active_user_id()（API / 非 UI 场景）
+  2. Streamlit session_state._login_user_id（UI 场景）
 
-Raises RuntimeError if no user can be resolved.
+都找不到就抛 RuntimeError。
 """
 import json
 import logging
@@ -15,41 +13,40 @@ from data.db_core import get_db, _hash_password, _verify_password
 
 _log = logging.getLogger(__name__)
 
-# Module-level override for non-Streamlit contexts (e.g., FastAPI)
+# 非 Streamlit 场景（比如 FastAPI）用的模块级用户覆盖
 _explicit_user_id: int | None = None
 
 
 def set_active_user_id(user_id: int | None) -> None:
-    """Set the active user_id for non-Streamlit contexts (e.g., FastAPI).
+    """给非 Streamlit 场景（如 FastAPI）设置当前 user_id。
 
-    Call this at the start of each API request to set the current user.
-    Pass None to clear and fall back to Streamlit session_state.
+    每个 API 请求开头调一次。传 None 表示清除，回到 Streamlit session_state。
     """
     global _explicit_user_id
     _explicit_user_id = user_id
 
 
 def _get_active_user_id() -> int:
-    """Resolve the active user_id.
+    """解析当前 user_id。
 
-    Priority:
-      1. Explicit override (set_active_user_id) — for API contexts
-      2. Streamlit session_state._login_user_id — for UI
+    优先级：
+      1. 显式指定（set_active_user_id）— API 场景
+      2. Streamlit session_state._login_user_id — UI 场景
 
-    Raises RuntimeError if no user can be resolved.
+    都拿不到就抛 RuntimeError。
     """
-    # 1) Explicit override (API / non-UI)
+    # 1) 显式指定（API / 非 UI）
     if _explicit_user_id is not None:
         return _explicit_user_id
 
-    # 2) Streamlit session_state (UI)
+    # 2) Streamlit session_state（UI）
     try:
         import streamlit as st
         uid = st.session_state.get("_login_user_id")
         if uid is not None:
             return int(uid)
-    except Exception:  # best-effort, skip
-        _log.debug("Failed to resolve user from session_state", exc_info=True)
+    except Exception:  # 尽力而为，拿不到就算了
+        _log.debug("从 session_state 解析用户失败", exc_info=True)
         pass
 
     raise RuntimeError(
@@ -58,13 +55,11 @@ def _get_active_user_id() -> int:
     )
 
 
-# ── Authentication ──
-
 def authenticate(username: str, password: str = "") -> dict | None:
-    """Verify credentials. Returns user profile dict on success, None on failure.
+    """校验登录。成功返回用户资料 dict，失败返回 None。
 
-    Residents (role='resident'): password is optional — empty password accepted.
-    Grid managers (role='grid'): password is REQUIRED and verified against hash.
+    居民（role='resident'）：密码可空，空密码直接放行。
+    网格员（role='grid'）：必须有密码，且要和存库的 hash 对上。
     """
     with get_db() as conn:
         row = conn.execute(
@@ -78,15 +73,15 @@ def authenticate(username: str, password: str = "") -> dict | None:
         stored_hash = user.get("password_hash", "")
 
         if user["role"] == "grid":
-            # Grid must provide correct password
+            # 网格员必须密码正确
             if not _verify_password(password, stored_hash):
                 return None
         else:
-            # Resident: if a password is set, verify it; if not, any/empty password works
+            # 居民：设了密码就校验；没设密码就随便/空密码都能进
             if stored_hash and not _verify_password(password, stored_hash):
                 return None
 
-        # Migrate legacy hash format to PBKDF2 on successful login
+        # 登录成功后顺手把旧版 hash 格式迁移成 PBKDF2
         if stored_hash and "$" not in stored_hash:
             new_hash = _hash_password(password)
             conn.execute(
@@ -99,33 +94,32 @@ def authenticate(username: str, password: str = "") -> dict | None:
         return user
 
 
-# ── CRUD ──
-
 def get_current_user() -> dict:
-    """Get the currently logged-in user's profile (from session_state).
-    Fallback to legacy id=1 for backward compatibility during migration.
+    """拿当前登录用户的资料（从 session_state）。
+
+    迁移期间兼容老逻辑：拿不到就回退到 id=1。
     """
     try:
         uid = _get_active_user_id()
         profile = get_user_by_id(uid)
         if profile:
             return profile
-        # _get_active_user_id() succeeded but the user was not found in DB
-        # (e.g. session_state._login_user_id is stale). Fall through to id=1.
+        # 用户 ID 解析出来了但库里没这个人（比如 session 里的 ID 过期了），
+        # 回退到 id=1。
     except RuntimeError:
         pass
-    # Legacy fallback: return user id=1 (pre-auth DB)
+    # 老逻辑兜底：返回 id=1 的用户（登录改造前的库）
     return get_user_by_id(1)
 
 
 def get_user_by_id(user_id: int) -> dict:
-    """Get a user profile by ID. Returns empty dict if not found."""
+    """按 ID 查用户资料，没有就返回空 dict。"""
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM user_profile WHERE id = ?", (user_id,)
         ).fetchone()
         if not row:
-            # Fallback to id=1 for legacy compatibility
+            # 兼容老数据：没有就回退到 id=1
             if user_id != 1:
                 row = conn.execute(
                     "SELECT * FROM user_profile WHERE id = 1"
@@ -134,7 +128,7 @@ def get_user_by_id(user_id: int) -> dict:
 
 
 def get_user_by_username(username: str) -> dict | None:
-    """Get a user profile by username. Returns None if not found."""
+    """按用户名查用户资料，没有就返回 None。"""
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM user_profile WHERE username = ?", (username.strip(),)
@@ -143,7 +137,7 @@ def get_user_by_username(username: str) -> dict | None:
 
 
 def list_users(role: str | None = None) -> list[dict]:
-    """List all active users, optionally filtered by role."""
+    """列所有启用中的用户，可按角色过滤。"""
     with get_db() as conn:
         if role:
             rows = conn.execute(
@@ -162,7 +156,7 @@ def list_users(role: str | None = None) -> list[dict]:
 def create_user(username: str, password: str = "", role: str = "resident",
                 community: str = "", building: str = "", unit: str = "",
                 name: str = "", resident_id: str = "") -> int:
-    """Create a new user. Returns the new user ID. Raises ValueError on duplicate."""
+    """新建用户，返回新用户 ID；用户名重复抛 ValueError。"""
     with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM user_profile WHERE username = ?", (username.strip(),)
@@ -186,11 +180,11 @@ def update_user_profile(community: str | None = None, building: str | None = Non
                         preferences: list[str] | None = None,
                         user_id: int | None = None,
                         password: str | None = None) -> None:
-    """Update user profile fields.
+    """更新用户资料。
 
-    Pass a string (including empty string) to set; pass None to skip.
-    If user_id is None, updates the currently logged-in user.
-    Pass password=<new_password> to set/change password; empty string clears it.
+    传字符串（包括空串）表示要设置；传 None 表示跳过不更新。
+    user_id 不传就更新当前登录用户。
+    password 传新密码就改密码；传空串表示清空密码。
     """
     if user_id is None:
         user_id = _get_active_user_id()
@@ -230,7 +224,7 @@ def update_user_profile(community: str | None = None, building: str | None = Non
 
 
 def set_onboarding_done(user_id: int | None = None) -> None:
-    """Mark onboarding as complete for the given user."""
+    """把某用户的引导流程标记为已完成。"""
     if user_id is None:
         user_id = _get_active_user_id()
     with get_db() as conn:
@@ -242,7 +236,7 @@ def set_onboarding_done(user_id: int | None = None) -> None:
 
 
 def reset_onboarding(user_id: int | None = None) -> None:
-    """Reset onboarding flag for the given user."""
+    """重置某用户的引导标记。"""
     if user_id is None:
         user_id = _get_active_user_id()
     with get_db() as conn:
@@ -253,8 +247,8 @@ def reset_onboarding(user_id: int | None = None) -> None:
         conn.commit()
 
 
-# ── Legacy compatibility wrappers (used by older code that takes no user_id) ──
+# 给老代码用的兼容包装（旧接口不传 user_id）
 
 def get_or_create_user() -> dict:
-    """Legacy: get current user profile. Use get_current_user() in new code."""
+    """旧接口：拿当前用户资料。新代码直接用 get_current_user()。"""
     return get_current_user()

@@ -14,17 +14,17 @@ from langchain.tools import tool
 from data.database import report_issue as _db_report_issue
 from data.database import get_issues_stats as _db_get_stats
 
-# ── Cache for LLM classify results (avoids duplicate API calls within session) ──
+# LLM 分类结果缓存（同一个会话里别重复调接口）
 _classify_cache: dict[str, tuple[str, str]] = {}
 _MAX_CACHE_SIZE = 200
 
 
 def _llm_classify(title: str, description: str) -> tuple[str, str]:
-    """Use LLM (DeepSeek) to classify issue category + assess urgency.
+    """用 LLM（DeepSeek）判断诉求类别 + 评估紧急度。
 
-    Returns (category, urgency) tuple.
-    Falls back to keyword matching on any error (API timeout, rate limit, etc.).
-    Results are cached by (title+description) to avoid duplicate API calls.
+    返回 (category, urgency) 元组。
+    接口超时、限流等任何报错都退回关键词匹配。
+    结果按（标题+描述）缓存，避免重复调接口。
     """
     cache_key = f"{title}|{description or ''}"
     if cache_key in _classify_cache:
@@ -35,7 +35,7 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
         from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
         if not DEEPSEEK_API_KEY:
-            raise ValueError("No API key configured")
+            raise ValueError("未配置 API key")
 
         llm = ChatOpenAI(
             api_key=DEEPSEEK_API_KEY,
@@ -43,8 +43,8 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
             model=DEEPSEEK_MODEL,
             temperature=0,
             max_tokens=80,
-            timeout=5,        # short timeout — classification is fast
-            max_retries=0,    # no retry — fall back to keywords on failure
+            timeout=5,        # 超时短一点，分类本来就快
+            max_retries=0,    # 不重试，失败直接走关键词
         )
 
         prompt = (
@@ -64,7 +64,7 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
         response = llm.invoke(prompt)
         text = response.content if hasattr(response, 'content') else str(response)
 
-        # Extract JSON from response (handles occasional markdown wrapping)
+        # 从返回里抠 JSON（偶尔会被 markdown 包一层）
         match = re.search(r'\{[^{}]*"category"[^{}]*"urgency"[^{}]*\}', text, re.DOTALL)
         if not match:
             match = re.search(r'\{[^}]+\}', text)
@@ -83,7 +83,7 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
             if urgency not in valid_urg:
                 urgency = "普通"
 
-            # Cache result (with size limit)
+            # 缓存结果，超了先挤掉最旧的
             if len(_classify_cache) >= _MAX_CACHE_SIZE:
                 _classify_cache.pop(next(iter(_classify_cache)))
             _classify_cache[cache_key] = (category, urgency)
@@ -91,16 +91,16 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
             return category, urgency
 
     except (Exception,):
-        # Catch all but don't catch BaseException (KeyboardInterrupt, SystemExit)
-        _log.debug("LLM classification failed, falling back to keyword-based classification")
+        # 只抓 Exception，别碰 BaseException（KeyboardInterrupt、SystemExit）
+        _log.debug("LLM 分类失败，退回关键词分类")
 
-    # ── Keyword fallback ──
+    # 关键词兜底
     cat = _keyword_classify(title, description)
     urg = _keyword_urgency(title, description)
     return cat, urg
 
 
-# ── Location validation: building/unit issues should have location info ──
+# 位置校验：楼栋/单元类诉求必须带位置
 
 _ROOM_REQUIRED_KEYWORDS = [
     "楼", "单元", "楼道", "电梯", "天台", "屋面", "车库", "地下室",
@@ -110,7 +110,7 @@ _ROOM_EXEMPT_KEYWORDS = [
     "南门", "北门", "围墙", "车棚", "快递柜", "全小区", "垃圾桶",
     "垃圾点", "绿化带", "健身器材",
 ]
-# Accept any reasonable location: building+floor, unit number, or building name
+# 只要有个像样的位置就算过：楼栋+楼层、单元号、楼名都行
 _ROOM_NUMBER_PATTERN = re.compile(
     r"(\d{3,}|[号楼栋幢层Ff]\s*\d+|"
     r"[A-Za-z]\d{2,}|\d+[层Ff楼]|"
@@ -120,11 +120,11 @@ _ROOM_NUMBER_PATTERN = re.compile(
 
 
 def validate_location(title: str, location: str) -> str | None:
-    """Check building/unit issues have at least building-level location.
+    """楼栋/单元类诉求至少要填到楼栋级别的位置。
 
-    Returns error only when location is completely empty for building/unit
-    issues. Any non-empty location (building name, floor, unit) is accepted —
-    having some location info is always more actionable than blocking the report.
+    只有楼栋/单元类问题且位置完全为空时才报错。
+    只要填了任何位置（楼名、楼层、单元）都算过——
+    有点位置信息总比把上报卡死强。
     """
     text = f"{title} {location}"
     needs_room = any(kw in text for kw in _ROOM_REQUIRED_KEYWORDS)
@@ -133,10 +133,10 @@ def validate_location(title: str, location: str) -> str | None:
     if needs_room and not is_exempt:
         if not location.strip():
             return "⚠️ 楼栋/单元类诉求请填写位置（如：3号楼2单元、7号楼前空地、中心花园）"
-        # Any non-empty location is accepted — partial info > no report
+        # 只要非空就接受 — 有半截信息也比没上报强
     return None
 
-# Issue categories for auto-classification
+# 自动分类用的关键词表
 _CATEGORIES = {
     "安全隐患": ["火灾", "漏电", "触电", "煤气", "爆炸", "消防", "通道堵塞", "玻璃碎裂",
                  "瓷砖脱落", "外墙", "年检", "飞线", "电动车", "电线裸露", "塌", "困人"],
@@ -155,7 +155,7 @@ _CATEGORIES = {
 
 
 def _keyword_classify(title: str, description: str) -> str:
-    """Keyword-based fallback classifier — used when LLM is unavailable."""
+    """关键词兜底分类器 — LLM 不可用时用。"""
     text = f"{title} {description}"
     for cat, keywords in _CATEGORIES.items():
         for kw in keywords:
@@ -165,7 +165,7 @@ def _keyword_classify(title: str, description: str) -> str:
 
 
 def _keyword_urgency(title: str, description: str) -> str:
-    """Keyword-based fallback urgency assessment — used when LLM is unavailable."""
+    """关键词兜底紧急度判断 — LLM 不可用时用。"""
     urgent_keywords = ["火灾", "漏电", "触电", "塌", "爆炸", "大面积停电", "电梯困人",
                        "受伤", "流血", "煤气", "中毒", "严重漏水"]
     high_keywords = ["停电", "停水", "电梯故障", "玻璃碎裂", "线路裸露", "消防",
@@ -181,7 +181,7 @@ def _keyword_urgency(title: str, description: str) -> str:
     return "普通"
 
 
-# ── AI-powered classification for UI forms (LLM with keyword fallback) ──
+# 表单用的 AI 分类（LLM + 关键词兜底）
 def _auto_classify(title: str, description: str = "") -> str:
     """AI 语义分类 — 由 DeepSeek 判断类别，失败时自动降级为关键词匹配。"""
     return _llm_classify(title, description)[0]
@@ -210,15 +210,15 @@ def report_issue(title: str, category: str = "", location: str = "",
     if not title.strip():
         return "❌ 请至少提供诉求标题，例如：'3号楼2单元电梯困人了'"
 
-    # Validate location for building/unit issues
+    # 楼栋/单元类诉求先校验位置
     loc_err = validate_location(title, location)
     if loc_err:
         return loc_err
 
-    # ── Classification: use fast keyword path when category+urgency are both
-    #     provided (e.g. from safety net), otherwise use LLM for better accuracy ──
+    # 分类：category 和 urgency 都给了（比如安全网传的）就走快路径，
+    #     否则用 LLM 分类，准确率高一点
     if category.strip() and urgency.strip():
-        # Fast path: skip LLM, use provided values (validated below)
+        # 快路径：跳过 LLM，直接用传进来的值（下面会校验）
         pass
     elif not category.strip():
         category, urgency = _llm_classify(title, description)
@@ -231,18 +231,18 @@ def report_issue(title: str, category: str = "", location: str = "",
         location=location.strip(),
         description=description.strip(),
         urgency=urgency,
-        author="",  # Let _resolve_author() auto-fill from user profile
-        suggested_category=category,  # persist AI classification for grid-manager review
+        author="",  # 空着，让 _resolve_author() 从用户资料自动补
+        suggested_category=category,  # 把 AI 分类存下来，网格员审核时能对照
     )
 
-    # Invalidate grid-side caches so new issue is visible immediately
+    # 清网格员那边的缓存，新工单立刻能看见
     try:
         from ui.cache import invalidate_issues
         invalidate_issues()
     except Exception:
         pass
 
-    # Get current stats for context
+    # 顺手取一下统计数据，回复里好带上
     stats = _db_get_stats()
 
     urgency_emoji = {"普通": "🔵", "紧急": "🟠", "极急": "🔴"}

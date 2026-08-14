@@ -1,4 +1,3 @@
-# data/db_sla.py
 """SLA（服务时效）分级 — 接诉即办的办理时限与超时预警。
 
 时效口径（评委问"紧急多久预警"时的标准答案）:
@@ -30,10 +29,10 @@ def _urgent_breach_expr() -> str:
 
 
 def get_sla_breaches(limit: int = 50) -> list[dict]:
-    """Return issues that have breached their SLA (still open past deadline).
+    """返回已超 SLA 的工单（还在时限内没解决的）。
 
-    Each item: {id, title, category, location, urgency, status, hours_open, level}
-      level: "critical" (极急/紧急超时) | "overdue" (普通超时)
+    每条: {id, title, category, location, urgency, status, hours_open, level}
+      level: "critical"（极急/紧急超时）| "overdue"（普通超时）
     """
     rows: list[dict] = []
     try:
@@ -52,12 +51,12 @@ def get_sla_breaches(limit: int = 50) -> list[dict]:
                 d["level"] = "critical" if d.get("urgency") in ("极急", "紧急") else "overdue"
                 rows.append(d)
     except Exception:
-        _log.warning("get_sla_breaches failed", exc_info=True)
+        _log.warning("get_sla_breaches 查询失败", exc_info=True)
     return rows
 
 
 def get_sla_summary() -> dict:
-    """Aggregate SLA breach counts for the dashboard / workbench."""
+    """给看板/工作台汇总 SLA 超时的计数。"""
     try:
         with get_db() as conn:
             urgent_pending = conn.execute(
@@ -83,7 +82,7 @@ def get_sla_summary() -> dict:
             "total_overdue": total_overdue["cnt"] if total_overdue else 0,
         }
     except Exception:
-        _log.warning("get_sla_summary failed", exc_info=True)
+        _log.warning("get_sla_summary 统计失败", exc_info=True)
         return {"urgent_pending": 0, "critical_overdue": 0, "normal_overdue": 0, "total_overdue": 0}
 
 
@@ -97,10 +96,10 @@ def _escalation_expr() -> str:
 
 
 def escalate_overdue_issues(limit: int = 20) -> list[dict]:
-    """将超时 2× 仍未解决的工单标记为「已升级」，并 best-effort 邮件通知。
+    """将超时 2× 仍未解决的工单标记为「已升级」，并尽力发封邮件通知。
 
     幂等：只处理 escalated_at 为空的工单，重复调用不会重复升级/重复发信。
-    Returns list of {id, title, category, urgency, hours_open} newly escalated.
+    返回本次新升级的工单列表 {id, title, category, urgency, hours_open}。
     """
     escalated: list[dict] = []
     try:
@@ -122,7 +121,7 @@ def escalate_overdue_issues(limit: int = 20) -> list[dict]:
                 escalated.append(dict(r))
             conn.commit()
     except Exception:
-        _log.warning("escalate_overdue_issues failed", exc_info=True)
+        _log.warning("escalate_overdue_issues 升级失败", exc_info=True)
         return []
 
     if escalated:
@@ -136,12 +135,12 @@ def escalate_overdue_issues(limit: int = 20) -> list[dict]:
                 )
                 send_email("社区先知 SLA 升级提醒", body)
         except Exception:
-            _log.warning("SLA escalation email failed", exc_info=True)
+            _log.warning("SLA 升级邮件发送失败", exc_info=True)
     return escalated
 
 
 def get_escalated_issues(limit: int = 20) -> list[dict]:
-    """Return issues already escalated (escalated_at set), newest escalation first."""
+    """查已升级的工单（escalated_at 有值），按升级时间新的在前。"""
     try:
         with get_db() as conn:
             rows = conn.execute(
@@ -154,5 +153,5 @@ def get_escalated_issues(limit: int = 20) -> list[dict]:
             ).fetchall()
             return [dict(r) for r in rows]
     except Exception:
-        _log.warning("get_escalated_issues failed", exc_info=True)
+        _log.warning("get_escalated_issues 查询失败", exc_info=True)
         return []

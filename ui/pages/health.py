@@ -1,4 +1,3 @@
-# ui/pages/health.py
 """健康防护 —— 疾病风险预警、预防建议、季节提醒."""
 import streamlit as st
 import altair as alt
@@ -14,7 +13,7 @@ except Exception as e:
     st.error(f"健康数据加载失败：{e}")
     st.stop()
 
-# Hero — overall risk level
+# 主卡片：整体风险等级
 
 hl = h["overall_level"]
 he = h["overall_emoji"]
@@ -74,7 +73,7 @@ if h.get("weather_breakdown"):
 
 st.markdown("---")
 
-# Per-disease risk cards — delegated to shared component
+# 各疾病风险卡片，交给公共组件渲染
 
 from ui.health_card import render_disease_detail_cards
 import logging

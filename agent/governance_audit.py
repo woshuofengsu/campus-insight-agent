@@ -1,11 +1,10 @@
 # agent/governance_audit.py
-"""Governance audit -- cross-table health report card.
+"""治理审计 —— 跨表体检报告卡。
 
-Audits four dimensions (issue management, proposal engagement, citizen
-participation, hotspots). Scoring: resolution rate baseline 80%, emergency
-penalty 5 pts/unresolved urgent (cap 25), staleness penalty 3 pts/SLA breach
-(cap 20), unresponded proposal penalty 8 pts (cap 40), adoption bonus, and
-participation floor.
+审四个维度（工单管理、提案参与、公民参与、热点）。
+评分规则：解决率基准 80%，紧急未处理每条扣 5 分（上限 25），
+SLA 超时每条扣 3 分（上限 20），待回复提案每条扣 8 分（上限 40），
+采纳率有加分，参与人数有下限。
 """
 import logging
 from data.database import get_db, compute_health_score
@@ -14,7 +13,7 @@ _log = logging.getLogger(__name__)
 
 
 def run_governance_audit() -> str:
-    """Run a cross-table governance audit. Returns a markdown report."""
+    """跨表跑一轮治理审计，返回 markdown 报告。"""
     try:
         health = compute_health_score()
         resolution_rate = health["resolution_rate"]
@@ -24,7 +23,7 @@ def run_governance_audit() -> str:
         grades: dict[str, dict] = {}
 
         with get_db() as conn:
-            # ── 1. Issue Management ──
+            # 1. 工单管理
             issue_summary = conn.execute(
                 "SELECT status, COUNT(*) as cnt FROM community_issues GROUP BY status"
             ).fetchall()
@@ -58,7 +57,7 @@ def run_governance_audit() -> str:
             if stale_count > 0:
                 lines.append(f"   ⚠️ 积压 {stale_count} 件超时未处理")
 
-            # ── 2. Proposal Engagement ──
+            # 2. 提案参与
             prop_summary = conn.execute(
                 "SELECT status, COUNT(*) as cnt FROM proposals GROUP BY status"
             ).fetchall()
@@ -88,7 +87,7 @@ def run_governance_audit() -> str:
             lines.append(f"\n**\U0001f4a1 提案参与**：{total_p} 件 · 待回复 {unresponded} · 已采纳/实施 {adopted}")
             lines.append(f"   人均附议：{avg_supporters} 人")
 
-            # ── 3. Citizen Engagement ──
+            # 3. 公民参与
             topic_rows = conn.execute(
                 "SELECT COUNT(*) as cnt, SUM(participant_count) as total_parts FROM discussion_topics"
             ).fetchone()
@@ -114,7 +113,7 @@ def run_governance_audit() -> str:
             }
             lines.append(f"\n**\U0001f5e3️ 公民参与**：{unique_authors} 位用户上报问题 · {total_participants} 人次参与议题讨论")
 
-            # ── 4. Hotspots ──
+            # 4. 热点类别
             cat_rows = conn.execute(
                 "SELECT category, COUNT(*) as cnt FROM community_issues "
                 "WHERE status != '已解决' GROUP BY category ORDER BY cnt DESC LIMIT 3"
@@ -123,10 +122,10 @@ def run_governance_audit() -> str:
                 cat_strs = [f"{r['category']}({r['cnt']}件)" for r in cat_rows]
                 lines.append(f"\n**\U0001f525 热点类别**：{'、'.join(cat_strs)}")
 
-        # ── 5. Overall Health ──
+        # 5. 整体健康度
         lines.append(f"\n**\U0001f3e5 治理健康度**：{health['grade']}（{health['score']} 分）")
 
-        # ── 6. Report Card ──
+        # 6. 分维度评分
         lines.append("\n### \U0001f4ca 分维度评分")
         for dim, g in grades.items():
             letter = "A" if g["score"] >= 85 else "B" if g["score"] >= 70 else "C" if g["score"] >= 50 else "D"
@@ -134,7 +133,7 @@ def run_governance_audit() -> str:
                 f"- {dim}：{letter} ({g['score']}分) {g['trend']} — {g['detail']}"
             )
 
-        # ── 7. Action Items ──
+        # 7. 行动建议
         actions: list[tuple[int, str]] = []
         if urgent_unresolved > 0:
             actions.append((10, f"\U0001f534 处理 {urgent_unresolved} 件紧急工单（最高优先）"))
@@ -156,5 +155,5 @@ def run_governance_audit() -> str:
         return "\n".join(lines)
 
     except Exception as e:
-        _log.warning("Governance audit failed (non-fatal): %s", e)
+        _log.warning("治理审计失败（非致命）：%s", e)
         return f"*治理体检暂时不可用：{e}*"

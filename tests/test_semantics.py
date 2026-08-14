@@ -30,7 +30,7 @@ def _cleanup_test_db(db_path: str):
 
 
 def _utc_hours_ago(hours: float) -> str:
-    """UTC wall-clock timestamp `hours` hours ago (matches SQLite CURRENT_TIMESTAMP)."""
+    """返回 hours 小时前的 UTC 时间，格式跟 SQLite CURRENT_TIMESTAMP 一致。"""
     return (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -47,7 +47,7 @@ def _insert_issue(conn, title: str, category: str = "设施维修", urgency: str
     return cur.lastrowid
 
 
-# -- 1. SLA 时区 --
+# 1. SLA 时区
 
 class TestSLATimezone(unittest.TestCase):
 
@@ -70,7 +70,7 @@ class TestSLATimezone(unittest.TestCase):
         self.assertNotIn(self._fresh_id, ids)
 
 
-# -- 2. 分级边界 --
+# 2. 分级边界
 
 class TestSLABoundaries(unittest.TestCase):
 
@@ -99,7 +99,7 @@ class TestSLABoundaries(unittest.TestCase):
         self.assertEqual(breaches[self.normal_over]["level"], "overdue")
 
 
-# -- 3. 满意度闭环 --
+# 3. 满意度闭环
 
 class TestSatisfactionClosedLoop(unittest.TestCase):
 
@@ -163,7 +163,7 @@ class TestSatisfactionClosedLoop(unittest.TestCase):
         self.assertEqual(row["satisfaction"], "不满意")
 
 
-# -- 4. 匿名 --
+# 4. 匿名
 
 class TestAnonymousReporting(unittest.TestCase):
 

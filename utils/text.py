@@ -1,18 +1,17 @@
 # utils/text.py
-"""Pure text-processing utilities — zero external dependencies.
+"""纯文本处理工具，不依赖任何第三方库。
 
-These functions are used by both the UI layer (ui/) and the agent layer (agent/).
-Keeping them in a standalone module avoids circular import risks and Streamlit
-exec()-context issues with ui/components.py.
+UI 层（ui/）和 agent 层（agent/）都在用。单独拆出来是为了避免循环 import，
+也躲开 Streamlit 对 ui/components.py 的 exec() 上下文问题。
 """
 import re
 
 
 def split_thinking(content: str) -> tuple[str, str]:
-    """Split AI response into (clean_content, thinking_text).
+    """把 AI 回复拆成（正文, 思考过程）两部分。
 
-    Handles DeepSeek-style <think>...</think> and <thinking>...</thinking> tags.
-    Used by both the chat UI (home.py) and the agent engine (engine.py).
+    处理 DeepSeek 风格的 <think>...</think> 和 <thinking>...</thinking> 标签。
+    聊天页（home.py）和 agent 引擎（engine.py）都在用。
     """
     thinking_parts: list[str] = []
     cleaned = content

@@ -1,4 +1,3 @@
-# ui/pages/voice.py
 """🗳️ 邻里议事 · 议 — 提案、附议（一键操作）、议题讨论（直接发言）."""
 import streamlit as st
 from data.database import (
@@ -32,7 +31,7 @@ page_header("🗳️ 邻里议事", "创建提案、附议、参与议题讨论�
 
 ooda_nav("voice")
 
-# ✍️ Create proposal form
+# 创建提案表单
 
 create_feedback = st.session_state.get("_create_proposal_feedback", "")
 create_error = st.session_state.get("_create_proposal_error", "")
@@ -77,13 +76,12 @@ with st.container(border=True):
                 invalidate_proposals()
                 st.session_state._create_proposal_feedback = f"✅ 提案 #{pid}「{title[:25]}」已发布！分类：{cat}"
                 st.session_state._create_proposal_error = ""
-                # Clear all form fields including category
-                # Clear form — del avoids Streamlit's widget-ownership guard
+                # 清掉所有表单字段（含分类），用 del 避开 Streamlit 的控件所有权检查
                 for _key in ("create_proposal_title", "create_proposal_desc", "create_proposal_cat"):
                     if _key in st.session_state:
                         del st.session_state[_key]
             except Exception as e:
-                _log.debug("non-critical failure", exc_info=True)
+                _log.debug("非致命错误", exc_info=True)
                 st.session_state._create_proposal_error = f"发布失败：{e}"
                 st.session_state._create_proposal_feedback = ""
         st.rerun()
@@ -97,7 +95,7 @@ if create_error:
 
 st.markdown("---")
 
-# Proposals stats
+# 提案统计
 
 pstats = get_proposals_stats()
 total_p = pstats["total"]
@@ -117,7 +115,7 @@ with c3:
 
 st.markdown("")
 
-# Proposals — sortable + support inline
+# 热门提案：可排序，直接附议
 
 section("热门提案")
 
@@ -133,7 +131,7 @@ proposals = get_proposals(
 if not proposals:
     info_card("在对话页说'我有个建议'来创建第一个提案！")
 else:
-    # Track support button clicks
+    # 记录附议按钮的反馈
     support_feedback = st.session_state.get("_support_feedback", {})
     support_error = st.session_state.get("_support_error", {})
 
@@ -142,7 +140,7 @@ else:
         with st.container(border=True):
             c_left, c_right = st.columns([5, 1])
             with c_left:
-                # Inline proposal info
+                # 提案信息内联展示
                 s = p.get("status", "讨论中")
                 emoji_map = {"讨论中": "💬", "已回应": "📝", "已采纳": "✅", "已实施": "🎉"}
                 emoji = emoji_map.get(s, "📌")
@@ -172,12 +170,12 @@ else:
                             st.session_state._support_feedback = {str(pid): f"附议成功！{p['title'][:20]} → {new_count} 人"}
                             st.session_state._support_error = {}
                         except Exception as e:
-                            _log.debug("non-critical failure", exc_info=True)
+                            _log.debug("非致命错误", exc_info=True)
                             st.session_state._support_error = {str(pid): str(e)}
                             st.session_state._support_feedback = {}
                         st.rerun()
 
-            # Show feedback for this proposal
+            # 显示这条提案的反馈
             fb_key = str(pid)
             if fb_key in support_feedback:
                 st.success(support_feedback[fb_key])
@@ -188,7 +186,7 @@ else:
 
 st.markdown("---")
 
-# Discussion topics — express opinion inline
+# 正在热议的议题，可直接发言
 
 section("正在热议")
 
@@ -216,7 +214,7 @@ else:
                     unsafe_allow_html=True,
                 )
 
-            # Show existing opinions
+            # 显示已有意见
             opinions = get_opinions(tid, limit=6)
             if opinions:
                 st.markdown(
@@ -252,10 +250,10 @@ else:
                             st.session_state._opinion_feedback = {
                                 str(tid): f"✅ 已发表！当前 {summary['total_opinions']} 条意见"
                             }
-                            # Clear the input (del avoids Streamlit's widget-ownership guard)
+                            # 清输入框（del 避开 Streamlit 的控件所有权检查）
                             del st.session_state[f"opinion_input_{tid}"]
                         except Exception as e:
-                            _log.debug("non-critical failure", exc_info=True)
+                            _log.debug("非致命错误", exc_info=True)
                             st.session_state._opinion_feedback = {str(tid): f"❌ 发表失败：{e}"}
                         st.rerun()
 
@@ -266,7 +264,7 @@ else:
 
 st.markdown("---")
 
-# Status legend
+# 状态图例
 
 st.markdown(
     f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-top:12px;">'

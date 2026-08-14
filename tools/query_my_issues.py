@@ -17,10 +17,10 @@ _log = logging.getLogger(__name__)
 
 
 def _resolve_current_author() -> str:
-    """Auto-resolve the current user's author identifier from session state.
+    """从会话里自动解析当前用户的作者标识。
 
-    Delegates to _resolve_author() in data/db_governance.py — the single
-    source of truth for author identity resolution.
+    具体逻辑交给 data/db_governance.py 的 _resolve_author()，
+    作者身份解析只认这一处。
     """
     from data.db_governance import _resolve_author
     author = _resolve_author("")
@@ -56,7 +56,7 @@ def query_my_issues() -> str:
             "发现小区里的问题？直接描述，帮你上报。比如「3号楼2单元电梯困人了」。"
         )
 
-    # ── Stats summary ──
+    # 统计摘要
     stats = get_my_stats(author)
     total = stats["total_issues"]
     resolved = stats["resolved_issues"]
@@ -93,7 +93,7 @@ def query_my_issues() -> str:
             lines.append(f"  📝 处理回复：{issue['processing_note'][:100]}")
         lines.append("")
 
-    # ── Governance encouragement ──
+    # 结尾给点治理小鼓励
     if pending == 0 and resolved > 0:
         lines.append("你上报的所有问题都已解决。")
     elif pending > 0:

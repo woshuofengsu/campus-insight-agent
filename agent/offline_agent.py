@@ -46,7 +46,7 @@ class OfflineAgent:
     def run_perception_check(self) -> list[dict]:
         return []
 
-    # ── Router ──
+    # 路由分发
 
     def _route(self, persona: dict | None, txt: str) -> str | None:
         if persona is None:
@@ -63,20 +63,20 @@ class OfflineAgent:
             return self._respond_proposal(txt)
         return None
 
-    # -- 🌊 社区脉搏 — 综合快报 --
+    # 社区脉搏：综合快报
 
     def _respond_pulse(self) -> str:
         """社区脉搏 — 调用 get_community_pulse + get_weather，格式化为自然播报。"""
         parts = []
 
-        # ── 天气 ──
+        # 天气
         try:
             from tools.query_weather import get_weather
             w = str(get_weather.invoke(""))
-            # Extract key weather facts
+            # 从输出里抠天气关键信息
             parts.append(f"🌤️ {self._extract_weather_line(w)}")
         except Exception:
-            _log.debug("get_weather.invoke() failed, trying get_today_weather fallback", exc_info=True)
+            _log.debug("get_weather.invoke() 失败，退回 get_today_weather 试试", exc_info=True)
             from tools.query_weather import get_today_weather
             try:
                 days, loc, _ = get_today_weather()
@@ -88,10 +88,10 @@ class OfflineAgent:
                         f"降水概率 {d['rain_prob']}%"
                     )
             except Exception:
-                    _log.debug("get_today_weather fallback also failed", exc_info=True)
+                    _log.debug("退回 get_today_weather 也失败了", exc_info=True)
                     parts.append("🌤️ 天气数据暂不可用")
 
-        # ── 本周数据 ──
+        # 本周数据
         try:
             from data.database import get_issues_stats, get_proposals, get_issues
             stats = get_issues_stats()
@@ -101,7 +101,7 @@ class OfflineAgent:
             resolved = stats["by_status"].get("已解决", 0)
             total = stats["total"]
 
-            # Hot categories
+            # 热点类别
             by_cat = stats.get("by_category", {})
             hot_cats = sorted(by_cat.items(), key=lambda x: -x[1])[:3]
 
@@ -136,14 +136,14 @@ class OfflineAgent:
                     )
 
         except Exception as e:
-            _log.debug("Failed to load stats for _respond_pulse: %s", e)
+            _log.debug("加载 _respond_pulse 的 stats 失败：%s", e)
             parts.append(f"\n📡 *本周数据加载中...（{e}）*")
 
         parts.append("")
         parts.append(self._random_encouragement("pulse"))
         return "\n".join(parts)
 
-    # -- 📊 治理数据 — 统计 + 分析 --
+    # 治理数据：统计 + 分析
 
     def _respond_stats(self, txt: str) -> str:
         """治理统计 — 调用 get_governance_stats，包装为分析报告。"""
@@ -154,16 +154,16 @@ class OfflineAgent:
             raw = str(get_governance_stats.invoke(""))
             parts.append(self._reformat_stats(raw))
         except Exception:
-            _log.debug("get_governance_stats failed, falling back to DB stats", exc_info=True)
+            _log.debug("get_governance_stats 失败，退回 DB stats", exc_info=True)
             try:
                 from data.database import get_issues_stats
                 stats = get_issues_stats()
                 parts.append(self._build_stats_from_db(stats))
             except Exception as e:
-                _log.debug("DB stats fallback failed: %s", e, exc_info=True)
+                _log.debug("DB stats 退回失败：%s", e, exc_info=True)
                 parts.append(f"*统计数据暂时无法加载（{e}）*")
 
-        # ── 针对性查询 ──
+        # 针对性查询
         cat_map = {
             "设施": "设施维修", "维修": "设施维修", "停车": "停车管理",
             "卫生": "环境卫生", "环境": "环境卫生", "安全": "安全隐患",
@@ -176,15 +176,15 @@ class OfflineAgent:
                     from tools.query_community_issues import query_issues
                     result = str(query_issues.invoke({"category": cn, "limit": 5}))
                     parts.append(f"\n🔍 **{cn}类工单详情**\n{self._reformat_issue_list(result)}")
-                except Exception:  # best-effort, skip
-                    _log.debug("query_issues for category=%r failed", cn, exc_info=True)
+                except Exception:  # 尽力而为，查不到就跳过
+                    _log.debug("query_issues 查 category=%r 失败", cn, exc_info=True)
                     pass
                 break
 
         parts.append(f"\n💡 {self._random_encouragement('stats')}")
         return "\n".join(parts)
 
-    # -- 🔧 报修 — 创建工单 --
+    # 报修：创建工单
 
     def _respond_report(self, txt: str) -> str:
         """报修 — 调用 report_issue.invoke()，提取工单号并给出追踪提示。"""
@@ -201,12 +201,12 @@ class OfflineAgent:
             })
             raw = str(result)
 
-            # Extract issue ID
+            # 抠工单号
             import re
             id_match = re.search(r'#(\d+)', raw)
             issue_id = id_match.group(1) if id_match else "?"
 
-            # Extract category and urgency
+            # 抠分类和紧急程度
             cat_match = re.search(r'分类[：:]\s*(\S+)', raw)
             urg_match = re.search(r'紧急程度[：:]\s*(\S+)', raw)
             cat = cat_match.group(1) if cat_match else "设施维修"
@@ -240,13 +240,13 @@ class OfflineAgent:
         except Exception as e:
             import logging
             _log = logging.getLogger(__name__)
-            _log.error("report_issue.invoke() failed for title=%r: %s", title, e)
+            _log.error("report_issue.invoke() 失败，title=%r：%s", title, e)
             return (
                 f"⚠️ 上报未能完成：{e}\n\n"
                 f"请稍后重试，或通过顶部导航「🔧 接诉即办」页面手动提交。"
             )
 
-    # -- 💡 提案 — 查看 + 创建引导 --
+    # 提案：查看 + 创建引导
 
     def _respond_proposal(self, txt: str) -> str:
         """提案 — 调用 get_proposals + get_topics，展示热门提案。"""
@@ -257,7 +257,7 @@ class OfflineAgent:
             raw = str(get_proposals.invoke({"sort_by": "supporters", "limit": 5}))
             parts.append(self._reformat_proposal_list(raw))
         except Exception:
-            _log.debug("get_proposals tool failed, trying DB fallback", exc_info=True)
+            _log.debug("get_proposals 工具失败，退回 DB", exc_info=True)
             try:
                 from data.database import get_proposals as db_props
                 props = db_props(sort_by="supporters", limit=5)
@@ -271,20 +271,20 @@ class OfflineAgent:
                             f"[{p.get('status','讨论中')}]"
                         )
             except Exception as e:
-                _log.debug("DB proposals fallback failed: %s", e, exc_info=True)
+                _log.debug("DB proposals 退回失败：%s", e, exc_info=True)
                 parts.append(f"*提案数据暂不可用（{e}）*")
 
-        # ── 议题 ──
+        # 议题
         if any(kw in txt for kw in ["议题", "讨论", "话题", "热议"]):
             try:
                 from tools.query_topics import get_topics
                 raw = str(get_topics.invoke(""))
                 parts.append(f"\n💬 **活跃议题**\n{self._reformat_topic_list(raw)}")
-            except Exception:  # best-effort, skip
-                _log.debug("get_topics failed", exc_info=True)
+            except Exception:  # 尽力而为，跳过
+                _log.debug("get_topics 失败", exc_info=True)
                 pass
 
-        # ── 创建意图 ──
+        # 创建意图
         if any(kw in txt for kw in ["创建", "发起", "提一个", "我想提", "新提案"]):
             parts.append(
                 "\n好的，直接在对话框里告诉我：\n"
@@ -297,12 +297,12 @@ class OfflineAgent:
         parts.append(f"\n{self._random_encouragement('proposal')}")
         return "\n".join(parts)
 
-    # -- 🤔 通用 — 未匹配到具体意图 --
+    # 通用：没匹配到具体意图
 
     def _handle_general(self, txt: str) -> str:
         """Fallback：未匹配任何 persona 时的通用回复。"""
 
-        # ── 感谢/正向反馈（必须在问候之前检查）──
+        # 感谢/正向反馈（得放在问候前面检查）
         if any(kw in txt for kw in ["谢谢", "感谢", "太好了", "很棒", "不错", "厉害"]):
             return random.choice([
                 "不客气。有需要随时找我。",
@@ -310,7 +310,7 @@ class OfflineAgent:
                 "有需要随时找我。",
             ])
 
-        # ── 打招呼 ──
+        # 打招呼
         greetings = [
             "你好", "嗨", "hello", "hi", "在吗", "你是", "你是谁",
             "帮忙", "什么是", "怎么用", "介绍一下",
@@ -332,15 +332,15 @@ class OfflineAgent:
                 f"想了解什么？"
             )
 
-        # ── 查看工单意图 ──
+        # 查看工单意图
         if any(kw in txt for kw in ["我的工单", "我的上报", "我上报的", "查看工单"]):
             return self._my_issues()
 
-        # ── 查看我的提案意图 ──
+        # 查看我的提案意图
         if any(kw in txt for kw in ["我的提案", "我提的", "我提议"]):
             return self._my_proposals()
 
-        # ── 真正的兜底 ──
+        # 真正的兜底
         hints = [
             "🌊 输入「社区脉搏」看本周热点",
             "🔧 直接描述诉求，如「3号楼电梯坏了」",
@@ -354,7 +354,7 @@ class OfflineAgent:
             + "\n\n你想试试哪个？"
         )
 
-    # -- 👤 我的 — 个人工单/提案追踪 --
+    # 我的：个人工单/提案追踪
 
     def _my_issues(self) -> str:
         """查看我的工单。"""
@@ -393,7 +393,7 @@ class OfflineAgent:
                 lines.append(f"\n{len(pending)} 件还在处理中。输入「查看我的工单」追踪。")
             return "\n".join(lines)
         except Exception as e:
-            _log.debug("my_issues query failed: %s", e, exc_info=True)
+            _log.debug("查询 my_issues 失败：%s", e, exc_info=True)
             return f"📋 工单查询暂时不可用（{e}），请稍后重试。"
 
     def _my_proposals(self) -> str:
@@ -422,10 +422,10 @@ class OfflineAgent:
                     lines.append(f"  💬 回复：{p['response_text'][:100]}")
             return "\n".join(lines)
         except Exception as e:
-            _log.debug("my_proposals query failed: %s", e, exc_info=True)
+            _log.debug("查询 my_proposals 失败：%s", e, exc_info=True)
             return f"💡 提案查询暂时不可用（{e}），请稍后重试。"
 
-    # -- Helpers --
+    # 辅助函数
 
     def _get_name(self) -> str:
         return get_user_name(self.memory)
@@ -441,7 +441,7 @@ class OfflineAgent:
         for line in weather_text.split("\n"):
             line = line.strip()
             if any(kw in line for kw in ["°C", "℃", "度", "晴", "雨", "云", "风", "温度"]):
-                # Clean up tool output formatting
+                # 清理工具输出的格式
                 cleaned = line.replace("**", "").strip("·- ")
                 if len(cleaned) > 10:
                     return cleaned
@@ -449,7 +449,7 @@ class OfflineAgent:
 
     def _reformat_stats(self, raw: str) -> str:
         """将 get_governance_stats 的原始输出重新排版为更自然的格式。"""
-        # Extract key numbers
+        # 抠关键数字
         import re
         total_m = re.search(r'总数[：:]\s*(\d+)', raw)
         pending_m = re.search(r'待处理[：:]\s*(\d+)', raw)
@@ -474,7 +474,7 @@ class OfflineAgent:
         if health_m:
             lines.append(f"📊 治理健康度：{health_m.group(1).strip()}")
 
-        # Category breakdown
+        # 分类明细
         cat_section = re.findall(r'([🔧🧹⚠💻🌐🍽📌]\S+)[：:]\s*(\d+)', raw)
         if cat_section:
             lines.append("\n📂 **分类分布**")
@@ -489,7 +489,7 @@ class OfflineAgent:
         for line in raw.split("\n"):
             line = line.strip()
             if line.startswith("#") and "📝" in line:
-                # Extract and simplify
+                # 提取并简化
                 import re
                 id_m = re.search(r'#(\d+)', line)
                 title_m = re.search(r'📝\s*(.+?)(?:\n|$)', line)

@@ -1,4 +1,3 @@
-# data/db_elderly.py
 """老年关怀档案 — 健康信息、用药提醒、紧急联系人、平安打卡、SOS 求助。
 
 面向 `elderly` 角色（独居/高龄老人的无障碍视图）。健康与联系方式按 JSON 字段
@@ -21,7 +20,7 @@ def _ensure_profile(conn, user_id: int) -> None:
 
 
 def get_profile(user_id: int) -> dict:
-    """Return a user's elderly profile (JSON fields parsed). Empty dict if none."""
+    """查老人档案（JSON 字段解析好），没有就返回空 dict。"""
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM elderly_profile WHERE user_id = ?", (user_id,)
@@ -77,10 +76,8 @@ def set_living_alone(user_id: int, is_alone: bool) -> None:
         conn.commit()
 
 
-# ── 平安打卡 ──
-
 def touch_active(user_id: int) -> None:
-    """Mark the elderly user as active right now (any interaction counts)."""
+    """记一次互动，把老人标记为「当前活跃」。"""
     with get_db() as conn:
         _ensure_profile(conn, user_id)
         conn.execute(
@@ -91,7 +88,7 @@ def touch_active(user_id: int) -> None:
 
 
 def get_inactive_elders(hours: int = INACTIVE_HOURS) -> list[dict]:
-    """Return elderly users inactive beyond `hours` (for the safety check)."""
+    """查超过 `hours` 小时没互动的老人（安全巡检用）。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT e.user_id, u.name, e.last_active_at, e.is_living_alone, e.emergency_contact "
@@ -112,7 +109,7 @@ def get_inactive_elders(hours: int = INACTIVE_HOURS) -> list[dict]:
 
 
 def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
-    """Notify grid workers about elderly users inactive beyond `hours`.
+    """通知网格员：有老人超过 `hours` 小时没互动了。
 
     24h 去重（同一天内不重复通知同一老人）。返回本次通知的老人数。
     """
@@ -147,14 +144,12 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
             notified += 1
         return notified
     except Exception:
-        _log.warning("notify_inactive_elders failed", exc_info=True)
+        _log.warning("notify_inactive_elders 通知老人失败", exc_info=True)
         return 0
 
 
-# ── SOS 求助 ──
-
 def sos_request(user_id: int) -> int:
-    """Create a new SOS request. Returns the sos_log id."""
+    """发起一条 SOS 求助，返回 sos_log 的 id。"""
     with get_db() as conn:
         cur = conn.execute("INSERT INTO sos_log (user_id) VALUES (?)", (user_id,))
         conn.commit()
@@ -215,14 +210,12 @@ def notify_sos_targeted(user_name: str, sos_id: int) -> int | None:
         )
         return target["id"]
     except Exception:
-        _log.warning("notify_sos_targeted failed", exc_info=True)
+        _log.warning("notify_sos_targeted 发 SOS 通知失败", exc_info=True)
         return None
 
 
-# ── 用药提醒 ──
-
 def due_reminders(user_id: int, now: datetime | None = None) -> list[dict]:
-    """Return medication reminders due within ±30 min of now."""
+    """查现在 ±30 分钟内到点的用药提醒。"""
     now = now or datetime.now()
     profile = get_profile(user_id)
     reminders = profile.get("medication_reminders", [])
@@ -239,10 +232,8 @@ def due_reminders(user_id: int, now: datetime | None = None) -> list[dict]:
     return due
 
 
-# ── 关怀提醒 ──
-
 def get_care_reminders(user_id: int) -> list[dict]:
-    """Aggregate care reminders: weather + health risk + meal point + anti-fraud."""
+    """汇总关怀提醒：天气 + 健康风险 + 助餐点 + 防诈骗。"""
     items: list[dict] = []
 
     # 恶劣天气出行提醒（雨雪/大风/高温，防滑倒）
@@ -257,7 +248,7 @@ def get_care_reminders(user_id: int) -> list[dict]:
                 items.append({"icon": "🌧️", "type": "weather",
                               "text": f"今天{today.get('condition', '')}，尽量别出门；买菜/取药可联系网格员"})
     except Exception:
-        _log.debug("care reminder weather check skipped", exc_info=True)
+        _log.debug("care reminder 天气检查跳过", exc_info=True)
 
     try:
         from data.db_health_alerts import HealthRiskEngine
@@ -266,7 +257,7 @@ def get_care_reminders(user_id: int) -> list[dict]:
             items.append({"icon": "🏥", "type": "health",
                           "text": f"当前健康风险偏高（{report.get('overall_score', '')}分），注意保暖与防护"})
     except Exception:
-        _log.debug("care reminder health check skipped", exc_info=True)
+        _log.debug("care reminder 健康检查跳过", exc_info=True)
 
     items.append({"icon": "🍚", "type": "meal", "text": "助餐点：中心花园东侧 11:00-13:00（可送餐上门）"})
     items.append({"icon": "🛡️", "type": "safety",
@@ -274,10 +265,8 @@ def get_care_reminders(user_id: int) -> list[dict]:
     return items
 
 
-# ── 网格员关怀视图 ──
-
 def get_medication_adherence(user_id: int, days: int = 7) -> list[dict]:
-    """Return the user's medication-taken confirmations from the last `days` days."""
+    """查用户最近 `days` 天的「已服药」确认记录。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT summary, created_at FROM event_memory "
@@ -290,7 +279,7 @@ def get_medication_adherence(user_id: int, days: int = 7) -> list[dict]:
 
 
 def get_elderly_overview() -> list[dict]:
-    """Aggregate all elderly users for the grid care panel: blood pressure + adherence."""
+    """汇总所有老人，给网格员关怀面板用：血压 + 服药依从性。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT e.user_id, u.name, e.is_living_alone, e.last_active_at, "

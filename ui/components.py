@@ -1,10 +1,10 @@
 # ui/components.py
-"""Design system — enterprise SaaS components for CommunityInsight."""
+"""设计系统 — 社区先知用的通用 UI 组件。"""
 import logging
 import streamlit as st
 from contextlib import contextmanager
 from datetime import datetime
-from utils.text import split_thinking  # re-export
+from utils.text import split_thinking  # 重新导出，方便别处直接 import
 
 _log = logging.getLogger(__name__)
 
@@ -52,17 +52,17 @@ CAT_LABEL = {
     "餐饮问题": "环境卫生", "校园管理": "社区事务",
 }
 
-# Category color-dot system — 8 community categories each get a scannable dot.
-# Dot colors are mid-saturation so they read on both light and dark grounds.
+# 分类色点：8 个社区分类各配一个色点，一眼就能扫出来
+# 颜色取中饱和度，浅色深色背景上都看得清
 CAT_COLORS = {
-    "设施维修": "#2563eb",  # blue
-    "环境卫生": "#059669",  # green
-    "安全隐患": "#dc2626",  # red
-    "停车管理": "#d97706",  # amber
-    "噪音扰民": "#7c3aed",  # violet
-    "物业服务": "#0891b2",  # cyan
-    "邻里矛盾": "#db2777",  # rose
-    "社区事务": "#64748b",  # slate
+    "设施维修": "#2563eb",
+    "环境卫生": "#059669",
+    "安全隐患": "#dc2626",
+    "停车管理": "#d97706",
+    "噪音扰民": "#7c3aed",
+    "物业服务": "#0891b2",
+    "邻里矛盾": "#db2777",
+    "社区事务": "#64748b",
 }
 
 CAT_COLOR_BG = {
@@ -72,7 +72,7 @@ CAT_COLOR_BG = {
 }
 
 
-# Status tag
+# 状态标签
 
 _STATUS_TOKEN_KEYS = {
     "待处理": ("danger_bg", "danger_border", "danger"),
@@ -116,10 +116,10 @@ def category_dot(cat: str) -> str:
     )
 
 
-# KPI — Horizontal strip (no card border)
+# KPI 横向条（不带卡片边框）
 
 def stat(label: str, value: str, accent: str = "", sub: str = ""):
-    """KPI card. Elevated surface, muted label, bold value (colored when semantic)."""
+    """KPI 卡片：浅色底、弱化标签、加粗数值（语义色时上色）。"""
     color = accent or TOKEN["text"]
     sub_html = (
         f'<div style="font-size:{TOKEN["font_micro"]};color:{TOKEN["text_muted"]};'
@@ -141,11 +141,11 @@ def stat(label: str, value: str, accent: str = "", sub: str = ""):
     )
 
 
-# Row-style cards (compact, not boxes)
+# 行式卡片（紧凑，不是盒子样式）
 
 def issue_row(issue: dict, show_checkbox: bool = False, checked: bool = False,
               checkbox_key: str = ""):
-    """Issue as a single table-like row. Left status dot, title, right tag."""
+    """工单做成一行一行的列表：左边状态点，中间标题，右边状态标签。"""
     s = issue.get("status", "")
     _, _, fg = _status_colors(s)
     urgency = issue.get("urgency", "")
@@ -187,7 +187,7 @@ def issue_row(issue: dict, show_checkbox: bool = False, checked: bool = False,
 
 
 def proposal_row(proposal: dict):
-    """Proposal as a compact row."""
+    """提案做成紧凑的一行。"""
     s = proposal.get("status", "讨论中")
     _, _, fg = _status_colors(s)
     supporters = proposal.get("supporter_count", 0)
@@ -207,7 +207,7 @@ def proposal_row(proposal: dict):
     )
 
 
-# Card system (for detail views, not lists)
+# 卡片系统（详情页用，列表不用）
 
 def _card(inner: str, bg: str = "", border: str = "",
           pad: str = "", shadow: str = "", hover: bool = True) -> str:
@@ -245,7 +245,7 @@ def info_card(title: str, detail: str = ""):
     )
 
 
-# Legacy card wrappers — still use for backward compat in detail views
+# 老接口的别名，详情页还在用，先留着兼容
 issue_card = issue_row
 proposal_card = proposal_row
 
@@ -290,7 +290,7 @@ def reminder(title: str, message: str):
     )
 
 
-# Section & Page Header
+# 章节标题和页头
 
 def section(title: str):
     st.markdown(
@@ -306,7 +306,7 @@ def section(title: str):
 
 
 def page_header(title: str, subtitle: str = "", badge: str = ""):
-    """Page header — clean, borderless, low-height (B 风格：无渐变底色，靠分隔线分层)."""
+    """页头：干净、无边框、矮一点（B 风格：无渐变底色，靠分隔线分层）。"""
     badge_html = (
         f'<span style="background:{TOKEN["accent_bg"]};color:{TOKEN["accent"]};'
         f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
@@ -331,7 +331,7 @@ def page_header(title: str, subtitle: str = "", badge: str = ""):
     )
 
 
-# Navigation — step indicator (minimal)
+# 导航：步骤指示条（极简版）
 
 _OODA_STEPS = [
     {"key": "home",          "label": "对话",      "pillar": ""},
@@ -345,10 +345,10 @@ _OODA_PAGE_MAP = {s["key"]: f"ui/pages/{s['key']}.py" for s in _OODA_STEPS}
 
 
 def ooda_nav(current: str):
-    """Compact horizontal strip — one light bar of 6 steps, active step highlighted.
+    """一行横向导航，6 个步骤一条光条，当前步骤高亮。
 
-    Replaces the old two-layer stepper (numbered dots + labels + connectors, plus a
-    second button row) with a single row so the page's real focal point isn't crowded.
+    以前是两层步骤条（数字点+文字+连线，还多一行按钮），太占地方，
+    改成单行后页面重点不会被挤掉。
     """
     n = len(_OODA_STEPS)
     cols = st.columns(n)
@@ -367,7 +367,7 @@ def ooda_nav(current: str):
                     st.switch_page(_OODA_PAGE_MAP[step["key"]])
 
 
-# Altair chart theming
+# Altair 图表配色
 
 def configure_altair(chart):
     return (
@@ -388,7 +388,7 @@ def configure_altair(chart):
     )
 
 
-# Utilities
+# 工具函数
 
 @contextmanager
 def loading(message: str = "Loading..."):
@@ -405,16 +405,16 @@ def time_ago(ts: str) -> str:
         if secs < 86400:    return f"{int(secs // 3600)}h ago"
         return f"{diff.days}d ago"
     except Exception:
-        _log.debug("time_ago parsing failed for ts=%r", ts, exc_info=True)
+        _log.debug("time_ago 解析失败，ts=%r", ts, exc_info=True)
         return ""
 
 
 def resolve_author(profile: dict) -> str:
-    """Resolve display author from user profile.
+    """从用户资料里解析展示用的作者名。
 
-    Priority: resident_id → community+building → name → login_id fallback → "我"
-    Must match data.db_governance._resolve_author() logic so that proposals
-    created via the Agent are visible on the "我的" page.
+    优先级：resident_id → 小区+楼栋 → 姓名 → login_id 兜底 → "我"
+    逻辑必须和 data.db_governance._resolve_author() 保持一致，
+    不然 Agent 建的提案在「我的」页面会看不到。
     """
     rid = (profile.get("resident_id") or "").strip()
     if rid:
@@ -429,7 +429,7 @@ def resolve_author(profile: dict) -> str:
     uid = profile.get("id")
     if uid:
         return f"user_{uid}"
-    # session_state fallback
+    # 再不行就从 session_state 兜底
     try:
         import streamlit as st
         sid_uid = st.session_state.get("_login_user_id")

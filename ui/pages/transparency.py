@@ -1,4 +1,3 @@
-# ui/pages/transparency.py
 """📊 社区治理看板 · 督 — 多维健康度 + 趋势分析 + 参与足迹."""
 import streamlit as st
 import altair as alt
@@ -19,12 +18,12 @@ from data.db_sla import get_sla_breaches
 import logging
 _log = logging.getLogger(__name__)
 
-# ── Page header ──
+# 页头
 page_header("📊 社区治理看板", "数据透明就是最好的信任机制——看看社区治理的真实状况。", "督")
 
 ooda_nav("transparency")
 
-# -- Health score — multi-dimensional --
+# 健康度：多维评分
 
 try:
     health = compute_health_score()
@@ -48,7 +47,7 @@ else:
     health_emoji, health_color = "🔴", TOKEN["danger"]
     health_detail = "大量问题积压，需要加快处理速度。"
 
-# Health hero card
+# 健康度主卡片
 st.markdown(
     f'<div style="background:{TOKEN["card_bg"]};border:2px solid {health_color};'
     f'border-radius:{TOKEN["radius_card"]};padding:20px 24px;text-align:center;'
@@ -61,7 +60,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Three sub-dimensions
+# 三个子维度
 c1, c2, c3 = st.columns(3)
 with c1:
     st.markdown(
@@ -103,7 +102,7 @@ with c3:
 
 st.markdown("---")
 
-# -- Trend chart — 7-day activity --
+# 近 7 天趋势图
 
 section("近7天治理活跃度")
 
@@ -117,8 +116,8 @@ if timeline:
     )
     df_melted["类型"] = df_melted["类型"].replace({"new_count": "新增上报", "resolved_count": "已解决"})
 
-    # Short date labels
-    df_melted["日期"] = df_melted["day"].str[5:]  # MM-DD
+    # 日期只取月-日
+    df_melted["日期"] = df_melted["day"].str[5:]  # 只取月-日
 
     chart = configure_altair(
         alt.Chart(df_melted)
@@ -139,7 +138,7 @@ else:
 
 st.markdown("---")
 
-# -- Core KPIs --
+# 核心指标
 
 section("核心指标总览")
 
@@ -166,7 +165,7 @@ with c5:
 
 st.markdown("---")
 
-# -- Issue status pipeline --
+# 工单流转
 
 section("工单流转")
 
@@ -193,7 +192,7 @@ if total_i > 0:
 
 st.markdown("---")
 
-# -- Category breakdown --
+# 类别明细
 
 section("问题类别明细")
 
@@ -226,7 +225,7 @@ if by_cat:
 
 st.markdown("---")
 
-# -- 📢 舆情情感分析 — from feedback_items --
+# 舆情情感分析（数据来自 feedback_items）
 
 section("居民舆情分析")
 
@@ -235,7 +234,7 @@ if fb["total"] > 0:
     pos, neg, neu = fb["positive"], fb["negative"], fb["neutral"]
     total_fb = fb["total"]
 
-    # Sentiment bar
+    # 情感三栏
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(
@@ -271,7 +270,7 @@ if fb["total"] > 0:
             unsafe_allow_html=True,
         )
 
-    # Hot feedback topics
+    # 热议话题
     if fb.get("top_topics"):
         st.markdown(
             f'<div style="font-size:0.78em;color:{TOKEN["text_muted"]};margin:10px 0 4px;">🔥 热议话题</div>',
@@ -286,7 +285,7 @@ if fb["total"] > 0:
 
 st.markdown("---")
 
-# -- ⚠️ 积压预警 — SLA 超时工单（分级口径统一走 data/db_sla.py）--
+# 积压预警：SLA 超时工单（口径统一在 data/db_sla.py）
 
 section("积压预警")
 
@@ -313,14 +312,14 @@ else:
 
 st.markdown("---")
 
-# -- 🔥 类别热力矩阵 — 类别 × 状态交叉透视 --
+# 类别热力矩阵：类别 × 状态交叉
 
 section("类别热力矩阵")
 
 issues_all = get_issues(limit=500)
 if issues_all and len(issues_all) >= 5:
     from collections import Counter
-    # Build cross-tab: category × status
+    # 建交叉表：类别 × 状态
     heat_data: dict[str, dict[str, int]] = {}
     all_statuses: set[str] = set()
     for i in issues_all:
@@ -331,11 +330,11 @@ if issues_all and len(issues_all) >= 5:
             heat_data[cat] = {}
         heat_data[cat][sts] = heat_data[cat].get(sts, 0) + 1
 
-    # Sort categories by total
+    # 按总量排序
     cat_totals = {c: sum(sd.values()) for c, sd in heat_data.items()}
     sorted_cats = sorted(cat_totals, key=cat_totals.get, reverse=True)
 
-    # Build DataFrame
+    # 组装 DataFrame
     status_list = ["待处理", "处理中", "已解决"]
     heat_rows = []
     for cat in sorted_cats:
@@ -346,7 +345,7 @@ if issues_all and len(issues_all) >= 5:
 
     df_heat = pd.DataFrame(heat_rows)
     if not df_heat.empty and len(df_heat.columns) > 1:
-        # Melt for Altair heatmap
+        # 转成长表给 Altair 画热力图
         id_vars = ["类别"]
         value_vars = [c for c in df_heat.columns if c != "类别"]
         df_melt = df_heat.melt(id_vars=id_vars, value_vars=value_vars,
@@ -371,7 +370,7 @@ if issues_all and len(issues_all) >= 5:
 
 st.markdown("---")
 
-# -- 🏆 贡献者排行榜 TOP 10 --
+# 贡献者排行榜 TOP 10
 
 section("社区贡献者 TOP 10")
 
@@ -379,11 +378,11 @@ if issues_all and len(issues_all) >= 3:
     from collections import Counter
     from data.database import get_proposals
 
-    # ── Most active reporters ──
+    # 上报最多的人
     author_counts = Counter(i.get("author", "匿名") for i in issues_all if i.get("author"))
     top_reporters = author_counts.most_common(10)
 
-    # ── Most supported proposals ──
+    # 附议最多的提案人
     proposals_all = get_proposals(limit=200)
     prop_authors: dict[str, int] = {}
     for p in proposals_all:
@@ -391,7 +390,7 @@ if issues_all and len(issues_all) >= 3:
         supporters = p.get("supporter_count", 0)
         prop_authors[auth] = prop_authors.get(auth, 0) + supporters
 
-    # Build leaderboard rows
+    # 组装排行榜数据
     leaderboard: list[dict] = []
     seen = set()
     for rank, (author, count) in enumerate(top_reporters):
@@ -405,7 +404,7 @@ if issues_all and len(issues_all) >= 3:
             "影响力": count * 2 + supporters,
         })
 
-    # Add proposal-only authors not already in list
+    # 补上只发过提案、没上报过的人
     extra_authors = sorted(prop_authors.items(), key=lambda x: -x[1])
     for author, supporters in extra_authors:
         if author not in seen and len(leaderboard) < 10:
@@ -419,22 +418,22 @@ if issues_all and len(issues_all) >= 3:
             seen.add(author)
 
     if leaderboard:
-        # Sort by influence
+        # 按影响力排序
         leaderboard.sort(key=lambda x: -x["影响力"])
         for i, row in enumerate(leaderboard):
             row["排名"] = i + 1
 
         df_leader = pd.DataFrame(leaderboard[:10])
 
-        # Top 3 medals
+        # 前三名发奖牌
         def _medal(rank):
             return {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, f"{rank}")
 
-        # Render as styled cards for top 3, table for rest
+        # 前三名用卡片，其余用表格
         c_l1, c_l2 = st.columns([3, 2])
 
         with c_l1:
-            # Horizontal bar chart
+            # 横向条形图
             df_bar = df_leader.head(10).copy()
             df_bar["贡献者"] = df_bar["排名"].apply(_medal) + " " + df_bar["贡献者"]
             bar_chart = configure_altair(
@@ -468,7 +467,7 @@ if issues_all and len(issues_all) >= 3:
 
 st.markdown("---")
 
-# -- Recent activity feed --
+# 最近动态
 
 section("最近动态")
 

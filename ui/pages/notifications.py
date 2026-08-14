@@ -1,4 +1,3 @@
-# ui/pages/notifications.py
 """🔔 消息中心 — 查看所有通知，标记已读."""
 import logging
 import streamlit as st
@@ -11,7 +10,7 @@ _log = logging.getLogger(__name__)
 try:
     unread = get_unread_count(st.session_state.get(SS.login_user_id, 0))
 except Exception:
-    _log.warning("Failed to get unread notification count", exc_info=True)
+    _log.warning("获取未读通知数失败", exc_info=True)
     unread = 0
 
 page_header("🔔 消息中心", "网格员处理反馈、提案进展、系统提醒 — 全部在这里。", f"{unread} 条未读" if unread else "")
@@ -32,7 +31,7 @@ if not user_id:
 notifications = get_notifications(user_id, limit=50)
 
 if not notifications:
-    # Empty state
+    # 空状态
     st.markdown(
         f'<div style="text-align:center;padding:48px 0;">'
         f'<div style="font-size:3em;margin-bottom:12px;">📭</div>'
@@ -58,7 +57,7 @@ for n in notifications:
     is_unread = not n.get("is_read", 0)
     created = (n.get("created_at", "") or "")[:16]
 
-    # Card with left border accent for unread
+    # 未读的卡片左边框加条高亮
     border_style = (
         f'border-left:3px solid {TOKEN["accent"]};'
         if is_unread else

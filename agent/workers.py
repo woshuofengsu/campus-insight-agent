@@ -30,29 +30,29 @@ def run_auditor() -> str:
 
 
 def run_all_workers(trigger: str = "") -> dict:
-    """Run the cooperative workers and return structured results.
+    """把几个协作 worker 都跑一遍，返回结构化结果。
 
-    Auditor only runs when explicitly triggered (含「审计/治理体检」等词) to
-    avoid unnecessary LLM cost on every turn.
+    Auditor 只在明确触发时才跑（含「审计/治理体检」等词），
+    免得每轮都白花 LLM 的钱。
     """
     result: dict = {}
     try:
         result["observer"] = run_observer()
     except Exception:
-        _log.warning("observer worker failed", exc_info=True)
+        _log.warning("observer worker 失败", exc_info=True)
         result["observer"] = {"alerts": [], "count": 0}
 
     try:
         result["dispatcher"] = run_dispatcher()
     except Exception:
-        _log.warning("dispatcher worker failed", exc_info=True)
+        _log.warning("dispatcher worker 失败", exc_info=True)
         result["dispatcher"] = []
 
     if any(kw in trigger for kw in ("审计", "治理体检", "全面检查", "整体情况")):
         try:
             result["auditor"] = run_auditor()
         except Exception:
-            _log.warning("auditor worker failed", exc_info=True)
+            _log.warning("auditor worker 失败", exc_info=True)
             result["auditor"] = ""
 
     return result

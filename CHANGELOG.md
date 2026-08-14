@@ -8,6 +8,24 @@
 
 ---
 
+## Streamlit Cloud 部署修复 + 整体审查修 BUG
+
+### 部署修复（解决 Cloud 白屏 / installer error）
+- **依赖版本上限对齐本地实际版本**（`requirements.txt`）：`langchain`/`langchain-classic`/`langchain-openai` 上限 `<1.0`→`<2.0`、`altair` `<6.0`→`<7.0`、`pandas` `<3.0`→`<4.0`——此前这些上限把本地实际安装的 1.x/6.x/3.x 版本全部排除，导致 pip 无版本可装（installer error）。
+- **streamlit** 锁 `>=1.36,<1.60`（排除 1.6x 前端 removeChild bug；下限满足 st.navigation）。
+- **移除 `.streamlit/config.toml` 的 `enableXsrfProtection=false`**（本地无碍，Cloud HTTPS 托管下会干扰前后端通信导致渲染崩溃）。
+- 新增 `runtime.txt`（python 3.11）——注意：Streamlit Cloud 不读它（Python 版本需在 App Settings 手动选），仅供 HF Spaces 等平台使用。
+
+### 审查修复
+- **演示机器人秒办结 bug**（`data/db_demo_worker.py`）：此前感知周期一触发，工单「派单→办结」30 秒内自动走完，居民看不到「待处理→处理中」过程。新增 `min_age_minutes=3`，只处理上报超 3 分钟的工单，闭环有时间感。
+- **安全重新隐藏工具栏**（`ui/css.py`）：用精准选择器（`.stDeployButton`/`#MainMenu`/`footer`）隐藏右上角工具栏，不碰 `html/body/stHeader` 结构（避免再次触发 removeChild 白屏）。
+
+### 验证
+- `pytest` 328 passed 全绿；本地无头浏览器（Playwright）实测登录页/老年版零 console 错误。
+- SQL 参数化 `datetime('now', ?)` 修饰符验证通过。
+
+---
+
 ## UI 升级（字号/对比度/图标/老年高对比）
 
 > 依据 `docs/UI_UPGRADE_PLAN.md` 实施。核心：消灭 11px 字号、正文 16px、老年版真高对比、图标体系统一框架。

@@ -1,5 +1,5 @@
 # ui/sidebar.py
-"""Sidebar — brand, user card, governance stats, account controls."""
+"""侧边栏 — 品牌、用户卡片、治理统计、账号操作。"""
 import streamlit as st
 from config import DEMO_MODE
 from ui.session_state import SS
@@ -11,7 +11,7 @@ from data.db_user import list_users, get_user_by_id
 
 
 def render_sidebar(profile: dict, role: str):
-    """Render the full sidebar. Call once per rerun inside main()."""
+    """渲染整个侧边栏，main() 里每次 rerun 调用一次。"""
     # 大字模式：放大全局根字号（老年友好，浏览器原生缩放之外的显式入口）
     if st.session_state.get("_large_font"):
         st.markdown('<style>html { font-size: 18px !important; }</style>', unsafe_allow_html=True)
@@ -31,7 +31,7 @@ def render_sidebar(profile: dict, role: str):
     _dang = TOKEN["sidebar_dang"]
     _succ = TOKEN["sidebar_succ"]
 
-    # ── Brand ──
+    # 品牌区
     st.markdown(
         f'<div style="padding:14px 0 10px;display:flex;align-items:center;gap:10px;">'
         f'<div style="width:36px;height:36px;border-radius:10px;'
@@ -48,7 +48,7 @@ def render_sidebar(profile: dict, role: str):
         unsafe_allow_html=True,
     )
 
-    # ── User card ──
+    # 用户卡片
     if profile:
         community = profile.get("community", "")
         building = profile.get("building", "")
@@ -73,7 +73,7 @@ def render_sidebar(profile: dict, role: str):
             unsafe_allow_html=True,
         )
 
-    # ── Governance stats ──
+    # 治理概览统计
     _section_label("概览")
 
     from ui.cache import cached_issues_stats, cached_proposals_stats, cached_knowledge_base
@@ -100,7 +100,7 @@ def render_sidebar(profile: dict, role: str):
             ("待处理", str(pending), _warn_bg, _warn),
         ], tx3)
 
-    # ── Knowledge base ──
+    # 知识库
     kb = cached_knowledge_base(category="faq", limit=1)
     gov = cached_knowledge_base(category="governance", limit=2)
     if kb or gov:
@@ -114,7 +114,7 @@ def render_sidebar(profile: dict, role: str):
                 unsafe_allow_html=True,
             )
 
-    # ── Emergency contacts（居民/老年友好：一键拨打；网格员无需自呼网格员/物业） ──
+    # 紧急联系（居民/老人一键拨打；网格员自己就是处理人，不需要这个）
     if role != "grid":
         _section_label("紧急联系")
         c_tel1, c_tel2 = st.columns(2)
@@ -123,10 +123,10 @@ def render_sidebar(profile: dict, role: str):
         with c_tel2:
             st.link_button("🔧 物业", "tel:62310086", width="stretch")
 
-    # ── Notifications ──
+    # 通知角标
     render_sidebar_badge()
 
-    # ── Account ──
+    # 账户区
     _section_label("账户")
 
     # 演示专用：账号切换仅在 DEMO_MODE 开启时显示。正式环境靠「退出→重新登录」隔离双角色，
@@ -157,7 +157,7 @@ def render_sidebar(profile: dict, role: str):
                 invalidate_all()
                 st.rerun()
 
-    # ── Theme + Font + Logout ──
+    # 主题 + 大字 + 退出
     c_t, c_f, c_l = st.columns([1, 1, 1])
     with c_t:
         theme_toggle()
@@ -176,7 +176,7 @@ def render_sidebar(profile: dict, role: str):
     st.caption("知 · 报 · 议 · 督 · 社区治理")
 
 
-# ── Internal helpers ──
+# 内部小工具
 
 def _section_label(label: str):
     st.markdown(

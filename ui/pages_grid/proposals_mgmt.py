@@ -1,4 +1,3 @@
-# ui/pages_grid/proposals_mgmt.py
 """提案管理（网格员端）—— 查看、回复、采纳居民提案."""
 import csv
 import io
@@ -70,15 +69,15 @@ if total_props > 0:
     adopted_count = sum(1 for p in all_props if p.get("status") == "已采纳")
     implemented_count = sum(1 for p in all_props if p.get("status") == "已实施")
 
-    # Top categories
+    # 最热类别
     from collections import Counter
     cat_counts = Counter(p.get("category", "") for p in all_props)
     top_cat = cat_counts.most_common(1)[0][0] if cat_counts else "—"
 
-    # Total supporters
+    # 总附议人次
     total_supporters = sum(p.get("supporter_count", 0) for p in all_props)
 
-    # Conversion funnel
+    # 转化漏斗
     conversion_rate = f"{implemented_count}/{total_props} = {round(implemented_count/total_props*100)}%" if total_props > 0 else "—"
 
     banner_cols = st.columns(4)

@@ -1,11 +1,10 @@
-# data/db_health.py
-"""Governance health analytics — scoring, timelines, efficiency metrics."""
+"""治理健康度分析 — 打分、时间线、效率指标。"""
 from datetime import datetime, timedelta
 from data.db_core import get_db
 
 
 def get_avg_resolution_days() -> float | None:
-    """Average days from creation to resolution for resolved issues. None if no resolved issues."""
+    """已解决工单从上报到办结的平均天数；一个都没解决就返回 None。"""
     with get_db() as conn:
         row = conn.execute(
             "SELECT AVG(julianday(resolved_at) - julianday(reported_at)) AS avg_days "
@@ -15,7 +14,7 @@ def get_avg_resolution_days() -> float | None:
 
 
 def get_recent_issue_counts(days: int = 7) -> dict:
-    """Count new and resolved issues in the last N days."""
+    """统计最近 N 天新增和已解决的工单数。"""
     with get_db() as conn:
         new_row = conn.execute(
             "SELECT COUNT(*) AS cnt FROM community_issues "
@@ -35,7 +34,7 @@ def get_recent_issue_counts(days: int = 7) -> dict:
 
 
 def get_issues_timeline(days: int = 7) -> list[dict]:
-    """Daily counts of reported and resolved issues for the past N days."""
+    """最近 N 天里每天新增/办结的工单数。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT DATE(reported_at) as day, COUNT(*) as count "
@@ -66,16 +65,16 @@ def get_issues_timeline(days: int = 7) -> list[dict]:
 
 
 def compute_health_score() -> dict:
-    """Multi-dimensional community governance health score.
+    """多维度的社区治理健康度打分。
 
-    Returns a dict with:
-      - score: 0-100 composite
+    返回字典：
+      - score: 0-100 综合分
       - grade: 优/良/需改进
-      - resolution_rate: percentage
-      - avg_days: average resolution time in days
-      - trend: backlog trend label
-      - speed_score: resolution speed sub-score (0-100)
-      - backlog_score: backlog health sub-score (0-100)
+      - resolution_rate: 办结率
+      - avg_days: 平均办结天数
+      - trend: 积压趋势标签
+      - speed_score: 办理速度子分（0-100）
+      - backlog_score: 积压健康子分（0-100）
     """
     from data.db_governance import get_issues_stats
 
@@ -83,18 +82,18 @@ def compute_health_score() -> dict:
     total = stats["total"]
     resolved = stats["by_status"].get("已解决", 0)
 
-    # Dimension 1: Resolution rate (40% weight)
+    # 维度1：办结率（占40%）
     resolution_rate = resolved / total * 100 if total > 0 else 100
 
-    # Dimension 2: Resolution speed (35% weight)
+    # 维度2：办理速度（占35%）
     avg_days = get_avg_resolution_days()
     if avg_days is not None:
         speed_score = max(0, min(100, 120 - avg_days * 8))
     else:
-        speed_score = 70  # No data yet, assume neutral
+        speed_score = 70  # 还没有数据，先按中性给 70 分
         avg_days = 0
 
-    # Dimension 3: Backlog trend (25% weight)
+    # 维度3：积压趋势（占25%）
     recent = get_recent_issue_counts(7)
     new_recent = recent["new_last_n_days"]
     resolved_recent = recent["resolved_last_n_days"]
@@ -107,7 +106,7 @@ def compute_health_score() -> dict:
         ratio = resolved_recent / max(new_recent, 1)
         backlog_score = max(0, min(95, int(ratio * 100 + 10)))
 
-    # Trend label
+    # 定趋势标签
     if backlog_score >= 75:
         trend = "↓ 改善中"
     elif backlog_score >= 45:
@@ -115,7 +114,7 @@ def compute_health_score() -> dict:
     else:
         trend = "↑ 需关注"
 
-    # Composite
+    # 按权重合成总分
     composite = resolution_rate * 0.40 + speed_score * 0.35 + backlog_score * 0.25
 
     if composite >= 80:

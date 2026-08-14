@@ -1,5 +1,5 @@
 # perception/monitor.py
-"""Perception engine — governance-oriented environmental checks."""
+"""感知引擎：定时做一轮治理相关的环境检查。"""
 from datetime import datetime
 from data.database import get_issues
 from utils.logger import get_logger
@@ -8,13 +8,13 @@ logger = get_logger(__name__)
 
 
 class PerceptionMonitor:
-    """Runs periodic governance checks and generates alert messages when anomalies are detected."""
+    """定时跑治理检查，发现异常就生成告警消息。"""
 
     def __init__(self):
         self.alerts: list[dict] = []
 
     def run_all_checks(self):
-        """Execute all perception checks in priority order. Returns list of alerts."""
+        """按优先级跑完全部检查，返回告警列表。"""
         self.alerts = []
 
         self._check_weather()
@@ -51,7 +51,7 @@ class PerceptionMonitor:
             logger.warning(f"Elderly safety check failed: {e}")
 
     def _check_escalation(self):
-        """SLA 升级：将超时 2× 的工单标记为「已升级」并触发邮件通知（best-effort）。"""
+        """SLA 升级：将超时 2× 的工单标记为「已升级」并触发邮件通知（尽力而为）。"""
         try:
             from data.db_sla import escalate_overdue_issues
             escalated = escalate_overdue_issues(limit=20)
@@ -78,7 +78,7 @@ class PerceptionMonitor:
             logger.warning(f"Auto-dispatch check failed: {e}")
 
     def _check_weather(self):
-        """Check for severe weather that could affect community safety."""
+        """看看有没有可能影响社区安全的恶劣天气。"""
         try:
             from tools.query_weather import get_today_weather
             days, _, _ = get_today_weather()
@@ -102,17 +102,16 @@ class PerceptionMonitor:
             logger.warning(f"Weather check failed: {e}")
 
     def _check_issue_hotspots(self):
-        """Alert when a specific category has high volume of pending issues.
+        """某个类别的待处理工单攒多了就告警。
 
-        When 5+ issues in a single category, also attempts to auto-create
-        a discussion topic via _discover_hot_topic.
+        单类攒到 5 件以上，还会用 _discover_hot_topic 试着自动建个讨论议题。
         """
         try:
             issues = get_issues(limit=100)
             if not issues:
                 return
 
-            # Count pending issues by category
+            # 按类别统计待处理数量
             pending_by_cat: dict[str, int] = {}
             for i in issues:
                 if i.get("status") in ("待处理", "处理中"):
@@ -136,7 +135,7 @@ class PerceptionMonitor:
                     "emoji": "📊",
                 })
 
-            # Auto-create discussion topic if a category hits threshold
+            # 某个类别超过阈值就自动建讨论议题
             if max(pending_by_cat.values()) >= 5 if pending_by_cat else False:
                 try:
                     from tools.query_topics import _discover_hot_topic
@@ -159,7 +158,7 @@ class PerceptionMonitor:
             logger.warning(f"Issue hotspot check failed: {e}")
 
     def _check_health_risk(self):
-        """Check community health risk and alert if level is high or critical."""
+        """检查社区健康风险，等级到高/严重就告警。"""
         try:
             from data.db_health_alerts import HealthRiskEngine
             engine = HealthRiskEngine()
@@ -184,13 +183,13 @@ class PerceptionMonitor:
             logger.warning(f"Health risk check failed: {e}")
 
     def _check_resolved_issues(self):
-        """Detect recently resolved issues to notify residents of progress."""
+        """找出今天刚解决的工单，给居民发个进展通知。"""
         try:
             issues = get_issues(limit=20)
             if not issues:
                 return
 
-            # Find recently resolved issues (today)
+            # 找今天刚解决的工单
             today = datetime.now().strftime("%Y-%m-%d")
             recently_resolved = [
                 i for i in issues

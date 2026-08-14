@@ -1,9 +1,9 @@
 # agent/reflector/_associations.py
-"""SQL-heavy association computation — spatial / temporal / recurrence / anomaly detection.
+"""重 SQL 的关联计算 —— 空间 / 时间 / 复发 / 异常检测。
 
-Extracted from the monolithic reflector.py. This module is the "heavy lifter":
-it runs up to 10 SQL queries per turn to find patterns across community_issues,
-proposals, and discussion_topics.
+从单文件的 reflector.py 拆出来的，这模块是"苦力担当"：
+每轮最多跑 10 条 SQL，在 community_issues、proposals、
+discussion_topics 里找模式。
 """
 import logging
 import math
@@ -14,7 +14,7 @@ from data.database import get_db
 
 _logger = logging.getLogger("agent.reflector")
 
-# ── Constants (shared with _parser.py via reflector/__init__.py) ──
+# 常量（和 _parser.py 通过 reflector/__init__.py 共享）
 
 _LOCATION_PATTERNS = [
     r"[一二三四五六七八九十\d]+号楼", r"[一二三四五六七八九十\d]+单元",
@@ -29,7 +29,7 @@ _STOP_WORDS: set[str] = {
 }
 
 
-# -- 1. Text extraction helpers
+# 1. 文本提取辅助
 
 def _extract_locations(text: str) -> set[str]:
     found: set[str] = set()
@@ -60,10 +60,10 @@ def _extract_keywords(text: str) -> list[str]:
     return result
 
 
-# -- 2. Analysis helpers
+# 2. 分析辅助
 
 def _cross_time_comparison(conn) -> dict:
-    """Compare this week vs last week for new issues and resolutions."""
+    """本周 vs 上周的新增和解决数量对比。"""
     row = conn.execute("""
         SELECT
             SUM(CASE WHEN reported_at > date('now', '-7 days') THEN 1 ELSE 0 END) AS new_this_week,
@@ -110,14 +110,13 @@ def _cross_time_comparison(conn) -> dict:
 
 
 def _z_score_anomalies(conn) -> list[dict]:
-    """Compute z-score based anomaly detection per category.
+    """按类别做 z-score 异常检测。
 
-    More statistically sound than simple ratio thresholds: computes mean and
-    stddev across all categories' weekly issue counts over a 4-week window,
-    then flags categories where the z-score exceeds 1.0.
+    比单纯的比例阈值靠谱：先算 4 周窗口内各类别每周工单数的
+    均值和标准差，再标出 z 值超过 1.0 的类别。
 
-    Also computes a severity score (0-10) combining z-score magnitude,
-    absolute count, and urgency mix.
+    另外算一个严重度分（0-10），综合 z 值大小、绝对数量、
+    紧急程度三样。
     """
     rows = conn.execute("""
         SELECT category,
@@ -143,7 +142,7 @@ def _z_score_anomalies(conn) -> list[dict]:
     for r in rows:
         z = (r["recent"] - mean) / std if std > 0 else 0
         if z < 1.0:
-            continue  # not significant
+            continue  # 不够显著，跳过
         count_score = min(r["recent"] / 5.0, 1.0) * 3
         urgency_score = min(r["urgent_pending"] / 2.0, 1.0) * 3
         severity = round(z * 2 + count_score + urgency_score, 1)
@@ -162,10 +161,9 @@ def _z_score_anomalies(conn) -> list[dict]:
 
 
 def _detect_upgrade_paths(conn) -> list[dict]:
-    """Detect categories where issues should escalate to proposals.
+    """找出该从"报"升级成"提案"的类别。
 
-    Criteria: 3+ unresolved issues in a category, no matching active proposal
-    with >10 supporters.
+    条件：某类别 3 件以上未解决问题，且没有对应的活跃提案（附议 >10 人）。
     """
     rows = conn.execute("""
         SELECT ci.category, COUNT(*) as issue_count
@@ -178,7 +176,7 @@ def _detect_upgrade_paths(conn) -> list[dict]:
     if not rows:
         return []
 
-    # Get existing proposal categories
+    # 查已有的提案类别
     prop_rows = conn.execute(
         "SELECT DISTINCT category FROM proposals WHERE status IN ('讨论中', '已回应')"
     ).fetchall()
@@ -198,31 +196,31 @@ def _detect_upgrade_paths(conn) -> list[dict]:
     return upgrades[:4]
 
 
-# -- 3. Main association computation
+# 3. 关联计算主入口
 
 def compute_associations(user_input: str, steps: list[dict], db_path: str = "") -> dict:
-    """Run SQL queries against community DB to find spatial/temporal/recurrence associations.
+    """对着社区数据库跑 SQL，找空间/时间/复发等关联。
 
-    Returns a dictionary with 10 analysis dimensions. Non-critical — failures
-    are logged and the caller receives an empty result set.
+    返回一个带 10 个分析维度的字典。非关键——失败只记日志，
+    调用方拿到空结果集。
     """
     import os as _os
     if not db_path:
         from config import DB_PATH as _dp
         db_path = _dp
     if not _os.path.isfile(db_path):
-        _logger.warning("DB file not found at %s — skipping association queries", db_path)
+        _logger.warning("找不到数据库文件 %s，跳过关联查询", db_path)
         return _empty_result()
 
     try:
         return _compute_associations_impl(user_input, steps)
     except Exception as e:
-        _logger.warning("Association query failed (non-fatal): %s", e, exc_info=True)
+        _logger.warning("关联查询失败（不影响）：%s", e, exc_info=True)
         return _empty_result()
 
 
 def _empty_result() -> dict:
-    """Return an empty (no-insight) association result."""
+    """返回空的（无洞察）关联结果。"""
     return {
         "spatial": [], "temporal": [], "recurrence": [],
         "anomalies": [], "correlations": [], "linked_proposals": [],
@@ -237,7 +235,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
     ui = user_input or ""
 
     with get_db() as conn:
-        # Gather locations from user_input and all tool_input string values
+        # 从用户输入和所有工具入参里收集位置
         locations = _extract_locations(ui)
         for s in (steps or []):
             ti = s.get("tool_input", {})
@@ -253,7 +251,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
         recurrence: list[dict] = []
         seen_ids: set[int] = set()
 
-        # ── 1. Spatial clustering ──
+        # 1. 空间聚类
         for loc in locations:
             for r in conn.execute(
                 "SELECT id, title, status, category, reported_at, location FROM community_issues "
@@ -264,7 +262,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
                     seen_ids.add(r["id"])
                     spatial.append(dict(r))
 
-        # ── 2. Temporal trend ──
+        # 2. 时间趋势
         if categories:
             placeholders = ",".join("?" for _ in categories)
             rows = conn.execute(
@@ -275,7 +273,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
             ).fetchall()
             temporal.extend(dict(r) for r in rows)
 
-        # ── 3. Recurrence detection ──
+        # 3. 复发检测
         for kw in keywords:
             for r in conn.execute(
                 "SELECT id, title, status, category, reported_at FROM community_issues "
@@ -286,7 +284,7 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
                     seen_ids.add(r["id"])
                     recurrence.append(dict(r))
 
-        # ── 4-10: Enhanced analyses (each wrapped for resilience) ──
+        # 4-10：增强分析（每个都单独兜底，挂一个不影响别的）
         anomalies = _run_optional_query(conn, _anomaly_detection_query)
         correlations = _run_optional_query(conn, _correlation_query)
         linked_proposals = _run_optional_query(conn, _linked_proposals_query)
@@ -308,24 +306,24 @@ def _compute_associations_impl(user_input: str, steps: list[dict]) -> dict:
         or z_anomalies or cross_time or upgrade_paths
     )
     assoc_data["has_insight"] = has
-    # insight_text is built by the insight module; set a placeholder here
+    # insight_text 由 insight 模块生成，这里先占个位
     assoc_data["insight_text"] = ""
     return assoc_data
 
 
-# -- 4. Optional query runners (non-critical)
+# 4. 可选的查询执行器（非关键）
 
 def _run_optional_query(conn, query_fn) -> list[dict]:
-    """Run a query function, returning [] on any failure — non-critical by design."""
+    """执行一个查询函数，挂了就返回 []——本来就是可选的。"""
     try:
         return query_fn(conn)
-    except Exception:  # ok to fail
-        _logger.debug("Optional query failed, returning empty result", exc_info=True)
+    except Exception:  # 挂了也没关系
+        _logger.debug("可选查询失败，返回空结果", exc_info=True)
         return []
 
 
 def _anomaly_detection_query(conn) -> list[dict]:
-    """Compare recent week vs 4-week baseline for category spikes."""
+    """本周 vs 4 周基线对比，抓类别的突增。"""
     rows = conn.execute("""
         SELECT category,
             SUM(CASE WHEN reported_at > date('now', '-7 days') THEN 1 ELSE 0 END) AS recent,
@@ -347,7 +345,7 @@ def _anomaly_detection_query(conn) -> list[dict]:
 
 
 def _correlation_query(conn) -> list[dict]:
-    """Categories that co-occur in the same locations."""
+    """同一位置反复一起出现的类别组合。"""
     rows = conn.execute("""
         SELECT a.category AS cat_a, b.category AS cat_b, COUNT(*) AS co_count
         FROM community_issues a
@@ -365,7 +363,7 @@ def _correlation_query(conn) -> list[dict]:
 
 
 def _linked_proposals_query(conn) -> list[dict]:
-    """Proposals addressing the top hot-issue categories."""
+    """和热点问题类别相关的提案。"""
     top_cats = conn.execute("""
         SELECT category FROM community_issues
         WHERE status != '已解决'
@@ -385,7 +383,7 @@ def _linked_proposals_query(conn) -> list[dict]:
 
 
 def _resolution_efficiency_query(conn) -> list[dict]:
-    """Per-category average resolution time."""
+    """各类别的平均解决耗时。"""
     rows = conn.execute("""
         SELECT category,
             COUNT(*) AS resolved_count,
@@ -403,14 +401,13 @@ def _resolution_efficiency_query(conn) -> list[dict]:
     ]
 
 
-# -- 5. Proactive dashboard insights
+# 5. 看板主动洞察
 
 def get_proactive_insights(db_path: str = "") -> dict:
-    """Run association analysis without user input — for dashboard proactive insights.
+    """不带用户输入直接跑关联分析——给看板的主动洞察用。
 
-    Unlike compute_associations() which is tied to a chat turn, this function
-    runs independently to surface anomalies, trends, and upgrade suggestions
-    directly on the dashboard.
+    和绑在聊天回合上的 compute_associations() 不同，
+    这个独立跑，把异常、趋势、升级建议直接摆到看板上。
     """
     if not db_path:
         from config import DB_PATH as _dp
@@ -435,8 +432,8 @@ def get_proactive_insights(db_path: str = "") -> dict:
                 _sla = get_sla_summary()
                 urgent_count = _sla.get("urgent_pending", 0)
                 stale_count = _sla.get("total_overdue", 0)
-            except Exception:  # best-effort, skip
-                _logger.debug("Failed to query SLA counts for proactive insights", exc_info=True)
+            except Exception:  # 尽力而为，跳过
+                _logger.debug("查询 SLA 计数失败（主动洞察用）", exc_info=True)
 
         has_insight = bool(z_anomalies or cross_time or upgrade_paths or resolution_efficiency)
         summary_parts: list[str] = []
@@ -488,5 +485,5 @@ def get_proactive_insights(db_path: str = "") -> dict:
             "summary_parts": summary_parts,
         }
     except Exception as e:
-        _logger.warning("Proactive insights failed: %s", e)
+        _logger.warning("主动洞察失败：%s", e)
         return {"has_insight": False, "summary_text": f"洞察分析暂不可用：{e}"}

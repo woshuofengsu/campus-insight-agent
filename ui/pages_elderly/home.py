@@ -1,4 +1,3 @@
-# ui/pages_elderly/home.py
 """🏠 老年关怀版首页 — 大字极简入口：SOS / 一键呼叫 / 上报 / 工单 / 吃药 / 健康."""
 import streamlit as st
 
@@ -16,7 +15,7 @@ name = (profile or {}).get("name", "") or "大爷/阿姨"
 if uid:
     touch_active(uid)
 
-# ── 顶部：退出 ──
+# 顶部：退出
 _top_l, _top_r = st.columns([4, 1])
 with _top_r:
     if st.button("退出", key="_elderly_logout"):
@@ -28,20 +27,20 @@ with _top_r:
 st.markdown(f'<div class="elderly-title">👴 {name}，您好！</div>', unsafe_allow_html=True)
 st.caption("点下面的大按钮就行，有事随时按红色按钮。")
 
-# ── 到点用药提醒（置顶） ──
+# 到点用药提醒，置顶
 due = due_reminders(uid) if uid else []
 if due:
     med_text = "，".join(f"{m['name']} {m['dosage']}" for m in due)
     big_card(f"💊 <strong>该吃药了：{med_text}</strong>", bg="#fefce8", border="#eab308")
     tts_speak(f"该吃药了：{med_text}")
 
-# ── 关怀提醒 ──
+# 关怀提醒
 for item in get_care_reminders(uid) if uid else []:
     big_card(f"{item['icon']} {item['text']}", bg="#f8fafc")
 
 st.markdown("---")
 
-# ── SOS 紧急求助（二次确认防误触） ──
+# SOS 紧急求助，二次确认防误触
 if not st.session_state.get("_sos_done"):
     if not st.session_state.get("_sos_confirm"):
         if st.button("🆘 我出事了", key="sos_main", type="primary", width="stretch"):
@@ -77,7 +76,7 @@ else:
 
 st.markdown("---")
 
-# ── 一键呼叫（子女置顶） ──
+# 一键呼叫，子女放最前
 elderly = get_profile(uid) if uid else {}
 contacts = elderly.get("emergency_contact", [])
 st.markdown('<div style="font-size:1.3em;font-weight:800;margin:8px 0;">📞 一键呼叫</div>', unsafe_allow_html=True)
@@ -98,7 +97,7 @@ with c3:
 
 st.markdown("---")
 
-# ── 功能大按钮导航（信息架构分组：办事 / 关怀 / 信息） ──
+# 功能大按钮：办事 / 关怀 / 信息 三组
 st.markdown('<div style="font-size:1.3em;font-weight:800;margin:14px 0 8px;color:#000;">📌 我要办事</div>', unsafe_allow_html=True)
 if st.button("🗣️ 一句话上报", key="go_report", width="stretch"):
     st.switch_page("ui/pages_elderly/report.py")

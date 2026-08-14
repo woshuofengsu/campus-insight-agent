@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for OfflineAgent — routing, response generation, and edge cases.
+"""OfflineAgent 单元测试 — 路由、回复生成、边界情况。
 
-Covers all persona routing paths, _handle_general branches, _my_issues,
-_my_proposals, and helper methods. Uses a temp SQLite DB for DB-dependent paths.
+覆盖所有角色路由路径、_handle_general 各分支、_my_issues、
+_my_proposals 和辅助方法。走数据库的路径用一个临时 SQLite 库。
 """
 import sys
 import os
@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 def _make_mock_st():
-    """Create a mock streamlit session_state with required attributes."""
+    """造一个带必需字段的 mock streamlit session_state。"""
     mock_st = MagicMock()
     mock_st.langchain_memory = MagicMock()
     mock_st.langchain_memory.chat_memory = MagicMock()
@@ -28,7 +28,7 @@ def _make_mock_st():
     return mock_st
 
 
-# -- 1. OfflineAgent._route — Persona Dispatch --
+# 1. OfflineAgent._route 角色分发
 
 class TestOfflineAgentRoute(unittest.TestCase):
 
@@ -90,7 +90,7 @@ class TestOfflineAgentRoute(unittest.TestCase):
         self.assertIsNone(result)
 
 
-# -- 2. OfflineAgent._handle_general — Fallback Branches --
+# 2. OfflineAgent._handle_general 兜底分支
 
 class TestOfflineAgentGeneral(unittest.TestCase):
 
@@ -173,7 +173,7 @@ class TestOfflineAgentGeneral(unittest.TestCase):
         self.assertIn("🤔", result)
 
 
-# -- 3. OfflineAgent._respond_pulse --
+# 3. OfflineAgent._respond_pulse
 
 class TestOfflineAgentPulse(unittest.TestCase):
 
@@ -213,7 +213,7 @@ class TestOfflineAgentPulse(unittest.TestCase):
         self.assertTrue("📊" in result or "深入了解" in result or "直接描述" in result)
 
 
-# -- 4. OfflineAgent._respond_stats --
+# 4. OfflineAgent._respond_stats
 
 class TestOfflineAgentStats(unittest.TestCase):
 
@@ -253,7 +253,7 @@ class TestOfflineAgentStats(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# -- 5. OfflineAgent._respond_report --
+# 5. OfflineAgent._respond_report
 
 class TestOfflineAgentReport(unittest.TestCase):
 
@@ -298,7 +298,7 @@ class TestOfflineAgentReport(unittest.TestCase):
         self.assertTrue("已上报" in result or "查看我的工单" in result or "追踪进度" in result)
 
 
-# -- 6. OfflineAgent._respond_proposal --
+# 6. OfflineAgent._respond_proposal
 
 class TestOfflineAgentProposal(unittest.TestCase):
 
@@ -339,7 +339,7 @@ class TestOfflineAgentProposal(unittest.TestCase):
         self.assertTrue("附议" in result or "提案已创建" in result or "提案已提交" in result)
 
 
-# -- 7. OfflineAgent.run — Full Pipeline --
+# 7. OfflineAgent.run 完整流程
 
 class TestOfflineAgentRun(unittest.TestCase):
 
@@ -393,11 +393,11 @@ class TestOfflineAgentRun(unittest.TestCase):
 
     def test_get_last_chain(self):
         chain = self.agent.get_last_chain()
-        # Chain may be None for offline agent (no LLM chain)
+        # 离线模式没有 LLM 链，chain 可能是 None
         self.assertTrue(chain is None or isinstance(chain, dict))
 
 
-# -- 8. OfflineAgent — Helper Methods --
+# 8. OfflineAgent 辅助方法
 
 class TestOfflineAgentHelpers(unittest.TestCase):
 
@@ -421,12 +421,12 @@ class TestOfflineAgentHelpers(unittest.TestCase):
 
     def test_get_name(self):
         name = self.agent._get_name()
-        # May be empty outside Streamlit context — graceful degradation
+        # 不在 Streamlit 环境里可能拿不到，允许空值
         self.assertIsInstance(name, str)
 
     def test_get_author_identifier(self):
         author = self.agent._get_author_identifier()
-        # May be None outside Streamlit context — graceful degradation
+        # 不在 Streamlit 环境里可能拿不到，允许 None
         self.assertTrue(author is None or isinstance(author, str))
 
     def test_extract_location(self):

@@ -86,8 +86,8 @@ def _llm_fact_check(response: str, intermediate_steps: list | None) -> str:
         resp = llm.invoke(prompt)
         content = (getattr(resp, "content", "") or "").strip()
         if content:
-            _log.info("reflection: LLM fact-check returned %d chars", len(content))
+            _log.info("reflection: LLM 事实核查返回 %d 字", len(content))
             return content
     except Exception:
-        _log.debug("LLM fact-check failed, returning original", exc_info=True)
+        _log.debug("LLM 事实核查失败，返回原文", exc_info=True)
     return response

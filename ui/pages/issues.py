@@ -1,4 +1,3 @@
-# ui/pages/issues.py
 """🔧 接诉即办 · 报 — 直接上报、追踪工单、看分类分布."""
 import streamlit as st
 import altair as alt
@@ -17,29 +16,29 @@ if memory is not None:
 else:
     profile = {}
 
-# Derive author identity from profile
+# 从档案里取上报人身份
 _author = resolve_author(profile)
 
 page_header("🔧 接诉即办", "发现社区诉求？一句话上报，自动分类定级。", "报")
 
 ooda_nav("issues")
 
-# ⚡ Quick report — native form (no chat needed)
+# 快捷上报：原生表单，不用走对话
 
 def _do_issues_report():
-    """Callback for quick report form — runs BEFORE page rerender."""
+    """快捷上报的回调，在页面重渲染之前执行。"""
     title = st.session_state.quick_report_title.strip()
     loc = st.session_state.quick_report_location.strip()
     if not title:
         st.session_state._report_error = "请至少输入问题描述。"
         return
-    # Dedup check — simple substring containment
+    # 去重检查：简单的标题包含匹配
     existing = get_issues(limit=100)
     dup = None
     title_lower = title.lower()
     for e in existing:
         e_title_lower = e.get("title", "").lower()
-        # Check if one title contains the other (high recall, low FP)
+        # 看两个标题谁包含谁（查得全，误报少）
         if len(title_lower) >= 4 and len(e_title_lower) >= 4:
             if title_lower in e_title_lower or e_title_lower in title_lower:
                 dup = e
@@ -50,15 +49,15 @@ def _do_issues_report():
             f"建议先关注该工单进展，如确是新问题请修改描述后重试。"
         )
         return
-    # Validate location for dorm/classroom issues
+    # 校验楼栋位置格式
     loc_err = validate_location(title, loc)
     if loc_err:
         st.session_state._report_error = loc_err
         return
-    # Auto classify (single LLM call, cached) and submit
+    # 自动分类（一次 LLM 调用，有缓存）再提交
     category, urgency = _llm_classify(title, "")
-    # Anonymous reporting: public author field stores a stable pseudonym; reporter_id
-    # still tracks identity for closed-loop notification.
+    # 匿名上报：公开的 author 存固定假名，reporter_id 仍
+    # 记录真实身份，方便闭环通知
     anonymous = st.session_state.get("quick_report_anonymous", False)
     try:
         issue_id = db_report_issue(
@@ -68,11 +67,11 @@ def _do_issues_report():
             description="",
             urgency=urgency,
             author=_author,
-            suggested_category=category,  # persist AI classification for grid-manager review
+            suggested_category=category,  # 把 AI 分类存下来，给网格员端参考
             anonymous=anonymous,
         )
         urgency_emoji = {"普通": "🔵", "紧急": "🟠", "极急": "🔴"}
-        invalidate_issues()  # ensure "我的" page shows fresh data
+        invalidate_issues()  # 刷新缓存，让「我的」页显示最新数据
         st.session_state._report_result = (
             f"✅ 工单 #{issue_id} 已生成！分类：{category} · 紧急程度：{urgency_emoji.get(urgency, '🔵')} {urgency}"
         )
@@ -80,7 +79,7 @@ def _do_issues_report():
         st.session_state.quick_report_title = ""
         st.session_state.quick_report_location = ""
     except Exception as e:
-        _log.debug("non-critical failure", exc_info=True)
+        _log.debug("非致命错误", exc_info=True)
         st.session_state._report_error = f"上报失败：{e}"
         st.session_state._report_result = ""
         import traceback
@@ -110,7 +109,7 @@ with st.container(border=True):
     with c2:
         st.button("上报", type="primary", width="stretch", key="quick_report_btn", on_click=_do_issues_report)
 
-# Show result/error from callback (survives rerun)
+# 显示回调里的结果/错误（重渲染后还能看到）
 if st.session_state.get("_report_error"):
     st.error(st.session_state.pop("_report_error"))
     if st.session_state.get("_report_trace"):
@@ -120,7 +119,7 @@ if st.session_state.get("_report_result"):
 
 st.markdown("---")
 
-# Stats overview
+# 统计概览
 
 try:
     stats = get_issues_stats()
@@ -150,7 +149,7 @@ with c4:
 
 st.markdown("")
 
-# Status pipeline chart
+# 工单状态分布图
 
 section("工单状态分布")
 
@@ -181,7 +180,7 @@ if by_status:
 
 st.markdown("---")
 
-# Category distribution
+# 类别分布
 
 section("问题类别分布")
 
@@ -213,11 +212,11 @@ if by_cat:
 
 st.markdown("---")
 
-# All issues — filterable
+# 全部工单，可筛选
 
 section("全部工单")
 
-# Accept cross-page filter from pulse (via session_state)
+# 接收脉搏页传过来的类别筛选（走 session_state）
 cross_filter = st.session_state.pop("_filter_category", None)
 
 f1, f2 = st.columns(2)
@@ -230,7 +229,7 @@ with f2:
     cat_options = ["全部"] + sorted(set(
         i.get("category", "其他") for i in get_issues(limit=200)
     ))
-    # Use cross_filter if set, otherwise default to "全部"
+    # 有跨页筛选就用它，否则默认「全部」
     default_idx = cat_options.index(cross_filter) if cross_filter in cat_options else 0
     cat_filter = st.selectbox(
         "按类别筛选", cat_options,

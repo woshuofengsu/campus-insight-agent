@@ -3,7 +3,7 @@
 import sys
 import os
 
-# Ensure project root is in path
+# 把项目根目录加进路径，不然 import 找不到模块
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
@@ -11,8 +11,7 @@ from ui.session_state import SS
 import altair as alt
 from config import DEEPSEEK_API_KEY, OFFLINE_MODE
 
-# ── Global Altair theme ──
-# Provides sensible defaults; individual charts override via configure_altair().
+# 全局图表配色，个别图表可以在 configure_altair() 里覆盖
 @alt.theme.register("community", enable=True)
 def _alt_theme():
     return alt.theme.ThemeConfig({
@@ -36,12 +35,12 @@ from agent.rag import build_index
 
 
 def main():
-    # ── Set native theme BEFORE set_page_config (critical for baseweb) ──
+    # 原生主题必须在 set_page_config 之前设置，这个顺序对 baseweb 很关键
     apply_theme_at_startup()
 
-    # ── Page Config — sidebar expanded only when logged in ──
-    # apply_native_theme() called immediately after to preserve dark-mode
-    # overrides that st.set_page_config() would otherwise reset to config.toml.
+    # 页面配置——侧边栏只在登录后展开
+    # 设完马上再调 apply_native_theme() 保住暗色模式，
+    # 不然 st.set_page_config() 会把 config.toml 里的配置重置掉。
     st.set_page_config(
         page_title="社区先知 · CommunityInsight",
         page_icon="🏘️",
@@ -49,23 +48,23 @@ def main():
         initial_sidebar_state="expanded",
     )
 
-    # ── Native theme override — must follow EVERY set_page_config call ──
+    # 原生主题覆盖，每次 set_page_config 之后都得跟着调一次
     apply_native_theme()
 
-    # ── Global CSS ──
+    # 全局 CSS
     from ui.css import inject_global_css, inject_sidebar_force_css
     inject_global_css()
     inject_theme_css()
     inject_sidebar_force_css()
 
-    # ── Validate .env (skip in offline demo mode) ──
+    # 校验 .env，离线演示模式就跳过
     is_offline = OFFLINE_MODE
     try:
         qp = st.query_params.get("offline")
         if qp and str(qp).lower() in ("1", "true", "yes"):
             is_offline = True
     except Exception:
-        pass  # query_params access may fail in some Streamlit versions — non-critical
+        pass  # 有的 Streamlit 版本没有 query_params，不重要，忽略
 
     if not DEEPSEEK_API_KEY and not is_offline:
         st.warning(
@@ -76,33 +75,33 @@ def main():
         is_offline = True
         st.session_state._force_offline = True
 
-    # ── Init Session (DB + Agent + Memory) ──
+    # 初始化会话（DB + Agent + 记忆）
     try:
         agent, memory = init_session()
     except Exception as e:
         st.error(f"😅 系统初始化失败：{e}\n请检查 .env 中的 API Key 是否正确。")
         st.stop()
 
-    # ── Build RAG index (non-blocking, skips if already indexed) ──
+    # 建 RAG 索引（不阻塞启动，建过就跳过）
     try:
         build_index(force=False)
     except Exception:
-        pass  # RAG is optional — don't block startup
+        pass  # RAG 不是必须的，别卡住启动
 
-    # ── Login Gate ──
+    # 登录门槛
     if SS.login_user_id not in st.session_state:
         render_login()
         return
 
-    # ── Onboarding Gate (new users only) ──
+    # 新人引导（只有新用户会走）
     if not memory.is_onboarding_done():
         render_onboarding(memory)
         return
 
-    # ── Real-time notification check (toasts) ──
+    # 实时通知检查（toast 弹窗）
     check_and_notify()
 
-    # ── Multi-Page Navigation ──
+    # 多页面导航
     profile = memory.get_user_profile()
     if profile is None:
         profile = {}
@@ -130,21 +129,21 @@ def main():
         # 居民端信息架构：按四字闭环「知·报·议·督」排序（核心任务靠前），
         # 个人/消息居中，低频（健康防护/治理大屏）靠后。
         nav = st.navigation([
-            # ── 核心：知·报·议·督 ──
+            # 核心四件套：知·报·议·督
             st.Page("ui/pages/home.py", title="对话", icon=":material/chat:", default=True),
             st.Page("ui/pages/pulse.py", title="社区脉搏", icon=":material/waves:"),
             st.Page("ui/pages/issues.py", title="接诉即办", icon=":material/build:"),
             st.Page("ui/pages/voice.py", title="邻里议事", icon=":material/forum:"),
             st.Page("ui/pages/transparency.py", title="社区治理看板", icon=":material/bar_chart:"),
-            # ── 个人与消息 ──
+            # 个人与消息
             st.Page("ui/pages/mine.py", title="我的", icon=":material/person:"),
             st.Page("ui/pages/notifications.py", title="消息", icon=":material/notifications:"),
-            # ── 低频 ──
+            # 低频功能
             st.Page("ui/pages/health.py", title="健康防护", icon=":material/health_and_safety:"),
             st.Page("ui/pages/bigscreen.py", title="治理大屏", icon=":material/tv:"),
         ])
 
-    # ── Sidebar（elderly 全屏无侧边栏，页面内大字导航 + 紧急联系） ──
+    # 侧边栏（老人端全屏没侧边栏，页面里大字导航 + 紧急联系）
     if role != "elderly":
         with st.sidebar:
             from ui.sidebar import render_sidebar

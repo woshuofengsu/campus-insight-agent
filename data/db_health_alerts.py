@@ -1,34 +1,29 @@
-# data/db_health_alerts.py
-"""🏥 疾病防治模块 — 季节模型 + 天气关联 + 社区人流密度 + 风险评分.
+"""疾病防治模块 — 季节模型 + 天气关联 + 社区人流密度 + 风险评分。
 
-  数据来源与模拟说明 / Data Provenance:
-  ─────────────────────────────────────────────────────────────────
-  本模块生成的是模拟/估计数据 (simulated/estimated data)，不是真实流行病学报告。
+  数据来源与模拟说明:
+  本模块生成的是模拟/估计数据，不是真实流行病学报告。
   风险评分基于三层模型叠加：
-    1. 季节先验 — 基于国家疾控局月度公报 (CDC monthly bulletins) 中公布的
+    1. 季节先验 — 基于国家疾控局月度公报中公布的
        中国北方地区季节性传染病流行趋势，提取各月份疾病基线风险。
     2. 天气关联 — 温度骤降、湿度变化、空气质量事件与呼吸道/胃肠道疾病
        发病率的已知统计相关性。
     3. 社区人流密度 — 流感高发季、换季时节等人员聚集场景下的传播风险推断。
   综合风险评分 = 季节基线 × 天气修正 + 密度修正 → 4级风险等级。
 
-  ⚠️ 重要提示：本模块输出仅供参考，不构成医疗建议。
-  ⚠️ IMPORTANT: This module produces simulated risk estimates based on
-     public health bulletins + seasonal models + weather correlation.
-     It is NOT real epidemiological surveillance data and must NOT be
-     used for clinical or public-health decision-making.
+  重要提示：本模块输出的是模拟估算值，基于公共卫生公报 + 季节模型 + 天气关联，
+  不是真实流行病学监测数据，不能用于临床或公共卫生决策。
 
-Architecture:
-  SeasonModel       — month-based disease risk priors (northern China)
-  WeatherCorrelator — temperature-drop / humidity triggers
-  CommunityDensity     — exam weeks, event density → transmission risk
-  HealthRiskEngine  — aggregates above into 4-tier risk levels
+架构:
+  SeasonModel       — 按月份的病种风险先验（北方地区）
+  WeatherCorrelator — 降温 / 湿度变化触发
+  CommunityDensity     — 考试周、活动密度 → 传播风险
+  HealthRiskEngine  — 把上面三层汇总成 4 级风险
 
-Usage:
+用法:
   from data.db_health_alerts import HealthRiskEngine
   engine = HealthRiskEngine()
-  risk = engine.evaluate()          # full evaluation
-  alerts = engine.active_alerts()   # only alerts above threshold
+  risk = engine.evaluate()          # 完整评估
+  alerts = engine.active_alerts()   # 只取超过阈值的告警
 """
 import json
 import logging
@@ -38,10 +33,10 @@ from data.database import get_db
 _log = logging.getLogger(__name__)
 
 
-# -- 1. Season Model — month-based priors for northern China --
+# 1. 季节模型：北方地区的按月先验
 
 _SEASON_DISEASES = {
-    # (start_month, end_month): [(disease, base_risk_0_to_100, symptoms, advice)]
+    # (开始月, 结束月): [(病名, 基础风险分0-100, 症状, 建议)]
     # 全年基础风险 — 任何时候都需要关注
     (1, 12): [
         ("甲型流感", 35, "高热、咳嗽、咽痛、全身酸痛、乏力",
@@ -86,7 +81,7 @@ _SEASON_DISEASES = {
 
 
 def _month_in_range(month: int, start: int, end: int) -> bool:
-    """Check if month falls in [start, end] range, wrapping across year boundary."""
+    """判断月份是否落在 [start, end] 区间，跨年也算。"""
     if start <= end:
         return start <= month <= end
     else:
@@ -94,7 +89,7 @@ def _month_in_range(month: int, start: int, end: int) -> bool:
 
 
 def get_seasonal_diseases(month: int | None = None) -> list[dict]:
-    """Return disease risks active for the given month (default: now)."""
+    """返回指定月份（默认现在）有哪些疾病风险。"""
     if month is None:
         month = datetime.now().month
 
@@ -112,13 +107,13 @@ def get_seasonal_diseases(month: int | None = None) -> list[dict]:
     return results
 
 
-# -- 2. Weather Correlator --
+# 2. 天气关联
 
 def _get_weather_risk_modifiers() -> dict:
-    """Fetch current weather and compute disease risk modifiers.
+    """取当前天气，算出疾病风险修正项。
 
-    Returns dict with keys: temp_drop, humidity, air_quality, modifiers
-    Each modifier is a delta added to base risk (positive = higher risk).
+    返回 dict，键有 temp_drop、humidity、air_quality、modifiers。
+    每个修正项是往基础风险上加的增量（正数 = 风险更高）。
     """
     modifiers: dict[str, int] = {}
     details: dict = {"temp_drop": 0, "humidity": 50, "air_quality": "未知",
@@ -138,8 +133,8 @@ def _get_weather_risk_modifiers() -> dict:
             details["rain_prob"] = rain_prob
             details["condition"] = condition
 
-            # 1. Temperature risk: large temp drop → flu/flu susceptibility ↑
-            #    Also: extreme cold (<5°C) or extreme heat (>35°C) raises baseline
+            # 1. 温度风险：昼夜温差大 → 感冒风险升高
+            #    极冷（<5°C）或极热（>35°C）也会抬高基线
             temp_range = temp_high - temp_low
             if temp_range > 12:
                 modifiers["昼夜温差大→感冒风险"] = 20
@@ -156,51 +151,51 @@ def _get_weather_risk_modifiers() -> dict:
             elif temp_low < 5:
                 modifiers["低温天气→呼吸道疾病"] = 10
 
-            # 2. Humidity risk: high humidity → mold / respiratory
+            # 2. 湿度风险：湿度过高 → 呼吸道
             if rain_prob >= 80:
                 modifiers["高湿预警→呼吸道疾病"] = 15
             elif rain_prob >= 60:
                 modifiers["湿度偏高→呼吸道疾病"] = 8
 
-            # 3. Specific weather events
+            # 3. 特殊天气事件
             if condition in ("沙尘暴", "霾", "浮尘"):
                 modifiers["空气污染→呼吸道疾病"] = 25
             elif condition in ("雾", "扬沙"):
                 modifiers["空气污染→呼吸道疾病"] = 12
 
             details["modifier_reasons"] = list(modifiers.keys())
-    except Exception:  # best-effort, skip
-        _log.debug("Weather risk modifier query failed", exc_info=True)
+    except Exception:  # 尽力而为，失败就算了
+        _log.debug("天气风险 modifier 查询失败", exc_info=True)
         pass
 
     return {"details": details, "total_modifier": sum(modifiers.values()),
             "breakdown": modifiers}
 
 
-# -- 3. Community Density Model --
+# 3. 社区人流密度模型
 
 def _get_community_density_risk() -> dict:
-    """Estimate community crowding → disease transmission risk.
+    """估社区人流聚集度 → 疾病传播风险。
 
-    Two-layer model:
-      1. Time-aware: hour-of-day × day-of-week → zone-based density
-         (unit buildings, meal points, activity rooms)
-      2. Calendar events: seasonal peaks, transitions, holiday returns
+    两层模型：
+      1. 时间感知：一天中的时段 × 周几 → 分区域密度
+         （单元楼、助餐点、活动室）
+      2. 日历事件：季节性高峰、换季、假期返程
     """
     now = datetime.now()
     month = now.month
     day = now.day
     hour = now.hour
-    weekday = now.weekday()  # 0=Mon ... 6=Sun
+    weekday = now.weekday()  # 0=周一 ... 6=周日
     is_weekend = weekday >= 5
 
     density_score = 0
     reasons: list[str] = []
 
-    # -- Layer 1: Time-of-day × Day-of-week density --
+    # 第1层：时段 × 星期几 的密度
 
     if is_weekend:
-        # Weekend: relaxed but units + activity rooms still active
+        # 周末：整体松弛，但单元楼/活动室还有人
         if 9 <= hour < 12:
             density_score += 5
             reasons.append("周末上午，活动室中等密集")
@@ -220,7 +215,7 @@ def _get_community_density_risk() -> dict:
             density_score += 2
             reasons.append("周末深夜，小区低密度")
     else:
-        # Weekday: follows daily commute rhythm
+        # 工作日：跟着上下班节奏走
         if 7 <= hour < 8:
             density_score += 8
             reasons.append("早高峰，单元楼/助餐点人流集中")
@@ -252,19 +247,19 @@ def _get_community_density_risk() -> dict:
             density_score += 2
             reasons.append("深夜，小区低密度")
 
-    # Weekday bonus for known high-traffic times
+    # 工作日高峰时段加一点
     if not is_weekend:
-        # Monday morning rush, full community
+        # 周一早高峰，全小区都动起来
         if weekday == 0 and 7 <= hour < 12:
             density_score += 3
             reasons.append("周一早高峰，全小区人流集中")
 
-    # -- Layer 2: Calendar events (seasonal peaks, etc.) --
+    # 第2层：日历事件（季节高峰等）
 
-    # Seasonal crowding peaks (winter flu / summer transition)
+    # 季节性人流高峰（冬季流感 / 夏季过渡）
     peak_windows = [
-        ((12, 25), (1, 10)),   # winter peak
-        ((6, 20), (7, 5)),     # summer peak
+        ((12, 25), (1, 10)),   # 冬季高峰
+        ((6, 20), (7, 5)),     # 夏季高峰
     ]
     for (sm, sd), (em, ed) in peak_windows:
         if (month == sm and day >= sd) or (month == em and day <= ed):
@@ -272,10 +267,10 @@ def _get_community_density_risk() -> dict:
             reasons.append("流感高发季，活动室/单元楼人员高度密集")
             break
 
-    # Pre-peak buildup (2 weeks before seasonal peak)
+    # 高峰前两周的爬坡期
     pre_peak_windows = [
-        ((12, 10), (1, 10)),   # winter pre+peak
-        ((6, 5), (7, 5)),      # summer pre+peak
+        ((12, 10), (1, 10)),   # 冬季爬坡+高峰
+        ((6, 5), (7, 5)),      # 夏季爬坡+高峰
     ]
     in_peak = False
     for (sm, sd), (em, ed) in peak_windows:
@@ -289,26 +284,26 @@ def _get_community_density_risk() -> dict:
                 reasons.append("换季时节，活动室人员密集")
                 break
 
-    # Season transitions
+    # 换季过渡
     if (month == 9 and 1 <= day <= 15) or (month == 2 and 20 <= day <= 28):
         density_score += 10
         reasons.append("换季时节，人员流动频繁")
 
-    # Holiday returns (National Day, May Day)
+    # 长假返程（国庆、五一）
     if (month == 10 and 5 <= day <= 10) or (month == 5 and 1 <= day <= 7):
         density_score += 5
         reasons.append("长假返程，人员流动增加")
 
-    # Cap at 30
+    # 封顶 30 分
     density_score = min(30, density_score)
 
     return {"score": density_score, "reasons": reasons}
 
 
-# -- 4. Health Risk Engine — aggregates all signals --
+# 4. 健康风险引擎：汇总所有信号
 
 class HealthRiskEngine:
-    """Aggregate seasonal, weather, and community-density signals into risk scores."""
+    """把季节、天气、社区密度三类信号汇总成风险分。"""
 
     def __init__(self):
         self.now = datetime.now()
@@ -316,7 +311,7 @@ class HealthRiskEngine:
         self.weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][self.now.weekday()]
 
     def evaluate(self) -> dict:
-        """Run full evaluation — returns a structured risk report.
+        """跑一遍完整评估 — 返回结构化风险报告。
 
         Returns:
             {
@@ -329,57 +324,56 @@ class HealthRiskEngine:
                 "advice_summary": str,
             }
         """
-        # ── Layer 1: Seasonal baseline
+        # 第1层：季节基线
         seasonal = get_seasonal_diseases(self.month)
 
-        # ── Layer 2: Weather modifiers
+        # 第2层：天气修正
         weather = _get_weather_risk_modifiers()
 
-        # ── Layer 3: Community density
+        # 第3层：社区密度
         density = _get_community_density_risk()
 
-        # ── Compute per-disease risk ──
-        # v2: Blend seasonal model with real national surveillance data.
-        #     Surveillance weight = 0.6 (60% real data, 40% season prior).
-        #     Falls back to pure season model if surveillance table is empty.
+        # 逐病种算风险
+        # v2：季节模型和国家真实监测数据融合，监测权重 0.6（六成真实、四成先验）。
+        #     监测表是空的就退回纯季节模型。
         try:
             from data.db_surveillance import blend_risk as _blend, seed_surveillance as _seed_surv
-            _seed_surv(force=True)  # force re-seed to pick up new disease names
+            _seed_surv(force=True)  # 强制重灌，好让新增的病名生效
             _use_surveillance = True
         except Exception:
-            _log.debug("Failed to load surveillance module, using season-only model", exc_info=True)
+            _log.debug("加载 surveillance 模块失败，退回纯季节模型", exc_info=True)
             _use_surveillance = False
 
         diseases = []
         total_risk = 0
         for d in seasonal:
-            # ── Step 1: Get data-driven base risk (blended with surveillance) ──
+            # 第1步：拿到数据驱动的基础风险（和监测数据融合过）
             if _use_surveillance:
                 blended_base, surv_meta = _blend(d["name"], d["base_risk"], surveillance_weight=0.6)
             else:
                 blended_base = d["base_risk"]
                 surv_meta = {"surveillance_available": False}
 
-            # ── Step 2: Apply weather + density modifiers on top ──
+            # 第2步：叠加上天气和密度修正
             adjusted = blended_base + weather["total_modifier"] + density["score"]
             adjusted = max(0, min(100, adjusted))
             diseases.append({
                 "name": d["name"],
                 "base_risk": d["base_risk"],
-                "blended_base_risk": round(blended_base, 1),  # after surveillance blend
+                "blended_base_risk": round(blended_base, 1),  # 融合监测数据后的基础风险
                 "adjusted_risk": adjusted,
                 "symptoms": d["symptoms"],
                 "advice": d["advice"],
                 "season": d["season"],
-                "surveillance": surv_meta,  # contains trend_risk, direction, data source
+                "surveillance": surv_meta,  # 里面带 trend_risk、方向、数据来源
             })
             total_risk += adjusted
 
-        # ── Overall score (weighted average, capped)
+        # 总分（加权平均，封顶）
         n = len(diseases) or 1
         overall = round(sum(d["adjusted_risk"] for d in diseases) / n)
 
-        # ── Risk level
+        # 风险等级
         if overall >= 70:
             level, emoji, color = "critical", "🔴", "danger"
         elif overall >= 50:
@@ -389,7 +383,7 @@ class HealthRiskEngine:
         else:
             level, emoji, color = "low", "🟢", "success"
 
-        # ── Top alerts
+        # 取风险最高的几条告警
         top_diseases = sorted(diseases, key=lambda x: -x["adjusted_risk"])[:3]
         alerts = [
             {
@@ -401,7 +395,7 @@ class HealthRiskEngine:
             for d in top_diseases
         ]
 
-        # ── Advice summary
+        # 建议汇总
         advice_parts = []
         if weather["total_modifier"] >= 15:
             advice_parts.append("🌡️ 近期天气变化较大，注意增减衣物")
@@ -414,15 +408,15 @@ class HealthRiskEngine:
 
         advice_summary = "；".join(advice_parts) if advice_parts else "🌿 当前社区健康风险较低，保持良好卫生习惯即可。"
 
-        # ── Surveillance data source note ──
+        # 监测数据来源备注
         surv_summary = {}
         try:
             from data.db_surveillance import get_surveillance_summary as _surv_summary
             surv_summary = _surv_summary()
             if surv_summary.get("available") and not advice_parts:
-                pass  # low risk, no extra advice needed
+                pass  # 风险低，不用额外建议
         except Exception:
-            _log.debug("Failed to load surveillance summary", exc_info=True)
+            _log.debug("加载 surveillance 摘要失败", exc_info=True)
             surv_summary = {"available": False}
 
         return {
@@ -437,19 +431,19 @@ class HealthRiskEngine:
             "weather_breakdown": weather["breakdown"],
             "community_density": density,
             "advice_summary": advice_summary,
-            "surveillance": surv_summary,       # CDC data status
+            "surveillance": surv_summary,       # 疾控数据状态
             "source_note": "基于国家疾控局月度公报（近似值） × 季节模型 × 实时天气模拟 · 仅供参考，不构成医疗建议",
             "evaluated_at": self.now.strftime("%Y-%m-%d %H:%M"),
             "weekday": self.weekday,
         }
 
     def active_alerts(self) -> list[dict]:
-        """Return only alerts above the 'moderate' threshold, for notification badges."""
+        """只返回超过 moderate 阈值的告警，给通知角标用。"""
         report = self.evaluate()
         return [a for a in report["top_alerts"] if a["adjusted_risk"] >= 40]
 
     def risk_badge_html(self) -> str:
-        """Return an inline HTML badge for sidebar / header display."""
+        """返回一个内联 HTML 徽章，给侧边栏/页头展示。"""
         report = self.evaluate()
         emoji = report["overall_emoji"]
         level_cn = {"low": "低风险", "moderate": "注意", "high": "警示", "critical": "高危"}
@@ -461,9 +455,9 @@ class HealthRiskEngine:
         )
 
 
-# -- 5. Cached convenience --
+# 5. 便捷缓存函数
 
 def cached_health_risk() -> dict:
-    """Health risk evaluation.  Name preserved for backward compat — no longer cached."""
+    """健康风险评估。名字保留给老代码用——其实已经不做缓存了。"""
     engine = HealthRiskEngine()
     return engine.evaluate()

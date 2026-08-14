@@ -1,5 +1,5 @@
 # ui/css.py
-"""Global CSS injection — all Streamlit overrides and responsive rules live here."""
+"""全局 CSS 注入：所有 Streamlit 的样式覆盖和响应式规则都集中在这。"""
 import streamlit as st
 
 GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -141,10 +141,10 @@ SIDEBAR_FORCE_CSS = """<style>
 
 
 def inject_global_css():
-    """Inject all global CSS rules. Call once in app.py after inject_theme_css()."""
+    """注入全部全局 CSS，app.py 里在 inject_theme_css() 之后调用一次。"""
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
 
 def inject_sidebar_force_css():
-    """Force sidebar visibility on desktop. Call after inject_global_css()."""
+    """桌面端侧边栏宽度设置，在 inject_global_css() 之后调用。"""
     st.markdown(SIDEBAR_FORCE_CSS, unsafe_allow_html=True)

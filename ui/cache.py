@@ -1,5 +1,5 @@
 # ui/cache.py
-"""Cached wrappers for expensive database queries — uses st.cache_data with TTL."""
+"""数据库重查询的缓存包装 — 用 st.cache_data 带 TTL。"""
 import streamlit as st
 
 from data.database import (
@@ -90,21 +90,21 @@ def cached_my_stats(author: str):
     return get_my_stats(author)
 
 
-# Use these instead of st.cache_data.clear() so only affected
-# queries are refreshed, leaving unrelated caches warm.
+# 清缓存别直接调 st.cache_data.clear()，用下面这些，
+# 只刷新受影响的部分，别的缓存还能继续用。
 
 def invalidate_issues():
-    """Clear all issue-related caches (status change, new issue, etc.)."""
+    """清掉所有工单相关缓存（改状态、新工单等场景用）。"""
     cached_issues.clear()
     cached_issues_stats.clear()
     cached_issues_timeline.clear()
     cached_health_score.clear()
-    cached_my_issues.clear()       # user's personal issue list
-    cached_my_stats.clear()        # user's personal stats
+    cached_my_issues.clear()       # 个人的工单列表
+    cached_my_stats.clear()        # 个人的统计
 
 
 def invalidate_proposals():
-    """Clear all proposal-related caches (including personal views)."""
+    """清掉提案相关缓存（含个人视图）。"""
     cached_proposals.clear()
     cached_proposals_stats.clear()
     cached_my_proposals.clear()
@@ -112,18 +112,17 @@ def invalidate_proposals():
 
 
 def invalidate_opinions(topic_id: int = 0):
-    """Clear opinion caches (called after user submits an opinion).
+    """清意见缓存（用户发表意见后调用）。
 
-    Note: currently clears the full opinion cache. The topic_id parameter is
-    accepted for API compatibility — a future optimization could clear only
-    the specific topic's cache entry.
+    注意：现在是把意见缓存整体清掉。topic_id 参数只是留着
+    兼容接口，以后可以优化成只清对应议题的那条。
     """
-    # TODO: per-topic cache invalidation via cached_opinions_by_topic.clear(topic_id)
+    # TODO: 按议题粒度清缓存，用 cached_opinions_by_topic.clear(topic_id)
     cached_opinions_by_topic.clear()
 
 
 def invalidate_content():
-    """Clear knowledge-base, topic, and event caches (content publishing)."""
+    """清知识库、议题、事件缓存（发内容后调用）。"""
     cached_knowledge_base.clear()
     cached_active_topics.clear()
     cached_community_events.clear()       # 通知/事件类内容发布后需要刷新
@@ -131,5 +130,5 @@ def invalidate_content():
 
 
 def invalidate_all():
-    """Hard reset — use only for onboarding reset."""
+    """全量清空 — 只有重置引导时才用。"""
     st.cache_data.clear()

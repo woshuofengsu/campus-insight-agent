@@ -99,14 +99,14 @@ def _llm_route_structured(text: str) -> dict | None:
                 "question": (data.get("question") or "").strip(),
             }
     except Exception:
-        _log.debug("LLM structured routing failed, falling back", exc_info=True)
+        _log.debug("LLM 结构化路由失败，退回兜底", exc_info=True)
     return None
 
 
 def route_intent(text: str) -> dict:
     """路由用户意图到建议工具。
 
-    Returns {"tool", "confidence", "method", "needs_clarification", "question"}
+    返回 {"tool", "confidence", "method", "needs_clarification", "question"}
     """
     tool, conf = _keyword_route(text)
 

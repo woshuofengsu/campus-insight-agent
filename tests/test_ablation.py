@@ -1,24 +1,24 @@
-# tests/test_ablation.py
-"""Ablation evaluation framework — measure agent performance with component toggles.
+# 消融对比测试脚本
+"""消融评估 — 开关各个组件，对比 agent 表现。
 
-Evaluates:
-  1. Tool-call accuracy — does the agent call the right tool for known inputs?
-  2. Latency breakdown — where does time go in the OODA pipeline?
-  3. Pre-fetch impact — with vs without pre-fetched data
-  4. Reflector impact — with vs without association analysis
+评估内容：
+  1. 工具调用准确率 — 已知输入下会不会调对工具
+  2. 延迟拆解 — OODA 流程的时间都花在哪
+  3. 预取影响 — 有预取和没预取的对比
+  4. 反射器影响 — 带不带关联分析的对比
 
-Usage:
-  python tests/test_ablation.py              # full ablation suite
-  python tests/test_ablation.py --quick       # fast check (2 cases only)
-  python tests/test_ablation.py --output report.md  # save report
+用法：
+  python tests/test_ablation.py              # 完整跑一遍
+  python tests/test_ablation.py --quick       # 快速检查（只跑 2 个用例）
+  python tests/test_ablation.py --output report.md  # 结果存成文件
 """
 import os, sys, time, json, io, contextlib
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# -- Test case definitions --
+# 测试用例定义
 
-# (user_input, expected_tool, expected_persona, description)
+# (用户输入, 期望工具, 期望角色, 描述)
 ACCURACY_CASES = [
     ("3号楼二楼水龙头漏水", "report_issue", "接诉助手", "接诉上报"),
     ("最近社区有什么动态", "get_community_pulse", "社区观察员", "社区脉搏"),
@@ -34,7 +34,7 @@ ACCURACY_CASES = [
     ("帮我查一下我的工单", "query_issues", "数据分析师", "我的工单"),
 ]
 
-# Cases that should trigger pre-fetch awareness
+# 这些输入应该触发预取
 PREFETCH_CASES = [
     "社区脉搏",           # get_community_pulse → should use prefetch
     "最近有什么提案",      # get_proposals → should use prefetch
@@ -42,7 +42,7 @@ PREFETCH_CASES = [
     "治理数据",           # get_governance_stats → should use prefetch
 ]
 
-# Cases that benefit from reflector/association analysis
+# 这些输入适合走反射器/关联分析
 ASSOCIATION_CASES = [
     ("3号楼二楼水龙头漏水", "空间关联：3号楼附近"),
     ("广场步道灯不亮", "空间关联：广场附近"),
@@ -50,10 +50,10 @@ ASSOCIATION_CASES = [
 ]
 
 
-# -- Mock session state for offline testing --
+# 离线测试用的 mock session_state
 
 class MockSessionState(dict):
-    """Minimal mock of Streamlit session_state for offline agent testing."""
+    """离线测试用的简化版 Streamlit session_state。"""
     def __getattr__(self, name):
         if name in self:
             return self[name]
@@ -70,7 +70,7 @@ def _make_mock_state():
         "preferences": "[]", "resident_id": "test_001", "name": "测试用户",
         "role": "resident", "onboarding_done": 1,
     }
-    # Mock LangChain memory — ConversationBufferMemory needs chat_memory
+    # mock 掉 LangChain 记忆，ConversationBufferMemory 必须要 chat_memory
     from langchain_classic.memory import ConversationBufferMemory
     state["langchain_memory"] = ConversationBufferMemory(
         memory_key="chat_history",
@@ -80,10 +80,10 @@ def _make_mock_state():
     return state
 
 
-# -- Test runners --
+# 各测试项
 
 def test_persona_routing():
-    """Test persona detection accuracy."""
+    """测角色识别准确率。"""
     from agent.prompt import detect_persona
 
     results = []
@@ -103,7 +103,7 @@ def test_persona_routing():
 
 
 def test_tool_discovery():
-    """Verify tool auto-discovery returns expected tools."""
+    """确认工具自动发现能返回预期工具。"""
     from tools import discover_tools
 
     t0 = time.time()
@@ -129,33 +129,33 @@ def test_tool_discovery():
 
 
 def test_ooda_pipeline_latency(quick: bool = False):
-    """Measure latency of each OODA phase using mock (no LLM call)."""
+    """用 mock 测各 OODA 阶段耗时（不调 LLM）。"""
     from config import DB_PATH
     from data.database import init_db
     init_db(DB_PATH)
 
     from perception.monitor import PerceptionMonitor
 
-    # Phase 1: Observe
+    # 阶段1：观察
     t0 = time.time()
     monitor = PerceptionMonitor()
     alerts = monitor.run_all_checks()
     t_observe = time.time() - t0
 
-    # Phase 4.3: Closed-loop check (DB-backed)
+    # 阶段4.3：闭环检查（查库）
     t0 = time.time()
     from data.database import get_issues, get_proposals
     issues = get_issues(limit=50)
     proposals = get_proposals(limit=50)
     t_reflect_db = time.time() - t0
 
-    # Phase 5: Association analysis (DB-backed)
+    # 阶段5：关联分析（查库）
     t0 = time.time()
     from agent.reflector import compute_associations
     assoc = compute_associations("3号楼灯坏了", [])
     t_associate = time.time() - t0
 
-    # Phase 3: Agent executor — skip LLM call, measure just construction
+    # 阶段3：只测 Agent 构建耗时，跳过 LLM
     t0 = time.time()
     state = _make_mock_state()
     agent = _create_agent_for_test(state)
@@ -171,16 +171,16 @@ def test_ooda_pipeline_latency(quick: bool = False):
 
 
 def _create_agent_for_test(state):
-    """Create a CommunityAgent instance for testing (no LLM calls)."""
+    """建一个测试用的 CommunityAgent（不调 LLM）。"""
     from agent.engine import CommunityAgent
-    # Suppress LLM creation errors — we only measure build time
+    # 吞掉 LLM 创建报错，反正只测构建耗时
     with contextlib.suppress(Exception):
         return CommunityAgent(state)
     return None
 
 
 def test_db_performance():
-    """Measure DB query performance for common operations."""
+    """测常用数据库操作的性能。"""
     from data.database import (
         get_issues, get_issues_stats, get_proposals, get_proposals_stats,
         get_active_topics, compute_health_score, get_feedback_stats,
@@ -210,24 +210,24 @@ def test_db_performance():
 
 
 def test_reflector_components():
-    """Test reflector sub-components in isolation."""
+    """单独测反射器的各个子组件。"""
     from agent.reflector import (
         parse_intermediate_steps, compute_associations,
         build_reasoning_chain,
     )
     from agent.reflector._parser import parse_text_actions as _parse_text_actions
 
-    # 1. Text-action parsing
+    # 1. 文本动作解析
     t0 = time.time()
     steps = _parse_text_actions("已为你生成工单 #42，分类为设施维修。社区脉搏显示本周有3个新工单。")
     t_text_parse = time.time() - t0
 
-    # 2. Empty steps → association still works (graceful degradation)
+    # 2. 空步骤也要能出关联（优雅降级）
     t0 = time.time()
     assoc_empty = compute_associations("测试查询", [])
     t_assoc_empty = time.time() - t0
 
-    # 3. build_reasoning_chain with text fallback
+    # 3. 用文本兜底构建推理链
     t0 = time.time()
     chain = build_reasoning_chain([], "社区脉搏显示3个新工单，天气晴好。", "社区脉搏")
     t_chain = time.time() - t0
@@ -244,7 +244,7 @@ def test_reflector_components():
 
 
 def test_memory_operations():
-    """Test memory layer operations."""
+    """测记忆层操作。"""
     state = _make_mock_state()
     from agent.memory import MemoryManager
 
@@ -270,10 +270,10 @@ def test_memory_operations():
     }
 
 
-# -- Report generation --
+# 报告生成
 
 def run_full_ablation(quick: bool = False) -> dict:
-    """Run all ablation tests and return structured results."""
+    """跑完全部消融测试，返回结构化结果。"""
     report = {
         "timestamp": datetime.now().isoformat(),
         "python_version": sys.version,
@@ -283,27 +283,27 @@ def run_full_ablation(quick: bool = False) -> dict:
 
     cases = ACCURACY_CASES if not quick else ACCURACY_CASES[:2]
 
-    # Section 1: Persona routing accuracy
+    # 第1部分：角色路由准确率
     print("[1/6] Testing persona routing...")
     report["sections"]["persona_routing"] = test_persona_routing()
 
-    # Section 2: Tool discovery
+    # 第2部分：工具发现
     print("[2/6] Testing tool discovery...")
     report["sections"]["tool_discovery"] = test_tool_discovery()
 
-    # Section 3: OODA pipeline latency
+    # 第3部分：OODA 管道延迟
     print("[3/6] Measuring OODA pipeline latency...")
     report["sections"]["pipeline_latency"] = test_ooda_pipeline_latency(quick)
 
-    # Section 4: DB performance
+    # 第4部分：数据库性能
     print("[4/6] Measuring DB performance...")
     report["sections"]["db_performance"] = test_db_performance()
 
-    # Section 5: Reflector components
+    # 第5部分：反射器组件
     print("[5/6] Testing reflector components...")
     report["sections"]["reflector"] = test_reflector_components()
 
-    # Section 6: Memory operations
+    # 第6部分：记忆操作
     print("[6/6] Testing memory operations...")
     report["sections"]["memory"] = test_memory_operations()
 
@@ -311,7 +311,7 @@ def run_full_ablation(quick: bool = False) -> dict:
 
 
 def format_report(report: dict) -> str:
-    """Format ablation report as markdown."""
+    """把消融报告格式化成 markdown。"""
     lines = [
         "# CommunityInsight Agent — Ablation 评估报告",
         "",
@@ -323,7 +323,7 @@ def format_report(report: dict) -> str:
         "",
     ]
 
-    # ── 1. Persona Routing ──
+    # 1. 角色路由
     pr = report["sections"]["persona_routing"]
     lines.extend([
         "## 1. Persona Routing 准确率",
@@ -341,7 +341,7 @@ def format_report(report: dict) -> str:
                 lines.append(f"| {d['input']} | {d['expected']} | {d['got']} | ❌ |")
         lines.append("")
 
-    # ── 2. Tool Discovery ──
+    # 2. 工具发现
     td = report["sections"]["tool_discovery"]
     lines.extend([
         "## 2. 工具自动发现",
@@ -359,7 +359,7 @@ def format_report(report: dict) -> str:
         lines.append(f"📌 额外工具：{', '.join(td['extra'])}")
     lines.append("")
 
-    # ── 3. Pipeline Latency ──
+    # 3. 管道延迟
     pl = report["sections"]["pipeline_latency"]
     lines.extend([
         "## 3. OODA 管道延迟分解",
@@ -376,7 +376,7 @@ def format_report(report: dict) -> str:
         "",
     ])
 
-    # ── 4. DB Performance ──
+    # 4. 数据库性能
     db = report["sections"]["db_performance"]
     lines.extend([
         "## 4. 数据库查询性能",
@@ -389,7 +389,7 @@ def format_report(report: dict) -> str:
         lines.append(f"| {name} | {result['latency_ms']}ms | {status} |")
     lines.append("")
 
-    # ── 5. Reflector Components ──
+    # 5. 反射器组件
     rf = report["sections"]["reflector"]
     lines.extend([
         "## 5. 反射器组件测试",
@@ -403,7 +403,7 @@ def format_report(report: dict) -> str:
         "",
     ])
 
-    # ── 6. Memory ──
+    # 6. 记忆操作
     mem = report["sections"]["memory"]
     lines.extend([
         "## 6. Memory 操作性能",
@@ -417,7 +417,7 @@ def format_report(report: dict) -> str:
         "",
     ])
 
-    # ── Summary ──
+    # 总结
     lines.extend([
         "---",
         "",
@@ -450,7 +450,7 @@ def format_report(report: dict) -> str:
     return "\n".join(lines)
 
 
-# -- CLI entry point --
+# 命令行入口
 
 if __name__ == "__main__":
     import argparse
@@ -459,7 +459,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, default="", help="Save report to file")
     args = parser.parse_args()
 
-    # Ensure DB is initialized
+    # 先把库建好
     from config import DB_PATH
     from data.database import init_db
     from data.seed import seed_all
@@ -480,7 +480,7 @@ if __name__ == "__main__":
             f.write(formatted)
         print(f"\n📄 Report saved to: {args.output}")
 
-    # Exit code: 0 if persona routing is 100%, 1 otherwise
+    # 退出码：角色路由 100% 通过返回 0，否则 1
     pr = report["sections"]["persona_routing"]
     if pr["rate"] < 100:
         print(f"\n⚠️  Persona routing accuracy is {pr['rate']:.1f}% — below 100%")

@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Integration tests for database roundtrip operations.
+"""数据库往返的集成测试。
 
-Tests full CRUD cycles across community_issues, proposals, notifications,
-and activity_log tables. Validates data integrity, cascade behavior,
-and concurrent read patterns.
+覆盖 community_issues、proposals、notifications、activity_log 的完整 CRUD
+闭环，验证数据完整性、级联行为和并发读。
 """
 import sys
 import os
@@ -27,7 +26,7 @@ def _cleanup_test_db(db_path):
         pass
 
 
-# -- 1. Issue CRUD — Full Lifecycle --
+# 1. 工单 CRUD 全流程
 
 class TestIssueCRUD(unittest.TestCase):
 
@@ -103,7 +102,7 @@ class TestIssueCRUD(unittest.TestCase):
         self.assertEqual(found[0]["status"], "已解决")
 
 
-# -- 2. Proposal Lifecycle --
+# 2. 提案生命周期
 
 class TestProposalLifecycle(unittest.TestCase):
 
@@ -142,7 +141,7 @@ class TestProposalLifecycle(unittest.TestCase):
         count3 = support_proposal(prop_id)
 
         self.assertEqual(count3, count2 + 1)
-        self.assertGreaterEqual(count3, 4)  # 1 creator + 3 supporters
+        self.assertGreaterEqual(count3, 4)  # 1 个创建人 + 3 次附议
 
         proposals = get_proposals(limit=100)
         found = [p for p in proposals if p["id"] == prop_id]
@@ -171,14 +170,14 @@ class TestProposalLifecycle(unittest.TestCase):
         self.assertGreaterEqual(stats["total"], 2)
 
 
-# -- 3. Notification Flow --
+# 3. 通知流程
 
 class TestNotificationFlow(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls._db_path = _init_test_db()
-        # Create a test user for notifications
+        # 先造一个测试用户，通知要发给具体的人
         from data.database import get_db
         with get_db() as conn:
             conn.execute(
@@ -241,7 +240,7 @@ class TestNotificationFlow(unittest.TestCase):
         self.assertEqual(count, 0)
 
 
-# -- 4. Activity Log --
+# 4. 操作日志
 
 class TestActivityLog(unittest.TestCase):
 
@@ -281,7 +280,7 @@ class TestActivityLog(unittest.TestCase):
         self.assertIn("today_proposals", summary)
 
 
-# -- 5. Cross-Table Consistency --
+# 5. 跨表一致性
 
 class TestCrossTableConsistency(unittest.TestCase):
 
@@ -294,22 +293,22 @@ class TestCrossTableConsistency(unittest.TestCase):
         _cleanup_test_db(cls._db_path)
 
     def test_issue_notification_chain(self):
-        """Issue status change → notification created → queryable."""
+        """工单状态变更 → 生成通知 → 能查得到。"""
         from data.database import report_issue, update_issue_status
         from data.db_notifications import notify_issue_status_change, get_notifications
 
         issue_id = report_issue("通知链测试", "设施维修", "地点", "", "普通", "test_user")
 
-        # Update status should trigger notification
+        # 状态变更应该触发通知
         notify_issue_status_change(issue_id, "已解决")
 
-        # Notification should be queryable
+        # 通知应该能查出来
         notifs = get_notifications(user_id=1, limit=50)
-        # Notification may or may not be found depending on author resolution
+        # 通知能不能查到取决于作者怎么解析，不强求
         self.assertIsInstance(notifs, list)
 
     def test_proposal_notification_chain(self):
-        """Proposal status change → notification created."""
+        """提案状态变更 → 生成通知。"""
         from data.database import create_proposal, update_proposal_status
         from data.db_notifications import notify_proposal_status_change
 
@@ -318,11 +317,11 @@ class TestCrossTableConsistency(unittest.TestCase):
         update_proposal_status(prop_id, "已采纳", response_text="采纳了")
         notify_proposal_status_change(prop_id, "已采纳", response_text="采纳了")
 
-        # Should not crash
+        # 别崩就行
         self.assertTrue(True)
 
     def test_concurrent_reads(self):
-        """Multiple reads from different tables should work in WAL mode."""
+        """多个线程同时读不同表，WAL 模式下应该没问题。"""
         from data.database import get_db
         import threading
 
@@ -345,7 +344,7 @@ class TestCrossTableConsistency(unittest.TestCase):
         self.assertEqual(len(errors), 0, f"Concurrent reads had errors: {errors}")
 
 
-# -- 6. Health Score Computation --
+# 6. 健康度计算
 
 class TestHealthScore(unittest.TestCase):
 
@@ -377,7 +376,7 @@ class TestHealthScore(unittest.TestCase):
     def test_avg_resolution_days(self):
         from data.database import get_avg_resolution_days
         avg = get_avg_resolution_days()
-        # May be None if no resolved issues with dates
+        # 没有带日期的已解决工单时可能返回 None
         self.assertTrue(avg is None or isinstance(avg, (int, float)))
 
 

@@ -7,7 +7,7 @@ logger = get_logger(__name__)
 
 
 def retry_on_failure(max_retries: int = 2):
-    """Decorator: retry a function on exception with exponential backoff."""
+    """装饰器：函数抛异常就重试，退避时间指数增长。"""
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

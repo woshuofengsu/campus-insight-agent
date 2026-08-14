@@ -1,4 +1,3 @@
-# data/db_memory.py
 """跨会话事件记忆 — 记录用户关键动作，供系统提示词注入个性化上下文。
 
 与 working memory（会话内）和 user_profile（画像）互补：event_memory 记录
@@ -12,7 +11,7 @@ _log = logging.getLogger(__name__)
 
 
 def remember_event(user_id: int, event_type: str, summary: str) -> None:
-    """Record a cross-session event for a user. Best-effort, never blocks."""
+    """记一条跨会话事件。尽力而为，写失败也不影响主流程。"""
     if not user_id:
         return
     try:
@@ -23,11 +22,11 @@ def remember_event(user_id: int, event_type: str, summary: str) -> None:
             )
             conn.commit()
     except Exception:
-        _log.warning("remember_event failed", exc_info=True)
+        _log.warning("remember_event 写入失败", exc_info=True)
 
 
 def get_recent_events(user_id: int, limit: int = 10) -> list[dict]:
-    """Return a user's recent events, newest first."""
+    """查用户最近的事件，新的在前。"""
     if not user_id:
         return []
     try:
@@ -39,12 +38,12 @@ def get_recent_events(user_id: int, limit: int = 10) -> list[dict]:
             ).fetchall()
             return [dict(r) for r in rows]
     except Exception:
-        _log.warning("get_recent_events failed", exc_info=True)
+        _log.warning("get_recent_events 查询失败", exc_info=True)
         return []
 
 
 def get_event_summary(user_id: int, limit: int = 5) -> str:
-    """Return a compact Chinese summary of recent events for prompt injection."""
+    """把最近事件拼成一段简短中文，给系统提示词注入用。"""
     events = get_recent_events(user_id, limit)
     if not events:
         return ""

@@ -1,8 +1,7 @@
 # agent/callbacks.py
-"""Streaming callback — captures agent thinking and tool calls in real-time.
+"""流式回调 —— 实时抓 Agent 的思考和工具调用。
 
-Surfaces tool execution events, LLM token streaming, and chain-of-thought
-reasoning for UI rendering.
+把工具执行事件、LLM token 流、推理过程暴露出来给 UI 渲染。
 """
 import time
 from typing import Any
@@ -13,14 +12,14 @@ logger = get_logger(__name__)
 
 
 class StreamingCallback(BaseCallbackHandler):
-    """LangChain callback that captures agent events for real-time UI updates.
+    """LangChain 回调，抓 Agent 事件给 UI 实时更新。
 
-    Writes to a shared dict (session_state._stream_events) that the UI polls.
-    Each event: {type, timestamp, data, ...}
+    写进共享字典（session_state._stream_events），UI 轮询它。
+    每条事件：{type, timestamp, data, ...}
     """
 
     def __init__(self, event_sink: dict | None = None):
-        """event_sink: optional dict for UI events. None = logged only."""
+        """event_sink：UI 事件的可选接收字典，None 就只记日志。"""
         super().__init__()
         self._sink = event_sink or {}
         self._events: list[dict] = []
@@ -36,7 +35,7 @@ class StreamingCallback(BaseCallbackHandler):
         self._tool_start_times.clear()
         self._current_tool = ""
 
-    # ── LLM events ──
+    # LLM 事件
 
     def on_llm_start(self, serialized: dict[str, Any], prompts: list[str],
                      **kwargs: Any) -> None:
@@ -56,7 +55,7 @@ class StreamingCallback(BaseCallbackHandler):
     def on_llm_error(self, error: BaseException, **kwargs: Any) -> None:
         self._add_event("llm_error", {"error": str(error)[:200]})
 
-    # ── Tool events ──
+    # 工具事件
 
     def on_tool_start(self, serialized: dict[str, Any], input_str: str,
                       **kwargs: Any) -> None:
@@ -88,7 +87,7 @@ class StreamingCallback(BaseCallbackHandler):
         })
         self._current_tool = ""
 
-    # ── Chain / Agent events ──
+    # 链 / Agent 事件
 
     def on_agent_action(self, action: Any, **kwargs: Any) -> None:
         self._add_event("agent_action", {
@@ -110,7 +109,7 @@ class StreamingCallback(BaseCallbackHandler):
     def on_chain_end(self, outputs: dict[str, Any], **kwargs: Any) -> None:
         self._add_event("chain_end", {})
 
-    # ── Internal ──
+    # 内部方法
 
     def _add_event(self, etype: str, data: dict):
         event = {
@@ -120,7 +119,7 @@ class StreamingCallback(BaseCallbackHandler):
         }
         self._events.append(event)
 
-        # Push to shared sink if available
+        # 有共享接收器就推过去
         if self._sink is not None:
             if "_stream_events" not in self._sink:
                 self._sink["_stream_events"] = []
@@ -128,7 +127,7 @@ class StreamingCallback(BaseCallbackHandler):
             self._sink["_stream_current_tool"] = self._current_tool
 
     def get_tool_timeline(self) -> list[dict]:
-        """Return a timeline of tool calls with durations for UI display."""
+        """返回工具调用时间线（带耗时），给 UI 展示。"""
         timeline: list[dict] = []
         current: dict | None = None
         for ev in self._events:

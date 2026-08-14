@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for persona detection and system prompt building.
+"""角色识别和系统提示词构建的单元测试。
 
-Covers detect_persona() with exhaustive keyword/edge/semantic cases
-and get_system_prompt() with profile injection validation.
+detect_persona() 覆盖关键词、边界、语义的穷举用例，
+get_system_prompt() 验证画像注入是否正常。
 """
 import sys
 import os
@@ -11,10 +11,10 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# -- 1. detect_persona — Repair Persona (接诉助手) --
+# 1. detect_persona 报修角色（接诉助手）
 
 class TestPersonaRepair(unittest.TestCase):
-    """Tests for 接诉助手 persona detection."""
+    """接诉助手角色的识别测试。"""
 
     def test_broken_keyword_high_confidence(self):
         from agent.prompt import detect_persona
@@ -84,7 +84,7 @@ class TestPersonaRepair(unittest.TestCase):
         self.assertIn("接诉", r["role"])
 
 
-# -- 2. detect_persona — Observer Persona (社区观察员) --
+# 2. detect_persona 观察角色（社区观察员）
 
 class TestPersonaObserver(unittest.TestCase):
 
@@ -104,7 +104,7 @@ class TestPersonaObserver(unittest.TestCase):
         from agent.prompt import detect_persona
         r = detect_persona("今天天气怎么样")
         self.assertIsNotNone(r)
-        # Weather keyword matches observer persona
+        # 天气关键词也归观察员
         self.assertIn("观察员", r["role"])
 
     def test_recent_dynamics(self):
@@ -120,7 +120,7 @@ class TestPersonaObserver(unittest.TestCase):
         self.assertIn("观察员", r["role"])
 
 
-# -- 3. detect_persona — Analyst Persona (数据分析师) --
+# 3. detect_persona 分析角色（数据分析师）
 
 class TestPersonaAnalyst(unittest.TestCase):
 
@@ -161,14 +161,14 @@ class TestPersonaAnalyst(unittest.TestCase):
         self.assertIn("数据分析师", r["role"])
 
     def test_category_count_overrides_repair(self):
-        """'统计设施维修数量' should route to analyst, not repair."""
+        """'统计设施维修数量' 应该归分析师，不是报修。"""
         from agent.prompt import detect_persona
         r = detect_persona("统计设施维修数量")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
 
-# -- 4. detect_persona — Advisor Persona (议事顾问) --
+# 4. detect_persona 顾问角色（议事顾问）
 
 class TestPersonaAdvisor(unittest.TestCase):
 
@@ -215,7 +215,7 @@ class TestPersonaAdvisor(unittest.TestCase):
         self.assertIn("议事顾问", r["role"])
 
 
-# -- 5. detect_persona — Edge Cases & Boundaries --
+# 5. detect_persona 边界情况
 
 class TestPersonaEdgeCases(unittest.TestCase):
 
@@ -231,7 +231,7 @@ class TestPersonaEdgeCases(unittest.TestCase):
 
     def test_single_char(self):
         from agent.prompt import detect_persona
-        r = detect_persona("d")  # len < 2
+        r = detect_persona("d")  # 长度小于 2
         self.assertIsNone(r)
 
     def test_greeting_no_match(self):
@@ -245,7 +245,7 @@ class TestPersonaEdgeCases(unittest.TestCase):
         self.assertIsNone(r)
 
     def test_very_long_input(self):
-        """Very long inputs should still work (no truncation)."""
+        """超长输入也要能正常识别（不做截断）。"""
         from agent.prompt import detect_persona
         long_text = "3号楼" + "的灯" * 200 + "坏了"
         r = detect_persona(long_text)
@@ -270,12 +270,12 @@ class TestPersonaEdgeCases(unittest.TestCase):
             self.assertEqual(r.get("confidence"), "low")
 
 
-# -- 6. detect_persona — Status Query Override --
+# 6. detect_persona 状态查询覆盖
 
 class TestStatusQueryOverride(unittest.TestCase):
 
     def test_fixed_yet_redirects_to_analyst(self):
-        """'我上报的水龙头修好了吗' should go to analyst, not repair."""
+        """'我上报的水龙头修好了吗' 应该走分析师，不是报修。"""
         from agent.prompt import detect_persona
         r = detect_persona("我上报的水龙头修好了吗")
         self.assertIsNotNone(r)
@@ -301,29 +301,29 @@ class TestStatusQueryOverride(unittest.TestCase):
         self.assertIn("数据分析师", r["role"])
 
     def test_short_ownership_check(self):
-        """Short ownership + query combo: '我的工单' """
+        """短的所有权+查询组合：'我的工单' """
         from agent.prompt import detect_persona
         r = detect_persona("我的工单")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
     def test_reply_status_check(self):
-        """Status query '回复了吗' with ownership signals triggers analyst."""
+        """'回复了吗' 这种状态查询加上所有权信号就归分析师。"""
         from agent.prompt import detect_persona
         r = detect_persona("我上报的工单回复了吗")
         self.assertIsNotNone(r)
         self.assertIn("数据分析师", r["role"])
 
 
-# -- 7. detect_persona — Semantic Fallback --
+# 7. detect_persona 语义兜底
 
 class TestSemanticFallback(unittest.TestCase):
 
     def test_regex_fallback_repair(self):
-        """Input with location+problem not in keyword list — semantic regex catches it."""
+        """带地点+问题但关键词表里没有 — 语义正则要能接住。"""
         from agent.prompt import detect_persona
-        # "3号楼饮水机突然无法出水" — "饮水机" in facility regex, "无法" in problem regex
-        # but neither is in the keyword list, so it must go through semantic fallback
+        # "饮水机"在设施正则里、"无法"在问题正则里，
+        # 但都不在关键词表里，所以必须走语义兜底
         r = detect_persona("饮水机突然无法出水")
         self.assertIsNotNone(r)
         self.assertIn("接诉", r["role"])
@@ -331,14 +331,14 @@ class TestSemanticFallback(unittest.TestCase):
     def test_regex_fallback_projector(self):
         from agent.prompt import detect_persona
         r = detect_persona("路灯模糊看不清")
-        # This one has keyword "看不清" + "路灯" → direct match likely
+        # 这条有"看不清"+"路灯"关键词，应该直接命中
         self.assertIsNotNone(r)
 
     def test_regex_fallback_suggestion(self):
         from agent.prompt import detect_persona
         r = detect_persona("能不能延长闭馆时间")
         self.assertIsNotNone(r)
-        # Should match either advisor keywords or semantic fallback
+        # 要么命中顾问关键词，要么走语义兜底，总得有结果
 
     def test_no_semantic_fallback_for_irrelevant(self):
         from agent.prompt import detect_persona
@@ -346,7 +346,7 @@ class TestSemanticFallback(unittest.TestCase):
         self.assertIsNone(r)
 
 
-# -- 8. get_system_prompt — System Prompt Building --
+# 8. get_system_prompt 系统提示词构建
 
 class TestSystemPrompt(unittest.TestCase):
 
@@ -370,7 +370,7 @@ class TestSystemPrompt(unittest.TestCase):
     def test_contains_tool_names(self):
         from agent.prompt import get_system_prompt
         prompt = get_system_prompt({"community": "测试"})
-        # Should mention key tool names
+        # 提示词里应该提到关键工具名
         self.assertIn("report_issue", prompt)
 
     def test_contains_forbidden_behavior(self):
@@ -402,7 +402,7 @@ class TestSystemPrompt(unittest.TestCase):
 
     def test_handles_preferences_json(self):
         from agent.prompt import get_system_prompt
-        # Preferences are parsed but may or may not appear in prompt depending on template
+        # 画像会解析，但进不进提示词要看模板怎么拼
         prompt = get_system_prompt({
             "community": "测试",
             "building": "大三",
@@ -415,7 +415,7 @@ class TestSystemPrompt(unittest.TestCase):
 
     def test_handles_invalid_preferences_json(self):
         from agent.prompt import get_system_prompt
-        # Invalid JSON should not crash
+        # 非法 JSON 不能崩
         prompt = get_system_prompt({
             "community": "测试",
             "preferences": "not valid json",
@@ -424,7 +424,7 @@ class TestSystemPrompt(unittest.TestCase):
         self.assertGreater(len(prompt), 1000)
 
 
-# -- 9. Helper: _detect_status_query --
+# 9. 辅助函数 _detect_status_query
 
 class TestDetectStatusQuery(unittest.TestCase):
 
@@ -446,7 +446,7 @@ class TestDetectStatusQuery(unittest.TestCase):
 
     def test_long_ownership_not_alone(self):
         from agent.prompt import _detect_status_query
-        # Long text (>20 chars) with ownership prefix but describing a new problem → not status query
+        # 文本很长（>20字）但带所有权前缀、描述的是新问题 → 不算状态查询
         self.assertFalse(_detect_status_query(
             "我的教三楼灯坏了需要尽快派人来维修更换灯管"))
 

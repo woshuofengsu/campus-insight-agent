@@ -101,7 +101,7 @@ def get_governance_stats() -> str:
         bar = "█" * min(cnt, 20)
         lines.append(f"     {cat_label}：{cnt} {bar}")
 
-    # Governance health indicator
+    # 治理健康度指标
     total = stats["total"]
     resolved = stats["by_status"].get("已解决", 0)
     if total > 0:
@@ -133,7 +133,7 @@ def collect_feedback(topic: str) -> str:
     agg = aggregate_feedback(topic)
 
     if agg["total"] == 0:
-        # ── No real data: show demo preview (read-only, not persisted) ──
+        # 没有真实数据：给个演示预览（只读，不落库）
         demo_opinions = {
             "停车": [
                 ("小区车位太少，晚上回来根本停不下", "负面"),
@@ -194,13 +194,13 @@ def collect_feedback(topic: str) -> str:
         ])
         return "\n".join(lines)
 
-    # Build report from real DB data
+    # 有真实数据就拼报告
     total = agg["total"]
     pos_pct = agg["positive"] / total * 100 if total > 0 else 0
     neg_pct = agg["negative"] / total * 100 if total > 0 else 0
     neu_pct = agg["neutral"] / total * 100 if total > 0 else 0
 
-    # Overall sentiment
+    # 总体情绪
     if pos_pct >= 60:
         overall = "😊 总体正面"
     elif neg_pct >= 60:
@@ -230,7 +230,7 @@ def collect_feedback(topic: str) -> str:
         se = sent_emoji.get(item["sentiment"], "😐")
         lines.append(f"     {se} {item['opinion']}")
 
-    # Governance insight
+    # 治理建议
     if neg_pct >= 50:
         lines.append(f"\n⚠️ 该话题负面意见较多，建议相关部门关注并回复。")
     elif pos_pct >= 70:

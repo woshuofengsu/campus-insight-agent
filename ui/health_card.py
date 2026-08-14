@@ -40,7 +40,7 @@ def render_health_risk_overview(h: dict) -> None:
     bar_color = TOKEN[h_color] if h_color in ("success", "warning", "danger") else TOKEN["accent"]
     risk_bar_pct = min(100, h_score)
 
-    # ── Build alert rows HTML ──
+    # 拼告警行的 HTML
     alerts_html = ""
     for alert in h.get("top_alerts", [])[:2]:
         alert_emoji = alert.get("emoji", "💊")
@@ -51,7 +51,7 @@ def render_health_risk_overview(h: dict) -> None:
             f'</div>'
         )
 
-    # ── Weather reasons ──
+    # 天气关联原因
     weather_note = ""
     if h.get("weather_mod_total", 0) >= 10:
         reasons = h.get("weather_breakdown", {})
@@ -62,7 +62,7 @@ def render_health_risk_overview(h: dict) -> None:
                 f'🌡️ 天气关联：{reason_str}</div>'
             )
 
-    # ── Source note ──
+    # 数据来源说明
     source_note = h.get("source_note", "")
     source_html = ""
     if source_note:
@@ -71,14 +71,14 @@ def render_health_risk_overview(h: dict) -> None:
             f'margin-top:6px;opacity:0.75;">📋 {source_note}</div>'
         )
 
-    # ── Render card ──
+    # 渲染卡片
     st.markdown("---")
     st.markdown(
         f'<div style="background:{TOKEN["card_bg"]};border:1.5px solid {bar_color};'
         f'border-radius:{TOKEN["radius_card"]};padding:16px 20px;box-shadow:{TOKEN["shadow"]};'
         f'margin-bottom:8px;">'
 
-        # Header row
+        # 标题行
         f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
         f'<span style="font-size:2em;">🏥</span>'
         f'<div style="flex:1;">'
@@ -90,24 +90,24 @@ def render_health_risk_overview(h: dict) -> None:
         f'<span style="font-size:0.7em;color:{TOKEN["text_muted"]};">分</span>'
         f'</div>'
 
-        # Gradient risk bar
+        # 渐变风险条
         f'<div style="height:6px;background:{TOKEN["border"]};border-radius:3px;margin:6px 0 10px;">'
         f'<div style="width:{risk_bar_pct}%;height:100%;background:linear-gradient(90deg,'
         f'#22c55e 0%, #eab308 35%, #f97316 65%, #ef4444 100%);border-radius:3px;'
         f'transition:width 0.5s ease;"></div></div>'
 
-        # Alerts
+        # 告警条目
         f'{alerts_html}'
 
-        # Advice
+        # 综合建议
         f'<div style="font-size:0.78em;color:{TOKEN["text_muted"]};margin-top:6px;'
         f'padding:8px 12px;background:{TOKEN["accent_bg"]};border-radius:6px;">'
         f'💡 {h["advice_summary"]}</div>'
 
-        # Weather note
+        # 天气提示
         f'{weather_note}'
 
-        # Source note
+        # 来源标注
         f'{source_html}'
 
         f'</div>',
@@ -170,7 +170,7 @@ def render_disease_detail_cards(h: dict) -> None:
                     unsafe_allow_html=True,
                 )
             with c_right:
-                # Risk gauge bar
+                # 风险仪表条
                 pct = min(100, ar)
                 if ar < 30:
                     gauge_color = TOKEN["success"]

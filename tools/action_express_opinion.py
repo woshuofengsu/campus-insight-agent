@@ -24,7 +24,7 @@ def express_opinion(topic_id: int, content: str) -> str:
     if not content or len(content.strip()) < 2:
         return "⚠️ 意见内容太短了，请至少写几个字。"
 
-    # Verify topic exists and is active
+    # 先确认议题还在且是活跃的
     topics = _db_get_active_topics(limit=50)
     target = None
     for t in topics:

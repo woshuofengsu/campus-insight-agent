@@ -1,30 +1,26 @@
-# data/database.py
-"""Database layer — re-export hub.
+"""数据库层统一出口，各个功能的 SQL 都拆在 data/ 下面的子模块里。
 
-All database functions are organized into focused submodules under data/.
-This file re-exports everything for backward compatibility so existing
-imports from `data.database` continue to work unchanged.
+这里把所有函数再 re-export 一遍，老代码里 `from data.database import xxx`
+的写法不用改也能继续用。
 
-Submodules:
-  data.db_core      — connection management, context manager, helpers
-  data.db_user      — user profile CRUD
-  data.db_knowledge — knowledge base, feedback items
-  data.db_governance — community issues, proposals, topics, opinions
-  data.db_sla       — SLA deadlines & escalation (imported directly, not re-exported)
-  data.db_dispatch  — proactive auto-dispatch to grid workers
-  data.db_memory    — cross-session event memory (imported directly)
-  data.db_elderly   — elderly care profile & safety (re-exported below)
-  data.db_health    — health score analytics, timelines
+子模块：
+  data.db_core      — 连接管理、上下文管理器、公共小工具
+  data.db_user      — 用户资料增删改查
+  data.db_knowledge — 知识库、反馈
+  data.db_governance — 社区问题、提案、话题、意见
+  data.db_sla       — SLA 时限与升级（直接 import，不在这里导出）
+  data.db_dispatch  — 主动派单给网格员
+  data.db_memory    — 跨会话事件记忆（直接 import）
+  data.db_elderly   — 老人档案与安全（下面有 re-export）
+  data.db_health    — 健康分统计、时间线
 """
 
-# ── Core ──
 from data.db_core import (
     init_db,
     get_connection,
     get_db,
 )
 
-# ── User ──
 from data.db_user import (
     authenticate,
     get_current_user,
@@ -38,7 +34,6 @@ from data.db_user import (
     reset_onboarding,
 )
 
-# ── Knowledge ──
 from data.db_knowledge import (
     search_knowledge,
     get_knowledge_base,
@@ -49,7 +44,6 @@ from data.db_knowledge import (
     aggregate_feedback,
 )
 
-# ── Governance ──
 from data.db_governance import (
     report_issue,
     get_issues,
@@ -78,7 +72,6 @@ from data.db_governance import (
     get_opinion_summaries_batch,
 )
 
-# ── Health ──
 from data.db_health import (
     get_avg_resolution_days,
     get_recent_issue_counts,
@@ -86,7 +79,6 @@ from data.db_health import (
     compute_health_score,
 )
 
-# ── Elderly care ──
 from data.db_elderly import (
     get_profile as get_elderly_profile,
     set_health_info as set_elderly_health_info,

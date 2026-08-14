@@ -1,15 +1,15 @@
 # ui/theme.py
-"""Theme system — community service counter: warm paper + dual indigo/violet brand.
+"""主题系统：社区服务台风格，暖纸底色 + 双品牌色（靛蓝 + 紫）。
 
-Design:
-  - Light is DEFAULT. Dark available via toggle.
-  - TWO brand colors: indigo #4f46e5 (primary actions, selection, active) and
-    violet #7c3aed (community-life accent: 议事/活动/通知/邻里温度). Neither is
-    used on card borders, dividers, or decoration.
-  - Semantic colors (green/amber/red) appear ONLY on status tags and KPI values.
-  - Warm neutrals throughout (paper ground, warm near-black text) — no cold gray.
-  - 8 community categories get a color-dot (see ui/components.CAT_COLORS).
-  - 4 font sizes. 3 font weights. No micro-tuning.
+设计：
+  - 默认浅色，深色靠开关切换。
+  - 两个品牌色：靛蓝 #4f46e5（主操作、选中、激活）和
+    紫 #7c3aed（社区生活点缀：议事/活动/通知/邻里温度），
+    都不用在卡片边框、分割线或装饰上。
+  - 语义色（绿/琥珀/红）只出现在状态标签和 KPI 数值上。
+  - 整体走暖色中性色（纸色底、暖黑文字），不用冷灰。
+  - 8 个社区分类各配一个色点（见 ui/components.CAT_COLORS）。
+  - 字号 4 档、字重 3 档，不做微调。
 """
 
 import logging
@@ -17,7 +17,7 @@ import streamlit as st  # noqa: F401
 
 _log = logging.getLogger(__name__)
 
-# Light tokens (DEFAULT)
+# 浅色主题变量（默认）
 TOKEN_LIGHT = {
         "accent":           "#4f46e5",
     "accent_hover":     "#4338ca",
@@ -106,7 +106,7 @@ TOKEN_LIGHT = {
         "chart_grid":       "rgba(31,29,25,0.06)",
 }
 
-# Dark tokens
+# 深色主题变量
 TOKEN_DARK = {
         "accent":           "#6d6bf5",
     "accent_hover":     "#807ef7",
@@ -195,12 +195,12 @@ TOKEN_DARK = {
         "chart_grid":       "rgba(255,255,255,0.04)",
 }
 
-# Theme state management
+# 主题模式存 session_state 里，键名统一从这走
 _THEME_KEY = "_community_theme_v4"
 
 
 def apply_theme_at_startup():
-    """Set default theme to light before st.set_page_config."""
+    """在 st.set_page_config() 之前先把默认主题设成浅色。"""
     if _THEME_KEY not in st.session_state:
         mode = "light"
         try:
@@ -210,7 +210,7 @@ def apply_theme_at_startup():
             if qp in ("light", "dark"):
                 mode = qp
         except Exception:
-            _log.debug("Failed to read theme from query params at startup", exc_info=True)
+            _log.debug("启动时从 query params 读主题失败", exc_info=True)
             pass
         st.session_state[_THEME_KEY] = mode
 
@@ -225,7 +225,7 @@ def get_theme() -> str:
         if qp in ("light", "dark"):
             return qp
     except Exception:
-        _log.debug("Failed to read theme from query params in get_theme", exc_info=True)
+        _log.debug("在 get_theme 里从 query params 读主题失败", exc_info=True)
         pass
     return "light"
 
@@ -235,7 +235,7 @@ def get_token() -> dict:
 
 
 def apply_native_theme():
-    """Override Streamlit engine colors. Call AFTER st.set_page_config()."""
+    """覆盖 Streamlit 引擎自带的颜色，必须在 st.set_page_config() 之后调用。"""
     theme = get_theme()
     try:
         if theme == "dark":
@@ -247,7 +247,7 @@ def apply_native_theme():
             st._config.set_option("theme.secondaryBackgroundColor", "#f4f1ec")
             st._config.set_option("theme.textColor", "#1f1d19")
     except Exception:
-        _log.debug("Failed to set native theme config options", exc_info=True)
+        _log.debug("设置原生主题配置项失败", exc_info=True)
         pass
 
 
@@ -261,17 +261,17 @@ def theme_toggle():
         try:
             st.query_params["theme"] = new
         except Exception:
-            _log.debug("non-critical failure", exc_info=True)
+            _log.debug("非致命错误", exc_info=True)
             pass
         st.rerun()
 
 
 def inject_theme_css():
-    """Inject theme CSS. Call once in app.py after set_page_config."""
+    """注入主题 CSS，app.py 里 set_page_config 之后调用一次就行。"""
     theme = get_theme()
     t = TOKEN_DARK if theme == "dark" else TOKEN_LIGHT
 
-    # ── Mobile viewport ──
+    # 移动端 viewport 设置，禁止用户缩放
     st.markdown("""<meta name="viewport" content="width=device-width, \
 initial-scale=1.0, maximum-scale=1.0, user-scalable=no">""",
                 unsafe_allow_html=True)

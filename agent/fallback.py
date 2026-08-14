@@ -1,7 +1,7 @@
 # agent/fallback.py
-"""Graceful fallback — data-backed responses when the LLM is unavailable.
+"""体面的兜底 —— LLM 不可用时，直接用数据库数据回话。
 
-Produces helpful, context-aware responses directly from the database.
+从数据库取真实数据拼出有用、贴合上下文的回复。
 """
 import logging
 
@@ -9,11 +9,11 @@ _log = logging.getLogger(__name__)
 
 
 def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
-    """Return a context-aware fallback response using DB data."""
+    """用数据库数据拼一条贴合上下文的兜底回复。"""
     error_msg = str(error) if error else "未知错误"
     txt = user_input.strip()
 
-    # ── Pulse intent ──
+    # 脉搏意图
     if any(kw in txt for kw in ("社区脉搏", "动态", "最近发生")):
         try:
             from data.database import get_issues, get_proposals, get_community_events, get_issues_stats
@@ -46,9 +46,9 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
                     lines.append(f"- {e.get('title','')[:40]}")
             return "\n".join(lines)
         except Exception:
-            _log.debug("Pulse fallback query failed", exc_info=True)
+            _log.debug("Pulse 退回查询失败", exc_info=True)
 
-    # ── Weather intent ──
+    # 天气意图
     if any(kw in txt for kw in ("天气", "温度", "下雨", "多少度")):
         try:
             from tools.query_weather import get_today_weather
@@ -62,9 +62,9 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
                     f"💡 {d['advice']}"
                 )
         except Exception:
-            _log.debug("Weather fallback query failed", exc_info=True)
+            _log.debug("Weather 退回查询失败", exc_info=True)
 
-    # ── Repair intent ──
+    # 报修意图
     if any(kw in txt for kw in ("报修", "上报", "坏了", "故障", "漏水", "不亮")):
         return (
             "🔧 看起来你想上报一个诉求。\n\n"
@@ -73,7 +73,7 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
             "或者稍后重试对话，服务恢复后会帮你处理。"
         )
 
-    # ── Proposal intent ──
+    # 提案意图
     if any(kw in txt for kw in ("提案", "建议", "提议")):
         return (
             "看起来你想提交建议或查看提案。\n\n"
@@ -82,7 +82,7 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
             "稍后重试对话也可以获得完整的智能分析。"
         )
 
-    # ── Health/stats intent ──
+    # 健康度/统计意图
     if any(kw in txt for kw in ("治理", "统计", "数据", "健康度")):
         try:
             from data.database import compute_health_score
@@ -97,9 +97,9 @@ def graceful_fallback(user_input: str, error: Exception | None = None) -> str:
                 f"如需更详细分析，请在服务恢复后重试。"
             )
         except Exception:
-            _log.debug("Health score fallback query failed", exc_info=True)
+            _log.debug("健康分退回查询失败", exc_info=True)
 
-    # ── Generic fallback ──
+    # 通用兜底
     return (
         f"😅 智能服务暂时不可用（{error_msg[:80]}）。\n\n"
         "你可以尝试以下操作：\n"

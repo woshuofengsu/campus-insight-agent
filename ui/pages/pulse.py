@@ -1,4 +1,3 @@
-# ui/pages/pulse.py
 """🌊 社区脉搏 · 知 — 正在发生什么？即将发生什么？"""
 import logging
 import streamlit as st
@@ -10,12 +9,12 @@ from ui.components import TOKEN, section, info_card, event_card, issue_card, sta
 
 _log = logging.getLogger(__name__)
 
-# ── Page header ──
+# 页头
 page_header("🌊 社区脉搏", "感知社区动态，不错过任何大事小情。", "知")
 
 ooda_nav("pulse")
 
-# -- 后台感知 — 定时扫描结果 --
+# 后台感知：定时扫描的结果
 
 try:
     from data.db_perception import get_latest_perception, get_perception_status, force_perception_scan
@@ -35,12 +34,12 @@ try:
         anomaly_count = perception.get("anomaly_count", 0)
         findings = perception.get("key_findings", [])
 
-        # Static status indicator
+        # 圆点颜色，有异常就红色
         dot_color = TOKEN["danger"] if anomaly_count > 0 else TOKEN["success"]
 
-        # Use container(border=True) for proper DOM enclosure
+        # 用 border=True 的容器，圆点这些样式才能包进去
         with st.container(border=True):
-            # Header row
+            # 标题行
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
                 f'<span style="font-weight:700;color:{TOKEN["text"]};">社区感知</span>'
@@ -52,10 +51,10 @@ try:
                 f'</div>',
                 unsafe_allow_html=True,
             )
-            # Summary line
+            # 摘要一行
             st.caption(overall)
 
-            # Findings in expander
+            # 发现的问题收进折叠框
             if findings:
                 with st.expander(f"📋 {len(findings)} 项发现", expanded=(anomaly_count > 0)):
                     for f_text in findings:
@@ -65,7 +64,7 @@ try:
                             unsafe_allow_html=True,
                         )
 
-            # Manual refresh
+            # 手动触发刷新
             c_refresh, _ = st.columns([1, 4])
             with c_refresh:
                 if st.button("🔄 立即扫描", key="force_perception", width="stretch",
@@ -78,17 +77,17 @@ try:
                             else:
                                 st.toast("扫描完成", icon="✅")
                         except Exception as e:
-                            _log.debug("non-critical failure", exc_info=True)
+                            _log.debug("非致命错误", exc_info=True)
                             st.toast(f"扫描失败: {e}", icon="❌")
                     st.rerun()
     else:
-        # No perception data yet — show initial scan prompt
+        # 还没感知数据，先提示正在初始化
         st.info("系统感知就绪 · 正在初始化首次扫描...")
 
 except Exception:
-    _log.warning("Perception engine unavailable", exc_info=True)
+    _log.warning("感知引擎不可用", exc_info=True)
 
-# -- Weather — full card (not compact) --
+# 天气：完整卡片
 
 st.markdown("---")
 
@@ -128,7 +127,7 @@ if days:
             unsafe_allow_html=True,
         )
 
-# -- 🏥 疾病防治 — 健康风险卡片 --
+# 疾病防治：健康风险卡片
 
 try:
     from data.db_health_alerts import cached_health_risk
@@ -136,9 +135,9 @@ try:
     health = cached_health_risk()
     render_health_risk_overview(health)
 except Exception:
-    _log.warning("Health risk module unavailable", exc_info=True)
+    _log.warning("健康风险模块不可用", exc_info=True)
 
-# -- Upcoming events --
+# 即将发生的事
 
 section("即将发生")
 
@@ -152,7 +151,7 @@ else:
     info_card("添加社区活动安排后可在此查看即将发生的大事")
 
 
-# -- 📡 社区动态时间线 — 实时活动 --
+# 社区动态时间线：实时活动
 
 section("社区动态")
 
@@ -187,7 +186,7 @@ try:
                 with c2:
                     st.caption(created)
     else:
-        # Fallback: show live_generator summary if no real activity yet
+        # 没真实动态时，退回用 live_generator 的摘要顶上
         try:
             from data.live_generator import get_live_summary
             summary = get_live_summary()
@@ -196,17 +195,17 @@ try:
             else:
                 st.caption("暂无社区动态。当邻居们开始上报问题和提交提案时，这里会实时更新。")
         except Exception:
-            _log.debug("non-critical failure", exc_info=True)
+            _log.debug("非致命错误", exc_info=True)
             st.caption("暂无社区动态。")
 except Exception:
-    _log.warning("Activity feed unavailable", exc_info=True)
+    _log.warning("动态流不可用", exc_info=True)
 
 
-# -- 📚 社区百科 — RAG 语义搜索 + quick access --
+# 社区百科：RAG 语义搜索 + 快速浏览
 
 section("社区百科")
 
-# ── Semantic search bar ──
+# 语义搜索框
 kb_search_query = st.text_input(
     "🔍 搜索社区公约、通知、FAQ...",
     placeholder="例如：助餐点营业时间、活动室开放时间、楼栋管理规定...",
@@ -215,7 +214,7 @@ kb_search_query = st.text_input(
 )
 
 if kb_search_query.strip():
-    # ── RAG semantic search ──
+    # RAG 语义搜索
     from agent.rag import semantic_search
     results = semantic_search(kb_search_query.strip(), top_k=6)
     if results:
@@ -238,11 +237,11 @@ if kb_search_query.strip():
                         unsafe_allow_html=True,
                     )
                 with c2:
-                    st.markdown("")  # spacer
+                    st.markdown("")  # 占位
     else:
         st.info(f"🔍 未找到与「{kb_search_query.strip()}」相关的百科信息。试试换个说法？")
 else:
-    # ── Default: browse recent entries ──
+    # 没搜的时候默认浏览最近几条
     kb_entries = get_knowledge_base(limit=10)
     if kb_entries:
         kb_icons = {"faq": "📞", "governance": "📋", "notice": "📢", "event": "📅", "calendar": "🗓️"}
@@ -266,7 +265,7 @@ else:
         info_card("添加社区活动安排、通知、常用电话等信息后展示")
 
 
-# -- Weekly hot spots --
+# 本周热点
 
 section("本周热点")
 
@@ -277,7 +276,7 @@ if issues:
     resolved = len([i for i in issues if i.get("status") == "已解决"])
     processing = len([i for i in issues if i.get("status") == "处理中"])
 
-    # KPI row (2×2 grid: stacks to 4 rows on mobile)
+    # KPI 一行 2 个，手机上自动堆成 4 行
     c1, c2 = st.columns(2)
     with c1:
         stat("总上报", str(total), TOKEN["accent"])
@@ -291,7 +290,7 @@ if issues:
 
     st.markdown("")
 
-    # ── 关联洞察（系统主动发现）──
+    # 关联洞察：系统主动发现的
     try:
         from agent.reflector import get_proactive_insights as _get_insights
         _insights = _get_insights()
@@ -315,11 +314,11 @@ if issues:
                 from datetime import datetime
                 st.caption(f'🕐 {datetime.now().strftime("%H:%M")} · 系统自动分析')
     except ImportError:
-        _log.warning("Reflector module not available for proactive insights", exc_info=True)
+        _log.warning("Reflector 模块没装，主动洞察出不来", exc_info=True)
     except Exception:
-        _log.warning("Failed to load proactive insights", exc_info=True)
+        _log.warning("加载主动洞察失败", exc_info=True)
 
-    # Category hotness
+    # 各类别数量统计
     cats: dict[str, int] = {}
     for i in issues:
         cat = i.get("category", "其他")
@@ -341,7 +340,7 @@ if issues:
         )
         st.altair_chart(chart, width="stretch")
 
-    # Hot category highlight — clickable to filter issues page
+    # 最热类别高亮，点一下跳到工单页筛选
     hot_cat = max(cats, key=cats.get)
     c_hot, c_btn = st.columns([3, 1])
     with c_hot:
@@ -353,7 +352,7 @@ if issues:
             unsafe_allow_html=True,
         )
     with c_btn:
-        st.markdown("")  # spacer
+        st.markdown("")  # 占位
         if st.button("🔍 查看详情 →", key="pulse_goto_issues"):
             st.session_state._filter_category = hot_cat
             st.switch_page("ui/pages/issues.py")

@@ -25,7 +25,7 @@ _RULE_TOOL_PLANS: list[tuple[tuple[str, ...], list[tuple[str, dict]]]] = [
 
 
 def _match_tool_plan(text: str) -> list[tuple[str, dict]] | None:
-    """Return the tool-call plan for a rule-template-matched composite query."""
+    """返回规则模板匹配到的复合查询对应的工具调用计划。"""
     for kws, plan in _RULE_TOOL_PLANS:
         if all(kw in text for kw in kws):
             return plan
@@ -45,7 +45,7 @@ def execute_plan_steps(text: str) -> list[dict] | None:
         from tools import discover_tools
         tools = {t.name: t for t in discover_tools()}
     except Exception:
-        _log.warning("discover_tools failed in execute_plan_steps", exc_info=True)
+        _log.warning("execute_plan_steps 里 discover_tools 失败", exc_info=True)
         return None
 
     results: list[dict] = []
@@ -57,13 +57,13 @@ def execute_plan_steps(text: str) -> list[dict] | None:
             obs = tool.invoke(kwargs)
             results.append({"tool": tool_name, "observation": str(obs)})
         except Exception as e:
-            _log.warning("plan step %s failed: %s", tool_name, e)
+            _log.warning("计划步骤 %s 失败：%s", tool_name, e)
             results.append({"tool": tool_name, "observation": f"[{tool_name} 调用失败: {e}]"})
     return results or None
 
 
 def _count_intents(text: str) -> int:
-    """Estimate how many distinct tool intents a single message carries."""
+    """估一下一条消息里带了几种不同的工具意图。"""
     from agent.router import _TOOL_KEYWORDS
     hits = set()
     for tool, kws in _TOOL_KEYWORDS.items():
@@ -73,7 +73,7 @@ def _count_intents(text: str) -> int:
 
 
 def _llm_plan(text: str) -> list[str] | None:
-    """LLM 生成步骤计划（best-effort）。"""
+    """LLM 生成步骤计划，失败了就算了。"""
     try:
         from langchain_openai import ChatOpenAI
         from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
@@ -94,15 +94,15 @@ def _llm_plan(text: str) -> list[str] | None:
         steps = [ln for ln in lines if ln]
         return steps[:4] if steps else None
     except Exception:
-        _log.debug("LLM planning failed, falling back", exc_info=True)
+        _log.debug("LLM 规划失败，退回兜底", exc_info=True)
         return None
 
 
 def plan_steps(text: str) -> list[str] | None:
-    """Return an ordered step plan for a complex query; None if single-intent.
+    """复杂查询返回有序步骤计划；单一意图返回 None。
 
-    Deterministic rule templates fire first (fast + testable); LLM planning
-    kicks in for multi-intent messages not covered by a template.
+    先走确定性的规则模板（快 + 好测）；模板没覆盖的多意图消息
+    才轮到 LLM 规划。
     """
     for kws, steps in _RULE_PLANS:
         if all(kw in text for kw in kws):

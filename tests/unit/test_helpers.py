@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for agent helpers — extract_location, random_encouragement,
-get_author_identifier, get_user_name.
+"""agent.helpers 单元测试 — extract_location、random_encouragement、
+get_author_identifier、get_user_name。
 
-Covers all location patterns, edge cases, and encouragement contexts.
+覆盖各种地点写法、边界情况和鼓励话术的各个场景。
 """
 import sys
 import os
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# -- 1. extract_location — Known Buildings --
+# 1. extract_location 已知地点
 
 class TestExtractLocationBuildings(unittest.TestCase):
 
@@ -69,7 +69,7 @@ class TestExtractLocationBuildings(unittest.TestCase):
         self.assertIn("楼道", result)
 
 
-# -- 2. extract_location — Edge Cases --
+# 2. extract_location 边界情况
 
 class TestExtractLocationEdges(unittest.TestCase):
 
@@ -97,13 +97,13 @@ class TestExtractLocationEdges(unittest.TestCase):
     def test_multiple_locations_returns_first(self):
         from agent.helpers import extract_location
         result = extract_location("3号楼和活动室都漏水")
-        # Should find at least one location
+        # 至少要能找出一个地点
         self.assertTrue(len(result) > 0)
 
     def test_dorm_resident_building(self):
         from agent.helpers import extract_location
         result = extract_location("2号楼网络很差")
-        # Matches "2号楼" (building pattern)
+        # 命中"2号楼"的楼栋模式
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 0)
 
@@ -123,7 +123,7 @@ class TestExtractLocationEdges(unittest.TestCase):
         self.assertIn("小区", result)
 
 
-# -- 3. random_encouragement — All Contexts --
+# 3. random_encouragement 各场景
 
 class TestRandomEncouragement(unittest.TestCase):
 
@@ -169,14 +169,14 @@ class TestRandomEncouragement(unittest.TestCase):
         self.assertTrue(len(result) > 5)
 
     def test_returns_different_values(self):
-        """random_encouragement should return variety (not always the same)."""
+        """鼓励话术应该有变化，不能老返回同一句。"""
         from agent.helpers import random_encouragement
         results = {random_encouragement("pulse") for _ in range(30)}
-        # Should have at least 2 unique results (pool has 3 for pulse)
+        # 至少要有 2 种不同结果（pulse 的话术池里有 3 句）
         self.assertGreaterEqual(len(results), 2)
 
 
-# -- 4. get_author_identifier — delegates to _resolve_author --
+# 4. get_author_identifier 委托给 _resolve_author
 
 class TestGetAuthorIdentifier(unittest.TestCase):
 
@@ -230,13 +230,13 @@ class TestGetAuthorIdentifier(unittest.TestCase):
         from agent.helpers import get_author_identifier
         with patch("data.db_user.get_current_user") as mock_user:
             mock_user.side_effect = Exception("DB error")
-            # Should not raise; _resolve_author catches and returns "匿名"
-            # which get_author_identifier maps to None
+            # 不该抛异常；_resolve_author 内部接住并返回"匿名"
+            # get_author_identifier 再把它映射成 None
             result = get_author_identifier(MagicMock())
             self.assertIsNone(result)
 
 
-# -- 5. get_user_name --
+# 5. get_user_name
 
 class TestGetUserName(unittest.TestCase):
 

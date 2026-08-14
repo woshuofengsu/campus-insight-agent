@@ -1,4 +1,3 @@
-# ui/pages_elderly/meds.py
 """💊 吃药提醒 — 今日用药 + 「我已吃」确认 + 提醒设置."""
 import streamlit as st
 
@@ -38,7 +37,7 @@ else:
 
 st.markdown("---")
 
-# ── 家属/网格员协助设置 ──
+# 家属协助设置用药提醒
 with st.expander("➕ 家属协助设置用药提醒", expanded=False):
     with st.form("meds_input"):
         med_name = st.text_input("药名", placeholder="如：降压药")

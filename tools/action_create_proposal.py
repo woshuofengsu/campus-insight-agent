@@ -4,12 +4,12 @@ from langchain.tools import tool
 from data.database import create_proposal as _db_create_proposal, get_proposals
 
 
-# Categories matching community_issues for consistency
+# 分类和工单那边保持一致
 _VALID_CATEGORIES = ["设施维修", "环境卫生", "安全隐患", "停车管理", "噪音扰民", "物业服务", "邻里矛盾", "社区事务"]
 
 
 def _check_duplicate(title: str) -> list[dict]:
-    """Check if a similar proposal already exists (simple keyword overlap)."""
+    """看看是不是已经有过类似提案（简单算关键词重叠）。"""
     existing = get_proposals(limit=50)
     title_keywords = set(title)
     duplicates = []
@@ -39,8 +39,8 @@ def create_proposal(title: str, description: str, category: str = "其他") -> s
         cat_list = "/".join(_VALID_CATEGORIES)
         return f"⚠️ 分类'{category}'无效。可选：{cat_list}"
 
-    # Check for duplicates — warn if similar proposals exist but don't block creation.
-    # Character-level Jaccard is too coarse for Chinese; false positives are common.
+    # 查重：有相似提案就提醒一下，但不拦着创建。
+    # 字符级 Jaccard 对中文太粗，误报挺常见的。
     duplicates = _check_duplicate(title)
     dup_note = ""
     if duplicates:
@@ -52,7 +52,7 @@ def create_proposal(title: str, description: str, category: str = "其他") -> s
 
     proposal_id = _db_create_proposal(title=title, description=description, category=category)
 
-    # Invalidate caches so new proposal is visible immediately on grid side and "我的" page
+    # 清缓存，网格员端和「我的」页立刻能看到新提案
     try:
         from ui.cache import invalidate_proposals
         invalidate_proposals()

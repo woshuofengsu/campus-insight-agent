@@ -1,4 +1,3 @@
-# data/db_dispatch.py
 """主动派单 — Agent 主动发现问题、按类别自动派单给网格员。
 
 战线二「主动发现 + 主动派单」的实现：感知引擎在 Observe 阶段扫描未派单的
@@ -26,26 +25,26 @@ CATEGORY_DEPT_MAP = {
 
 
 def _grid_worker_for(dept: str) -> dict | None:
-    """Find a grid worker (as a full row dict) for a given department."""
+    """按部门找一个网格员，返回整行 dict。"""
     try:
         from data.db_user import list_users
         for u in list_users(role="grid"):
             if (u.get("building") or "").strip() == dept:
                 return u
     except Exception:
-        _log.warning("_grid_worker_for failed for dept=%r", dept, exc_info=True)
+        _log.warning("_grid_worker_for 在 dept=%r 下没找到网格员", dept, exc_info=True)
     return None
 
 
 def _any_grid_worker() -> dict | None:
-    """Fallback: return any grid worker."""
+    """兜底：随便返回一个网格员。"""
     try:
         from data.db_user import list_users
         grids = list_users(role="grid")
         if grids:
             return grids[0]
     except Exception:
-        _log.warning("_any_grid_worker failed", exc_info=True)
+        _log.warning("_any_grid_worker 兜底也找不到网格员", exc_info=True)
     return None
 
 
@@ -54,11 +53,11 @@ def _worker_display_name(u: dict) -> str:
 
 
 def auto_dispatch(issue_id: int) -> dict | None:
-    """Assign one open issue to a grid worker by category→department mapping.
+    """按「类别→部门」映射，给一个还没派单的工单指派网格员。
 
-    Writes both `assignee` (display name) and `assignee_id` (user id) and sends
-    a notification to the assignee. No-op if already assigned. Returns
-    {issue_id, assignee, assignee_id} or None.
+    同时写 `assignee`（显示名）和 `assignee_id`（用户 ID），再给被派单人发
+    一条站内通知。已经派过的直接返回，不重复处理。返回
+    {issue_id, assignee, assignee_id}，找不到人就返回 None。
     """
     with get_db() as conn:
         issue = conn.execute(
@@ -85,7 +84,7 @@ def auto_dispatch(issue_id: int) -> dict | None:
             (name, uid, issue_id),
         )
         conn.commit()
-    _log.info("auto_dispatch #%d -> %s (id=%s, dept=%s)", issue_id, name, uid, dept)
+    _log.info("auto_dispatch 已派单 #%d -> %s (id=%s, dept=%s)", issue_id, name, uid, dept)
 
     # 站内通知：让网格员感知到被派了新单
     try:
@@ -97,7 +96,7 @@ def auto_dispatch(issue_id: int) -> dict | None:
             related_id=issue_id,
         )
     except Exception:
-        _log.warning("auto_dispatch notification failed for #%d (non-critical)", issue_id, exc_info=True)
+        _log.warning("auto_dispatch 发通知失败（工单 #%d，不影响）", issue_id, exc_info=True)
 
     return {"issue_id": issue_id, "assignee": name, "assignee_id": uid}
 
@@ -105,8 +104,8 @@ def auto_dispatch(issue_id: int) -> dict | None:
 def discover_and_dispatch(limit: int = 20) -> list[dict]:
     """主动扫描未派单的开放工单并自动派单（战线二）。
 
-    Prioritizes 极急/紧急 first. Returns the list of auto-dispatched items as
-    {issue_id, title, category, assignee, assignee_id}.
+    极急/紧急的排前面先派。返回本次自动派出的列表，每项
+    {issue_id, title, category, assignee, assignee_id}。
     """
     with get_db() as conn:
         rows = conn.execute(

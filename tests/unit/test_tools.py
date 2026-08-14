@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for tool functions — invoke logic, edge cases, error handling.
+"""工具函数单元测试 — 调用逻辑、边界情况、错误处理。
 
-Covers every @tool-decorated function in tools/ with tests that validate:
-  - Correct input → expected output structure
-  - Boundary inputs (empty, invalid, edge) → graceful handling
-  - Fallback paths (LLM unavailable, DB empty)
+tools/ 里每个带 @tool 装饰器的函数都要覆盖到：
+  - 正常输入 → 输出结构符合预期
+  - 边界输入（空、非法、极端）→ 能优雅处理
+  - 兜底路径（LLM 不可用、数据库为空）
 """
 import sys
 import os
@@ -14,10 +14,10 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-# -- Helper: create a temp in-memory DB for tests that need one --
+# 需要建临时库的测试共用一个初始化函数
 
 def _init_test_db():
-    """Init a temporary DB for tool tests."""
+    """给工具测试建一个临时库。"""
     db_path = os.path.join(os.path.dirname(__file__), "_test_tools.db")
     from data.database import init_db
     init_db(db_path)
@@ -31,7 +31,7 @@ def _cleanup_test_db(db_path):
         pass
 
 
-# -- 1. report_issue — issue reporting tool --
+# 1. report_issue 报修工具
 
 class TestReportIssue(unittest.TestCase):
 
@@ -67,7 +67,7 @@ class TestReportIssue(unittest.TestCase):
         self.assertIn("#", result)
 
     def test_fast_path_with_category_and_urgency(self):
-        """When both category and urgency are provided, skip LLM classification."""
+        """分类和紧急度都给了就直接走，跳过 LLM 分类。"""
         from tools.action_report_issue import report_issue
         result = report_issue.invoke({
             "title": "楼道堆放杂物",
@@ -113,15 +113,15 @@ class TestReportIssue(unittest.TestCase):
 
     def test_validate_location_exempt(self):
         from tools.action_report_issue import validate_location
-        # Outdoor/common areas (广场, 花园) are exempt from location requirement
+        # 户外/公共区域（广场、花园）不强制要地点
         err = validate_location("7号楼前广场积水", "")
         self.assertIsNone(err)
 
     def test_classify_cache_hit(self):
-        """Verify LLM classify cache works."""
+        """验证 LLM 分类的缓存能用。"""
         from tools.action_report_issue import _llm_classify, _classify_cache
         _classify_cache.clear()
-        # Prime cache manually
+        # 手动塞一条缓存
         _classify_cache["test|desc"] = ("设施维修", "普通")
         cat, urg = _llm_classify("test", "desc")
         self.assertEqual(cat, "设施维修")
@@ -142,7 +142,7 @@ class TestReportIssue(unittest.TestCase):
         self.assertTrue(re.search(r'#\d+', result))
 
 
-# -- 2. get_community_pulse — community pulse query --
+# 2. get_community_pulse 社区脉搏查询
 
 class TestCommunityPulse(unittest.TestCase):
 
@@ -172,7 +172,7 @@ class TestCommunityPulse(unittest.TestCase):
         self.assertTrue(len(text) > 50)
 
 
-# -- 3. query_issues — issue querying --
+# 3. query_issues 工单查询
 
 class TestQueryIssues(unittest.TestCase):
 
@@ -188,7 +188,7 @@ class TestQueryIssues(unittest.TestCase):
         from tools.query_community_issues import query_issues
         result = query_issues.invoke({"category": "", "status": "", "limit": 5})
         self.assertIsInstance(result, str)
-        # Should indicate no results (DB is empty)
+        # 库里没数据，应该提示查不到
         self.assertTrue("暂无" in result or "安好" in result or "没有" in result)
 
     def test_with_category_filter(self):
@@ -202,7 +202,7 @@ class TestQueryIssues(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# -- 4. get_governance_stats — governance statistics --
+# 4. get_governance_stats 治理统计
 
 class TestGovernanceStats(unittest.TestCase):
 
@@ -218,7 +218,7 @@ class TestGovernanceStats(unittest.TestCase):
         from tools.query_community_issues import get_governance_stats
         result = get_governance_stats.invoke("")
         self.assertIsInstance(result, str)
-        # Empty DB should show "暂无" or "良好"
+        # 空库应该显示"暂无"或"良好"之类的零状态
         self.assertTrue(len(result) > 10)
 
     def test_after_reporting_shows_data(self):
@@ -235,7 +235,7 @@ class TestGovernanceStats(unittest.TestCase):
         self.assertIn("总数", result)
 
 
-# -- 5. get_weather — weather query --
+# 5. get_weather 天气查询
 
 class TestWeather(unittest.TestCase):
 
@@ -263,7 +263,7 @@ class TestWeather(unittest.TestCase):
         days, loc, is_real = get_today_weather()
         self.assertIsNotNone(days)
         self.assertIsInstance(loc, str)
-        self.assertIsInstance(is_real, bool)  # may be real or mock depending on config
+        self.assertIsInstance(is_real, bool)  # 真数据还是 mock 看配置
 
     def test_make_advice_storm(self):
         from tools.query_weather import _make_advice
@@ -288,7 +288,7 @@ class TestWeather(unittest.TestCase):
         self.assertIn("天气", result)
 
 
-# -- 6. get_proposals — proposal listing --
+# 6. get_proposals 提案列表
 
 class TestProposals(unittest.TestCase):
 
@@ -312,7 +312,7 @@ class TestProposals(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# -- 7. create_proposal — proposal creation --
+# 7. create_proposal 创建提案
 
 class TestCreateProposal(unittest.TestCase):
 
@@ -350,12 +350,12 @@ class TestCreateProposal(unittest.TestCase):
 
     def test_duplicate_check_keyword_overlap(self):
         from tools.action_create_proposal import _check_duplicate
-        # With empty DB, should return empty list
+        # 库里没数据，重复检查应该返回空列表
         dups = _check_duplicate("独一无二的提案标题")
         self.assertEqual(len(dups), 0)
 
 
-# -- 8. support_proposal — proposal support --
+# 8. support_proposal 附议提案
 
 class TestSupportProposal(unittest.TestCase):
 
@@ -383,7 +383,7 @@ class TestSupportProposal(unittest.TestCase):
         self.assertIn("未找到", result)
 
 
-# -- 9. express_opinion — opinion expression --
+# 9. express_opinion 发表意见
 
 class TestExpressOpinion(unittest.TestCase):
 
@@ -403,7 +403,7 @@ class TestExpressOpinion(unittest.TestCase):
         self.assertIn("⚠️", result)
 
 
-# -- 10. query_knowledge — RAG knowledge search --
+# 10. query_knowledge 知识库检索
 
 class TestQueryKnowledge(unittest.TestCase):
 
@@ -426,7 +426,7 @@ class TestQueryKnowledge(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-# -- 11. get_topics — topic listing --
+# 11. get_topics 议题列表
 
 class TestTopics(unittest.TestCase):
 
@@ -452,11 +452,11 @@ class TestTopics(unittest.TestCase):
     def test_discover_hot_topic_empty_db(self):
         from tools.query_topics import _discover_hot_topic
         result = _discover_hot_topic()
-        # With empty DB, should return None
+        # 库里没数据，应该返回 None
         self.assertIsNone(result)
 
 
-# -- 12. collect_feedback — opinion collection --
+# 12. collect_feedback 意见收集
 
 class TestCollectFeedback(unittest.TestCase):
 
@@ -479,7 +479,7 @@ class TestCollectFeedback(unittest.TestCase):
         self.assertIn("演示数据", result)
 
 
-# -- 13. Tool discovery --
+# 13. 工具发现
 
 class TestToolDiscovery(unittest.TestCase):
 

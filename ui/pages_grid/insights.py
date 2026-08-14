@@ -1,4 +1,3 @@
-# ui/pages_grid/insights.py
 """📈 数据洞察 — 7 维关联分析：异常检测、空间热点、解决效率、升级路径."""
 import streamlit as st
 import altair as alt
@@ -11,7 +10,7 @@ from ui.components import TOKEN, tag, configure_altair, page_header, methodology
 from data.database import get_db
 from data.db_sla import get_sla_breaches
 
-# ── Reuse reflector's battle-tested analysis functions ──
+# 直接复用 reflector 里验证过的分析函数
 import logging
 _log = logging.getLogger(__name__)
 from agent.reflector import (
@@ -20,12 +19,12 @@ from agent.reflector import (
     _detect_upgrade_paths,
 )
 
-# ── Page Render ──
+# 页面渲染
 page_header("📈 数据洞察", "基于 OODA 反射器的 7 维关联分析，自动发现社区治理中的隐藏模式和趋势。")
 
 methodology_panel()
 
-# -- 🤖 治理周报 — 一键生成 --
+# 治理周报：一键生成
 st.markdown("---")
 
 c_rpt, c_btn = st.columns([3, 1])
@@ -48,13 +47,13 @@ if generate_btn:
         report = generate_weekly_report(include_llm_summary=True)
         st.session_state._weekly_report = report
 else:
-    # Persist report in session state so it stays visible after interactions
+    # 周报放 session_state，交互之后不丢
     if "_weekly_report" not in st.session_state:
         st.session_state._weekly_report = None
 
 report = st.session_state._weekly_report
 if report:
-    # ── 发送到邮箱（QQ SMTP；凭据在 .env，未配置则提示）──
+    # 发送到邮箱（QQ SMTP，凭据在 .env，没配就提示）
     if st.button("📧 发送到邮箱", key="send_report_email"):
         from data.email_notify import send_email, is_configured
         if not is_configured():
@@ -64,7 +63,7 @@ if report:
         else:
             st.warning("邮件发送失败，请检查 .env 中的 SMTP 配置（QQ 邮箱需使用授权码）。")
 
-    # ── Executive summary card ──
+    # 分析摘要卡片
     if report.get("exec_summary"):
         st.markdown(
             f'<div style="background:linear-gradient(135deg,{TOKEN["accent_bg"]},'
@@ -80,10 +79,10 @@ if report:
     elif not generate_btn:
         st.info("👆 点击「生成周报」按钮，系统将自动分析数据并生成完整报告。")
 
-    # ── Report sections in expandable cards ──
+    # 周报各章节收进折叠卡片
     data = report.get("data", {})
     if data:
-        # KPI quick glance
+        # 关键指标速览
         kpi = data.get("kpi", {})
         if kpi:
             k1, k2, k3 = st.columns(3)
@@ -99,11 +98,11 @@ if report:
             with k5:
                 st.metric("📤 本周解决", kpi.get("week_resolved", 0))
 
-        # Full report in expander
+        # 完整周报放折叠框
         with st.expander("📋 查看完整周报", expanded=False):
             st.markdown(report.get("markdown", ""))
 
-        # Download button
+        # 下载按钮
         st.download_button(
             "📥 下载周报 (Markdown)",
             data=report.get("markdown", ""),
@@ -114,17 +113,17 @@ if report:
 
 st.markdown("---")
 
-# ── Helper: run analysis once ──
+# 分析只跑一次
 @st.cache_data(ttl=60, show_spinner="正在分析社区治理数据...")
 def _run_insight_analysis():
-    """Run all 7 analysis dimensions and return structured results."""
+    """跑完 7 个维度的分析，返回结构化结果。"""
     try:
         with get_db() as conn:
             z_anomalies = _z_score_anomalies(conn)
             cross_time = _cross_time_comparison(conn)
             upgrade_paths = _detect_upgrade_paths(conn)
 
-            # Spatial hotspots: locations with most pending issues
+            # 空间热点：待处理最多的地点
             spatial_raw = conn.execute("""
                 SELECT location, COUNT(*) as cnt,
                        SUM(CASE WHEN urgency='紧急' THEN 1 ELSE 0 END) as urgent_cnt
@@ -135,7 +134,7 @@ def _run_insight_analysis():
             """).fetchall()
             spatial_hotspots = [dict(r) for r in spatial_raw]
 
-            # Resolution efficiency by category
+            # 各类别解决效率
             eff_raw = conn.execute("""
                 SELECT category,
                        COUNT(*) AS resolved_count,
@@ -148,7 +147,7 @@ def _run_insight_analysis():
             """).fetchall()
             resolution_eff = [dict(r) for r in eff_raw]
 
-            # Recurrence detection: similar unresolved titles matching resolved ones
+            # 复发检测：未解决的跟已解决的同区域同类别对比
             recurrence_raw = conn.execute("""
                 SELECT a.title AS unresolved_title, a.category, a.location, a.status,
                        b.title AS resolved_title, b.resolved_at
@@ -161,7 +160,7 @@ def _run_insight_analysis():
             """).fetchall()
             recurrences = [dict(r) for r in recurrence_raw]
 
-            # Category correlations: co-occurring in same location
+            # 类别关联：同一地点共现
             corr_raw = conn.execute("""
                 SELECT a.category AS cat_a, b.category AS cat_b, COUNT(*) AS co_count
                 FROM community_issues a
@@ -173,10 +172,10 @@ def _run_insight_analysis():
             """).fetchall()
             correlations = [dict(r) for r in corr_raw]
 
-            # Overdue SLA — 分级口径（极急6h / 紧急24h / 普通72h），统一走 data/db_sla.py
+            # SLA 超时——分级口径（极急6h / 紧急24h / 普通72h），统一走 data/db_sla.py
             overdues = get_sla_breaches(limit=10)
 
-            # Category breakdown with urgency mix
+            # 类别分布（带上紧急度）
             cat_breakdown_raw = conn.execute("""
                 SELECT category,
                        COUNT(*) AS total,
@@ -211,7 +210,7 @@ data = _run_insight_analysis()
 if data is None:
     st.stop()
 
-# -- Row 1: Alert Cards (异常 + 超时SLA) --
+# 第 1 行：预警卡片（异常 + SLA 超时）
 st.markdown("### 🚨 预警中心")
 
 alert_cols = st.columns(3)
@@ -280,7 +279,7 @@ with alert_cols[2]:
 
 st.markdown("---")
 
-# -- Row 2: Category Breakdown Chart + Spatial Hotspots --
+# 第 2 行：类别分布图 + 空间热点
 chart_col1, chart_col2 = st.columns([3, 2])
 
 with chart_col1:
@@ -341,7 +340,7 @@ with chart_col2:
 
 st.markdown("---")
 
-# -- Row 3: Resolution Efficiency + Upgrade Paths --
+# 第 3 行：解决效率 + 升级路径
 eff_col1, eff_col2 = st.columns(2)
 
 with eff_col1:
@@ -349,7 +348,7 @@ with eff_col1:
     re_data = data["resolution_eff"]
     if re_data and len(re_data) >= 2:
         df_eff = pd.DataFrame(re_data)
-        # Color bars: fast = green, slow = red
+        # 柱子颜色：快绿慢红
         df_eff["color"] = df_eff["avg_days"].apply(
             lambda d: TOKEN["success"] if d <= 3 else TOKEN["warning"] if d <= 7 else TOKEN["danger"]
         )
@@ -367,7 +366,7 @@ with eff_col1:
             .properties(height=180)
         )
         st.altair_chart(eff_chart, width="stretch")
-        # Text summary
+        # 文字总结
         slowest = re_data[0]
         fastest = re_data[-1]
         st.caption(
@@ -398,7 +397,7 @@ with eff_col2:
 
 st.markdown("---")
 
-# -- Row 4: Recurrence Detection + Category Correlations --
+# 第 4 行：复发检测 + 类别关联
 rec_col1, rec_col2 = st.columns(2)
 
 with rec_col1:
@@ -435,7 +434,7 @@ with rec_col2:
 
 st.markdown("---")
 
-# -- Row 5: Overdue SLA Detail Table --
+# 第 5 行：SLA 超时明细
 if data["overdues"]:
     st.markdown("### ⏰ SLA 超时明细")
     st.caption("以下工单已超时未解决（按紧急度分级口径），需立即关注。")

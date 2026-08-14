@@ -1,4 +1,3 @@
-# ui/pages_elderly/health.py
 """🏥 我的健康 — 紧急信息卡 + 血压记录 + 子女电话."""
 import streamlit as st
 
@@ -18,7 +17,7 @@ from data.db_elderly import get_profile, set_health_info, set_emergency_contact
 elderly = get_profile(uid) if uid else {}
 health = elderly.get("health_info", {})
 
-# ── 紧急信息卡（急救/网格员上门 3 秒看清） ──
+# 紧急信息卡：急救或网格员上门 3 秒看清
 chronic = "、".join(health.get("chronic", [])) or "无"
 blood_type = health.get("blood_type", "未记录")
 allergy = health.get("allergy", "无")
@@ -31,7 +30,7 @@ big_card(
     bg="#fef2f2", border="#dc2626",
 )
 
-# ── 血压记录 ──
+# 血压记录
 st.markdown('<div style="font-size:1.25em;font-weight:800;margin:8px 0;">🩺 血压记录</div>', unsafe_allow_html=True)
 bp = health.get("blood_pressure", [])
 if bp:
@@ -42,7 +41,7 @@ if bp:
 else:
     st.info("暂无血压记录。")
 
-# ── 子女电话 ──
+# 子女电话
 st.markdown('<div style="font-size:1.25em;font-weight:800;margin:8px 0;">👨‍👩‍👧 紧急联系人</div>', unsafe_allow_html=True)
 contacts = elderly.get("emergency_contact", [])
 if contacts:
@@ -51,7 +50,7 @@ if contacts:
 else:
     st.info("未设置紧急联系人。")
 
-# ── 家属/网格员协助录入 ──
+# 家属或网格员帮忙录入
 with st.expander("➕ 家属/网格员协助录入", expanded=False):
     with st.form("health_input"):
         sys_bp = st.text_input("收缩压（高压）", placeholder="如：150")

@@ -1,22 +1,22 @@
 # agent/prompt.py
-"""System prompt template for CommunityInsight Agent — 基层微治理方向.
+"""社区先知 Agent 的 system prompt 模板 —— 基层微治理方向.
 
-Also provides persona detection (detect_persona) for role-routing — the agent
-wears different "hats" depending on what the user is trying to do.
+另外提供 detect_persona 做人设路由——Agent 根据用户想干什么
+戴不同的"帽子"。
 """
 import json
 import re
 from datetime import datetime
 
 
-# -- Persona Routing — lightweight intent detection (no LLM needed) --
+# 人设路由：轻量意图识别，不依赖 LLM
 
-# Each persona: (role_name, emoji, focus_hint)
+# 每个人设是：(角色名, emoji, 关注点提示)
 _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
     (
         # 报修 — 小区设施故障关键词。覆盖常见问题描述 + 否定式 + 感官描述。
-        # Note: "修" is intentionally NOT here (too ambiguous — matches "维修" in queries).
-        # "要修"/"修一下"/"修修" capture reporting intent without false-matching data queries.
+        # 注意："修"故意没放进来（太模糊，"维修"会误匹配查询）。
+        # 用"要修"/"修一下"/"修修"抓报修意图，不会误伤数据查询。
         ["坏了", "漏水", "故障", "不亮", "没电", "没水", "没网", "碎了", "裂了",
          "掉了", "断了", "堵了", "停了", "失灵", "停电", "停水", "断网", "报修",
          "上报", "要修", "修一下", "修修", "滴水", "漏雨", "摇晃", "松动", "锈",
@@ -25,7 +25,7 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
          "不制冷", "不制热", "不热", "不冷", "不转", "不运行",
          "破了", "歪了", "塌了", "陷了", "脏了", "臭了", "不干净",
          "不卫生", "有异味", "发霉", "长毛", "虫子", "蟑螂", "老鼠",
-         # ── v2 扩展：覆盖更多小区真实场景 ──
+         # v2 扩展：覆盖更多小区真实场景
          "模糊", "看不清", "太暗", "太亮", "太吵", "噪音", "吵闹", "太冷",
          "太热", "没空调", "不走了", "不动了", "卡住了", "没水了", "水太小",
          "漏气", "冒烟", "烧焦", "火花", "异味", "发臭", "堵住", "堵塞",
@@ -46,7 +46,7 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
          "如果", "想法", "提议", "改善", "改进", "优化", "增加", "延长", "开设",
          "应该", "可否", "能否", "考虑", "怎么看", "觉得", "认为", "好不好",
          "怎么样", "行不行", "同不同意",
-         # ── v2 扩展：覆盖更多议事诉求 ──
+         # v2 扩展：覆盖更多议事诉求
          "涨价", "降价", "价格", "太贵", "贵了", "不合理", "不公平", "凭什么",
          "为什么要", "为什么不能", "应当", "理应", "有必要", "没必要",
          "想要", "希望能", "能不能让", "可不可以", "求求", "呼吁",
@@ -59,7 +59,7 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
          "体验", "方便", "麻烦", "折腾", "浪费", "效率",
          "充电桩", "快递柜", "电梯安装", "健身器材",
          "助餐服务", "养老设施", "儿童活动", "门禁", "停车位",
-         # ── v3: "看看大家提了xxx" pattern → proposal query intent ──
+         # v3："看看大家提了xxx" 这类是查提案的意图
          "大家提了", "大家有什么", "提了什么好",
          "有什么好建议", "有什么好想法", "有什么好主意"],
         "🗳️ 议事顾问",
@@ -72,7 +72,7 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
          "工单", "进度", "状态", "查询", "查看", "列表", "所有", "有几",
          "维修", "设施", "分类", "分布", "总数", "数量", "平均",
          "有什么问题", "有哪些问题", "什么问题", "哪个类别",
-         # ── v2 扩展：覆盖更多数据查询场景 ──
+         # v2 扩展：覆盖更多数据查询场景
          "找一下", "查查", "查一下", "搜一下", "看看有没有", "帮我看看",
          "还有多少", "有几个", "多少个", "处理了", "没处理的",
          "报修情况", "解决情况", "治理情况", "哪类", "什么类型",
@@ -89,7 +89,7 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
         ["社区脉搏", "动态", "热点", "最近", "这周", "今天", "发生", "什么",
          "新闻", "通知", "大事", "新鲜事", "天气", "怎么样", "如何", "情况",
          "告诉我", "介绍", "有什么",
-         # ── v2 扩展：覆盖更多社区动态询问 ──
+         # v2 扩展：覆盖更多社区动态询问
          "聊聊", "说说", "讲一下", "播报", "快讯", "简讯",
          "最近有什么", "最近发生什么", "有什么新鲜", "有什么大事",
          "社区最新", "最近动态", "最新消息", "最新情况",
@@ -102,9 +102,9 @@ _PERSONA_SIGNALS: list[tuple[list[str], str, str]] = [
 ]
 
 
-# ── Semantic fallback patterns ──
-# When no keyword matches, try regex-based detection for common community patterns.
-# <location/facility> + <negative/problem descriptor>
+# 语义兜底匹配
+# 关键词没命中时，用正则去识别常见的社区问题句式。
+# 模式：<地点/设施> + <负面/问题描述>
 _SEMANTIC_FALLBACK_REPAIR = re.compile(
     r"((?:[一二三四五六七八九十\d]+号楼|[一二三四五六七八九十\d]+单元|"
     r"小区|车库|楼道|天台|电梯间|活动室|助餐点|快递柜|垃圾站|"
@@ -125,9 +125,8 @@ _SEMANTIC_FALLBACK_PROPOSAL = re.compile(
 )
 
 
-# ── Status-query patterns: user is asking about an EXISTING issue's progress ──
-# These override repair persona routing because "上报的xxx修好了吗" is a
-# data query, not a new issue report.
+# 状态查询句式：用户问的是已有工单的进度
+# 这些要覆盖报修路由——"上报的xxx修好了吗"是查数据，不是新报修。
 _STATUS_QUERY_PATTERNS = [
     r"修好了吗", r"修好没", r"修了没", r"解决了吗", r"解决了没",
     r"处理了吗", r"处理了没", r"好了吗", r"好了没", r"怎么样了",
@@ -137,7 +136,7 @@ _STATUS_QUERY_PATTERNS = [
 ]
 _STATUS_QUERY_RE = re.compile("|".join(_STATUS_QUERY_PATTERNS))
 
-# Strong ownership signals — user is talking about THEIR OWN stuff
+# 强所有权信号——用户在说"自己的"东西
 _OWNERSHIP_PREFIXES = [
     "我的", "我上报的", "我报修的", "我提交的", "我那个", "我之前",
     "我上次", "我前几天", "我刚刚", "我刚才", "我昨天", "我前天",
@@ -147,28 +146,28 @@ _OWNERSHIP_RE = re.compile("|".join(_OWNERSHIP_PREFIXES))
 
 
 def _detect_status_query(txt: str) -> bool:
-    """Return True if the user is asking about status/progress of an existing item,
-    rather than reporting a new problem or creating something new.
+    """用户是在问已有事项的进度/状态就返回 True，
+    而不是在报新问题或创建新东西。
 
-    Detects two signals:
-    1. Status-check keywords: "修好了吗" / "解决了吗" / "有进展吗" etc.
-    2. Ownership + query combo: "我的xxx" + check intent (weaker signal alone,
-       but combined with a repair-keyword hit, it flips the intent to query)
+    看两个信号：
+    1. 状态检查关键词："修好了吗" / "解决了吗" / "有进展吗" 等
+    2. 所有权 + 查询组合："我的xxx" + 查询意图（单独看比较弱，
+       但配上报修关键词命中，就把意图翻成查询）
     """
     if _STATUS_QUERY_RE.search(txt):
         return True
-    # Ownership signal alone is not enough — only flip if also short (likely
-    # a quick check, not a long problem description)
+    # 光有所有权信号不够——还得短（大概率是随手一问，
+    # 不是长篇问题描述）
     if _OWNERSHIP_RE.search(txt) and len(txt) <= 20:
         return True
     return False
 
 
 def _semantic_detect(txt: str) -> dict | None:
-    """Regex-based semantic fallback when keyword matching finds nothing.
+    """关键词匹配不到时，用正则做语义兜底。
 
-    Handles cases like "教三楼的钟不走了" or "投影仪模糊看不清"
-    which don't contain exact keywords like "坏了" or "故障".
+    处理"教三楼的钟不走了"、"投影仪模糊看不清"这类
+    不含"坏了"/"故障"等精确关键词的说法。
     """
     if _SEMANTIC_FALLBACK_REPAIR.search(txt):
         return {
@@ -192,17 +191,14 @@ def _semantic_detect(txt: str) -> dict | None:
 
 
 def detect_persona(user_input: str) -> dict | None:
-    """Detect user intent and return the appropriate persona context.
+    """识别用户意图，返回对应的人设上下文。
 
-    Uses lightweight keyword matching with confidence scoring and
-    multi-persona blending for compound queries. Falls back to regex-based
-    semantic detection when no keywords match.
+    用轻量关键词匹配 + 置信度打分，复合查询会混合多个人设；
+    关键词全没命中时退回正则语义检测。返回的人设字典会被
+    engine._orient() 注入 oriented_input，让 Agent 这轮戴对"帽子"。
 
-    The returned persona dict is injected into the agent's oriented_input
-    by engine._orient() so the agent adopts the right "hat" for this turn.
-
-    Priority: data-analysis keywords trump repair keywords when both match,
-    because "统计报修数量" is a query, not a repair report.
+    优先级：分析类关键词压过报修类——"统计报修数量"是查询，
+    不是报修。
     """
     if not user_input:
         return None
@@ -210,28 +206,28 @@ def detect_persona(user_input: str) -> dict | None:
     if len(txt) < 2:
         return None
 
-    # Collect ALL matching personas with individual keyword match counts
-    matches: list[tuple[int, str, str, int]] = []  # (index, role, hint, match_count)
+    # 把所有命中的人设都收进来，带各自的匹配数
+    matches: list[tuple[int, str, str, int]] = []  # (序号, 角色, 提示, 匹配数)
     for idx, (keywords, role, hint) in enumerate(_PERSONA_SIGNALS):
         matched = sum(1 for kw in keywords if kw in txt)
         if matched > 0:
             matches.append((idx, role, hint, matched))
 
     if not matches:
-        # ── Semantic fallback: regex-based pattern matching ──
+        # 语义兜底：正则模式匹配
         return _semantic_detect(txt)
 
-    # ── Status-query override: "修好了吗" / "解决了吗" etc. ──
-    # When the user is asking about an existing item's progress, redirect
-    # from repair persona to data analyst — they need query_issues, not report_issue.
+    # 状态查询覆盖："修好了吗" / "解决了吗" 等
+    # 用户问已有事项的进度时，把人设从报修转到数据分析——
+    # 他们需要 query_issues，不是 report_issue。
     if _detect_status_query(txt):
-        repair_idx = 0  # 接诉助手 is always index 0
-        data_idx = 2    # 数据分析师 is always index 2
+        repair_idx = 0  # 接诉助手固定是 0 号
+        data_idx = 2    # 数据分析师固定是 2 号
         matched_indices = {m[0] for m in matches}
         if repair_idx in matched_indices:
-            # Flip: treat as data query instead of repair report
+            # 翻转：当成查数据，而不是报修
             data_keywords, data_role, data_hint = _PERSONA_SIGNALS[data_idx]
-            # Re-count matches against data keywords for confidence
+            # 重新按数据关键词数一遍，算置信度
             data_hits = sum(1 for kw in data_keywords if kw in txt)
             conf = "medium" if data_hits >= 1 else "low"
             return {
@@ -244,23 +240,23 @@ def detect_persona(user_input: str) -> dict | None:
                 "original_persona": "🔧 接诉助手",
             }
 
-    # ── Confidence scoring ──
+    # 置信度打分
     total_matches = sum(m[3] for m in matches)
     roles_by_idx: dict[int, tuple[str, str, int]] = {m[0]: (m[1], m[2], m[3]) for m in matches}
 
-    # Very short input (<5 chars) → lower confidence, use first match
-    # (5+ char inputs with keyword matches get full resolution)
+    # 太短的输入（<5 字）置信度低，直接用第一个命中
+    # （5 字以上且有关键词命中的才走完整判断）
     if len(txt) < 5:
         _, role, hint, count = matches[0]
         return {"role": role, "focus_hint": hint, "confidence": "low",
                 "matched_count": count}
-    # Single match with only 1 keyword hit → fast path, low confidence
+    # 只命中一个人设且只有 1 个关键词 → 走快路径，置信度低
     if len(matches) == 1 and matches[0][3] == 1:
         _, role, hint, count = matches[0]
         return {"role": role, "focus_hint": hint, "confidence": "low",
                 "matched_count": count}
 
-    # ── Priority: 数据分析师 (idx=2) wins with strong analysis keywords ──
+    # 优先：数据分析师（idx=2）配上强分析关键词就赢
     if 2 in roles_by_idx:
         strong_data_kw = ["统计", "数据", "分析", "汇总", "趋势", "占比", "对比", "排名", "图表", "报告"]
         if any(kw in txt for kw in strong_data_kw):
@@ -269,8 +265,8 @@ def detect_persona(user_input: str) -> dict | None:
             return {"role": role, "focus_hint": hint, "confidence": conf,
                     "matched_count": count}
 
-    # ── Priority: Category + "问题" combos → data analyst ──
-    # "电梯有什么问题" "停车有哪些问题" etc. → query, not pulse
+    # 优先：类别 + "问题" 组合 → 数据分析师
+    # "电梯有什么问题"、"停车有哪些问题" 等 → 查询，不是播报
     _cat_words = ["电梯", "停车", "物业", "楼道", "绿化", "垃圾", "设施",
                   "噪音", "卫生", "安全", "消防", "环境", "充电"]
     if 2 in roles_by_idx and any(cw in txt for cw in _cat_words):
@@ -278,7 +274,7 @@ def detect_persona(user_input: str) -> dict | None:
         return {"role": role, "focus_hint": hint, "confidence": "medium",
                 "matched_count": count}
 
-    # ── Query-prefix disambiguation: "看看有哪些提案" "查查工单" → data analyst ──
+    # 查询前缀消歧："看看有哪些提案" "查查工单" → 数据分析师
     _query_prefixes = ["看看有哪些", "看看有", "查查有", "查一下有", "找一下有",
                        "搜一下有", "帮我看看有", "帮我查"]
     _gov_nouns = ["提案", "工单", "议题", "问题", "报修"]
@@ -286,18 +282,18 @@ def detect_persona(user_input: str) -> dict | None:
         role, hint, count = roles_by_idx[2]
         return {"role": role, "focus_hint": hint, "confidence": "medium",
                 "matched_count": count}
-    # "报修情况" "报修统计" "报修数据" → data analyst, NOT repair
+    # "报修情况"/"报修统计"/"报修数据" → 数据分析师，不是报修
     if 2 in roles_by_idx and any(f"{gn}{s}" in txt for gn in _gov_nouns
                                   for s in ["情况", "统计", "数据", "列表", "汇总"]):
         role, hint, count = roles_by_idx[2]
         return {"role": role, "focus_hint": hint, "confidence": "medium",
                 "matched_count": count}
 
-    # ── Priority: 社区观察员 (idx=3) vs 议事顾问 (idx=1) ──
+    # 优先：社区观察员（idx=3）和议事顾问（idx=1）打架时
     if 3 in roles_by_idx and 1 in roles_by_idx:
-        # "看看有什么提案" / "看看大家提了xxx" → clear proposal-view intent
-        # Force 议事 routing when user is browsing proposals, even if
-        # generic observer keywords like "有什么"/"什么" have higher counts.
+        # "看看有什么提案" / "看看大家提了xxx" → 明显是看提案的意图
+        # 用户在翻提案时强制走议事路由，哪怕"有什么"/"什么"
+        # 这类观察员关键词命中数更高。
         _view_proposal = ("看看有什么" in txt or "看看大家提了" in txt
                           or "看看都有什么" in txt or "有什么好" in txt)
         if _view_proposal:
@@ -314,8 +310,8 @@ def detect_persona(user_input: str) -> dict | None:
             return {"role": role, "focus_hint": hint, "confidence": conf,
                     "matched_count": count}
 
-    # ── Multi-persona blending for compound queries ──
-    # When 2+ strong personas match, blend their focus hints
+    # 复合查询的多重人设混合
+    # 2 个以上强人设命中时，把它们的关注点提示拼起来
     if len(matches) >= 2 and total_matches >= 4:
         primary = matches[0]
         secondary = matches[1]
@@ -328,8 +324,8 @@ def detect_persona(user_input: str) -> dict | None:
                 "confidence": conf, "matched_count": total_matches,
                 "blended": True, "secondary_role": secondary[1]}
 
-    # ── Default: prefer persona with most keyword matches ──
-    # Sort by match count descending; if top has significantly more than second, use it
+    # 默认：挑关键词命中最多的人设
+    # 按匹配数降序排；第一名明显比第二名多就用它
     matches.sort(key=lambda x: -x[3])
     if len(matches) >= 2 and matches[0][3] >= matches[1][3] + 1:
         _, role, hint, count = matches[0]
@@ -337,7 +333,7 @@ def detect_persona(user_input: str) -> dict | None:
         return {"role": role, "focus_hint": hint, "confidence": conf,
                 "matched_count": count}
 
-    # ── Fallback: first match by index order ──
+    # 兜底：按定义顺序取第一个命中
     _, role, hint, count = matches[0]
     conf = "high" if count >= 3 else "medium" if count >= 2 else "low"
     return {"role": role, "focus_hint": hint, "confidence": conf,
@@ -345,7 +341,7 @@ def detect_persona(user_input: str) -> dict | None:
 
 
 def get_system_prompt(user_profile: dict, environment_context: str = "") -> str:
-    """Build the governance-focused system prompt with user context injected."""
+    """拼治理向的 system prompt，把用户信息注入进去。"""
     community = user_profile.get("community", "未设置")
     building = user_profile.get("building", "未设置")
     unit = user_profile.get("unit", "未设置")

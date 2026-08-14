@@ -1,5 +1,5 @@
 # ui/login.py
-"""Login page — clean authentication gate."""
+"""登录页 — 干净的鉴权入口。"""
 import streamlit as st
 from ui.components import TOKEN
 from data.db_user import authenticate, create_user, get_user_by_username
@@ -84,7 +84,7 @@ def _render_login_form():
 
 
 def _render_register_form():
-    """Registration form (resident only)."""
+    """注册表单（只开放给居民）。"""
     muted_color = TOKEN["text_muted"]
 
     new_username = st.text_input("用户名", key="reg_username", placeholder="请设置用户名")
@@ -121,7 +121,7 @@ def _render_register_form():
 
 
 def _login_demo(role: str):
-    """Quick demo login."""
+    """演示用的一键登录。"""
     from data.db_user import list_users
     users = list_users()
     target = [u for u in users if u.get("role") == role]
@@ -129,6 +129,6 @@ def _login_demo(role: str):
         uid = target[0].get("id")
         st.session_state["_login_user_id"] = uid
         st.session_state["_ob_role"] = role
-        # Clear cached profile so get_user_profile() re-reads from DB
+        # 清掉缓存的资料，让 get_user_profile() 重新读库
         st.session_state.pop("user_profile", None)
         st.rerun()

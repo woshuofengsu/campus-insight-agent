@@ -1,5 +1,4 @@
-# data/db_governance.py
-"""Governance tables — community_issues, proposals, discussion_topics, topic_opinions."""
+"""治理相关表 — 社区工单、提案、话题讨论、话题意见。"""
 import hashlib
 import logging
 from data.db_core import get_db
@@ -11,12 +10,11 @@ _ANON_SALT = "community-insight-anon-2026"
 
 
 def anonymized_author(identity: str) -> str:
-    """Generate a stable pseudonymous author label for anonymous reports.
+    """给匿名上报生成一个稳定的伪名标签。
 
-    Hashes the reporter's identity (reporter_id / resident_id) so the public
-    author field never leaks the real identity, while the same reporter's
-    anonymous reports still share one consistent label — traceable for the
-    closed loop, unlinkable to the real person by other residents.
+    把上报人身份（reporter_id / resident_id）哈希一下，公开的 author 字段
+    就不会泄露真实身份；同一个人的匿名上报又能共用同一个标签——闭环能追踪，
+    别的居民对不上号。
     """
     if not identity:
         return "匿名居民"
@@ -25,11 +23,11 @@ def anonymized_author(identity: str) -> str:
 
 
 def _resolve_author(author: str = "") -> str:
-    """Auto-fill author from current user profile if empty.
+    """author 为空时，从当前用户资料自动填。
 
-    Priority: resident_id → community+building → name → login_id fallback → "匿名"
-    Must match ui.components.resolve_author() logic so that issues reported
-    via the Agent are visible on the "我的" page.
+    优先级: resident_id → community+building → name → login_id 兜底 → "匿名"
+    必须和 ui.components.resolve_author() 的逻辑保持一致，否则 Agent 上报的
+    工单在「我的」页面看不到。
     """
     if author:
         return author
@@ -46,40 +44,40 @@ def _resolve_author(author: str = "") -> str:
         name = (profile.get("name") or "").strip()
         if name:
             return name
-        # Last resort: use raw user id so it's at least unique per-user
+        # 最后兜底：直接用用户 ID，至少每人唯一
         uid = profile.get("id")
         if uid:
             return f"user_{uid}"
-    except Exception:  # log and skip
+    except Exception:  # 记个日志跳过
         _log.warning(
-            "_resolve_author: failed to resolve user profile, using id-based fallback"
+            "_resolve_author: 解析用户资料失败，退回用 ID 兜底"
         )
-        # Direct session_state read as final fallback
+        # 最后的兜底：直接读 session_state
         try:
             import streamlit as st
             uid = st.session_state.get("_login_user_id")
             if uid:
                 return f"user_{uid}"
-        except Exception:  # best-effort, skip
-            _log.debug("Failed to resolve author from session_state fallback", exc_info=True)
+        except Exception:  # 尽力而为，失败就算了
+            _log.debug("从 session_state 兜底解析 author 也失败", exc_info=True)
             pass
     return "匿名"
 
 
-# ── Community Issues ──
+# 社区工单
 
 def _resolve_reporter_id() -> int | None:
-    """Resolve the current user's id for reporter tracking (privacy-safe).
+    """解析当前用户的 ID，用于记录上报人（不泄露隐私）。
 
-    Kept separate from author display: reporter_id enables closed-loop
-    notification even when the author field is anonymized.
+    和展示用的 author 分开存：author 被匿名化之后，reporter_id 还能用来发
+    闭环通知。
     """
     try:
         from data.db_user import get_current_user
         profile = get_current_user()
         return profile.get("id")
-    except Exception:  # log and skip
-        _log.debug("_resolve_reporter_id: failed to resolve current user", exc_info=True)
+    except Exception:  # 记个日志跳过
+        _log.debug("_resolve_reporter_id: 解析当前用户失败", exc_info=True)
         return None
 
 
@@ -88,14 +86,13 @@ def report_issue(title: str, category: str, location: str = "",
                  author: str = "", suggested_category: str = "",
                  reporter_id: int | None = None,
                  anonymous: bool = False) -> int:
-    """Report a community issue. Returns the new issue ID.
+    """上报一条社区工单，返回新工单 ID。
 
     Args:
-        suggested_category: the AI's raw classification (stored for grid-manager review)
-        reporter_id: submitting user's id — auto-resolved if omitted
-        anonymous: if True, the public author field stores a stable pseudonym
-            (anonymized_author) instead of the real identity. The reporter_id is
-            still stored separately for closed-loop notification.
+        suggested_category: AI 的原始分类结果（存下来给网格员复核用）
+        reporter_id: 上报人的用户 ID — 不传就自动解析
+        anonymous: 为 True 时，公开的 author 字段存稳定伪名（anonymized_author）
+            而不是真实身份；reporter_id 仍然单独存一份，用于闭环通知。
     """
     if reporter_id is None:
         reporter_id = _resolve_reporter_id()
@@ -114,27 +111,27 @@ def report_issue(title: str, category: str, location: str = "",
         )
         conn.commit()
         iid = cur.lastrowid
-    _log.info("report_issue #%d created (reporter_id=%s, category=%s, suggested=%s)",
+    _log.info("report_issue 已创建工单 #%d (reporter_id=%s, category=%s, suggested=%s)",
               iid, reporter_id, category, suggested_category or category)
-    # Log activity
+    # 记一条活动日志
     try:
         from data.db_notifications import log_activity
         log_activity(author, "上报问题", "issue", iid, title,
                      f"{category} · {location}" if location else category)
-    except Exception:  # log and skip
-        _log.debug("log_activity failed for report_issue #%d (non-critical)", iid)
-    # Cross-session event memory (personalization)
+    except Exception:  # 记个日志跳过
+        _log.debug("report_issue #%d 记活动日志失败（不影响）", iid)
+    # 记到跨会话事件记忆（个性化用）
     try:
         from data.db_memory import remember_event
         remember_event(reporter_id, "report_issue", f"上报了工单 #{iid}「{title[:20]}」")
     except Exception:
-        _log.debug("remember_event failed for report_issue #%d", iid)
+        _log.debug("report_issue #%d 记事件记忆失败", iid)
     return iid
 
 
 def get_issues(category: str | None = None, status: str | None = None,
                urgency: str | None = None, limit: int = 20) -> list[dict]:
-    """Query community issues with optional filters."""
+    """按条件查社区工单，条件都可选。"""
     with get_db() as conn:
         query = "SELECT * FROM community_issues WHERE 1=1"
         params: list = []
@@ -154,7 +151,7 @@ def get_issues(category: str | None = None, status: str | None = None,
 
 
 def get_issues_stats() -> dict:
-    """Get issue statistics for dashboard: counts by category and status."""
+    """给看板查工单统计：按分类和状态计数。"""
     with get_db() as conn:
         by_category = conn.execute(
             "SELECT category, COUNT(*) as cnt FROM community_issues GROUP BY category"
@@ -175,7 +172,7 @@ def get_issues_stats() -> dict:
 
 
 def get_my_issues(author: str, limit: int = 50) -> list[dict]:
-    """Get issues reported by a specific author."""
+    """查某个上报人的工单。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM community_issues WHERE author = ? ORDER BY reported_at DESC LIMIT ?",
@@ -185,12 +182,10 @@ def get_my_issues(author: str, limit: int = 50) -> list[dict]:
 
 
 def get_my_anonymous_issues(reporter_id: int, limit: int = 50) -> list[dict]:
-    """Get the caller's own anonymous issues, resolved by reporter_id.
+    """按 reporter_id 查当前用户自己的匿名工单。
 
-    Anonymous issues store a pseudonymous author (匿名居民#hash), so the resident
-    cannot find them via the normal author-string matching. This queries by
-    reporter_id instead — returning only the caller's own anonymous issues without
-    exposing any real identity to other residents.
+    匿名工单的 author 是伪名（匿名居民#hash），按作者名匹配找不到自己那份，
+    所以改用 reporter_id 查——只返回自己的匿名工单，也不暴露别人的身份。
     """
     if not reporter_id:
         return []
@@ -205,7 +200,7 @@ def get_my_anonymous_issues(reporter_id: int, limit: int = 50) -> list[dict]:
 
 
 def get_my_proposals(author: str, limit: int = 50) -> list[dict]:
-    """Get proposals created by a specific author."""
+    """查某个作者创建的提案。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM proposals WHERE author = ? ORDER BY created_at DESC LIMIT ?",
@@ -215,7 +210,7 @@ def get_my_proposals(author: str, limit: int = 50) -> list[dict]:
 
 
 def get_my_stats(author: str) -> dict:
-    """Get participation stats for a specific author."""
+    """查某个作者的参与统计。"""
     with get_db() as conn:
         total_issues = conn.execute(
             "SELECT COUNT(*) as cnt FROM community_issues WHERE author = ?", (author,),
@@ -240,18 +235,18 @@ def get_my_stats(author: str) -> dict:
 def update_issue_status(issue_id: int, status: str, actor: str = "",
                        processing_note: str = "", assignee: str = "",
                        assignee_id: int | None = None) -> None:
-    """Update the status of a community issue. Notifies reporter + logs activity.
+    """更新工单状态，并通知上报人 + 记活动日志。
 
     Args:
-        issue_id: the issue to update
-        status: new status (待处理/处理中/已解决)
-        actor: who performed the action (for activity log)
-        processing_note: optional note from the grid about the resolution/action
-        assignee: optional assignee display name (who is handling this issue)
-        assignee_id: optional assignee user id — the stable key for "my todo" filtering
+        issue_id: 要更新的工单
+        status: 新状态（待处理/处理中/已解决）
+        actor: 操作人（用于活动日志）
+        processing_note: 网格员的处理备注（可选）
+        assignee: 处理人显示名（可选）
+        assignee_id: 处理人用户 ID（可选）——「我的待办」按这个稳定键过滤
     """
     with get_db() as conn:
-        # Fetch issue info before update for notification + activity
+        # 更新前先把工单信息取出来，通知和日志要用
         issue = conn.execute(
             "SELECT title, author, category, location FROM community_issues WHERE id = ?",
             (issue_id,),
@@ -280,7 +275,7 @@ def update_issue_status(issue_id: int, status: str, actor: str = "",
             )
         conn.commit()
 
-    # ── Notify reporter + log activity (outside transaction) ──
+    # 通知上报人 + 记日志（放在事务外面）
     if issue:
         issue_title = issue["title"] or ""
         try:
@@ -295,22 +290,22 @@ def update_issue_status(issue_id: int, status: str, actor: str = "",
                 "issue", issue_id, issue_title,
                 f"{issue['category']} · {issue['location']}" if issue["location"] else issue["category"],
             )
-        except Exception:  # log and skip
-            _log.debug("notify/log_activity failed for issue #%d status change (non-critical)", issue_id)
+        except Exception:  # 记个日志跳过
+            _log.debug("工单 #%d 状态变更时通知/记日志失败（不影响）", issue_id)
 
 
 def set_satisfaction(issue_id: int, value: str, reason: str = "",
                      reopen_on_dissatisfied: bool = True) -> str:
-    """Record a resident's satisfaction for a resolved issue.
+    """记录居民对已解决工单的满意度评价。
 
     Args:
         value: "满意" | "不满意"
-        reason: optional free-text reason (especially for "不满意"), stored and
-            surfaced to the grid manager so dissatisfaction is actionable.
-        reopen_on_dissatisfied: if "不满意", move the issue to "待复核" for the
-            grid manager to confirm/驳回 (no longer auto-reopens unilaterally).
+        reason: 自由填写的理由（尤其「不满意」时），存下来展示给网格员，
+            让不满有处着手。
+        reopen_on_dissatisfied: 「不满意」时把工单挪到「待复核」，由网格员
+            确认是否重开（不再单方面自动重开）。
 
-    Returns the final status ("已解决" if satisfied, "待复核" if dissatisfied).
+    返回最终状态（满意是「已解决」，不满意是「待复核」）。
     """
     value = value if value in ("满意", "不满意") else "满意"
     reason = (reason or "").strip()
@@ -330,9 +325,9 @@ def set_satisfaction(issue_id: int, value: str, reason: str = "",
             )
             final_status = "已解决"
         conn.commit()
-    _log.info("set_satisfaction #%d -> %s (reason=%r, status=%s)",
+    _log.info("set_satisfaction 工单 #%d -> %s (reason=%r, status=%s)",
               issue_id, value, reason, final_status)
-    # Cross-session event memory (personalization)
+    # 记到跨会话事件记忆（个性化用）
     try:
         from data.db_memory import remember_event
         with get_db() as conn:
@@ -342,17 +337,17 @@ def set_satisfaction(issue_id: int, value: str, reason: str = "",
         if _row and _row["reporter_id"]:
             remember_event(_row["reporter_id"], "satisfaction", f"对工单 #{issue_id} 评价为{value}")
     except Exception:
-        _log.debug("remember_event failed for set_satisfaction #%d", issue_id)
+        _log.debug("set_satisfaction 工单 #%d 记事件记忆失败", issue_id)
     return final_status
 
 
 def review_dissatisfaction(issue_id: int, reopen: bool) -> str:
-    """Grid manager reviews a resident's "不满意" rating.
+    """网格员复核居民的「不满意」评价。
 
     reopen=True  → 确认重开（status='待处理'，保留不满意原因供追踪）。
     reopen=False → 驳回（status='已解决'，保留评价但不重开）。
 
-    Returns the resulting status.
+    返回最终状态。
     """
     new_status = "待处理" if reopen else "已解决"
     with get_db() as conn:
@@ -367,19 +362,19 @@ def review_dissatisfaction(issue_id: int, reopen: bool) -> str:
                 (issue_id,),
             )
         conn.commit()
-    _log.info("review_dissatisfaction #%d -> %s (reopen=%s)", issue_id, new_status, reopen)
+    _log.info("review_dissatisfaction 工单 #%d -> %s (reopen=%s)", issue_id, new_status, reopen)
     try:
         from data.db_notifications import notify_issue_status_change, log_activity
         notify_issue_status_change(issue_id, new_status)
         log_activity("网格员", "复核满意度" if reopen else "驳回不满意",
                      "issue", issue_id, "", new_status)
     except Exception:
-        _log.debug("notify/log_activity failed for review_dissatisfaction #%d", issue_id)
+        _log.debug("review_dissatisfaction 工单 #%d 通知/记日志失败", issue_id)
     return new_status
 
 
 def get_satisfaction_stats() -> dict:
-    """Aggregate satisfaction across resolved issues (for grid-manager dashboard)."""
+    """汇总已解决工单的满意度（给网格员看板）。"""
     try:
         with get_db() as conn:
             row = conn.execute(
@@ -398,15 +393,15 @@ def get_satisfaction_stats() -> dict:
                 "rate": round(satisfied / total * 100, 1) if total else None,
             }
     except Exception:
-        _log.warning("get_satisfaction_stats failed", exc_info=True)
+        _log.warning("get_satisfaction_stats 统计失败", exc_info=True)
         return {"satisfied": 0, "dissatisfied": 0, "total": 0, "rate": None}
 
 
 def get_dissatisfaction_reasons(limit: int = 10) -> list[dict]:
-    """Return recently-dissatisfied issues with their reasons (for grid workbench).
+    """查最近被「不满意」的工单和理由（给网格员工作台）。
 
-    Surfaces the free-text reason residents leave on a 「不满意」 rating, so the
-    grid manager can act on the concrete cause instead of just the count.
+    把居民在「不满意」评价里填的自由文本理由展示出来，网格员能针对具体
+    原因处理，而不是只看个数字。
     """
     try:
         with get_db() as conn:
@@ -419,15 +414,15 @@ def get_dissatisfaction_reasons(limit: int = 10) -> list[dict]:
             ).fetchall()
             return [dict(r) for r in rows]
     except Exception:
-        _log.warning("get_dissatisfaction_reasons failed", exc_info=True)
+        _log.warning("get_dissatisfaction_reasons 查询失败", exc_info=True)
         return []
 
 
-# ── Proposals ──
+# 提案
 
 def create_proposal(title: str, description: str, category: str = "其他",
                      author: str = "", reporter_id: int | None = None) -> int:
-    """Create a new community proposal. Returns the new proposal ID."""
+    """新建一条社区提案，返回新提案 ID。"""
     if reporter_id is None:
         reporter_id = _resolve_reporter_id()
     with get_db() as conn:
@@ -442,14 +437,14 @@ def create_proposal(title: str, description: str, category: str = "其他",
     try:
         from data.db_notifications import log_activity
         log_activity(author, "提交提案", "proposal", pid, title, category)
-    except Exception:  # log and skip
-        _log.debug("log_activity failed for create_proposal #%d (non-critical)", pid)
+    except Exception:  # 记个日志跳过
+        _log.debug("create_proposal #%d 记活动日志失败（不影响）", pid)
     return pid
 
 
 def get_proposals(category: str | None = None, status: str | None = None,
                   sort_by: str = "supporters", limit: int = 20) -> list[dict]:
-    """Query proposals with optional filters and sorting."""
+    """按条件查提案，支持排序。"""
     with get_db() as conn:
         query = "SELECT * FROM proposals WHERE 1=1"
         params: list = []
@@ -467,7 +462,7 @@ def get_proposals(category: str | None = None, status: str | None = None,
 
 
 def support_proposal(proposal_id: int, actor: str = "") -> int:
-    """Add one supporter to a proposal. Returns new supporter count."""
+    """给提案加一个附议，返回新的附议人数。"""
     with get_db() as conn:
         conn.execute(
             "UPDATE proposals SET supporter_count = supporter_count + 1 WHERE id = ?",
@@ -482,16 +477,16 @@ def support_proposal(proposal_id: int, actor: str = "") -> int:
         from data.db_notifications import log_activity
         log_activity(actor or "居民", "附议提案", "proposal", proposal_id,
                      row["title"] if row else "", f"共 {new_count} 人附议")
-    except Exception:  # log and skip
-        _log.debug("log_activity failed for support_proposal #%d (non-critical)", proposal_id)
+    except Exception:  # 记个日志跳过
+        _log.debug("support_proposal #%d 记活动日志失败（不影响）", proposal_id)
     return new_count
 
 
 def update_proposal_status(proposal_id: int, status: str,
                            response_text: str = "", actor: str = "") -> None:
-    """Update proposal status and optionally add a response. Notifies author + logs."""
+    """更新提案状态，可顺带写回复。通知提案人 + 记日志。"""
     with get_db() as conn:
-        # Fetch before update
+        # 先取提案信息
         prop = conn.execute(
             "SELECT title, author, category FROM proposals WHERE id = ?", (proposal_id,)
         ).fetchone()
@@ -519,12 +514,12 @@ def update_proposal_status(proposal_id: int, status: str,
                 actor or "网格员", action_map.get(status, "更新提案"),
                 "proposal", proposal_id, prop["title"], prop["category"],
             )
-        except Exception:  # log and skip
-            _log.debug("notify/log_activity failed for proposal #%d status change (non-critical)", proposal_id)
+        except Exception:  # 记个日志跳过
+            _log.debug("提案 #%d 状态变更时通知/记日志失败（不影响）", proposal_id)
 
 
 def get_proposals_stats() -> dict:
-    """Get proposal statistics."""
+    """查提案统计。"""
     with get_db() as conn:
         total = conn.execute("SELECT COUNT(*) as cnt FROM proposals").fetchone()
         by_category = conn.execute(
@@ -540,11 +535,11 @@ def get_proposals_stats() -> dict:
         }
 
 
-# ── Discussion Topics ──
+# 话题讨论
 
 def create_topic(title: str, description: str, category: str = "",
                   created_by_agent: bool = True) -> int:
-    """Create a new discussion topic. Returns the new topic ID."""
+    """新建一个讨论话题，返回新话题 ID。"""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO discussion_topics (title, description, category, created_by_agent) VALUES (?,?,?,?)",
@@ -555,7 +550,7 @@ def create_topic(title: str, description: str, category: str = "",
 
 
 def get_active_topics(limit: int = 10) -> list[dict]:
-    """Get currently active discussion topics."""
+    """查当前进行中的讨论话题。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM discussion_topics WHERE is_active = 1 ORDER BY participant_count DESC, created_at DESC LIMIT ?",
@@ -565,7 +560,7 @@ def get_active_topics(limit: int = 10) -> list[dict]:
 
 
 def close_topic(topic_id: int) -> None:
-    """Close/end a discussion topic."""
+    """关闭/结束一个讨论话题。"""
     with get_db() as conn:
         conn.execute(
             "UPDATE discussion_topics SET is_active = 0, ended_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -575,7 +570,7 @@ def close_topic(topic_id: int) -> None:
 
 
 def increment_topic_participants(topic_id: int) -> int:
-    """Increment participant count for a topic."""
+    """话题参与人数 +1。"""
     with get_db() as conn:
         conn.execute(
             "UPDATE discussion_topics SET participant_count = participant_count + 1 WHERE id = ?",
@@ -588,10 +583,10 @@ def increment_topic_participants(topic_id: int) -> int:
         return row["participant_count"] if row else 0
 
 
-# ── Topic Opinions ──
+# 话题意见
 
 def add_opinion(topic_id: int, content: str, participant_label: str = "匿名居民") -> int:
-    """Add an opinion to a discussion topic. Returns the opinion ID."""
+    """往话题里加一条意见，返回意见 ID。"""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO topic_opinions (topic_id, content, participant_label) VALUES (?,?,?)",
@@ -607,7 +602,7 @@ def add_opinion(topic_id: int, content: str, participant_label: str = "匿名居
 
 
 def get_opinions_by_topic(topic_id: int, limit: int = 50) -> list[dict]:
-    """Get opinions for a specific topic."""
+    """查某个话题下的意见。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM topic_opinions WHERE topic_id = ? ORDER BY created_at DESC LIMIT ?",
@@ -617,7 +612,7 @@ def get_opinions_by_topic(topic_id: int, limit: int = 50) -> list[dict]:
 
 
 def get_opinion_summary(topic_id: int) -> dict:
-    """Get summary stats for a topic's opinions."""
+    """查某个话题意见的汇总统计。"""
     with get_db() as conn:
         total = conn.execute(
             "SELECT COUNT(*) as cnt FROM topic_opinions WHERE topic_id = ?",
@@ -638,22 +633,22 @@ def get_opinion_summary(topic_id: int) -> dict:
 
 
 def get_opinion_summaries_batch(topic_ids: list[int]) -> dict[int, dict]:
-    """Get opinion counts for multiple topics in a single query — eliminates N+1.
+    """一次查询拿多个话题的意见数——避免 N+1。
 
-    Returns {topic_id: {"total_opinions": int, "topic_title": str}, ...}
+    返回 {topic_id: {"total_opinions": int, "topic_title": str}, ...}
     """
     if not topic_ids:
         return {}
     with get_db() as conn:
         placeholders = ",".join("?" for _ in topic_ids)
-        # Count opinions per topic in one query
+        # 一条 SQL 把每个话题的意见数查出来
         count_rows = conn.execute(
             f"SELECT topic_id, COUNT(*) as cnt FROM topic_opinions "
             f"WHERE topic_id IN ({placeholders}) GROUP BY topic_id",
             topic_ids,
         ).fetchall()
         counts = {r["topic_id"]: r["cnt"] for r in count_rows}
-        # Get topic titles in one query
+        # 再一条 SQL 查话题标题
         topic_rows = conn.execute(
             f"SELECT id, title FROM discussion_topics "
             f"WHERE id IN ({placeholders})",

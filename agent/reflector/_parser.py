@@ -1,13 +1,13 @@
 # agent/reflector/_parser.py
-"""Step parsing, text-action fallback parsing, and trivial-input gating.
+"""步骤解析、文本动作兜底解析、闲聊输入闸门。
 
-Extracted from the monolithic reflector.py — these are the "shape" utilities
-that convert raw LangChain intermediate_steps (or raw text when no formal
-tool calls fired) into structured reasoning steps.
+从单文件的 reflector.py 拆出来的——这些"整形"工具把
+LangChain 的原始 intermediate_steps（或没正式调工具时的原始文本）
+转成结构化的推理步骤。
 """
 import re
 
-# ── Constants ──
+# 常量
 
 _STOP_WORDS: set[str] = {
     "了", "的", "是", "我", "要", "有", "在", "不", "和", "都",
@@ -19,12 +19,12 @@ _PHASE_ICONS = {
     "observe": "🔍", "orient": "⚡", "decide": "🗳️", "act": "🔧", "reflect": "🌤️",
 }
 
-# Token that stops at spaces, Chinese punctuation, and line breaks
+# 遇空格、中文标点、换行就停的 token
 _TK = r"[^\s，。；！？\n]+"
 
 _TEXT_ACTION_PATTERNS: list[tuple[str, str, str]] = [
-    # (regex pattern, icon, phase)
-    # Order matters: more specific patterns first to prevent sub-pattern shadowing
+    # (正则, 图标, 阶段)
+    # 顺序很重要：具体的模式放前面，防止被宽泛模式抢走
     (rf"已(为你|为你)?生成工单\s*[#＃]?\s*{_TK}", "⚡", "act"),
     (rf"工单\s*[#＃]\s*{_TK}", "⚡", "act"),
     (r"(上报|报修|创建).{0,10}(工单|问题)", "⚡", "act"),
@@ -39,7 +39,7 @@ _TEXT_ACTION_PATTERNS: list[tuple[str, str, str]] = [
     (r"已采纳|已实施|已回应", "✅", "act"),
 ]
 
-# Messages that don't warrant 10+ SQL queries for association analysis
+# 这些消息不值得为关联分析跑 10 多条 SQL
 _TRIVIAL_PATTERNS: set[str] = {
     "你好", "您好", "hi", "hello", "嗨", "早", "早上好", "下午好", "晚上好",
     "谢谢", "感谢", "thanks", "thank you", "3q",
@@ -52,27 +52,27 @@ _TRIVIAL_PATTERNS: set[str] = {
 }
 
 
-# -- 1. Step normalisation
+# 1. 步骤入参归一化
 
 def normalize_tool_input(tool_input) -> dict:
-    """Normalize tool_input to a dict. Accepts str, int, None — safe for .get()."""
+    """把 tool_input 归一成 dict。str、int、None 都行——.get() 用着安全。"""
     if tool_input is None:
         return {}
     if isinstance(tool_input, dict):
         return tool_input
     if isinstance(tool_input, str):
         return {"input": tool_input}
-    # Number, list, or other — wrap for safe display
+    # 数字、列表等其他类型——包一层好安全展示
     return {"value": tool_input}
 
 
-# -- 2. Step summarisation
+# 2. 步骤摘要
 
 def summarize_step(tool_name: str, tool_input: dict) -> str:
-    """Generate a one-line human-readable Chinese summary of a tool call.
+    """给一次工具调用生成一行人话中文摘要。
 
-    Uses a dispatch table keyed by exact tool name for robustness.
-    The 16 known tools are the ones auto-discovered from tools/.
+    用按工具名精确匹配的分发表，稳。
+    16 个已知工具就是 tools/ 里自动发现的那些。
     """
     ti = tool_input or {}
 
@@ -88,7 +88,7 @@ def summarize_step(tool_name: str, tool_input: dict) -> str:
         "get_weather": lambda: "查询天气信息",
         "query_knowledge": lambda: f"语义搜索社区知识：{str(ti.get('query',''))[:30]}",
         "get_community_policy": lambda: f"检索社区规章：{str(ti.get('topic',''))[:30]}",
-        # 议 — proposals & discussion
+        # 议 — 提案和讨论
         "create_proposal": lambda: f"创建提案：{str(ti.get('title',''))[:30]}",
         "support_proposal": lambda: f"附议提案 #{ti.get('proposal_id','?')}",
         "get_proposals": lambda: "查询提案列表",
@@ -104,10 +104,10 @@ def summarize_step(tool_name: str, tool_input: dict) -> str:
     return f"调用 {tool_name}"
 
 
-# -- 3. Step parsing
+# 3. 步骤解析
 
 def parse_intermediate_steps(intermediate_steps: list) -> list[dict]:
-    """Convert LangChain intermediate_steps (list[tuple[AgentAction, str]]) to structured steps."""
+    """把 LangChain 的 intermediate_steps（list[tuple[AgentAction, str]]）转成结构化步骤。"""
     if not intermediate_steps:
         return []
     steps: list[dict] = []
@@ -129,23 +129,23 @@ def parse_intermediate_steps(intermediate_steps: list) -> list[dict]:
     return steps
 
 
-# -- 4. Text-action parsing (fallback)
+# 4. 文本动作解析（兜底）
 
 def parse_text_actions(raw_response: str) -> list[dict]:
-    """Extract pseudo-steps from the agent's text response.
+    """从 Agent 的文本回复里抠出伪步骤。
 
-    When DeepSeek generates action descriptions inline (e.g. "已为你生成工单 #42")
-    instead of formally calling tools via LangChain, this parser recovers those
-    actions so the reasoning chain isn't empty.
+    DeepSeek 直接在文字里描述动作（比如"已为你生成工单 #42"）
+    而不是正经调 LangChain 工具时，这个解析器把动作捞回来，
+    推理链才不会空着。
 
-    Returns a list of step dicts compatible with parse_intermediate_steps output.
+    返回的步骤字典和 parse_intermediate_steps 输出兼容。
     """
     steps: list[dict] = []
-    covered_ranges: list[tuple[int, int]] = []  # for overlap dedup
+    covered_ranges: list[tuple[int, int]] = []  # 记已覆盖的范围，去重用
 
     def _has_overlap(start: int, end: int) -> bool:
         for cs, ce in covered_ranges:
-            if start < ce and end > cs:  # intervals overlap
+            if start < ce and end > cs:  # 区间重叠
                 return True
         return False
 
@@ -153,7 +153,7 @@ def parse_text_actions(raw_response: str) -> list[dict]:
         for m in re.finditer(pattern, raw_response):
             start, end = m.start(), m.end()
             if _has_overlap(start, end):
-                continue  # skip — already covered by a higher-priority pattern
+                continue  # 跳过——更高优先级的模式已经盖过了
             covered_ranges.append((start, end))
             match_text = m.group(0)[:60]
             steps.append({
@@ -165,22 +165,21 @@ def parse_text_actions(raw_response: str) -> list[dict]:
                 "summary": f"AI 执行：{match_text}",
             })
 
-    # Sort by position in text (natural reading order)
+    # 按在文本里的位置排（符合阅读顺序）
     steps.sort(key=lambda s: raw_response.find(s["tool_output"]))
     return steps
 
 
-# -- 5. Trivial-input gate
+# 5. 闲聊输入闸门
 
 def is_trivial_input(user_input: str) -> bool:
-    """Return True if the input is generic small-talk that shouldn't trigger
-    the heavy association analysis pipeline."""
+    """输入是普通寒暄就返回 True，别触发重的关联分析流程。"""
     cleaned = user_input.strip().lower().rstrip("。！？!?.,，")
     if len(cleaned) <= 2:
         return True
     if cleaned in _TRIVIAL_PATTERNS:
         return True
-    # Greeting-only pattern: "你好呀", "嗨~", etc.
+    # 纯问候句式："你好呀"、"嗨~" 等
     if re.match(
         r"^(你好|您好|hi|hello|嗨|早|谢谢|感谢|thanks|bye|再见|拜拜)[!！~～呀啊哦呢嘛啦喔]*$",
         cleaned,

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for governance audit engine — cross-table health analysis.
+"""治理审计引擎单元测试 — 跨表健康度分析。
 
-Covers run_governance_audit() with empty DB, populated DB, and various
-health score scenarios to validate scoring methodology.
+run_governance_audit() 覆盖空库、有数据的库和多种健康度场景，
+验证评分口径。
 """
 import sys
 import os
@@ -27,7 +27,7 @@ def _cleanup_test_db(db_path):
             pass
 
 
-# -- 1. Empty DB — All Zero State --
+# 1. 空库全零状态
 
 class TestGovernanceAuditEmptyDB(unittest.TestCase):
 
@@ -48,13 +48,13 @@ class TestGovernanceAuditEmptyDB(unittest.TestCase):
     def test_empty_db_has_sections(self):
         from agent.governance_audit import run_governance_audit
         report = run_governance_audit()
-        # Should have at least the health score line
+        # 至少要有健康度那一行
         self.assertIn("治理健康度", report)
 
     def test_empty_db_no_errors(self):
         from agent.governance_audit import run_governance_audit
         report = run_governance_audit()
-        # Should not contain error markers
+        # 不能带报错信息
         self.assertNotIn("Traceback", report)
         self.assertNotIn("Exception", report)
 
@@ -64,7 +64,7 @@ class TestGovernanceAuditEmptyDB(unittest.TestCase):
         self.assertIn("分维度评分", report)
 
 
-# -- 2. Populated DB — With Sample Data --
+# 2. 有数据的库
 
 class TestGovernanceAuditWithData(unittest.TestCase):
 
@@ -75,10 +75,10 @@ class TestGovernanceAuditWithData(unittest.TestCase):
 
     @classmethod
     def _seed_data(cls):
-        """Insert sample issues, proposals, and topics for audit testing."""
+        """给审计测试塞一批工单、提案和议题。"""
         from data.database import get_db
         with get_db() as conn:
-            # Insert issues with varied status/urgency
+            # 工单：状态、紧急度都岔开一点
             conn.execute(
                 "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at, resolved_at) VALUES "
@@ -101,7 +101,7 @@ class TestGovernanceAuditWithData(unittest.TestCase):
                 "INSERT INTO community_issues (title, category, location, description, "
                 "urgency, status, author, reported_at) VALUES "
                 "('垃圾未清理', '环境卫生', '助餐点', '垃圾桶满了', '普通', '待处理', 'user2', "
-                "datetime('now', '-10 days'))"  # stale > 7 days
+                "datetime('now', '-10 days'))"  # 超过 7 天算积压
             )
             conn.execute(
                 "INSERT INTO community_issues (title, category, location, description, "
@@ -116,7 +116,7 @@ class TestGovernanceAuditWithData(unittest.TestCase):
                 "datetime('now', '-7 days'), datetime('now', '-2 days'))"
             )
 
-            # Insert proposals
+            # 提案
             conn.execute(
                 "INSERT INTO proposals (title, description, category, supporter_count, "
                 "status, author) VALUES "
@@ -134,7 +134,7 @@ class TestGovernanceAuditWithData(unittest.TestCase):
                 "'已反馈给物业部门', 'user3')"
             )
 
-            # Insert discussion topics
+            # 议题
             conn.execute(
                 "INSERT INTO discussion_topics (title, description, category, "
                 "created_by_agent, is_active, participant_count) VALUES "
@@ -181,7 +181,7 @@ class TestGovernanceAuditWithData(unittest.TestCase):
     def test_populated_db_mentions_urgent_issue(self):
         from agent.governance_audit import run_governance_audit
         report = run_governance_audit()
-        # Should mention the urgent unresolved issue
+        # 应该提到那条没解决的紧急工单
         self.assertTrue("紧急" in report or "安全隐患" in report)
 
     def test_populated_db_no_crash(self):
@@ -190,7 +190,7 @@ class TestGovernanceAuditWithData(unittest.TestCase):
         self.assertNotIn("Traceback", report)
 
 
-# -- 3. All Resolved DB — Perfect Health --
+# 3. 全部已解决的库
 
 class TestGovernanceAuditAllResolved(unittest.TestCase):
 
@@ -226,17 +226,17 @@ class TestGovernanceAuditAllResolved(unittest.TestCase):
     def test_all_resolved_has_grade(self):
         from agent.governance_audit import run_governance_audit
         report = run_governance_audit()
-        # Should have a grade (优/良/需改进)
+        # 应该有评级（优/良/需改进）
         self.assertTrue("优" in report or "良" in report or "需改进" in report)
 
     def test_all_resolved_no_action_items_or_minimal(self):
         from agent.governance_audit import run_governance_audit
         report = run_governance_audit()
-        # With all resolved, urgent action items should be minimal
+        # 全解决了的话，紧急行动建议应该没有或很少
         self.assertNotIn("🔴", report)  # No urgent (red) action items
 
 
-# -- 4. All Pending/Urgent DB — Poor Health --
+# 4. 全部积压的库
 
 class TestGovernanceAuditAllPending(unittest.TestCase):
 
@@ -272,25 +272,25 @@ class TestGovernanceAuditAllPending(unittest.TestCase):
     def test_all_pending_mentions_stale(self):
         from agent.governance_audit import run_governance_audit
         report = run_governance_audit()
-        # Should mention the 7+ day stale issues
+        # 应该提到那些超过 7 天的积压单
         self.assertTrue("积压" in report or "7天" in report)
 
 
-# -- 5. DB Error — Graceful Degradation --
+# 5. 数据库报错兜底
 
 class TestGovernanceAuditDBError(unittest.TestCase):
 
     def test_db_error_graceful(self):
-        """When DB is not initialized, audit should return error message, not crash."""
-        # Temporarily break the DB path to simulate error
+        """库没初始化时，审计应该返回错误提示而不是崩。"""
+        # 故意把库搞坏来模拟报错
         from agent.governance_audit import run_governance_audit
-        # run_governance_audit catches exceptions and returns error string
-        # Even with broken DB, it should not raise
+        # run_governance_audit 内部会接住异常，返回错误字符串
+        # 就算库坏了也不能抛
         try:
             report = run_governance_audit()
             self.assertIsInstance(report, str)
         except Exception:
-            # If DB completely broken, function should still handle it
+            # 库彻底坏了函数也得兜住
             pass
 
 

@@ -48,7 +48,7 @@ class TestDispatchByDepartment(unittest.TestCase):
         from data.db_dispatch import auto_dispatch
         iid = report_issue("邻里纠纷", "邻里矛盾", reporter_id=self.resident)
         result = auto_dispatch(iid)
-        # 居委会部门无网格员 → fallback 网格办 → grid_mgmt
+        # 居委会部门没有网格员 → 退回网格办 → grid_mgmt
         self.assertEqual(result["assignee_id"], self.grid_mgmt)
 
 

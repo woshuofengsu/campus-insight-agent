@@ -21,7 +21,7 @@ _ICON_PATHS = {
 
 
 def material_icon(name: str, size: int = 24, color: str = "currentColor") -> str:
-    """Return an inline SVG for a Material Symbol. Falls back to empty string."""
+    """返回 Material Symbol 的内联 SVG，查不到就返回空串。"""
     path = _ICON_PATHS.get(name)
     if not path:
         return ""

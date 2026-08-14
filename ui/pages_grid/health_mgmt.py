@@ -1,4 +1,3 @@
-# ui/pages_grid/health_mgmt.py
 """健康管理（网格员端）—— 全小区健康风险、预警推送、防护建议."""
 import streamlit as st
 import altair as alt
@@ -26,7 +25,7 @@ hc = h["overall_color"]
 hs = h["overall_score"]
 hcolor = TOKEN[hc] if hc in ("success", "warning", "danger") else TOKEN["accent"]
 
-# Overview banner
+# 总览横幅
 
 level_label = {"low": "🟢 低风险", "moderate": "🟡 注意防护", "high": "🟠 警示", "critical": "🔴 高危预警"}
 st.markdown(
@@ -55,13 +54,13 @@ with c4:
 
 st.markdown("---")
 
-# Disease risk table
+# 疾病风险表
 
 section("🦠 疾病风险明细表")
 
 diseases_sorted = sorted(h["diseases"], key=lambda x: -x["adjusted_risk"])
 
-# Build DataFrame
+# 组装表格数据
 df_rows = []
 for d in diseases_sorted:
     ar = d["adjusted_risk"]
@@ -84,7 +83,7 @@ for d in diseases_sorted:
 
 df = pd.DataFrame(df_rows)
 
-# Visual: bar chart
+# 画条形图
 bar_chart = configure_altair(
     alt.Chart(df)
     .mark_bar(size=22)
@@ -103,7 +102,7 @@ st.altair_chart(bar_chart, width="stretch")
 
 st.markdown("---")
 
-# Detailed disease cards with action buttons
+# 各疾病详情卡片，带操作按钮
 
 section("📋 详细防护建议")
 
@@ -134,12 +133,12 @@ for d in diseases_sorted:
                 f'</div>',
                 unsafe_allow_html=True,
             )
-            # Quick action: push notification placeholder
+            # 快捷操作：推送提醒（先占位）
             if ar >= 50:
                 if st.button("📢 推送提醒", key=f"health_push_{d['name']}", width="stretch"):
                     st.toast(f"已推送「{d['name']}」防护提醒到全小区通知", icon="📢")
 
-# Community density section
+# 人员密度
 
 st.markdown("---")
 section("👥 小区人员密度评估")
@@ -164,7 +163,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Weather factors
+# 天气因子
 
 st.markdown("---")
 section("🌡️ 天气风险因子")

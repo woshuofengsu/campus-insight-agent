@@ -1,5 +1,5 @@
 # ui/onboarding.py
-"""First-time user onboarding — two-step flow: pick role, fill profile."""
+"""首次使用引导 — 两步：选身份，填资料。"""
 import base64
 import os
 import streamlit as st
@@ -8,7 +8,7 @@ from ui.components import TOKEN
 
 
 def _get_bg_base64() -> str:
-    """Auto-detect any image in assets/ and return as base64 data URL."""
+    """自动找 assets/ 里的图片，转成 base64 数据链接。"""
     assets_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
     if not os.path.isdir(assets_dir):
         return ""
@@ -23,20 +23,20 @@ def _get_bg_base64() -> str:
 
 
 def render_onboarding(memory: MemoryManager) -> bool:
-    """Render a premium onboarding screen with two-step flow.
+    """渲染两步式引导页。
 
-    Caller must check memory.is_onboarding_done() before invoking.
-    Returns False (onboarding still in progress).
+    调用前记得先查 memory.is_onboarding_done()。
+    返回 False（引导还没走完）。
     """
     bg = _get_bg_base64()
     has_bg = bool(bg)
 
-    # Colors — always light & welcoming
+    # 引导页颜色固定用浅色，显得亲切
     text_color = TOKEN["text"]
     muted_color = TOKEN["text_sec"]
     accent = TOKEN["accent"]
 
-    # Minimal background CSS
+    # 背景图 CSS，能少则少
     if has_bg:
         st.markdown(f"""
 <style>
@@ -64,8 +64,8 @@ def render_onboarding(memory: MemoryManager) -> bool:
 
 
 def _render_step_role(text_color, muted_color, accent):
-    """Step 1: Choose role — resident or grid."""
-    # Center with columns
+    """第一步：选身份 — 居民 / 网格员 / 老年关怀版。"""
+    # 用列居中
     col_l, col_m, col_r = st.columns([1, 1.5, 1])
     with col_m:
         st.markdown(f"""
@@ -100,7 +100,7 @@ def _render_step_role(text_color, muted_color, accent):
                 st.rerun()
             st.caption("大字模式 · 一键呼叫 · 吃药提醒")
 
-        # Step dots
+        # 步骤圆点
         st.markdown(f"""
         <div style="display:flex;justify-content:center;gap:8px;margin-top:32px;">
             <div style="width:8px;height:8px;border-radius:50%;background:{accent};"></div>
@@ -110,7 +110,7 @@ def _render_step_role(text_color, muted_color, accent):
 
 
 def _render_step_form(memory, role, text_color, muted_color, accent):
-    """Step 2: Fill in role-specific profile info."""
+    """第二步：按身份填对应的资料。"""
     is_resident = role == "resident"
     is_elderly = role == "elderly"
     if is_elderly:
@@ -120,7 +120,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
     else:
         emoji, title, subtitle, btn_label = "🦺", "网格员信息", "填写工作信息，进入网格员工作台", "进入工作台"
 
-    # Center with columns
+    # 用列居中
     col_l, col_m, col_r = st.columns([1, 2.2, 1])
     with col_m:
         st.markdown(f"""
@@ -170,7 +170,7 @@ def _render_step_form(memory, role, text_color, muted_color, accent):
         with c_submit:
             submitted = st.button(btn_label, type="primary", use_container_width=True)
 
-        # Step dots
+        # 步骤圆点
         st.markdown(f"""
         <div style="display:flex;justify-content:center;gap:8px;margin-top:24px;">
             <div style="width:8px;height:8px;border-radius:50%;background:{TOKEN["border_visible"]};"></div>

@@ -8,7 +8,7 @@ import streamlit as st
 
 
 def require_role(required: str) -> None:
-    """Block the page if the logged-in user's role does not match `required`."""
+    """当前登录角色和 required 对不上就拦下这个页面。"""
     profile = st.session_state.get("user_profile") or {}
     role = profile.get("role", "resident")
     if role != required:

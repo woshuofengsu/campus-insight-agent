@@ -1,5 +1,4 @@
-# data/db_perception.py
-"""🧠 背景感知模块 — 定期扫描社区数据，生成感知洞察.
+"""背景感知模块 — 定期扫描社区数据，生成感知洞察。
 
 触发机制:
   - 任意用户访问任意页面 → init_session() → 检查距上次扫描是否超过阈值
@@ -19,10 +18,10 @@ from data.db_core import get_db
 
 _log = logging.getLogger(__name__)
 
-# ── 默认扫描间隔（分钟）──
+# 默认扫描间隔（分钟）
 DEFAULT_SCAN_INTERVAL_MINUTES = 30
 
-# ── 异常检测阈值 ──
+# 异常检测阈值
 ANOMALY_SPIKE_RATIO = 2.5    # 某分类当日新增 > 日均 × 2.5 → 异常
 ANOMALY_MIN_COUNT = 3        # 至少达到此数量才触发异常
 # SLA 超期口径已收敛到 data/db_sla.py（极急6h / 紧急24h / 普通72h），
@@ -93,7 +92,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
     week_ago = _n_days_ago(7)
 
     with get_db() as conn:
-        # -- 1. 基础数据采集 --
+        # 1. 基础数据采集
         total = conn.execute("SELECT COUNT(*) as cnt FROM community_issues").fetchone()["cnt"]
         pending = conn.execute(
             "SELECT COUNT(*) as cnt FROM community_issues WHERE status IN ('待处理','处理中')"
@@ -106,7 +105,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             (today_str,),
         ).fetchone()["cnt"]
 
-        # -- 2. 趋势分析 — 本周 vs 上周 --
+        # 2. 趋势分析：本周 vs 上周
         this_week_new = conn.execute(
             "SELECT COUNT(*) as cnt FROM community_issues WHERE date(reported_at) >= ?",
             (week_ago,),
@@ -143,7 +142,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
 
         resolution_rate = round(this_week_resolved / max(1, this_week_new) * 100)
 
-        # -- 3. 异常检测 — 分类/地点激增 --
+        # 3. 异常检测：分类/地点激增
         anomalies: list[dict] = []
 
         # 3a. 分类激增检测：今日各分类 vs 近7天日均
@@ -162,7 +161,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                 "WHERE category = ? AND date(reported_at) >= ? AND date(reported_at) < ?",
                 (cat, week_ago, today_str),
             ).fetchone()["cnt"]
-            avg_daily = week_total / max(1, 6)  # exclude today
+            avg_daily = week_total / max(1, 6)  # 不算今天
 
             if today_cnt >= ANOMALY_MIN_COUNT and today_cnt > avg_daily * ANOMALY_SPIKE_RATIO:
                 anomalies.append({
@@ -201,7 +200,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                         "level": "warning",
                     })
 
-        # -- 4. 积压预警 — SLA 超期工单（分级口径统一走 data/db_sla.py）--
+        # 4. 积压预警：SLA 超期工单（口径统一走 data/db_sla.py）
         from data.db_sla import get_sla_summary
         _sla = get_sla_summary()
         overdue_critical = _sla["critical_overdue"]   # 极急/紧急 超时
@@ -222,7 +221,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                 "level": "warning",
             })
 
-        # -- 5. 舆情快照 — 近期反馈情绪 --
+        # 5. 舆情快照：近期反馈情绪
         sentiment_rows = conn.execute(
             "SELECT sentiment, COUNT(*) as cnt FROM feedback_items "
             "WHERE created_at >= ? GROUP BY sentiment",
@@ -235,7 +234,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         total_fb = pos + neg + neu
         sentiment_ratio = round(pos / max(1, total_fb) * 100) if total_fb else 50
 
-        # -- 6. 提案动态 --
+        # 6. 提案动态
         proposals_active = conn.execute(
             "SELECT COUNT(*) as cnt FROM proposals WHERE status='讨论中'"
         ).fetchone()["cnt"]
@@ -244,10 +243,10 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             (week_ago,),
         ).fetchone()["cnt"]
 
-        # -- 7. 生成综合摘要 --
+        # 7. 生成综合摘要
         key_findings: list[str] = []
 
-        # Trend finding
+        # 趋势发现
         if trend == "rising":
             key_findings.append(
                 f"📈 近7天新增工单 {this_week_new} 件，较上周（{last_week_new} 件）明显上升"
@@ -276,11 +275,11 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
             mood = "积极" if sentiment_ratio >= 60 else "一般" if sentiment_ratio >= 40 else "需要关注"
             key_findings.append(f"💬 近7天居民反馈情绪：{mood}（正面率 {sentiment_ratio}%）")
 
-        # Anomaly findings
+        # 异常发现
         for a in anomalies:
             key_findings.append(f"{'🔴' if a['level'] == 'critical' else '🟡'} {a['message']}")
 
-        # Overall summary (1-line)
+        # 一句话总结
         if not anomalies and trend in ("stable", "declining"):
             overall = f"🌿 社区运转正常 · {today_new} 件新增 · 解决率 {resolution_rate}%"
         elif anomalies:
@@ -292,7 +291,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         else:
             overall = f"📊 社区运转平稳 · {today_new} 件新增 · 待处理 {pending} 件"
 
-        # -- 8. 持久化 --
+        # 8. 持久化
         details = {
             "this_week_new": this_week_new,
             "this_week_resolved": this_week_resolved,
@@ -319,7 +318,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         )
         conn.commit()
 
-        # -- 9. 记录到活动日志 --
+        # 9. 记录到活动日志
         try:
             from data.db_notifications import log_activity
             log_activity(
@@ -327,8 +326,8 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
                 target_type="perception",
                 detail=f"发现 {len(anomalies)} 项异常 · {today_new} 件新增工单",
             )
-        except Exception:  # best-effort, skip
-            _log.debug("Failed to log activity for perception scan", exc_info=True)
+        except Exception:  # 尽力而为，失败就算了
+            _log.debug("perception 扫描记活动日志失败", exc_info=True)
             pass
 
     result = {
@@ -346,7 +345,7 @@ def _do_perception_scan(trigger: str = "auto") -> dict:
         "issues_new_today": today_new,
     }
 
-    _log.info("Perception scan complete: %s", overall)
+    _log.info("perception 扫描完成：%s", overall)
     return result
 
 

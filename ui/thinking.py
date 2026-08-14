@@ -1,11 +1,11 @@
 # ui/thinking.py
-"""Agent reasoning-chain visualizer — renders OODA steps and association insights.
+"""Agent 推理链可视化 — 渲染 OODA 步骤和关联发现。
 
-Consumed by the chat UI (home.py) after each agent turn. Works with two data
-shapes: structured (list[dict] steps + associations) or fallback (raw
-thinking_text from DeepSeek <think> tags).
+聊天页（home.py）每次 agent 跑完一轮后调用。数据有两种形态：
+结构化（list[dict] 的 steps + associations）或兜底（DeepSeek <think>
+标签里的原始 thinking_text）。
 
-All rendering uses inline CSS and the TOKEN design system from ui.components.
+渲染全部走内联 CSS 和 ui.components 的 TOKEN 设计系统。
 """
 
 import html as _html
@@ -17,7 +17,7 @@ _log = logging.getLogger(__name__)
 
 
 def _esc(text: str) -> str:
-    """HTML-escape user-provided text to prevent injection and rendering breakage."""
+    """转义用户输入，防止注入和渲染被搞坏。"""
     if not text:
         return ""
     return _html.escape(str(text), quote=False)
@@ -32,25 +32,23 @@ PHASE_COLORS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Structured reasoning chain
-# ---------------------------------------------------------------------------
+# 结构化推理链
 
 def render_reasoning_chain(
     steps: list[dict] | None,
     associations: dict | None = None,
 ) -> None:
-    """Render the agent's reasoning chain as a polished expandable component.
+    """把 agent 的推理链渲染成一个可展开的组件。
 
-    Each step dict: phase, icon, tool_name, tool_input, tool_output, summary.
-    Associations dict: spatial, temporal, recurrence, has_insight, insight_text.
+    step 字典字段：phase, icon, tool_name, tool_input, tool_output, summary。
+    associations 字典字段：spatial, temporal, recurrence, has_insight, insight_text。
     """
     if not steps:
         return
 
     n = len(steps)
 
-    # Build a compact summary for the expander label (first step summary)
+    # 折叠面板标题用第一步的摘要，太长了截断
     first_summary = _esc(steps[0].get("summary", "")) if steps else ""
     label_summary = first_summary[:28] + ("…" if len(first_summary) > 28 else "")
     with st.expander(
@@ -62,11 +60,11 @@ def render_reasoning_chain(
             border = PHASE_COLORS.get(phase, TOKEN["border"])
             icon = s.get("icon", "🔹")
 
-            # Truncated tool-input string (JSON, max 80 chars)
+            # 工具入参转 JSON 后截断，最多 80 字符
             try:
                 inp = json.dumps(s.get("tool_input", {}), ensure_ascii=False)
             except Exception:
-                _log.debug("non-critical failure", exc_info=True)
+                _log.debug("非致命错误", exc_info=True)
                 inp = str(s.get("tool_input", ""))
             inp = (inp[:77] + "...") if len(inp) > 80 else inp
 
@@ -74,7 +72,7 @@ def render_reasoning_chain(
             tool_output = _esc(s.get("tool_output", ""))
             summary_safe = _esc(s.get("summary", ""))
 
-            # Build details line: tool_name · input · output
+            # 拼详情行：工具名 · 入参 · 输出
             _tmu = TOKEN["text_muted"]
             _tsec = TOKEN["text_sec"]
             detail_parts = []
@@ -205,22 +203,19 @@ def render_reasoning_chain(
                     unsafe_allow_html=True,
                 )
 
-            # Insight text rendered separately for proper markdown processing
+            # 关联结论单独渲染，好走 markdown
             if insight_text:
                 st.markdown(insight_text)
 
             _render_proactive_suggestions(associations, steps)
 
 
-# ---------------------------------------------------------------------------
-# Proactive suggestion engine
-# ---------------------------------------------------------------------------
+# 主动建议引擎
 
 def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None:
-    """Generate actionable "you might want to..." suggestions from association data.
+    """根据关联数据生成「你可能想…」的可操作建议。
 
-    Looks at spatial clusters, anomalies, linked proposals, and tool calls to
-    suggest concrete next actions the user can take.
+    看空间聚集、异常、关联提案和工具调用情况，给用户推具体能做的事。
     """
     suggestions: list[dict] = []  # {icon, text, action_hint}
 
@@ -230,7 +225,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
     recurrence = associations.get("recurrence", [])
     efficiency = associations.get("resolution_efficiency", [])
 
-    # 1. Spatial cluster → suggest checking related issues
+    # 1. 空间聚集 → 建议去查相关工单
     if len(spatial) >= 2:
         locations = sorted({(r.get("location") or r.get("title", ""))[:12] for r in spatial})
         loc_str = "、".join(locations[:2])
@@ -239,7 +234,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
             "action_hint": '输入「查看该区域详情」了解更多',
         })
 
-    # 2. Anomaly spike → suggest reporting or monitoring
+    # 2. 某类激增 → 建议上报或关注
     if anomalies:
         top_anomaly = anomalies[0]
         suggestions.append({
@@ -247,7 +242,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
             "action_hint": "你可以上报类似问题或查看相关提案",
         })
 
-    # 3. Linked proposals → suggest supporting them
+    # 3. 关联提案 → 建议去附议
     if linked:
         top_prop = linked[0]
         suggestions.append({
@@ -255,14 +250,14 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
             "action_hint": f'输入「附议提案 {top_prop["id"]}」来支持',
         })
 
-    # 4. Recurrence → suggest deeper investigation
+    # 4. 反复出现 → 建议深挖根因
     if recurrence:
         suggestions.append({
             "icon": "🔄", "text": f"发现 {len(recurrence)} 个复发问题，根本原因可能未解决",
             "action_hint": '输入「查看复发问题详情」了解更多',
         })
 
-    # 5. Slow resolution → suggest advocacy
+    # 5. 解决太慢 → 建议推动
     if efficiency:
         worst = efficiency[0]
         if worst.get("avg_days", 0) >= 5:
@@ -271,7 +266,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
                 "action_hint": '输入「我想提建议」来推动改善',
             })
 
-    # 6. Based on tool usage → contextual suggestions
+    # 6. 看这轮用了哪些工具，给场景化建议
     tool_names = [s.get("tool_name", "") for s in (steps or [])]
     if "report_issue" in tool_names:
         suggestions.append({
@@ -287,7 +282,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
     if not suggestions:
         return
 
-    # Render as a clean suggestions bar
+    # 渲染成一条干净的建议栏
     items_html = ""
     for sug in suggestions[:4]:
         items_html += (
@@ -309,9 +304,7 @@ def _render_proactive_suggestions(associations: dict, steps: list[dict]) -> None
     )
 
 
-# ---------------------------------------------------------------------------
-# Tool-call progress indicator (real-time)
-# ---------------------------------------------------------------------------
+# 工具调用进度条（实时）
 
 TOOL_ICONS = {
     "report_issue": "🔧", "query_issues": "🔍", "get_community_pulse": "🌊",
@@ -329,20 +322,20 @@ TOOL_LABELS = {
 
 
 def render_tool_progress(events: list[dict] | None) -> None:
-    """Render a compact real-time tool execution progress bar.
+    """渲染一个紧凑的实时工具执行进度条。
 
-    Reads StreamingCallback events and displays:
-      - Currently executing tool (with animated spinner)
-      - Completed tools (with checkmark and elapsed time)
-      - Failed tools (with error icon)
+    读 StreamingCallback 的事件流，展示：
+      - 正在执行的工具（带转圈动画）
+      - 已完成（打勾 + 耗时）
+      - 失败（错误图标）
 
     Args:
-        events: List of callback events from StreamingCallback.events
+        events: StreamingCallback.events 里的事件列表
     """
     if not events:
         return
 
-    # Parse tool timeline from events
+    # 从事件里整理出每个工具的时间线
     tool_events: dict[str, dict] = {}  # tool_name → {start, end, elapsed_ms, error}
     for ev in events:
         if ev["type"] == "tool_start":
@@ -363,7 +356,7 @@ def render_tool_progress(events: list[dict] | None) -> None:
     if not tool_events:
         return
 
-    # Build inline chip for each tool
+    # 每个工具拼一个小徽章
     chips: list[str] = []
     for tool_name, info in tool_events.items():
         icon = TOOL_ICONS.get(tool_name, "⚙️")
@@ -413,12 +406,10 @@ def render_tool_progress(events: list[dict] | None) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Fallback: raw thinking text
-# ---------------------------------------------------------------------------
+# 兜底：原始思考文本
 
 def render_thinking_fallback(thinking_text: str | None) -> None:
-    """Fallback for raw DeepSeek <think> text when no structured steps exist."""
+    """没有结构化步骤时，直接展示 DeepSeek <think> 原始文本。"""
     if not thinking_text or not thinking_text.strip():
         return
 

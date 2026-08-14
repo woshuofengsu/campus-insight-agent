@@ -1,6 +1,6 @@
-"""End-to-end verification test suite.
+"""端到端验证测试。
 
-Compatible with both pytest collection and direct execution:
+pytest 收集和直接执行都行：
     pytest tests/test_verify_all.py -s
     python tests/test_verify_all.py
 """
@@ -9,7 +9,7 @@ import sys, os, tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
-# --  Helper utilities --
+# 辅助函数
 
 def _ok(msg):
     print(f'  [OK] {msg}')
@@ -20,7 +20,7 @@ def _fail(msg):
 
 
 def _check(condition, count_obj, fail_msg):
-    """Increment counter; return (condition, count_obj)."""
+    """计数加一，返回 (条件, 计数对象)。"""
     count_obj[0] += 1
     if condition:
         count_obj[1] += 1
@@ -29,14 +29,14 @@ def _check(condition, count_obj, fail_msg):
     return condition
 
 
-# Module-level storage so main() can read counts without test functions returning values
+# 放模块级，main() 才能读到每个用例的计数
 _section_counts = [0, 0]
 
 
-# --  1. Module compilation --
+# 1. 模块编译
 
 def test_01_module_compilation():
-    """1. Module Compilation (35 modules)"""
+    """1. 模块编译（35 个模块）"""
     print('\n=== 1. Module Compilation (53 modules) ===')
     modules = [
         'config', 'agent.prompt', 'agent.engine', 'agent.reflector', 'agent.memory', 'agent.callbacks',
@@ -56,7 +56,7 @@ def test_01_module_compilation():
         'utils.logger', 'utils.retry', 'utils.text',
         'perception.monitor',
     ]
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
     for m in modules:
         try:
             __import__(m)
@@ -69,10 +69,10 @@ def test_01_module_compilation():
     _section_counts[:] = cnt
 
 
-# --  2. Persona routing --
+# 2. 角色路由
 
 def test_02_persona_routing():
-    """2. Persona Routing"""
+    """2. 角色路由"""
     print('\n=== 2. Persona Routing ===')
     from agent.prompt import detect_persona
     p_tests = [
@@ -85,14 +85,14 @@ def test_02_persona_routing():
         ('有哪些提案', '议事顾问'), ('附议提案3', '议事顾问'), ('查看工单进度', '数据分析师'),
         ('看看有什么问题', '数据分析师'),
         ('查询所有待处理工单', '数据分析师'),
-        # Status-query override: "修好了吗" type queries flip repair→data analyst
+        # 状态查询会覆盖角色："修好了吗" 这类会把报修翻成数据分析师
         ('我上报的水龙头修好了吗', '数据分析师'),
         ('助餐点灯修好了吗', None),
         ('工单#42解决了吗', '数据分析师'),
         ('我之前报修的灯泡有进展吗', '数据分析师'),
         ('3号楼厕所堵了处理了吗', '数据分析师'),
         ('我那个提案有回复吗', '议事顾问'),
-        # Genuine repair intents should still route correctly
+        # 真正的报修意图还是得正常路由
         ('3号楼灯坏了', '接诉助手'),
         ('助餐点没电了', '接诉助手'),
         ('水龙头漏水了', '接诉助手'),
@@ -110,10 +110,10 @@ def test_02_persona_routing():
     _section_counts[:] = [len(p_tests), p_ok]
 
 
-# --  3. Text-action parsing --
+# 3. 文本动作解析
 
 def test_03_text_action_parsing():
-    """3. Text-Action Parsing"""
+    """3. 文本动作解析"""
     print('\n=== 3. Text-Action Parsing ===')
     from agent.reflector._parser import parse_text_actions as _parse_text_actions, _TEXT_ACTION_PATTERNS
     t_tests = [
@@ -135,10 +135,10 @@ def test_03_text_action_parsing():
     _section_counts[:] = [len(t_tests), t_ok]
 
 
-# --  4. Step summarization (14 tools) --
+# 4. 步骤总结（14 个工具）
 
 def test_04_step_summarization():
-    """4. Step Summarization (14 tools)"""
+    """4. 步骤总结（14 个工具）"""
     print('\n=== 4. Step Summarization (14 tools) ===')
     from agent.reflector._parser import summarize_step as _summarize_step
     s_tests = [
@@ -163,13 +163,13 @@ def test_04_step_summarization():
     _section_counts[:] = [len(s_tests), s_ok]
 
 
-# --  5. Association dimensions --
+# 5. 关联维度
 
 def test_05_association_dimensions():
-    """5. Association Dimensions"""
+    """5. 关联维度"""
     print('\n=== 5. Association Dimensions ===')
     from agent.reflector import compute_associations, build_reasoning_chain
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
     result = compute_associations('test', [])
     keys = ['spatial', 'temporal', 'recurrence', 'anomalies', 'correlations',
             'linked_proposals', 'resolution_efficiency', 'has_insight', 'insight_text']
@@ -191,14 +191,14 @@ def test_05_association_dimensions():
     _section_counts[:] = cnt
 
 
-# --  6. System prompt --
+# 6. 系统提示词
 
 def test_06_system_prompt():
-    """6. System Prompt"""
+    """6. 系统提示词"""
     print('\n=== 6. System Prompt ===')
     from agent.prompt import get_system_prompt
     from agent.reflector._parser import _TEXT_ACTION_PATTERNS
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     prompt = get_system_prompt({'community': '测试大学', 'building': '大三', 'unit': '计算机'})
     if '预取' in prompt and 'report_issue' in prompt and len(prompt) > 2000:
@@ -217,10 +217,10 @@ def test_06_system_prompt():
     _section_counts[:] = cnt
 
 
-# --  7. Tool discovery --
+# 7. 工具发现
 
 def test_07_tool_discovery():
-    """7. Tool Discovery"""
+    """7. 工具发现"""
     print('\n=== 7. Tool Discovery ===')
     from tools import discover_tools
     tools = discover_tools()
@@ -232,14 +232,14 @@ def test_07_tool_discovery():
     _section_counts[:] = [1, 1 if len(tools) >= 10 else 0]
 
 
-# --  8. Database roundtrip --
+# 8. 数据库往返
 
 def test_08_database_roundtrip():
-    """8. Database Roundtrip"""
+    """8. 数据库往返"""
     print('\n=== 8. Database Roundtrip ===')
     db_path = os.path.join(tempfile.gettempdir(), 'test_community_verify.db')
     from data.database import init_db
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     try:
         init_db(db_path)
@@ -310,10 +310,10 @@ def test_08_database_roundtrip():
     _section_counts[:] = cnt
 
 
-# --  9. Prefetch functions --
+# 9. 预取函数
 
 def test_09_prefetch_functions():
-    """9. Prefetch Functions"""
+    """9. 预取函数"""
     print('\n=== 9. Prefetch Functions ===')
     from data.database import init_db
     from data.seed import seed_all
@@ -324,7 +324,7 @@ def test_09_prefetch_functions():
     db_path2 = os.path.join(tempfile.gettempdir(), 'test_prefetch_verify.db')
     init_db(db_path2)
     seed_all(db_path2)
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     pulse = _prefetch_pulse()
     if '社区脉搏' in pulse and '工单' in pulse:
@@ -361,7 +361,7 @@ def test_09_prefetch_functions():
         _fail('_prefetch_query_issues: empty or missing')
     cnt[0] += 1
 
-    # try_prefetch dispatch
+    # try_prefetch 的分发
     r1 = try_prefetch('社区脉搏有什么新动态？')
     if r1 is not None:
         cnt[1] += 1; _ok('try_prefetch("社区脉搏") matched')
@@ -417,13 +417,13 @@ def test_09_prefetch_functions():
     _section_counts[:] = cnt
 
 
-# --  10. Seed deterministic hash --
+# 10. 种子数据确定性哈希
 
 def test_10_seed_deterministic_hash():
-    """10. Seed Deterministic Hash"""
+    """10. 种子数据确定性哈希"""
     print('\n=== 10. Seed Deterministic Hash ===')
     from data.seed import _stable_hash
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     h1 = _stable_hash('test title 1', 4)
     h2 = _stable_hash('test title 1', 4)
@@ -445,16 +445,16 @@ def test_10_seed_deterministic_hash():
     _section_counts[:] = cnt
 
 
-# --  11. Proposal status response preservation --
+# 11. 提案状态回复保留
 
 def test_11_proposal_status_response_preservation():
-    """11. Proposal Status Response Preservation"""
+    """11. 提案状态回复保留"""
     print('\n=== 11. Proposal Status Response Preservation ===')
     db_path3 = os.path.join(tempfile.gettempdir(), 'test_proposal_verify.db')
     from data.database import init_db
     init_db(db_path3)
     from data.database import create_proposal, update_proposal_status, get_proposals
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     pid = create_proposal('测试提案Preserve', '测试', '社区事务', 'test_author')
     update_proposal_status(pid, '已回应', '官方回复测试文本')
@@ -481,16 +481,16 @@ def test_11_proposal_status_response_preservation():
     _section_counts[:] = cnt
 
 
-# --  12. Issue reopen (resolved_at → NULL) --
+# 12. 工单重开（resolved_at 清空）
 
 def test_12_issue_reopen_resolved_clearing():
-    """12. Issue Reopen Resolved Clearing"""
+    """12. 工单重开时清空 resolved_at"""
     print('\n=== 12. Issue Reopen Resolved Clearing ===')
     db_path4 = os.path.join(tempfile.gettempdir(), 'test_issue_reopen.db')
     from data.database import init_db
     init_db(db_path4)
     from data.database import report_issue, update_issue_status, get_issues
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     iid = report_issue('test reopen', '设施维修', 'loc', 'desc', '普通', 'author')
     update_issue_status(iid, '已解决')
@@ -517,10 +517,10 @@ def test_12_issue_reopen_resolved_clearing():
     _section_counts[:] = cnt
 
 
-# --  13. Enhanced anomaly detection --
+# 13. 增强版异常检测
 
 def test_13_enhanced_anomaly_detection():
-    """13. Enhanced Anomaly Detection"""
+    """13. 增强版异常检测"""
     print('\n=== 13. Enhanced Anomaly Detection ===')
     db_path5 = os.path.join(tempfile.gettempdir(), 'test_enhanced_reflector.db')
     from data.database import init_db, get_db
@@ -529,7 +529,7 @@ def test_13_enhanced_anomaly_detection():
     seed_all(db_path5)
     from agent.reflector import (_z_score_anomalies, _cross_time_comparison,
                                   _detect_upgrade_paths, compute_associations)
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     with get_db() as conn:
         za = _z_score_anomalies(conn)
@@ -555,7 +555,7 @@ def test_13_enhanced_anomaly_detection():
         _fail(f'upgrade_paths wrong type: {type(up)}')
     cnt[0] += 1
 
-    # Verify enriched association dict has new keys
+    # 确认关联结果里带了新字段
     assoc = compute_associations('教三楼灯坏了', [])
     new_keys = ['cross_time', 'z_anomalies', 'upgrade_paths']
     missing_new = [k for k in new_keys if k not in assoc]
@@ -565,7 +565,7 @@ def test_13_enhanced_anomaly_detection():
         _fail(f'Missing new keys: {missing_new}')
     cnt[0] += 1
 
-    # Verify z_anomalies entries have severity field
+    # 确认 z_anomalies 每条都有 severity 字段
     all_have_severity = all('severity' in a and 'level' in a for a in za)
     _ok(f'z_anomalies severity+level fields: {all_have_severity} (count={len(za)})')
     cnt[1] += 1
@@ -577,15 +577,15 @@ def test_13_enhanced_anomaly_detection():
     _section_counts[:] = cnt
 
 
-# --  14. Enhanced persona detection --
+# 14. 增强版角色识别
 
 def test_14_enhanced_persona_detection():
-    """14. Enhanced Persona Detection"""
+    """14. 增强版角色识别"""
     print('\n=== 14. Enhanced Persona Detection ===')
     from agent.prompt import detect_persona as _dp14
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
-    # Confidence scoring — high confidence
+    # 置信度打分 — 高置信
     r_conf = _dp14('3号楼灯坏了漏水故障')
     if r_conf and r_conf.get('confidence') == 'high' and r_conf.get('matched_count', 0) >= 3:
         cnt[1] += 1; _ok(f'High confidence: conf={r_conf["confidence"]}, matches={r_conf["matched_count"]}')
@@ -593,7 +593,7 @@ def test_14_enhanced_persona_detection():
         _fail(f'confidence result: {r_conf}')
     cnt[0] += 1
 
-    # Single short keyword
+    # 单个短关键词
     r_low = _dp14('灯')
     if r_low is None or r_low.get('confidence') == 'low':
         cnt[1] += 1; _ok(f'Short keyword: low/no confidence: {r_low}')
@@ -601,7 +601,7 @@ def test_14_enhanced_persona_detection():
         _fail(f'low conf: {r_low}')
     cnt[0] += 1
 
-    # Very short input
+    # 输入太短
     r_short = _dp14('你好')
     if r_short is None:
         cnt[1] += 1; _ok('Very short input returns None')
@@ -609,7 +609,7 @@ def test_14_enhanced_persona_detection():
         _fail(f'short input should return None: {r_short}')
     cnt[0] += 1
 
-    # Mixed CN/EN input
+    # 中英混输
     r_mixed = _dp14('wifi坏了楼道')
     if r_mixed and '接诉' in r_mixed.get('role', ''):
         cnt[1] += 1; _ok(f'Mixed CN/EN: role={r_mixed["role"][:15]}..., conf={r_mixed.get("confidence")}')
@@ -617,7 +617,7 @@ def test_14_enhanced_persona_detection():
         _fail(f'Mixed CN/EN: {r_mixed}')
     cnt[0] += 1
 
-    # Three-way persona conflict
+    # 三个角色打架
     r_three = _dp14('统计最近的提案和水龙头漏水修复情况')
     if r_three and r_three.get('role'):
         cnt[1] += 1; _ok(f'Three-way conflict resolves: role={r_three["role"][:15]}..., conf={r_three.get("confidence")}')
@@ -625,7 +625,7 @@ def test_14_enhanced_persona_detection():
         _fail(f'Three-way: {r_three}')
     cnt[0] += 1
 
-    # Multi-persona blend
+    # 多角色混合
     r_blend = _dp14('统计最近社区动态和提案数据')
     if r_blend and r_blend.get('role'):
         cnt[1] += 1; _ok(f'Multi-persona: role={r_blend["role"][:15]}..., conf={r_blend.get("confidence")}')
@@ -637,17 +637,17 @@ def test_14_enhanced_persona_detection():
     _section_counts[:] = cnt
 
 
-# --  15. Governance audit data --
+# 15. 治理审计数据
 
 def test_15_governance_audit_data():
-    """15. Governance Audit Data"""
+    """15. 治理审计数据"""
     print('\n=== 15. Governance Audit Data ===')
     db_path6 = os.path.join(tempfile.gettempdir(), 'test_audit_report.db')
     from data.database import init_db, get_db, compute_health_score
     from data.seed import seed_all
     init_db(db_path6)
     seed_all(db_path6)
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     with get_db() as conn:
         issue_count = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
@@ -659,7 +659,7 @@ def test_15_governance_audit_data():
         _fail(f'counts: {issue_count}/{proposal_count}/{topic_count}')
     cnt[0] += 1
 
-    # Health score fields
+    # 健康度字段
     health = compute_health_score()
     if 'score' in health and 'grade' in health and 'resolution_rate' in health and 'trend' in health:
         cnt[1] += 1
@@ -674,15 +674,15 @@ def test_15_governance_audit_data():
     _section_counts[:] = cnt
 
 
-# --  16. Theme token consistency --
+# 16. 主题色板一致性
 
 def test_16_theme_token_consistency():
-    """16. Theme Token Consistency"""
+    """16. 主题色板一致性"""
     print('\n=== 16. Theme Token Consistency ===')
     from ui.theme import TOKEN_LIGHT, TOKEN_DARK
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
-    # Same keys in both themes
+    # 两套主题的键要一致
     if set(TOKEN_LIGHT.keys()) == set(TOKEN_DARK.keys()):
         cnt[1] += 1; _ok(f'Light/Dark tokens have identical keys ({len(TOKEN_LIGHT)} keys)')
     else:
@@ -691,7 +691,7 @@ def test_16_theme_token_consistency():
         _fail(f'Light-only: {only_light}, Dark-only: {only_dark}')
     cnt[0] += 1
 
-    # Radius tokens unchanged between themes
+    # 圆角在深浅色里保持一致
     radius_keys = ['radius_input', 'radius_card', 'radius_full']
     all_same = all(TOKEN_LIGHT[k] == TOKEN_DARK[k] for k in radius_keys)
     if all_same:
@@ -700,21 +700,21 @@ def test_16_theme_token_consistency():
         _fail('Radius tokens differ')
     cnt[0] += 1
 
-    # Transition tokens unchanged
+    # 过渡动画也保持一致
     if TOKEN_LIGHT['transition'] == TOKEN_DARK['transition']:
         cnt[1] += 1; _ok('Transition token identical')
     else:
         _fail('Transition differs')
     cnt[0] += 1
 
-    # Text colors differ (dark should be lighter)
+    # 文字颜色要不同（深色模式下应该更浅）
     if TOKEN_DARK['text'] != TOKEN_LIGHT['text']:
         cnt[1] += 1; _ok('Text colors differ between themes (expected)')
     else:
         _fail('Text colors identical')
     cnt[0] += 1
 
-    # Background colors differ
+    # 背景色要不同
     if TOKEN_DARK['card_bg'] != TOKEN_LIGHT['card_bg']:
         cnt[1] += 1; _ok('Card backgrounds differ between themes')
     else:
@@ -725,10 +725,10 @@ def test_16_theme_token_consistency():
     _section_counts[:] = cnt
 
 
-# --  17. Notification module --
+# 17. 通知模块
 
 def test_17_notification_module():
-    """17. Notification Module"""
+    """17. 通知模块"""
     print('\n=== 17. Notification Module ===')
     db_path7 = os.path.join(tempfile.gettempdir(), 'test_notify.db')
     from data.database import init_db, get_db
@@ -736,7 +736,7 @@ def test_17_notification_module():
     init_db(db_path7)
     seed_all(db_path7)
     from ui.notify import _fetch_counts, render_sidebar_badge
-    cnt = [0, 0]  # [total, passed]
+    cnt = [0, 0]  # [总数, 通过数]
 
     counts = _fetch_counts()
     if counts and 'total' in counts and 'pending' in counts and 'urgent' in counts:
@@ -746,7 +746,7 @@ def test_17_notification_module():
         _fail(f'fetch_counts: {counts}')
     cnt[0] += 1
 
-    # Verify counts are integers
+    # 确认计数都是整数
     all_ints = all(isinstance(counts.get(k, 0), int) for k in ['total', 'pending', 'urgent', 'proposal_total', 'proposal_pending'])
     if all_ints:
         cnt[1] += 1; _ok('All count values are integers')
@@ -754,7 +754,7 @@ def test_17_notification_module():
         _fail('Non-int values in counts')
     cnt[0] += 1
 
-    # Verify counts match DB reality
+    # 确认计数和库里的实际数量对得上
     with get_db() as conn:
         actual_total = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
         actual_pending = conn.execute("SELECT COUNT(*) FROM community_issues WHERE status='待处理'").fetchone()[0]
@@ -764,7 +764,7 @@ def test_17_notification_module():
         _fail(f'Count mismatch: {counts["total"]} != {actual_total}')
     cnt[0] += 1
 
-    # Verify proposal counts
+    # 确认提案计数
     with get_db() as conn:
         actual_props = conn.execute("SELECT COUNT(*) FROM proposals").fetchone()[0]
         actual_discussing = conn.execute("SELECT COUNT(*) FROM proposals WHERE status='讨论中'").fetchone()[0]
@@ -780,10 +780,10 @@ def test_17_notification_module():
     _section_counts[:] = cnt
 
 
-# --  Direct execution entry point (backward compatible) --
+# 直接执行入口（兼容旧用法）
 
 def main():
-    """Run all 17 verification sections. Compatible with `python tests/test_verify_all.py`."""
+    """跑全部 17 个验证模块，支持 `python tests/test_verify_all.py` 直接执行。"""
     tests = [
         test_01_module_compilation,
         test_02_persona_routing,

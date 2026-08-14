@@ -1,15 +1,14 @@
 # ui/notify.py
-"""Real-time notification system — sidebar badges + toast alerts.
+"""实时通知 — 侧边栏角标 + toast 弹提醒。
 
-Tracks "last seen" counts in st.session_state and detects changes on each
-rerun. When new issues appear (resident view) or urgent items increase
-(grid view), shows a toast notification and sidebar badge.
+在 st.session_state 里记「上次看到」的计数，每次 rerun 对比变化。
+居民端有新房客问题、网格员端紧急工单变多时，弹 toast 并在侧边栏显示角标。
 
-Architecture:
-  - Each check compares current DB counts vs. cached session_state counts
-  - On detection, updates cache + fires toast + renders badge
-  - Badge is a CSS red dot with count, rendered in sidebar
-  - Toast uses st.toast (Streamlit 1.59+)
+架构：
+  - 每次把库里当前计数和 session_state 里缓存的计数比一下
+  - 发现变化就更新缓存 + 弹 toast + 画角标
+  - 角标是 CSS 红点带数字，画在侧边栏
+  - toast 用 st.toast（Streamlit 1.59+）
 """
 
 import logging
@@ -21,18 +20,18 @@ _log = logging.getLogger(__name__)
 
 
 def _fetch_counts():
-    """Fetch current counts from DB. Returns dict or None if DB unavailable."""
+    """从库里取当前计数，库不可用时返回 None。"""
     try:
         from ui.cache import cached_issues_stats, cached_proposals_stats
         i_stats = cached_issues_stats()
         p_stats = cached_proposals_stats()
-        # Query DB directly for urgent count
+        # 紧急工单数直接查库
         try:
             from data.database import get_issues
             urgent_issues = get_issues(urgency="紧急", limit=100)
             urgent = len([i for i in urgent_issues if i.get("status") != "已解决"])
         except Exception:
-            _log.debug("Failed to query urgent issues for notification count", exc_info=True)
+            _log.debug("查询通知要用的紧急工单数失败", exc_info=True)
             urgent = 0
 
         return {
@@ -42,18 +41,17 @@ def _fetch_counts():
             "proposal_total": p_stats["total"],
             "proposal_pending": p_stats["by_status"].get("讨论中", 0),
         }
-    except Exception:  # ok to fail
-        _log.debug("_fetch_counts failed", exc_info=True)
+    except Exception:  # 挂了就算了，不阻塞
+        _log.debug("_fetch_counts 挂了", exc_info=True)
         return None
 
 
 def check_and_notify():
-    """Main entry point — check for new items, fire toasts, cache counts.
+    """入口 — 检查有没有新东西，弹 toast，更新缓存计数。
 
-    Call once per rerun, before page content (after onboarding gate).
+    每次 rerun 调一次，放在页面内容之前（引导页通过之后）。
 
-    For residents: alerts on new pending issues matching their reports.
-    For grid managers: alerts on new urgent issues, new proposals.
+    居民端：有新工单就提醒；网格员端：新紧急工单、新提案会提醒。
     """
     counts = _fetch_counts()
     if not counts:
@@ -64,7 +62,7 @@ def check_and_notify():
         try:
             role = role.get_user_profile().get("role", "resident")
         except Exception:
-            _log.debug("Failed to resolve user role from memory profile", exc_info=True)
+            _log.debug("从记忆档案解析用户角色失败", exc_info=True)
             role = "resident"
     else:
         role = "resident"
@@ -78,15 +76,15 @@ def check_and_notify():
                     f"📢 社区新增 {new_count} 件工单，点击左侧「🌊 社区脉搏」查看最新动态",
                     icon="📢",
                 )
-            except Exception:  # log and skip
-                _log.debug("st.toast failed for resident notification (non-critical)")
+            except Exception:  # 记个日志跳过就行
+                _log.debug("st.toast 弹居民端通知失败（非致命错误）")
         st.session_state[SS.notif_last_total] = counts["total"]
 
     else:
         last_urgent = st.session_state.get(SS.notif_last_urgent, -1)
         last_proposal = st.session_state.get(SS.notif_last_proposal, -1)
 
-        # First load — just cache, don't notify
+        # 第一次进来只缓存，不弹通知
         if last_urgent == -1:
             st.session_state[SS.notif_last_urgent] = counts["urgent"]
             st.session_state[SS.notif_last_proposal] = counts["proposal_total"]
@@ -106,8 +104,8 @@ def check_and_notify():
         for msg in toasts:
             try:
                 st.toast(msg, icon="🔔")
-            except Exception:  # log and skip
-                _log.debug("st.toast failed for grid notification (non-critical)")
+            except Exception:  # 记个日志跳过就行
+                _log.debug("st.toast 弹网格端通知失败（非致命错误）")
 
         st.session_state[SS.notif_last_urgent] = counts["urgent"]
         st.session_state[SS.notif_last_proposal] = counts["proposal_total"]
@@ -115,12 +113,12 @@ def check_and_notify():
 
 
 def render_sidebar_badge():
-    """Render notification badges in the sidebar.
+    """在侧边栏渲染通知角标。
 
-    Shows:
-      - 🔴 badge for urgent items (grid only)
-      - 🟡 badge for pending items
-      - 🔔 badge for unread notifications (both roles)
+    展示：
+      - 🔴 紧急工单数（只有网格员看得到）
+      - 🟡 待处理数
+      - 🔔 未读消息数（两个角色都有）
     """
     counts = _fetch_counts()
     if not counts:
@@ -130,8 +128,8 @@ def render_sidebar_badge():
     if role:
         try:
             role = role.get_user_profile().get("role", "resident")
-        except Exception:  # ok to fail
-            _log.debug("Failed to resolve user role in render_sidebar_badge", exc_info=True)
+        except Exception:  # 挂了就算了
+            _log.debug("在 render_sidebar_badge 里解析用户角色失败", exc_info=True)
             return
     else:
         return
@@ -142,8 +140,8 @@ def render_sidebar_badge():
     try:
         from data.db_notifications import get_unread_count
         unread_note = get_unread_count(user_id)
-    except Exception:  # log and skip
-        _log.debug("get_unread_count failed for user #%d (non-critical)", user_id)
+    except Exception:  # 记个日志跳过就行
+        _log.debug("用户 #%d 的 get_unread_count 查不到（非致命错误）", user_id)
 
     if role == "grid":
         urgent = counts.get("urgent", 0)
@@ -172,7 +170,7 @@ def render_sidebar_badge():
         if urgent > 0 or pending > 0:
             st.markdown(badge_html, unsafe_allow_html=True)
 
-    # Resident: show pending count + unread notifications
+    # 居民端：显示待处理数 + 未读消息
     else:
         pending = counts.get("pending", 0)
         if pending > 5 or unread_note > 0:

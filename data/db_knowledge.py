@@ -1,9 +1,6 @@
-# data/db_knowledge.py
-"""Knowledge base and feedback tables."""
+"""知识库和反馈表。"""
 from data.db_core import get_db
 
-
-# ── Knowledge Base ──
 
 def search_knowledge(query: str, category: str | None = None) -> list[dict]:
     with get_db() as conn:
@@ -21,7 +18,7 @@ def search_knowledge(query: str, category: str | None = None) -> list[dict]:
 
 
 def get_knowledge_base(category: str = "", limit: int = 20) -> list[dict]:
-    """List knowledge base entries, optionally filtered by category."""
+    """列知识库条目，可按分类过滤。"""
     with get_db() as conn:
         if category:
             rows = conn.execute(
@@ -37,7 +34,7 @@ def get_knowledge_base(category: str = "", limit: int = 20) -> list[dict]:
 
 
 def get_community_events(limit: int = 10) -> list[dict]:
-    """Get upcoming and recent community events from knowledge_base (category='event')."""
+    """从知识库拿社区活动，category 是 event/calendar/notice 的都算。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM knowledge_base WHERE category IN ('event', 'calendar', 'notice') ORDER BY id DESC LIMIT ?",
@@ -46,10 +43,8 @@ def get_community_events(limit: int = 10) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-# ── Feedback Items ──
-
 def get_feedback_stats() -> dict:
-    """Get overall sentiment stats and recent feedback items."""
+    """整体情感统计 + 最近几条反馈。"""
     with get_db() as conn:
         total = conn.execute("SELECT COUNT(*) as cnt FROM feedback_items").fetchone()
         positive = conn.execute(
@@ -79,7 +74,7 @@ def get_feedback_stats() -> dict:
 
 def add_feedback(topic: str, opinion: str, source: str = "用户反馈",
                  sentiment: str = "中性") -> int:
-    """Record a piece of feedback/opinion. Returns the new feedback ID."""
+    """记一条反馈/意见，返回新记录的 ID。"""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO feedback_items (topic, opinion, source, sentiment) VALUES (?,?,?,?)",
@@ -90,7 +85,7 @@ def add_feedback(topic: str, opinion: str, source: str = "用户反馈",
 
 
 def get_feedback_by_topic(topic: str, limit: int = 20) -> list[dict]:
-    """Get feedback items for a specific topic."""
+    """按主题查反馈。"""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM feedback_items WHERE topic LIKE ? ORDER BY created_at DESC LIMIT ?",
@@ -100,7 +95,7 @@ def get_feedback_by_topic(topic: str, limit: int = 20) -> list[dict]:
 
 
 def aggregate_feedback(topic: str) -> dict:
-    """Aggregate feedback sentiment for a topic."""
+    """汇总某个主题的情感分布。"""
     with get_db() as conn:
         total = conn.execute(
             "SELECT COUNT(*) as cnt FROM feedback_items WHERE topic LIKE ?",

@@ -1,5 +1,4 @@
-# data/seed.py
-"""Generate demo data for community governance competition demo.
+"""给社区治理比赛 demo 生成演示数据。
 
 海淀小区 · 接诉即办 社区治理叙事线：
   1. 电梯安全: 诉求 → 提案(加装电梯) → 讨论中
@@ -16,13 +15,13 @@ _log = logging.getLogger(__name__)
 
 
 def _stable_hash(text: str, mod: int = 4) -> int:
-    """Deterministic hash — stable across Python sessions (unlike built-in hash())."""
+    """确定性哈希 — 跨 Python 会话结果稳定（内置 hash() 不行）。"""
     h = hashlib.md5(text.encode("utf-8")).hexdigest()
     return int(h, 16) % mod
 
 
 def _seed_users():
-    """Seed demo users — resident + grid worker for competition demo."""
+    """种演示账号 — 居民 + 网格员，比赛 demo 用。"""
     users = [
         ("demo_resident", "", "resident", "海淀小区", "3号楼", "2单元501", "王阿姨", "HD0302501"),
         ("demo_grid", "demo123", "grid", "海淀小区", "网格一组", "", "刘网格员", "G2026001"),
@@ -79,11 +78,11 @@ def _seed_elderly_profile():
         ])
         set_living_alone(uid, True)
     except Exception as e:
-        _log.debug("Seed elderly profile failed: %s", e, exc_info=True)
+        _log.debug("seed 老人档案失败：%s", e, exc_info=True)
 
 
 def _seed_knowledge():
-    """Seed knowledge base: notices, governance guides, community policies."""
+    """种知识库：通知、治理指南、社区政策。"""
     entries = [
         ("event", "3号楼电梯停运检修通知",
          "8月15日（周六）8:00-12:00 对3号楼2单元电梯进行年度检修，期间电梯停运，请提前安排出行。检修电话：62319876。",
@@ -150,14 +149,14 @@ def _seed_knowledge():
 
 
 def _seed_issues():
-    """Seed 38 community complaints with authors for personal footprint demo."""
+    """种 38 条居民诉求，带上报人，好展示「我的」足迹。"""
     today = datetime.now()
     d = lambda n: (today - timedelta(days=n)).strftime("%Y-%m-%d")
 
     authors = ["王阿姨", "李叔", "张大爷", "赵先生", "孙女士", "刘女士", "陈先生", "周先生", "吴大爷"]
 
     issues = [
-        # ── Storyline 1: 电梯安全（高层痛点）──
+        # 叙事线1：电梯安全（高层痛点）
         ("3号楼2单元电梯困人频发", "安全隐患", "3号楼2单元",
          "本月电梯已两次困人，最长一次40分钟，老人孩子都吓坏了。物业检修后仍反复，必须彻底解决。",
          "紧急", "处理中", d(2), authors[0]),
@@ -170,7 +169,7 @@ def _seed_issues():
         ("2号楼2单元电梯按钮面板失灵", "设施维修", "2号楼2单元",
          "电梯内多个楼层按钮按下无反应，有次直接跳过5楼，老人按错楼层干着急。",
          "普通", "已解决", d(7), authors[3]),
-        # ── Storyline 2: 消防隐患 ──
+        # 叙事线2：消防隐患
         ("3号楼楼道堆放杂物堵塞消防通道", "安全隐患", "3号楼2单元楼道",
          "楼道堆满旧家具和纸箱，消防通道被堵了大半，一旦着火逃生通道都没了。",
          "紧急", "处理中", d(2), authors[0]),
@@ -183,7 +182,7 @@ def _seed_issues():
         ("消防栓前堆满纸箱杂物", "安全隐患", "8号楼1层消防栓",
          "消防栓被一堆废纸箱围住，紧急情况根本没法取用，灭火器也早已过期。",
          "极急", "处理中", d(0), authors[0]),
-        # ── Storyline 3: 停车难 ──
+        # 叙事线3：停车难
         ("小区车位不足夜间乱停", "停车管理", "小区主干道",
          "晚上回来车位全满，只能停路边，早上又挡住别人出不去，天天吵架。",
          "普通", "待处理", d(4), authors[3]),
@@ -193,7 +192,7 @@ def _seed_issues():
         ("外来车辆长期占位", "停车管理", "小区东门附近",
          "几辆外地牌照车长期占用公共车位，本地居民反而没地方停，建议设门禁识别。",
          "普通", "待处理", d(2), authors[1]),
-        # ── Storyline 4: 环境卫生 ──
+        # 叙事线4：环境卫生
         ("小区东南角垃圾桶满溢", "环境卫生", "东南角垃圾点",
          "垃圾桶三天没清运，垃圾堆到路边，异味和蚊蝇都来了，夏天实在难熬。",
          "普通", "已解决", d(8), authors[0]),
@@ -206,7 +205,7 @@ def _seed_issues():
         ("宠物粪便无人清理", "环境卫生", "小区步道",
          "遛狗不清理粪便，步道上到处都是，已经踩到过好几次，太恶心了。",
          "普通", "待处理", d(2), authors[4]),
-        # ── Storyline 5: 噪音扰民 ──
+        # 叙事线5：噪音扰民
         ("广场舞音响音量过大", "噪音扰民", "中心广场",
          "晚上7-9点广场舞音响开得震天响，家里孩子写作业都受影响，窗户都不敢开。",
          "普通", "待处理", d(3), authors[3]),
@@ -216,7 +215,7 @@ def _seed_issues():
         ("深夜施工噪音扰民", "噪音扰民", "小区北门附近",
          "北门外工地深夜还在施工，混凝土搅拌车声音持续到凌晨，整栋楼睡不好。",
          "普通", "待处理", d(2), authors[0]),
-        # ── Storyline 6: 管道老化 ──
+        # 叙事线6：管道老化
         ("4号楼1单元下水道堵塞", "设施维修", "4号楼1单元",
          "一楼厨房下水道返水，污水流得满地都是，一股恶臭，家里没法待。",
          "紧急", "处理中", d(1), authors[2]),
@@ -226,7 +225,7 @@ def _seed_issues():
         ("9号楼2单元厨房管道漏水", "设施维修", "9号楼2单元",
          "厨房顶部管道持续渗水，天花板都泡起皮了，怀疑楼上管道老化破裂。",
          "普通", "处理中", d(2), authors[3]),
-        # ── Storyline 7: 老年关怀 ──
+        # 叙事线7：老年关怀
         ("独居老人张大爷三天未出门", "社区事务", "11号楼3单元301",
          "独居张大爷三天没见出门，邻居敲门无人应，希望社区赶紧上门看看，担心出事。",
          "紧急", "处理中", d(0), authors[0]),
@@ -236,7 +235,7 @@ def _seed_issues():
         ("老年助餐点餐品单一", "社区事务", "社区助餐点",
          "助餐点每天就两三个菜，老人反映吃腻了，希望能丰富菜品、增加营养搭配。",
          "普通", "待处理", d(3), authors[2]),
-        # ── Storyline 8: 物业服务 ──
+        # 叙事线8：物业服务
         ("物业报修响应慢", "物业服务", "全小区",
          "报修快一周了都没人上门，打电话催总说“在安排”，服务效率太低。",
          "普通", "待处理", d(2), authors[4]),
@@ -249,7 +248,7 @@ def _seed_issues():
         ("小区监控多处失效", "物业服务", "小区各出入口",
          "东门和北门监控坏了，丢过快递也查不到，居民没有安全感。",
          "普通", "待处理", d(3), authors[1]),
-        # ── 更多场景 ──
+        # 更多场景
         ("12号楼顶层屋面漏水", "设施维修", "12号楼顶层",
          "顶楼住户反映一下雨就漏水，墙面都发霉了，雨季快到了急需处理。",
          "紧急", "处理中", d(1), authors[2]),
@@ -297,7 +296,7 @@ def _seed_issues():
 
 
 def _seed_proposals():
-    """Seed 19 community proposals with authors."""
+    """种 19 条社区提案，带作者。"""
     authors = ["王阿姨", "李叔", "张大爷", "赵先生", "孙女士", "刘女士", "陈先生", "周先生"]
 
     proposals = [
@@ -369,7 +368,7 @@ def _seed_proposals():
 
 
 def _seed_topics():
-    """Seed discussion topics with opinions from residents."""
+    """种讨论话题和居民意见。"""
     topics = [
         ("加装电梯你支持吗？",
          "4-12号楼无电梯，老人上下楼困难。有居民提议加装电梯。你支持吗？费用怎么分摊？一楼住户的顾虑如何化解？",
@@ -444,7 +443,7 @@ def _seed_topics():
 
 
 def _seed_feedback():
-    """Seed feedback items for sentiment analysis."""
+    """种反馈条目，供情感分析用。"""
     feedbacks = [
         ("电梯安全", "电梯困人太吓人了，希望能彻底修好", "用户反馈", "负面"),
         ("电梯安全", "上周物业派人检修了，最近没再困人", "用户反馈", "正面"),
@@ -485,7 +484,7 @@ def _seed_feedback():
 
 
 def seed_all(db_path: str):
-    """Seed the database with governance demo data. Only seeds if DB is empty — NEVER deletes existing data."""
+    """往库里种治理演示数据。只在库空的时候种——绝不删已有数据。"""
     init_db(db_path)
     with get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
@@ -503,21 +502,21 @@ def seed_all(db_path: str):
     _seed_proposals()
     _seed_topics()
     _seed_feedback()
-    # ── Surveillance data (CDC monthly bulletin) ──
+    # 疾控监测数据（国家疾控局月度公报）
     try:
         from data.db_surveillance import seed_surveillance
         surv_result = seed_surveillance()
         print(f"[seed] Health surveillance: {surv_result['msg']}")
     except Exception as e:
-        _log.debug("Health surveillance seeding failed: %s", e, exc_info=True)
+        _log.debug("种 health surveillance 数据失败：%s", e, exc_info=True)
         print(f"[seed] Health surveillance seeding skipped: {e}")
-    # ── Activity log backfill (from existing seed data) ──
+    # 用现有种子数据回填活动日志
     try:
         from data.db_notifications import seed_activity_from_existing
         act_result = seed_activity_from_existing()
         print(f"[seed] Activity log backfill: {act_result}")
     except Exception as e:
-        _log.debug("Activity log backfill failed: %s", e, exc_info=True)
+        _log.debug("回填活动日志失败：%s", e, exc_info=True)
         print(f"[seed] Activity log backfill skipped: {e}")
     print("[seed] Done! Seeded: 14 knowledge entries, 38 community issues, "
           "19 proposals, 7 discussion topics, 28 opinions, 28 feedback items, "

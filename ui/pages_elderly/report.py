@@ -1,4 +1,3 @@
-# ui/pages_elderly/report.py
 """🗣️ 一句话上报 — 语音/文字描述问题，自动分类生成工单."""
 import streamlit as st
 
