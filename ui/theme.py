@@ -314,8 +314,6 @@ initial-scale=1.0, maximum-scale=1.0, user-scalable=no">""",
 
 html, body, #root, [id="root"] {{
     background: {t["page_bg"]} !important;
-    margin: 0 !important;
-    padding: 0 !important;
     min-height: 100vh !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

@@ -4,20 +4,9 @@ import streamlit as st
 
 GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
-    html, body { margin: 0 !important; padding: 0 !important; overflow-x: hidden !important; }
     *, *::before, *::after { box-sizing: border-box; }
 
-    #MainMenu, footer, header[data-testid="stHeader"] { display: none !important; }
-    .stDeployButton { display: none !important; }
-
-    .stApp, .stApp > div, [data-testid="stAppViewContainer"],
-    [data-testid="stAppViewContainer"] > div,
-    [data-testid="stAppViewContainer"] > div > div,
-    [data-testid="stMain"], [data-testid="stMain"] > div {
-        padding: 0 !important; background: inherit;
-    }
-
-    html, body, [class*="css"] {
+    body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
                      "Microsoft YaHei", "Helvetica Neue", sans-serif;
         -webkit-font-smoothing: antialiased;
