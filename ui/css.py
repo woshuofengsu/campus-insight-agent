@@ -136,13 +136,11 @@ GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale
 </style>"""
 
 SIDEBAR_FORCE_CSS = """<style>
+/* 仅约束桌面端侧边栏宽度；不再强制展开已折叠的侧边栏（aria-expanded=false 的
+   强制显示会与 Streamlit 前端 DOM 状态冲突，触发 removeChild 错误导致白屏）。 */
 @media (min-width: 769px) {
-    [data-testid="stSidebar"],
-    [data-testid="stSidebar"][aria-expanded="false"],
-    [data-testid="stSidebarCollapsed"] {
-        display: flex !important; visibility: visible !important; opacity: 1 !important;
-        min-width: 240px !important; max-width: 300px !important; width: 280px !important;
-        transform: none !important; position: relative !important; left: 0 !important;
+    [data-testid="stSidebar"] {
+        min-width: 240px !important; max-width: 300px !important;
     }
 }
 </style>"""
