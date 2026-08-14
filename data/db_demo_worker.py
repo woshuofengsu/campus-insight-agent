@@ -13,11 +13,13 @@ from data.db_core import get_db
 _log = logging.getLogger(__name__)
 
 
-def process_new_issues(limit: int = 1) -> int:
+def process_new_issues(limit: int = 1, min_age_minutes: int = 3) -> int:
     """把最早的 N 条「待处理」工单推进为「已解决」（渐进，闭环可观察）。
 
-    每次只推进少量工单，避免一次性清空待办；只处理已派单的（assignee 非空），
-    呼应「自动派单 → 自动办结」的完整链路。返回本次处理的工单数。
+    每次只推进少量工单，避免一次性清空待办；只处理已派单（assignee 非空）且
+    上报超过 `min_age_minutes` 分钟的工单——让工单在「待处理」状态停留片刻，
+    居民/评委能看到「待处理→处理中→已解决」的真实过程，而非秒办结。
+    返回本次处理的工单数。
     """
     if not DEMO_AUTO_WORKER:
         return 0
@@ -28,8 +30,9 @@ def process_new_issues(limit: int = 1) -> int:
             rows = conn.execute(
                 "SELECT id FROM community_issues "
                 "WHERE status = '待处理' AND (assignee_id IS NOT NULL OR assignee != '') "
+                "AND reported_at < datetime('now', ?) "
                 "ORDER BY id ASC LIMIT ?",
-                (limit,),
+                (f'-{min_age_minutes} minutes', limit),
             ).fetchall()
         for r in rows:
             iid = r["id"]

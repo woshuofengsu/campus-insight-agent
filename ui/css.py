@@ -6,6 +6,11 @@ GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale
 <style>
     *, *::before, *::after { box-sizing: border-box; }
 
+    /* 隐藏 Streamlit 右上角工具栏（精准选择器，不碰 header 结构，避免 removeChild） */
+    .stDeployButton { display: none !important; }
+    #MainMenu { visibility: hidden !important; }
+    footer { display: none !important; }
+
     body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
                      "Microsoft YaHei", "Helvetica Neue", sans-serif;
