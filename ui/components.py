@@ -128,8 +128,8 @@ def stat(label: str, value: str, accent: str = "", sub: str = ""):
     )
     st.markdown(
         f'<div class="stat-card" style="background:{TOKEN["card_bg"]};'
-        f'border:1px solid {TOKEN["border"]};border-radius:{TOKEN["radius_card"]};'
-        f'padding:14px 16px;box-shadow:{TOKEN["shadow_sm"]};">'
+        f'border:none;border-radius:{TOKEN["radius_card"]};'
+        f'padding:{TOKEN["space_sm"]} {TOKEN["space_md"]};box-shadow:{TOKEN["shadow_sm"]};">'
         f'<div class="stat-label" style="font-size:{TOKEN["font_micro"]};'
         f'font-weight:{TOKEN["weight_semibold"]};color:{TOKEN["text_muted"]};'
         f'letter-spacing:0.03em;margin-bottom:5px;">{label}</div>'
@@ -211,8 +211,8 @@ def proposal_row(proposal: dict):
 
 def _card(inner: str, bg: str = "", border: str = "",
           pad: str = "", shadow: str = "", hover: bool = True) -> str:
+    # B 风格：无边框，靠柔阴影 + 大圆角区分卡片层级
     bg = bg or TOKEN["card_bg"]
-    bd = border or TOKEN["border"]
     pd = pad or TOKEN["space_md"]
     sh = shadow or TOKEN["shadow_sm"]
     hov = (
@@ -220,8 +220,8 @@ def _card(inner: str, bg: str = "", border: str = "",
         f"cursor: pointer;"
     ) if hover else ""
     return (
-        f'<div style="background:{bg};border:1px solid {bd};'
-        f'border-radius:{TOKEN["radius_card"]};padding:{pd};margin:5px 0;'
+        f'<div style="background:{bg};border:none;'
+        f'border-radius:{TOKEN["radius_card"]};padding:{pd};margin:6px 0;'
         f'box-shadow:{sh};{hov}font-size:{TOKEN["font_body"]};line-height:1.55;"'
         f' onmouseover="this.style.boxShadow=\'{TOKEN["shadow"]}\';'
         f'this.style.transform=\'translateY(-1px)\';"'
@@ -294,10 +294,11 @@ def reminder(title: str, message: str):
 
 def section(title: str):
     st.markdown(
-        f'<div style="display:flex;align-items:center;gap:10px;margin:26px 0 12px;">'
-        f'<div style="width:4px;height:20px;border-radius:2px;'
+        f'<div style="display:flex;align-items:center;gap:10px;'
+        f'margin:{TOKEN["space_xl"]} 0 {TOKEN["space_sm"]};">'
+        f'<div style="width:4px;height:22px;border-radius:2px;'
         f'background:{TOKEN["brand_gradient"]};flex-shrink:0;"></div>'
-        f'<div style="font-size:1.12em;font-weight:{TOKEN["weight_bold"]};'
+        f'<div style="font-size:{TOKEN["font_title"]};font-weight:{TOKEN["weight_bold"]};'
         f'color:{TOKEN["text"]};line-height:1.2;">{title}</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -305,25 +306,24 @@ def section(title: str):
 
 
 def page_header(title: str, subtitle: str = "", badge: str = ""):
-    """Gradient hero band — the unified page masthead for every surface."""
+    """Page header — clean, borderless, low-height (B 风格：无渐变底色，靠分隔线分层)."""
     badge_html = (
-        f'<span style="background:rgba(255,255,255,0.22);color:#ffffff;'
+        f'<span style="background:{TOKEN["accent_bg"]};color:{TOKEN["accent"]};'
         f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
         f'padding:3px 11px;border-radius:{TOKEN["radius_full"]};'
-        f'margin-left:10px;vertical-align:middle;'
-        f'border:1px solid rgba(255,255,255,0.35);">{badge}</span>'
+        f'margin-left:10px;vertical-align:middle;">{badge}</span>'
     ) if badge else ""
     sub_html = (
-        f'<div style="color:rgba(255,255,255,0.88);font-size:{TOKEN["font_body"]};'
-        f'margin-top:5px;font-weight:{TOKEN["weight_medium"]};'
+        f'<div style="color:{TOKEN["text_sec"]};font-size:{TOKEN["font_body"]};'
+        f'margin-top:4px;font-weight:{TOKEN["weight_medium"]};'
         f'max-width:760px;line-height:1.5;">{subtitle}</div>'
     ) if subtitle else ""
 
     st.markdown(
-        f'<div style="background:{TOKEN["brand_gradient"]};'
-        f'border-radius:14px;padding:22px 26px;margin-bottom:16px;'
-        f'box-shadow:0 10px 28px rgba(79,70,229,0.28);">'
-        f'<div style="font-size:1.45em;font-weight:{TOKEN["weight_bold"]};color:#ffffff;'
+        f'<div style="background:transparent;'
+        f'padding:4px 0 12px;margin-bottom:8px;'
+        f'border-bottom:1px solid {TOKEN["divider"]};">'
+        f'<div style="font-size:{TOKEN["font_display"]};font-weight:{TOKEN["weight_bold"]};color:{TOKEN["text"]};'
         f'letter-spacing:-0.01em;line-height:1.25;">{title}{badge_html}</div>'
         f'{sub_html}'
         f'</div>',

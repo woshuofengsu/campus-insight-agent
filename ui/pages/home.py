@@ -27,7 +27,8 @@ threshold = PERCEPTION_IDLE_SECONDS
 if last_interaction and (now - last_interaction) > threshold and (now - last_check) > threshold:
     st.session_state.last_check_time = now
     alerts = agent.run_perception_check()
-    for alert in alerts:
+    # 感知消息节流：一次最多注入 3 条，避免多条提醒叠加刷屏
+    for alert in alerts[:3]:
         alert_msg = f"**{alert['title']}**\n\n{alert['message']}"
         memory.add_message("assistant", alert_msg)
         reminder(alert["title"], alert["message"])

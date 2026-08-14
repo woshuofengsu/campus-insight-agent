@@ -42,7 +42,7 @@ def render_sidebar(profile: dict, role: str):
         f'<div style="min-width:0;">'
         f'<div style="font-size:1.05em;font-weight:700;color:{tx};'
         f'letter-spacing:-0.01em;line-height:1.25;">CommunityInsight</div>'
-        f'<div style="font-size:0.68em;color:{tx3};margin-top:1px;">'
+        f'<div style="font-size:0.75em;color:{tx3};margin-top:1px;">'
         f'{"社区治理平台" if role != "grid" else "网格员工作台"}</div>'
         f'</div></div>',
         unsafe_allow_html=True,
@@ -114,13 +114,14 @@ def render_sidebar(profile: dict, role: str):
                 unsafe_allow_html=True,
             )
 
-    # ── Emergency contacts（老年友好：一键拨打） ──
-    _section_label("紧急联系")
-    c_tel1, c_tel2 = st.columns(2)
-    with c_tel1:
-        st.link_button("📞 网格员", "tel:62319876", width="stretch")
-    with c_tel2:
-        st.link_button("🔧 物业", "tel:62310086", width="stretch")
+    # ── Emergency contacts（居民/老年友好：一键拨打；网格员无需自呼网格员/物业） ──
+    if role != "grid":
+        _section_label("紧急联系")
+        c_tel1, c_tel2 = st.columns(2)
+        with c_tel1:
+            st.link_button("📞 网格员", "tel:62319876", width="stretch")
+        with c_tel2:
+            st.link_button("🔧 物业", "tel:62310086", width="stretch")
 
     # ── Notifications ──
     render_sidebar_badge()
@@ -179,8 +180,8 @@ def render_sidebar(profile: dict, role: str):
 
 def _section_label(label: str):
     st.markdown(
-        f'<div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px;">'
-        f'<span style="font-size:0.68em;font-weight:600;color:{TOKEN["sidebar_text_muted"]};'
+        f'<div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px;">'
+        f'<span style="font-size:0.75em;font-weight:600;color:{TOKEN["sidebar_text_muted"]};'
         f'letter-spacing:0.06em;white-space:nowrap;">{label}</span>'
         f'<div style="flex:1;height:1px;background:{TOKEN["sidebar_border"]};"></div></div>',
         unsafe_allow_html=True,

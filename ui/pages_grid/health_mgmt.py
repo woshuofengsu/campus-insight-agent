@@ -130,7 +130,7 @@ for d in diseases_sorted:
             st.markdown(
                 f'<div style="text-align:center;padding-top:16px;">'
                 f'<div style="font-size:1.8em;font-weight:800;color:{hcolor};">{ar}</div>'
-                f'<div style="font-size:0.68em;color:{TOKEN["text_muted"]};">风险分</div>'
+                f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};">风险分</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )

@@ -34,6 +34,11 @@ DEMO_MODE = _secret("DEMO_MODE", "").lower() in ("1", "true", "yes")
 # 如需演示"持续活跃"的假数据，在 .env 设 DEMO_LIVE_DATA=true。
 DEMO_LIVE_DATA = _secret("DEMO_LIVE_DATA", "").lower() in ("1", "true", "yes")
 
+# ── 演示闭环机器人 ──
+# 默认开启：新工单自动走「处理中→已解决→通知居民」，让「办」字闭环真的转。
+# 生产/真实运营环境设 DEMO_AUTO_WORKER=false 关闭，回到人工流程。
+DEMO_AUTO_WORKER = _secret("DEMO_AUTO_WORKER", "true").lower() in ("1", "true", "yes")
+
 DEEPSEEK_API_KEY = _secret("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = _secret("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 DEEPSEEK_MODEL = _secret("DEEPSEEK_MODEL", "deepseek-chat")

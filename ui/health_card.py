@@ -58,7 +58,7 @@ def render_health_risk_overview(h: dict) -> None:
         if reasons:
             reason_str = " · ".join(list(reasons.keys())[:2])
             weather_note = (
-                f'<div style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-top:6px;">'
+                f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-top:6px;">'
                 f'🌡️ 天气关联：{reason_str}</div>'
             )
 
@@ -67,7 +67,7 @@ def render_health_risk_overview(h: dict) -> None:
     source_html = ""
     if source_note:
         source_html = (
-            f'<div style="font-size:0.68em;color:{TOKEN["text_muted"]};'
+            f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};'
             f'margin-top:6px;opacity:0.75;">📋 {source_note}</div>'
         )
 
@@ -147,7 +147,7 @@ def render_disease_detail_cards(h: dict) -> None:
             }
             dir_label = direction_cn.get(surv.get("trend_direction", ""), "")
             surv_note = (
-                f'<span style="font-size:0.68em;color:{TOKEN["success"]};margin-left:6px;'
+                f'<span style="font-size:0.75em;color:{TOKEN["success"]};margin-left:6px;'
                 f'font-weight:600;">📡 {dir_label}</span>'
             )
 
@@ -157,7 +157,7 @@ def render_disease_detail_cards(h: dict) -> None:
                 st.markdown(
                     f'<span style="font-size:1em;font-weight:700;color:{TOKEN["text"]};">'
                     f'{d["name"]}</span>'
-                    f'<span style="font-size:0.72em;color:{badge_color};margin-left:10px;'
+                    f'<span style="font-size:0.75em;color:{badge_color};margin-left:10px;'
                     f'font-weight:600;">{badge}</span>'
                     f'{surv_note}',
                     unsafe_allow_html=True,
@@ -188,7 +188,7 @@ def render_disease_detail_cards(h: dict) -> None:
                     f'margin-top:4px;width:80px;margin-left:auto;margin-right:auto;">'
                     f'<div style="width:{pct}%;height:100%;background:{gauge_color};border-radius:2px;"></div>'
                     f'</div>'
-                    f'<div style="font-size:0.65em;color:{TOKEN["text_muted"]};margin-top:2px;">'
+                    f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-top:2px;">'
                     f'基础 {d["base_risk"]} · 天气 +{h.get("weather_mod_total", 0)}</div>'
                     f'</div>',
                     unsafe_allow_html=True,

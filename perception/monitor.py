@@ -24,10 +24,21 @@ class PerceptionMonitor:
         self._check_auto_dispatch()
         self._check_escalation()
         self._check_elderly_safety()
+        self._check_demo_worker()
 
         if self.alerts:
             logger.info(f"Perception check: {len(self.alerts)} alert(s) generated")
         return self.alerts
+
+    def _check_demo_worker(self):
+        """演示闭环机器人：自动把新工单办结（处理中→已解决→通知居民）。"""
+        try:
+            from data.db_demo_worker import process_new_issues
+            processed = process_new_issues(limit=1)
+            if processed:
+                logger.info(f"Demo worker resolved {processed} issue(s)")
+        except Exception as e:
+            logger.warning(f"Demo worker check failed: {e}")
 
     def _check_elderly_safety(self):
         """独居老人安全检测：超时未互动 → 通知网格员留意（24h 去重）。"""
@@ -108,16 +119,22 @@ class PerceptionMonitor:
                     cat = i.get("category", "其他")
                     pending_by_cat[cat] = pending_by_cat.get(cat, 0) + 1
 
-            for cat, count in pending_by_cat.items():
-                if count >= 3:
-                    self.alerts.append({
-                        "title": f"{cat}热点提醒",
-                        "message": (
-                            f"近期{cat}类问题积压 {count} 件待处理。"
-                            f"建议关注此类问题的处理进展，如有新的同类问题请及时上报。"
-                        ),
-                        "emoji": "📊",
-                    })
+            # 合并为一条热点提醒（只列 Top 3 积压类别），避免一次刷屏多条
+            hot_cats = sorted(
+                ((cat, cnt) for cat, cnt in pending_by_cat.items() if cnt >= 3),
+                key=lambda x: -x[1],
+            )[:3]
+            if hot_cats:
+                parts = "、".join(f"{cat}({cnt}件)" for cat, cnt in hot_cats)
+                total = sum(cnt for _, cnt in hot_cats)
+                self.alerts.append({
+                    "title": "社区热点提醒",
+                    "message": (
+                        f"当前热点积压 {total} 件待处理：{parts}。"
+                        f"建议优先关注这些类别，如有同类问题请及时上报。"
+                    ),
+                    "emoji": "📊",
+                })
 
             # Auto-create discussion topic if a category hits threshold
             if max(pending_by_cat.values()) >= 5 if pending_by_cat else False:

@@ -1,11 +1,14 @@
 # agent/router.py
-"""意图 → 工具 语义路由（规则关键词 + LLM 语义兜底 + 置信度阈值）。
+"""意图 → 工具 语义路由（LLM 主决策 + 关键词快路径/兜底）。
 
-把「用户该调哪个工具」从提示词里的穷举触发词，升级为可扩展的语义路由：
-常见意图走规则（零延迟），未见表述走 LLM 语义（覆盖长尾），失败回退关键词/不干预。
-结果注入 ORIENT 阶段作为「本轮建议工具」，帮助主 Agent 更准地调用工具。
+V3 重构：把「用户该调哪个工具」的决策权交还给 LLM——
+- 明确查询类（社区脉搏/天气/我的工单…）走关键词快路径，省一次 LLM 调用；
+- 动作类/歧义类（上报/提案/长文本）走 LLM 结构化判断（含澄清机制）；
+- LLM 不可用/超时时回退关键词表（护栏，不抢主决策）。
 """
+import json
 import logging
+import re
 
 _log = logging.getLogger(__name__)
 
@@ -17,9 +20,13 @@ VALID_TOOLS = {
     "support_proposal", "query_knowledge",
 }
 
-# 规则关键词表（覆盖常见说法；未见表述交给 LLM 语义层）。
-# 顺序即优先级：强动作意图在前，report_issue（最宽泛）放最后做兜底，
-# 避免「充电桩」这种词把「我建议加装充电桩」误判成上报。
+# 快路径工具：明确、几乎无歧义的查询类意图（命中即跳过 LLM，零延迟）
+_FAST_PATH_TOOLS = {
+    "get_community_pulse", "get_weather", "query_my_issues",
+    "get_proposals", "get_topics", "get_governance_stats", "query_knowledge",
+}
+
+# 关键词兜底表（顺序即优先级：强意图在前，report_issue 最宽泛放最后）
 _TOOL_KEYWORDS: dict[str, list[str]] = {
     "get_weather": ["天气", "温度", "下雨", "刮风", "空气质量", "冷不冷", "热不热"],
     "get_community_pulse": ["社区脉搏", "最近发生", "动态", "热点", "大事", "情况怎么样", "有什么新", "新鲜事", "有啥事"],
@@ -41,7 +48,7 @@ _TOOL_KEYWORDS: dict[str, list[str]] = {
 
 
 def _keyword_route(text: str) -> tuple[str | None, str]:
-    """规则关键词路由。返回 (tool, confidence)。按表顺序匹配（强意图优先）。"""
+    """关键词兜底路由。返回 (tool, confidence)。"""
     for tool, kws in _TOOL_KEYWORDS.items():
         for kw in kws:
             if kw in text:
@@ -49,8 +56,8 @@ def _keyword_route(text: str) -> tuple[str | None, str]:
     return None, "low"
 
 
-def _llm_route(text: str) -> str | None:
-    """LLM 语义路由（best-effort，仅在规则低置信度时调用）。"""
+def _llm_route_structured(text: str) -> dict | None:
+    """LLM 结构化语义路由（主决策），输出 JSON 含澄清机制。"""
     try:
         from langchain_openai import ChatOpenAI
         from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
@@ -58,35 +65,65 @@ def _llm_route(text: str) -> str | None:
             return None
         llm = ChatOpenAI(
             api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
-            model=DEEPSEEK_MODEL, temperature=0, max_tokens=20, timeout=4, max_retries=0,
+            model=DEEPSEEK_MODEL, temperature=0, max_tokens=160, timeout=5, max_retries=0,
         )
         tool_list = "、".join(sorted(VALID_TOOLS))
         prompt = (
-            "你是社区治理助手的意图路由器。判断用户这句话最可能调用哪个工具。\n"
+            "你是社区治理助手的意图路由器。判断用户这句话的意图，输出 JSON。\n"
             f"可选工具：{tool_list}\n"
-            f"用户：{text[:120]}\n"
-            "只返回一个工具名，不要解释；若都不匹配返回 none。"
+            "规则：\n"
+            "1. tool 填最合适的工具名；实在无法判断填 null。\n"
+            "2. confidence 填 0~1 的小数（你的把握）。\n"
+            "3. 若信息不足、需要追问澄清，needs_clarification 填 true 并给出 question；否则 false。\n"
+            "只输出 JSON，不要任何解释：\n"
+            '{"tool": "...", "confidence": 0.9, "needs_clarification": false, "question": ""}\n'
+            f"用户：{text[:160]}\n"
         )
         resp = llm.invoke(prompt)
-        tool = (getattr(resp, "content", "") or "").strip().lower()
-        if tool in VALID_TOOLS:
-            return tool
+        content = getattr(resp, "content", "") or ""
+        m = re.search(r"\{.*\}", content, re.DOTALL)
+        if not m:
+            return None
+        data = json.loads(m.group())
+        tool = data.get("tool")
+        if tool and tool in VALID_TOOLS:
+            try:
+                conf_val = float(data.get("confidence", 0))
+            except (TypeError, ValueError):
+                conf_val = 0.5
+            return {
+                "tool": tool,
+                "confidence": "high" if conf_val >= 0.7 else "medium",
+                "method": "llm",
+                "needs_clarification": bool(data.get("needs_clarification", False)),
+                "question": (data.get("question") or "").strip(),
+            }
     except Exception:
-        _log.debug("LLM semantic routing failed, falling back to none", exc_info=True)
+        _log.debug("LLM structured routing failed, falling back", exc_info=True)
     return None
 
 
 def route_intent(text: str) -> dict:
     """路由用户意图到建议工具。
 
-    Returns {"tool": str|None, "confidence": high/medium/low, "method": keyword/llm/none}
+    Returns {"tool", "confidence", "method", "needs_clarification", "question"}
     """
     tool, conf = _keyword_route(text)
+
+    # 快路径：明确查询类意图，跳过 LLM（零延迟）
+    if tool in _FAST_PATH_TOOLS:
+        return {"tool": tool, "confidence": "high", "method": "keyword_fast",
+                "needs_clarification": False, "question": ""}
+
+    # 主决策：LLM 语义路由
+    llm_result = _llm_route_structured(text)
+    if llm_result:
+        return llm_result
+
+    # 护栏：LLM 不可用/低置信 → 关键词兜底
     if tool:
-        return {"tool": tool, "confidence": conf, "method": "keyword"}
+        return {"tool": tool, "confidence": conf, "method": "keyword_fallback",
+                "needs_clarification": False, "question": ""}
 
-    llm_tool = _llm_route(text)
-    if llm_tool:
-        return {"tool": llm_tool, "confidence": "medium", "method": "llm"}
-
-    return {"tool": None, "confidence": "low", "method": "none"}
+    return {"tool": None, "confidence": "low", "method": "none",
+            "needs_clarification": True, "question": "能再具体说说是哪方面的问题吗？"}

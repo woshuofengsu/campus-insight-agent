@@ -1,10 +1,17 @@
 # tests/test_deepseek_compat.py
-"""Verify DeepSeek API compatibility with OpenAI format + function calling."""
+"""Verify DeepSeek API compatibility with OpenAI format + function calling.
+
+需要真实 DeepSeek API（消耗额度 + 网络）。默认被 pytest 跳过（-m integration_api
+才跑），避免无 key/断网时全量测试挂掉。
+"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import json
+import pytest
 from openai import OpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+
+pytestmark = pytest.mark.integration_api
 
 
 def test_basic_chat():

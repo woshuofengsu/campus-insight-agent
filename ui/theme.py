@@ -51,7 +51,7 @@ TOKEN_LIGHT = {
     "sidebar_border":   "#e9e5df",
     "sidebar_text":     "#1f1d19",
     "sidebar_text_sec": "#6b665e",
-    "sidebar_text_muted": "#9c958a",
+    "sidebar_text_muted": "#6f6a62",
     "sidebar_accent":   "#4f46e5",
     "sidebar_accent_bg":"#eef0ff",
     "sidebar_warn_bg":  "#fffbeb",
@@ -64,20 +64,21 @@ TOKEN_LIGHT = {
     "card_bg":          "#ffffff",
     "card_hover":       "#fafaf8",
     "input_bg":         "#ffffff",
-    "border":           "#e9e5df",
-    "border_visible":   "#d8d3cb",
+    "border":           "#f1ede7",
+    "border_visible":   "#e6e0d8",
     "border_focus":     "#cfc9f5",
-    "divider":          "#e9e5df",
+    "divider":          "#f1ede7",
 
         "text":             "#1f1d19",
     "text_sec":         "#6b665e",
-    "text_muted":       "#9c958a",
+    "text_muted":       "#6f6a62",
     "text_inverse":     "#ffffff",
 
-        "font_display":     "1.35em",
-    "font_body":        "0.875em",
-    "font_label":       "0.75em",
-    "font_micro":       "0.6875em",
+        "font_display":     "1.5em",
+    "font_title":       "1.25em",
+    "font_body":        "1em",
+    "font_label":       "0.8125em",
+    "font_micro":       "0.75em",
     "weight_bold":       "700",
     "weight_semibold":   "600",
     "weight_medium":     "500",
@@ -91,13 +92,13 @@ TOKEN_LIGHT = {
     "space_xl":         "24px",
     "space_2xl":        "32px",
 
-        "radius_input":     "8px",
-    "radius_card":      "10px",
+        "radius_input":     "12px",
+    "radius_card":      "16px",
     "radius_full":      "99px",
 
         "shadow_none":      "none",
-    "shadow_sm":        "0 1px 2px rgba(31,29,25,0.05)",
-    "shadow":           "0 1px 3px rgba(31,29,25,0.07)",
+    "shadow_sm":        "0 2px 12px rgba(31,29,25,0.06)",
+    "shadow":           "0 6px 20px rgba(31,29,25,0.09)",
     "shadow_md":        "0 4px 16px rgba(31,29,25,0.08)",
 
         "transition":       "0.15s ease",
@@ -162,10 +163,11 @@ TOKEN_DARK = {
     "text_muted":       "#6b665d",
     "text_inverse":     "#12100d",
 
-        "font_display":     "1.35em",
-    "font_body":        "0.875em",
-    "font_label":       "0.75em",
-    "font_micro":       "0.6875em",
+        "font_display":     "1.5em",
+    "font_title":       "1.25em",
+    "font_body":        "1em",
+    "font_label":       "0.8125em",
+    "font_micro":       "0.75em",
     "weight_bold":       "700",
     "weight_semibold":   "600",
     "weight_medium":     "500",
@@ -179,13 +181,13 @@ TOKEN_DARK = {
     "space_xl":         "24px",
     "space_2xl":        "32px",
 
-        "radius_input":     "8px",
-    "radius_card":      "10px",
+        "radius_input":     "12px",
+    "radius_card":      "16px",
     "radius_full":      "99px",
 
         "shadow_none":      "none",
-    "shadow_sm":        "0 1px 2px rgba(0,0,0,0.4)",
-    "shadow":           "0 2px 8px rgba(0,0,0,0.5)",
+    "shadow_sm":        "0 2px 12px rgba(0,0,0,0.4)",
+    "shadow":           "0 6px 20px rgba(0,0,0,0.5)",
     "shadow_md":        "0 8px 24px rgba(0,0,0,0.6)",
 
         "transition":       "0.15s ease",
@@ -722,7 +724,7 @@ code, pre {{
         font-size: 1.3em !important;
     }}
     [data-testid="stMetric"] label {{
-        font-size: 0.68em !important;
+        font-size: 0.75em !important;
     }}
 
     .stTabs [data-baseweb="tab"] {{

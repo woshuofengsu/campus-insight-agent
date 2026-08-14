@@ -186,6 +186,39 @@ def cancel_sos(sos_id: int) -> None:
         conn.commit()
 
 
+def notify_sos_targeted(user_name: str, sos_id: int) -> int | None:
+    """SOS 定向通知（不广播）：优先网格办/居委会网格员，fallback 任一网格员。
+
+    避免多网格员场景下 SOS 广播轰炸所有网格员。返回被通知的网格员 id。
+    """
+    try:
+        from data.db_user import list_users
+        from data.db_notifications import create_notification
+        grids = list_users(role="grid")
+        if not grids:
+            return None
+        target = None
+        for dept in ("网格办", "居委会", "网格一组"):
+            for g in grids:
+                if (g.get("building") or "").strip() == dept:
+                    target = g
+                    break
+            if target:
+                break
+        if not target:
+            target = grids[0]
+        create_notification(
+            target["id"], "sos",
+            f"⚠️ SOS 紧急求助：{user_name}",
+            "老年关怀版用户发出紧急求助，请立即联系/上门查看。",
+            related_id=sos_id,
+        )
+        return target["id"]
+    except Exception:
+        _log.warning("notify_sos_targeted failed", exc_info=True)
+        return None
+
+
 # ── 用药提醒 ──
 
 def due_reminders(user_id: int, now: datetime | None = None) -> list[dict]:

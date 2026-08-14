@@ -258,6 +258,17 @@ def _set_status(iid: int, new_status: str, note: str = "", assignee: str = ""):
     invalidate_issues()
 
 
+def _available_actions(status: str) -> list[tuple[str, str]]:
+    """返回当前状态可执行的动作 [(label, new_status), ...]（用于 st.form 收敛）。"""
+    if status == "待处理":
+        return [("🔄 开始处理", "处理中"), ("✅ 标记已解决", "已解决")]
+    if status == "处理中":
+        return [("✅ 标记已解决", "已解决"), ("↩️ 退回待处理", "待处理")]
+    if status == "已解决":
+        return [("🔄 重新打开", "待处理")]
+    return []
+
+
 def _batch_set_status(selected_ids: list[int], new_status: str, note: str = ""):
     """Bulk update status for selected issues."""
     count = 0
@@ -457,7 +468,7 @@ else:
                 suggested_cat = _suggest_category(title, desc, suggested_cat)
                 if suggested_cat and suggested_cat != cat:
                     st.markdown(
-                        f'<span style="font-size:0.72em;background:{TOKEN["accent_bg"]};'
+                        f'<span style="font-size:0.75em;background:{TOKEN["accent_bg"]};'
                         f'color:{TOKEN["accent"]};padding:1px 6px;border-radius:4px;'
                         f'font-weight:600;cursor:pointer;" title="AI建议将此类问题归类为「{suggested_cat}」">'
                         f'🤖 {suggested_cat}</span>',
@@ -524,93 +535,36 @@ else:
                         _log.debug("non-critical failure", exc_info=True)
                         st.caption("处理记录暂不可用")
 
-                    # ── Action buttons in detail view ──
+                    # ── 处理操作（st.form 收敛，消除 session_state 手动清理） ──
                     st.markdown("---")
                     st.markdown("**🔧 处理操作**")
-                    dc1, dc2, dc3 = st.columns(3)
-                    detail_note_key = f"_detail_note_{iid}"
-                    detail_assignee_key = f"_detail_assignee_{iid}"
-                    with dc1:
-                        st.text_input("处理备注", key=detail_note_key, placeholder="添加处理说明…",
-                                     label_visibility="collapsed")
-                    with dc2:
-                        st.text_input("指派处理人", key=detail_assignee_key, placeholder="输入姓名…",
-                                     label_visibility="collapsed")
-                    with dc3:
-                        pass
 
-                    dbtn1, dbtn2, dbtn3, dbtn4 = st.columns(4)
-                    if status == "待处理":
-                        with dbtn1:
-                            if st.button("🔄 处理中", key=f"detail_prog_{iid}", width="stretch"):
-                                _set_status(iid, "处理中",
-                                           note=st.session_state.get(detail_note_key, ""),
-                                           assignee=st.session_state.get(detail_assignee_key, ""))
-                                if detail_note_key in st.session_state:
-                                    del st.session_state[detail_note_key]
-                                if detail_assignee_key in st.session_state:
-                                    del st.session_state[detail_assignee_key]
-                                st.rerun()
-                        with dbtn2:
-                            if st.button("✅ 已解决", key=f"detail_resolve_{iid}", width="stretch"):
-                                _set_status(iid, "已解决",
-                                           note=st.session_state.get(detail_note_key, ""),
-                                           assignee=st.session_state.get(detail_assignee_key, ""))
-                                if detail_note_key in st.session_state:
-                                    del st.session_state[detail_note_key]
-                                if detail_assignee_key in st.session_state:
-                                    del st.session_state[detail_assignee_key]
-                                st.rerun()
-                    elif status == "处理中":
-                        with dbtn1:
-                            if st.button("✅ 标记已解决", key=f"detail_resolve_{iid}", width="stretch"):
-                                _set_status(iid, "已解决",
-                                           note=st.session_state.get(detail_note_key, ""),
-                                           assignee=st.session_state.get(detail_assignee_key, ""))
-                                if detail_note_key in st.session_state:
-                                    del st.session_state[detail_note_key]
-                                if detail_assignee_key in st.session_state:
-                                    del st.session_state[detail_assignee_key]
-                                st.rerun()
-                        with dbtn2:
-                            if st.button("↩️ 退回待处理", key=f"detail_return_{iid}", width="stretch"):
-                                _set_status(iid, "待处理",
-                                           note=st.session_state.get(detail_note_key, ""),
-                                           assignee=st.session_state.get(detail_assignee_key, ""))
-                                if detail_note_key in st.session_state:
-                                    del st.session_state[detail_note_key]
-                                if detail_assignee_key in st.session_state:
-                                    del st.session_state[detail_assignee_key]
-                                st.rerun()
-                    elif status == "待复核":
+                    if status == "待复核":
                         st.caption("居民评价「不满意」，请确认是否重开：")
-                        with dbtn1:
+                        c1, c2 = st.columns(2)
+                        with c1:
                             if st.button("✅ 确认重开", key=f"review_reopen_{iid}", width="stretch"):
                                 review_dissatisfaction(iid, reopen=True)
                                 invalidate_issues()
                                 st.rerun()
-                        with dbtn2:
+                        with c2:
                             if st.button("↩️ 驳回（维持已解决）", key=f"review_dismiss_{iid}", width="stretch"):
                                 review_dissatisfaction(iid, reopen=False)
                                 invalidate_issues()
                                 st.rerun()
-                    elif status == "已解决":
-                        with dbtn1:
-                            if st.button("🔄 重新打开", key=f"detail_reopen_{iid}", width="stretch"):
-                                _set_status(iid, "待处理",
-                                           note=st.session_state.get(detail_note_key, ""),
-                                           assignee=st.session_state.get(detail_assignee_key, ""))
-                                if detail_note_key in st.session_state:
-                                    del st.session_state[detail_note_key]
-                                if detail_assignee_key in st.session_state:
-                                    del st.session_state[detail_assignee_key]
-                                st.rerun()
-
-                    # Quick assignee fill
-                    if st.session_state.get(detail_note_key, "") == "" and proc_note:
-                        st.session_state[detail_note_key] = proc_note
-                    if st.session_state.get(detail_assignee_key, "") == "" and assignee:
-                        st.session_state[detail_assignee_key] = assignee
+                    else:
+                        actions = _available_actions(status)
+                        with st.form(key=f"detail_form_{iid}"):
+                            note = st.text_input("处理备注", placeholder="添加处理说明…",
+                                                 value=proc_note or "")
+                            assignee_input = st.text_input("指派处理人", placeholder="输入姓名…",
+                                                           value=assignee or "")
+                            chosen = st.radio("操作", [a[0] for a in actions], horizontal=True)
+                            submitted = st.form_submit_button("✅ 确认执行", width="stretch")
+                        if submitted:
+                            new_status = dict(actions)[chosen]
+                            _set_status(iid, new_status, note=note, assignee=assignee_input)
+                            st.rerun()
 
                     if st.button("❌ 收起详情", key=f"detail_close_{iid}", width="stretch"):
                         st.session_state[detail_key] = False

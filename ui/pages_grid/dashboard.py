@@ -310,7 +310,7 @@ try:
                 f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
                 f'padding:2px 10px;border-radius:{TOKEN["radius_full"]};">🤖 AI 主动发现</span>'
                 f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">🧠 智能洞察</span>'
-                f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};margin-left:auto;">'
+                f'<span style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-left:auto;">'
                 f'系统自动分析 · 实时更新</span></div>',
                 unsafe_allow_html=True,
             )
@@ -383,7 +383,7 @@ try:
                     f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
                     f'padding:2px 10px;border-radius:{TOKEN["radius_full"]};">🛰️ 后台自动扫描</span>'
                     f'<span style="font-size:0.95em;font-weight:700;color:{TOKEN["text"]};">🧠 社区感知</span>'
-                    f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};">{time_label} 自动扫描</span>'
+                    f'<span style="font-size:0.75em;color:{TOKEN["text_muted"]};">{time_label} 自动扫描</span>'
                     f'<span style="font-size:0.85em;color:{alert_color};margin-left:auto;font-weight:600;">'
                     f'{alert_icon} {overall[:50]}</span></div>',
                     unsafe_allow_html=True,
@@ -401,7 +401,7 @@ try:
                         f'<div style="text-align:center;padding-top:8px;">'
                         f'<div style="font-size:2em;">{alert_icon}</div>'
                         f'<div style="font-size:1.4em;font-weight:800;color:{alert_color};">{anomaly_count}</div>'
-                        f'<div style="font-size:0.68em;color:{TOKEN["text_muted"]};">项异常</div>'
+                        f'<div style="font-size:0.75em;color:{TOKEN["text_muted"]};">项异常</div>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )

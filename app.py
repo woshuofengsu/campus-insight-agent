@@ -127,15 +127,20 @@ def main():
             st.Page("ui/pages_elderly/meds.py", title="💊 吃药提醒", icon=":material/medication:"),
         ])
     else:
+        # 居民端信息架构：按四字闭环「知·报·议·督」排序（核心任务靠前），
+        # 个人/消息居中，低频（健康防护/治理大屏）靠后。
         nav = st.navigation([
+            # ── 核心：知·报·议·督 ──
             st.Page("ui/pages/home.py", title="对话", icon=":material/chat:", default=True),
             st.Page("ui/pages/pulse.py", title="社区脉搏", icon=":material/waves:"),
             st.Page("ui/pages/issues.py", title="接诉即办", icon=":material/build:"),
             st.Page("ui/pages/voice.py", title="邻里议事", icon=":material/forum:"),
             st.Page("ui/pages/transparency.py", title="社区治理看板", icon=":material/bar_chart:"),
-            st.Page("ui/pages/health.py", title="健康防护", icon=":material/health_and_safety:"),
-            st.Page("ui/pages/notifications.py", title="消息", icon=":material/notifications:"),
+            # ── 个人与消息 ──
             st.Page("ui/pages/mine.py", title="我的", icon=":material/person:"),
+            st.Page("ui/pages/notifications.py", title="消息", icon=":material/notifications:"),
+            # ── 低频 ──
+            st.Page("ui/pages/health.py", title="健康防护", icon=":material/health_and_safety:"),
             st.Page("ui/pages/bigscreen.py", title="治理大屏", icon=":material/tv:"),
         ])
 

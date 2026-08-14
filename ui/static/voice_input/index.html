@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { margin: 0; padding: 0; }
+    #btn {
+      font-size: 1.3em; padding: 14px 22px; border-radius: 14px;
+      border: 2px solid #dc2626; background: #fef2f2; cursor: pointer; font-weight: 700;
+    }
+    #status { margin: 8px 0; color: #64748b; font-size: 1.1em; min-height: 1.5em; }
+  </style>
+</head>
+<body>
+  <button id="btn">🎤 按住说话</button>
+  <p id="status">点击按钮，说出您的问题</p>
+  <script>
+    function sendValue(v) {
+      // Streamlit 组件双向通信：把识别文本回传给 Python
+      window.parent.postMessage(
+        { isStreamlitMessage: true, type: "streamlit:setComponentValue", value: v },
+        "*"
+      );
+    }
+    document.getElementById("btn").addEventListener("click", function () {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const status = document.getElementById("status");
+      if (!SR) {
+        status.innerText = "当前浏览器不支持语音，请直接在下框打字";
+        return;
+      }
+      const rec = new SR();
+      rec.lang = "zh-CN";
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onresult = function (e) {
+        const text = e.results[0][0].transcript;
+        status.innerText = "已识别：" + text;
+        sendValue(text);
+      };
+      rec.onerror = function () {
+        status.innerText = "没听清，请再说一次或手动输入";
+      };
+      rec.start();
+    });
+  </script>
+</body>
+</html>

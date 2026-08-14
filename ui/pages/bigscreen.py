@@ -150,7 +150,7 @@ def _inject_bigscreen_css(c: dict) -> None:
         letter-spacing: -0.02em; line-height: 1.2;
     }}
     .kpi-label {{
-        font-size: 0.68em; color: {c["text_muted"]}; font-weight: 500;
+        font-size: 0.75em; color: {c["text_muted"]}; font-weight: 500;
         text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
     }}
     @keyframes pulse-ring {{
@@ -398,7 +398,7 @@ for idx, (label, value, suffix, color, style, sub) in enumerate(kpi_data):
 <div class="kpi-card {style} {extra_class} fade-up" style="animation-delay:{idx*0.06}s;">
     <div class="kpi-label">{label}</div>
     <div class="kpi-value" style="color:{color};">{value}{suffix}</div>
-    {"<div style='font-size:0.68em;color:" + C["text_muted"] + ";margin-top:2px;'>" + sub + "</div>" if sub else ""}
+    {"<div style='font-size:0.75em;color:" + C["text_muted"] + ";margin-top:2px;'>" + sub + "</div>" if sub else ""}
 </div>
 """, unsafe_allow_html=True)
 
@@ -460,11 +460,11 @@ with col_side:
         box-shadow:0 0 20px {ring_glow}44;">
         <div style="text-align:center;">
             <div style="font-size:1.8em;font-weight:800;color:{ring_color};line-height:1;">{score}</div>
-            <div style="font-size:0.65em;color:{C["text_muted"]};">分</div>
+            <div style="font-size:0.75em;color:{C["text_muted"]};">分</div>
         </div>
     </div>
     <div style="font-size:1em;font-weight:700;color:{ring_color};margin-top:6px;">{grade}</div>
-    <div style="font-size:0.65em;color:{C["text_muted"]};">治理健康度</div>
+    <div style="font-size:0.75em;color:{C["text_muted"]};">治理健康度</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -479,7 +479,7 @@ with col_side:
                 pct = count / total_i * 100 if total_i > 0 else 0
                 st.markdown(f"""
 <div style="margin:6px 0;">
-    <div style="display:flex;justify-content:space-between;font-size:0.72em;color:{C["text_sec"]};margin-bottom:1px;">
+    <div style="display:flex;justify-content:space-between;font-size:0.75em;color:{C["text_sec"]};margin-bottom:1px;">
         <span>{label}</span><span style="color:{color};">{count} · {pct:.0f}%</span>
     </div>
     <div style="height:6px;background:{C["surface_raised"]};border-radius:3px;overflow:hidden;">
@@ -491,7 +491,7 @@ with col_side:
 
     # Avg resolution speed
     st.markdown(f"""
-<div style="margin-top:8px;font-size:0.72em;color:{C["text_muted"]};text-align:center;">
+<div style="margin-top:8px;font-size:0.75em;color:{C["text_muted"]};text-align:center;">
     ⏱️ 平均解决周期：<strong style="color:{C["warning"] if avg_days > 3 else C["success"]};">{avg_days} 天</strong>
     &nbsp;·&nbsp;
     🏃 解决速度：<strong style="color:{C["success"]};">{health.get('speed_score', '—')} 分</strong>
@@ -554,7 +554,7 @@ with col_heat:
         top_cat = max(by_cat, key=by_cat.get)
         top_count = by_cat[top_cat]
         st.markdown(f"""
-<div style="font-size:0.72em;color:{C["text_muted"]};margin-top:8px;">
+<div style="font-size:0.75em;color:{C["text_muted"]};margin-top:8px;">
     🔥 最高发：「{top_cat}」— {top_count} 件，占 {top_count/total_i*100:.0f}%
 </div>
 """, unsafe_allow_html=True)
@@ -632,7 +632,7 @@ st.markdown(f"""
 # FOOTER
 
 st.markdown(f"""
-<div style="text-align:center;font-size:0.65em;color:{C["text_muted"]};margin-top:8px;">
+<div style="text-align:center;font-size:0.75em;color:{C["text_muted"]};margin-top:8px;">
     CommunityInsight · Community Monitor · Real-time Monitoring
     · {now.strftime("%Y-%m-%d %H:%M:%S")}
     {'''<br/><span style="color:#f59e0b;font-weight:600;">演示模式 · 模拟数据</span>''' if _using_mock else ""}

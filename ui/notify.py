@@ -155,7 +155,7 @@ def render_sidebar_badge():
             badge_html += (
                 f'<span style="background:{TOKEN["sidebar_dang_bg"]};color:{TOKEN["sidebar_dang"]};'
                 f'border:1px solid {TOKEN["sidebar_dang"]};border-radius:99px;'
-                f'padding:2px 10px;font-size:0.72em;font-weight:700;white-space:nowrap;">'
+                f'padding:2px 10px;font-size:0.75em;font-weight:700;white-space:nowrap;">'
                 f'🔴 {urgent} 紧急</span>'
             )
 
@@ -163,7 +163,7 @@ def render_sidebar_badge():
             badge_html += (
                 f'<span style="background:{TOKEN["sidebar_warn_bg"]};color:{TOKEN["sidebar_warn"]};'
                 f'border:1px solid {TOKEN["sidebar_warn"]};border-radius:99px;'
-                f'padding:2px 10px;font-size:0.72em;font-weight:700;white-space:nowrap;">'
+                f'padding:2px 10px;font-size:0.75em;font-weight:700;white-space:nowrap;">'
                 f'⏳ {pending} 待处理</span>'
             )
 
@@ -182,7 +182,7 @@ def render_sidebar_badge():
             if unread_note > 0:
                 parts.append(f'🔔 {unread_note} 条新消息')
             st.markdown(
-                f'<div style="font-size:0.72em;color:{TOKEN["sidebar_warn"]};'
+                f'<div style="font-size:0.75em;color:{TOKEN["sidebar_warn"]};'
                 f'padding:3px 0;">{" · ".join(parts)}</div>',
                 unsafe_allow_html=True,
             )

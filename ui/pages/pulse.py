@@ -303,7 +303,7 @@ if issues:
                     f'font-size:{TOKEN["font_micro"]};font-weight:{TOKEN["weight_semibold"]};'
                     f'padding:2px 10px;border-radius:{TOKEN["radius_full"]};">🤖 AI 主动发现</span>'
                     f'<span style="font-size:0.9em;font-weight:700;color:{TOKEN["text"]};">🧠 智能洞察</span>'
-                    f'<span style="font-size:0.68em;color:{TOKEN["text_muted"]};margin-left:auto;">'
+                    f'<span style="font-size:0.75em;color:{TOKEN["text_muted"]};margin-left:auto;">'
                     f'系统自动发现</span></div>',
                     unsafe_allow_html=True,
                 )

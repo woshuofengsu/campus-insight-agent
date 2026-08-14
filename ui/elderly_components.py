@@ -5,8 +5,14 @@
 语音能力（ASR/TTS）走浏览器 Web Speech API，不支持时自动降级为文字，绝不阻塞。
 """
 import json
+import os
 
 import streamlit as st
+import streamlit.components.v1 as components
+
+# 语音输入自定义组件（双向回传识别文本）
+_VOICE_COMPONENT_DIR = os.path.join(os.path.dirname(__file__), "static", "voice_input")
+_voice_input_component = components.declare_component("voice_input", path=_VOICE_COMPONENT_DIR)
 
 
 def inject_elderly_css():
@@ -23,18 +29,19 @@ def inject_elderly_css():
         }
         .stTextInput input, .stTextArea textarea { font-size: 1.2em !important; }
         .elderly-card {
-            background: #ffffff; border: 2px solid #e2e8f0; border-radius: 16px;
+            background: #ffffff; border: 2px solid #334155; border-radius: 16px;
             padding: 20px; margin: 12px 0; font-size: 1.1em; line-height: 1.7;
+            color: #000000;
         }
-        .elderly-title { font-size: 1.6em !important; font-weight: 800; }
+        .elderly-title { font-size: 1.6em !important; font-weight: 800; color: #000000; }
     </style>
     """, unsafe_allow_html=True)
 
 
-def big_card(markdown_text: str, bg: str = "#ffffff", border: str = "#e2e8f0"):
+def big_card(markdown_text: str, bg: str = "#ffffff", border: str = "#334155"):
     st.markdown(
         f'<div style="background:{bg};border:2px solid {border};border-radius:16px;'
-        f'padding:20px;margin:12px 0;font-size:1.1em;line-height:1.7;">{markdown_text}</div>',
+        f'padding:20px;margin:12px 0;font-size:1.1em;line-height:1.7;color:#000000;">{markdown_text}</div>',
         unsafe_allow_html=True,
     )
 
@@ -66,34 +73,13 @@ def tts_speak(text: str, label: str = "🔊 朗读"):
     """, height=64)
 
 
-def voice_input(key: str, placeholder: str = "点右边的麦克风，说出您的问题") -> str | None:
-    """语音输入组件：Web Speech API 录音 → 回填到 st.text_area。
+def voice_input(key: str | None = None) -> str | None:
+    """语音输入组件：Web Speech API 录音 → 通过双向组件把识别文本回传给 Python。
 
-    返回 None（录音结果直接写入 session_state[key]）；不支持语音时用户手动打字。
+    返回识别文本（或 None 表示未识别/不支持）；调用方把返回值回填到输入框。
     """
-    st.components.v1.html(f"""
-    <button onclick="startRec()" style="font-size:1.3em;padding:14px 22px;border-radius:14px;
-        border:2px solid #dc2626;background:#fef2f2;cursor:pointer;font-weight:700;">🎤 按住说话</button>
-    <p id="rec_status" style="margin:6px 0;color:#64748b;">识别结果会自动填到下方输入框</p>
-    <script>
-    var rec = null;
-    function startRec() {{
-        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) {{
-            document.getElementById('rec_status').innerText = '当前浏览器不支持语音，请手动输入';
-            return;
-        }}
-        rec = new SR(); rec.lang = 'zh-CN'; rec.interimResults = false; rec.maxAlternatives = 1;
-        rec.onresult = function(e) {{
-            var text = e.results[0][0].transcript;
-            window.parent.postMessage({{type: 'elderly_voice', key: {json.dumps(key)}, text: text}}, '*');
-            document.getElementById('rec_status').innerText = '已识别：' + text;
-        }};
-        rec.onerror = function(e) {{
-            document.getElementById('rec_status').innerText = '没听清，请再说一次或手动输入';
-        }};
-        rec.start();
-    }}
-    </script>
-    """, height=130)
-    return None
+    try:
+        value = _voice_input_component(key=key, default=None)
+        return value if isinstance(value, str) and value.strip() else None
+    except Exception:
+        return None

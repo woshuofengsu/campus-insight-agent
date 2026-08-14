@@ -42,7 +42,7 @@ GLOBAL_CSS = """<meta name="viewport" content="width=device-width, initial-scale
     }
     [data-testid="stChatMessage"] img { width: 28px !important; height: 28px !important; border-radius: 6px; }
     [data-testid="stChatMessage"] [data-testid="stCaptionContainer"] {
-        font-size: 0.72em; color: var(--c-text-muted, #9c958a); margin-top: 4px;
+        font-size: 0.75em; color: var(--c-text-muted, #9c958a); margin-top: 4px;
     }
 
     .stButton > button {

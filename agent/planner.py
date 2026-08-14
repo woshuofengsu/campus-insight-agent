@@ -16,6 +16,51 @@ _RULE_PLANS: list[tuple[tuple[str, ...], list[str]]] = [
     (("提案", "工单"), ["查询相关提案", "查询同类别工单", "对照提案与诉求"]),
 ]
 
+# 规则模板 → 具体工具调用序列（Plan-and-Execute 真循环用）
+_RULE_TOOL_PLANS: list[tuple[tuple[str, ...], list[tuple[str, dict]]]] = [
+    (("统计", "提案"), [("get_governance_stats", {}), ("get_proposals", {})]),
+    (("社区脉搏", "天气"), [("get_community_pulse", {}), ("get_weather", {})]),
+    (("提案", "工单"), [("get_proposals", {}), ("query_issues", {"limit": 10})]),
+]
+
+
+def _match_tool_plan(text: str) -> list[tuple[str, dict]] | None:
+    """Return the tool-call plan for a rule-template-matched composite query."""
+    for kws, plan in _RULE_TOOL_PLANS:
+        if all(kw in text for kw in kws):
+            return plan
+    return None
+
+
+def execute_plan_steps(text: str) -> list[dict] | None:
+    """真正执行计划：对规则模板覆盖的复合查询，逐步调用真实工具并收集观察。
+
+    返回 [{"tool": 工具名, "observation": 结果}, ...]；非模板查询返回 None。
+    这是 Plan-and-Execute 的「执行」半环，结果交给 LLM 汇总。
+    """
+    plan = _match_tool_plan(text)
+    if not plan:
+        return None
+    try:
+        from tools import discover_tools
+        tools = {t.name: t for t in discover_tools()}
+    except Exception:
+        _log.warning("discover_tools failed in execute_plan_steps", exc_info=True)
+        return None
+
+    results: list[dict] = []
+    for tool_name, kwargs in plan:
+        tool = tools.get(tool_name)
+        if not tool:
+            continue
+        try:
+            obs = tool.invoke(kwargs)
+            results.append({"tool": tool_name, "observation": str(obs)})
+        except Exception as e:
+            _log.warning("plan step %s failed: %s", tool_name, e)
+            results.append({"tool": tool_name, "observation": f"[{tool_name} 调用失败: {e}]"})
+    return results or None
+
 
 def _count_intents(text: str) -> int:
     """Estimate how many distinct tool intents a single message carries."""

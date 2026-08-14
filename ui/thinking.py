@@ -81,10 +81,10 @@ def render_reasoning_chain(
             if tool_name:
                 detail_parts.append(f'<code style="font-size:0.76em;">{tool_name}</code>')
             if inp and inp != "{}":
-                detail_parts.append(f'<span style="color:{_tmu};font-size:0.74em;">📥 {inp}</span>')
+                detail_parts.append(f'<span style="color:{_tmu};font-size:0.75em;">📥 {inp}</span>')
             if tool_output:
                 out_short = tool_output[:100]
-                detail_parts.append(f'<span style="color:{_tsec};font-size:0.74em;">→ {out_short}</span>')
+                detail_parts.append(f'<span style="color:{_tsec};font-size:0.75em;">→ {out_short}</span>')
 
             details = ""
             if detail_parts:
@@ -170,25 +170,25 @@ def render_reasoning_chain(
             if anomaly_html:
                 panel_sections.append(
                     f'<div style="margin-bottom:6px;">'
-                    f'<span style="font-size:0.72em;color:{TOKEN["danger"]};font-weight:600;">⚠ 异常检测</span><br>'
+                    f'<span style="font-size:0.75em;color:{TOKEN["danger"]};font-weight:600;">⚠ 异常检测</span><br>'
                     f'{anomaly_html}</div>'
                 )
             if cards_html:
                 panel_sections.append(
                     f'<div style="margin-bottom:6px;">'
-                    f'<span style="font-size:0.72em;color:{TOKEN["accent"]};font-weight:600;">📍 空间关联</span><br>'
+                    f'<span style="font-size:0.75em;color:{TOKEN["accent"]};font-weight:600;">📍 空间关联</span><br>'
                     f'{cards_html}</div>'
                 )
             if corr_html:
                 panel_sections.append(
                     f'<div style="margin-bottom:6px;">'
-                    f'<span style="font-size:0.72em;color:{TOKEN["warning"]};font-weight:600;">🔗 类别关联</span><br>'
+                    f'<span style="font-size:0.75em;color:{TOKEN["warning"]};font-weight:600;">🔗 类别关联</span><br>'
                     f'{corr_html}</div>'
                 )
             if proposal_html:
                 panel_sections.append(
                     f'<div>'
-                    f'<span style="font-size:0.72em;color:{TOKEN["success"]};font-weight:600;">💡 相关提案</span><br>'
+                    f'<span style="font-size:0.75em;color:{TOKEN["success"]};font-weight:600;">💡 相关提案</span><br>'
                     f'{proposal_html}</div>'
                 )
 
@@ -405,7 +405,7 @@ def render_tool_progress(events: list[dict] | None) -> None:
 
     st.markdown(
         f'<div style="margin:8px 0;">'
-        f'<span style="font-size:0.72em;color:{TOKEN["text_muted"]};font-weight:500;">'
+        f'<span style="font-size:0.75em;color:{TOKEN["text_muted"]};font-weight:500;">'
         f'⚡ 工具执行</span><br>'
         f'{"".join(chips)}'
         f'</div>',

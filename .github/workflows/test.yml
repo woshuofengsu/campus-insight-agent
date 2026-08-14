@@ -1,4 +1,4 @@
-name: 309 Tests
+name: CI Tests
 
 on:
   push:
@@ -26,9 +26,5 @@ jobs:
           pip install pytest
 
       - name: Run tests
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          python -m pytest tests/unit/ tests/integration/ tests/e2e/ \
-            tests/test_critical_paths.py tests/test_verify_all.py \
-            -v --tb=short --color=yes
+          python -m pytest -q --tb=short --color=yes

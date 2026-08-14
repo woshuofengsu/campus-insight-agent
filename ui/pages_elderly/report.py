@@ -13,8 +13,11 @@ uid = (profile or {}).get("id")
 st.markdown('<div class="elderly-title">🗣️ 一句话上报</div>', unsafe_allow_html=True)
 st.caption("说出或写下您遇到的问题，我们会帮您上报给网格员。")
 
-# 语音输入（iframe 内识别显示；不支持时手动输入）
-voice_input("elderly_voice_text")
+# 语音输入（识别文本回填到下方输入框）
+_voice_text = voice_input("elderly_voice_text")
+if _voice_text and not st.session_state.get("elderly_report_text"):
+    st.session_state["elderly_report_text"] = _voice_text
+    st.rerun()
 
 # 大字输入框（主路径）
 text = st.text_area(

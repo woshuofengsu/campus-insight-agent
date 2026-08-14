@@ -56,12 +56,8 @@ if not st.session_state.get("_sos_done"):
                     sos_id = sos_request(uid)
                     st.session_state._sos_id = sos_id
                     try:
-                        from data.db_notifications import broadcast_notification
-                        broadcast_notification(
-                            "sos", f"⚠️ SOS 紧急求助：{name}",
-                            f"老年关怀版用户「{name}」发出紧急求助，请立即联系/上门查看。",
-                            related_id=sos_id,
-                        )
+                        from data.db_elderly import notify_sos_targeted
+                        notify_sos_targeted(name, sos_id)
                     except Exception:
                         pass
                 st.session_state._sos_done = True
@@ -102,14 +98,19 @@ with c3:
 
 st.markdown("---")
 
-# ── 功能大按钮导航 ──
+# ── 功能大按钮导航（信息架构分组：办事 / 关怀 / 信息） ──
+st.markdown('<div style="font-size:1.3em;font-weight:800;margin:14px 0 8px;color:#000;">📌 我要办事</div>', unsafe_allow_html=True)
 if st.button("🗣️ 一句话上报", key="go_report", width="stretch"):
     st.switch_page("ui/pages_elderly/report.py")
 if st.button("📋 我的工单", key="go_progress", width="stretch"):
     st.switch_page("ui/pages_elderly/progress.py")
+
+st.markdown('<div style="font-size:1.3em;font-weight:800;margin:14px 0 8px;color:#000;">💊 健康关怀</div>', unsafe_allow_html=True)
 if st.button("💊 吃药提醒", key="go_meds", width="stretch"):
     st.switch_page("ui/pages_elderly/meds.py")
 if st.button("🏥 我的健康", key="go_health", width="stretch"):
     st.switch_page("ui/pages_elderly/health.py")
+
+st.markdown('<div style="font-size:1.3em;font-weight:800;margin:14px 0 8px;color:#000;">🔊 信息</div>', unsafe_allow_html=True)
 if st.button("🔊 听通知", key="go_notify", width="stretch"):
     st.switch_page("ui/pages_elderly/notify.py")

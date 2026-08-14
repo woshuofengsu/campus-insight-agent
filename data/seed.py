@@ -26,6 +26,7 @@ def _seed_users():
     users = [
         ("demo_resident", "", "resident", "海淀小区", "3号楼", "2单元501", "王阿姨", "HD0302501"),
         ("demo_grid", "demo123", "grid", "海淀小区", "网格一组", "", "刘网格员", "G2026001"),
+        ("demo_grid2", "demo123", "grid", "海淀小区", "物业", "", "王物业", "G2026002"),
         ("demo_elderly", "", "elderly", "海淀小区", "11号楼", "3单元301", "张大爷", "HD1103301"),
     ]
     with get_db() as conn:

@@ -56,10 +56,27 @@ class CommunityAgent:
             max_tokens=2000,
         )
 
+    def _filter_tools_for_role(self, role: str) -> list:
+        """按角色裁剪工具集，让 LLM 不被无关工具干扰。
+
+        老年：极简 4 工具（上报/查单/天气/脉搏）。
+        网格员：去掉居民侧动作（上报/附议/发意见/建提案）。
+        居民：全量。
+        """
+        if role == "elderly":
+            allowed = {"report_issue", "query_my_issues", "get_weather", "get_community_pulse"}
+            return [t for t in self.tools if t.name in allowed]
+        if role == "grid":
+            excluded = {"report_issue", "support_proposal", "express_opinion", "create_proposal"}
+            return [t for t in self.tools if t.name not in excluded]
+        return self.tools
+
     def _build_agent(self, environment_context: str = "") -> AgentExecutor:
         """构建 LangChain Agent，注入感知上下文（天气、预警等）"""
         user_profile = self.memory.get_user_profile()
         system_prompt = get_system_prompt(user_profile, environment_context)
+        role = user_profile.get("role", "resident")
+        tools = self._filter_tools_for_role(role)
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
@@ -70,13 +87,13 @@ class CommunityAgent:
 
         agent = create_openai_functions_agent(
             llm=self.llm,
-            tools=self.tools,
+            tools=tools,
             prompt=prompt,
         )
 
         return AgentExecutor(
             agent=agent,
-            tools=self.tools,
+            tools=tools,
             memory=self.memory.get_langchain_memory(),
             max_iterations=AGENT_MAX_ITERATIONS,
             max_execution_time=AGENT_TIMEOUT,
@@ -290,6 +307,10 @@ class CommunityAgent:
                 parts.append(
                     f"【本轮建议工具：{route['tool']}（{route['confidence']}置信度/{route['method']}路由）】"
                 )
+            elif route.get("needs_clarification"):
+                parts.append(
+                    f"【意图不明确，需追问澄清：{route.get('question') or '请用户补充关键信息'}】"
+                )
         except Exception:
             logger.debug("Semantic tool routing skipped (non-fatal)", exc_info=True)
 
@@ -351,6 +372,18 @@ class CommunityAgent:
             (output_text, intermediate_steps) — intermediate_steps is the raw
             LangChain tool-call trace: list[tuple[AgentAction, str]]
         """
+        # ── Plan-and-Execute 快路径：规则模板复合查询直接执行 + LLM 汇总 ──
+        raw_user = oriented_input.split("【用户消息】")[-1] if "【用户消息】" in oriented_input else oriented_input
+        try:
+            from agent.planner import execute_plan_steps
+            plan_results = execute_plan_steps(raw_user)
+            if plan_results:
+                summary = self._summarize_plan(plan_results, raw_user)
+                if summary:
+                    return summary, []  # 走了规划执行，无 AgentExecutor 步骤
+        except Exception:
+            logger.debug("Plan-and-Execute fast path skipped", exc_info=True)
+
         executor = self._build_agent(
             environment_context=self._format_environment_for_prompt(environment)
         )
@@ -377,6 +410,30 @@ class CommunityAgent:
         output = result.get("output", "")
         steps = result.get("intermediate_steps", [])
         return output, steps
+
+    def _summarize_plan(self, plan_results: list[dict], user_input: str) -> str | None:
+        """LLM 汇总 Plan-and-Execute 执行结果（best-effort）。"""
+        try:
+            from langchain_openai import ChatOpenAI
+            from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+            if not DEEPSEEK_API_KEY:
+                return None
+            llm = ChatOpenAI(
+                model=DEEPSEEK_MODEL, openai_api_key=DEEPSEEK_API_KEY,
+                base_url=DEEPSEEK_BASE_URL, temperature=0.3, max_tokens=600, timeout=8,
+            )
+            facts = "\n".join(f"[{r['tool']}]\n{r['observation']}" for r in plan_results)
+            prompt = (
+                "你是社区助手。根据下面工具返回的真实数据回答用户问题。\n"
+                "引用具体数字，先给结论再给细节，末尾给 1 个下一步建议。\n\n"
+                f"用户：{user_input}\n\n工具数据：\n{facts}\n"
+            )
+            resp = llm.invoke(prompt)
+            content = (getattr(resp, "content", "") or "").strip()
+            return content or None
+        except Exception:
+            logger.debug("plan summarize failed", exc_info=True)
+            return None
 
     def _reflect(self, raw_response: str, user_input: str, environment: dict,
                  intermediate_steps: list | None = None) -> str:
@@ -452,17 +509,16 @@ class CommunityAgent:
         raw_response = self._enforce_tool_call(raw_response, user_input,
                                                 intermediate_steps)
 
-        # ── 4.6: Fact verification (anti-hallucination #2) ──
-        # Verify any #ticket/#proposal ids cited in the reply actually exist in
-        # the DB; append a correction note if not (complements enforce_tool_call).
-        raw_response = self._verify_facts(raw_response)
+        # ── 4.6: Fact reflection (anti-hallucination #2) ──
+        # 编号存在性（正则护栏）+ LLM 数值/语义一致性核查（主防线）。
+        raw_response = self._verify_facts(raw_response, intermediate_steps)
 
         return raw_response
 
-    def _verify_facts(self, response: str) -> str:
-        """Verify cited #ids against the DB. Delegates to agent/verifier.py."""
-        from agent.verifier import verify_facts
-        return verify_facts(response)
+    def _verify_facts(self, response: str, intermediate_steps: list | None = None) -> str:
+        """Reflect on cited facts against tool results. Delegates to agent/reflection.py."""
+        from agent.reflection import reflect
+        return reflect(response, intermediate_steps)
 
     def _enforce_tool_call(self, response: str, user_input: str,
                            intermediate_steps: list | None) -> str:

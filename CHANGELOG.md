@@ -1,10 +1,105 @@
 # 变更日志
 
-> 社区先知 CommunityInsight Agent —— 治理闭环 + 优化方案落地 + 老年关怀版
+> 社区先知 CommunityInsight Agent —— 治理闭环 + 优化落地 + 老年关怀版 + Agent 内核重构
 >
-> 日期：2026-08-13　测试基线：**328 passed, 7 subtests passed**（`pytest -q`）
+> 日期：2026-08-14　测试基线：**328 passed, 3 deselected, 7 subtests passed**（`pytest -q`，无 key 也绿）
 
 本日志记录本轮「全都做」迭代对系统的改动。改动原则：**内部标识不动**（表 `campus_issues`、字段 `school/grade/major/student_id`、角色 `student/teacher`、工具 `get_campus_pulse/get_school_policy`、路由 `/api/campus-pulse`、DB `campus_insight.db`、类 `CampusAgent` 均保留），只改用户可见文案与数据口径。
+
+---
+
+## UI 升级（字号/对比度/图标/老年高对比）
+
+> 依据 `docs/UI_UPGRADE_PLAN.md` 实施。核心：消灭 11px 字号、正文 16px、老年版真高对比、图标体系统一框架。
+
+### P1 Token 重建（`ui/theme.py`）
+- 字号梯度重建（浅色+深色同步）：`font_display` 1.35→**1.5em(24px)**、新增 `font_title` 1.25em(20px)、`font_body` 0.875→**1em(16px)**、`font_label` 0.75→**0.8125em(13px)**、`font_micro` 0.6875→**0.75em(12px，下限)**。
+- 对比度加深：`text_muted` / `sidebar_text_muted` 由 #9c958a → **#6f6a62**（≈4.8:1，AA 达标）。
+
+### P1.5 微文本批量提升（消灭 <12px）
+- 11 个文件 33 处硬编码 `0.65em/0.68em/0.72em/0.74em` 字号 → 统一 **0.75em(12px)**：`css.py`、`notify.py`、`sidebar.py`、`bigscreen.py`、`issues_mgmt.py`、`thinking.py`、`health_card.py`、`dashboard.py`、`health_mgmt.py`、`pulse.py` 等。
+
+### P2 图标体系统一框架（`ui/icons.py` 新增）
+- 提供 `material_icon()`（内联 SVG，跨 Streamlit 页面内不渲染 Material 前缀的限制）。
+- 规范：功能图标用 Material / SVG，emoji 仅作情感装饰（现有按钮均配文字，文字承载功能，emoji 已是装饰）。
+
+### P3 老年版真高对比（`ui/elderly_components.py`）
+- `.elderly-card` 边框由浅灰 #e2e8f0 → **深色 #334155**，文字纯黑 #000（on #fff = 21:1，WCAG AAA）。
+- `big_card` 默认边框同步改深色 + 纯黑字；触控按钮 ≥64px（已有）保持。
+
+### 验证
+- `grep font-size:0.(6x|7x)em` 零残留（无 <12px）。
+- `pytest` 328 passed 全绿。
+
+### P5 网格员工作台重构（`ui/pages_grid/issues_mgmt.py`）
+- 详情「处理操作」由「2 个 session_state text_input + 4 个重复状态按钮 + 手动 del 清理」重构为 **`st.form` 收敛**：备注 + 指派 + 动作 radio + 单个「确认执行」。
+- 新增 `_available_actions(status)`（状态 → 可执行动作映射）；「待复核」分支独立处理（review_dissatisfaction）。
+- 消除 `_detail_note_{iid}` / `_detail_assignee_{iid}` 手动清理样板代码。
+
+### P6 组件库升级（`ui/components.py`）
+- `page_header` 标题字号由硬编码 `1.45em` → `TOKEN["font_display"]`（24px，走 token 系统）。
+
+### P4 三角色气质（逐页精细化排版）
+- **组件库 token 化**（`ui/components.py`）：
+  - `section()` 区块标题字号由硬编码 `1.12em` → `TOKEN["font_title"]`（20px），间距 `margin:26px 0 12px` → `space_xl/space_sm` token。
+  - `stat()` KPI 卡片 `padding:14px 16px` → `space_sm/space_md` token（全站 KPI 留白一致）。
+- **老年端信息架构分组**（`ui/pages_elderly/home.py`）：功能大按钮按「📌 我要办事 / 💊 健康关怀 / 🔊 信息」三组归类，替代无分组平铺。
+- **三端气质落地**：
+  - 老年端：20px 根字号 + 深色边框 + 纯黑字（AAA）+ 分组导航。
+  - 网格员端：KPI 大数字 1.7em + 工作台分区卡片（KPI/SLA/升级/关怀/待办/洞察）。
+  - 居民端：暖纸面 + 渐变 hero 横幅 + 品牌色主 CTA + 统一区块标题（20px）。
+
+---
+
+## 审查补齐（V2/V3 方案未完成项收尾）
+
+> 针对上一轮审查发现的「打折/未完成」项，逐条补齐。全程 `pytest` 全绿。
+
+### 补齐项
+- **②删穷举触发词表**（`agent/prompt.py`）：删除「触发词→工具映射表」+「工具组合模式」两大穷举表格，替换为 5 条「工具使用原则」（按语义判断、数据必调工具、动作直调、多工具组合、信息不足追问）——兑现 V3「删穷举表，改为工具说明驱动」，并修正 CHANGELOG 此前「已删」的不实描述。
+- **③追问机制接入**（`agent/engine.py`）：`_orient` 消费 `route_intent` 的 `needs_clarification/question`，意图不明确时注入「需追问澄清」提示。
+- **④多网格员**（`data/seed.py`）：新增 `demo_grid2`（物业部门）；新增 `tests/test_dispatch.py`（3 个：按部门分发 / 无部门 fallback / 同名按 id 区分不串单）。
+- **⑤SOS 定向派发**（`data/db_elderly.py`）：新增 `notify_sos_targeted`（优先网格办/居委会，fallback 任一），`home.py` 由广播改为定向——多网格员不再轰炸。
+- **⑥数值核对硬校验**（`agent/reflection.py`）：新增 `_verify_stats_numbers`，回复「满意率/解决率 X%」与 DB 实际值对比，偏差 >20% 追加更正提示。
+- **⑦Plan-and-Execute 真循环**（`agent/planner.py` + `agent/engine.py`）：新增 `execute_plan_steps`（规则模板复合查询真正逐步调工具）+ `_summarize_plan`（LLM 汇总）；`_decide_and_act` 加快路径（模板命中→直接执行+汇总，否则走 AgentExecutor）。
+
+### 审查纠正（上轮误判，实为已存在）
+- **⑧思考卡片可视化**：`ui/thinking.py` 的 `render_reasoning_chain` + `home.py` 已展示「理解→选工具→结果→反思」链路（engine `_last_chain`），上轮误判为「未做」。
+- **⑨记忆主动回访**：`agent/closed_loop.py` 已做「待处理/同天已解决/未回应提案」提醒 + `event_memory` 注入「你最近…」，上轮误判为「未做」。
+
+### ⑩信息架构收敛（务实版）
+- `app.py` 居民导航重排：按四字闭环「知·报·议·督」排序 + 分组注释（核心/个人消息/低频）。说明：Streamlit `st.navigation` 为平铺单层，且 `switch_page` 要求页面在导航内，故未做页面合并（9 页功能保留是演示需要）。
+
+---
+
+## Agent 内核重构 + 工程收尾（综合 V2/V3 方案）
+
+> 依据 `docs/OPTIMIZATION_PLAN_V2.md` + `docs/OPTIMIZATION_PLAN_V3.md` 实施。核心：把 Agent 从「规则外壳 + LLM 替补」重构为「LLM 主决策 + 规则护栏」。全程 `pytest` 全绿（无 key 也绿）。
+
+### P0 工程地基
+- **CI 修复**：`.github/workflows/test.yml` 名称 `309 Tests`→`CI Tests`；pytest 路径改为全量收集（含 test_semantics/test_elderly/test_ablation）；移除 DEEPSEEK_API_KEY secret 依赖。
+- **pytest.ini** 定义 markers（unit/integration/e2e/smoke/integration_api）+ `addopts -m "not integration_api"`。
+- **真实 API 测试隔离**：`tests/test_deepseek_compat.py` 标 `integration_api`，默认跳过——**无 key 也全绿，测试时间 90s→38s**。
+- **依赖锁版本**：`requirements.txt` 全部加版本上限（`>=x,<y`），防止大版本漂移。
+- **dist 清理**：删除「校园先知」旧安装包 zip。
+- **README**：三角色说明 + 「演示数据会重置」声明。
+
+### P1 Agent 内核（决策权交还 LLM）
+- **理解层 LLM 化**（`agent/router.py` 重写）：LLM 优先结构化路由（JSON 输出 `tool/confidence/needs_clarification/question`）；关键词表降级为快路径（明确查询类）+ 兜底（LLM 不可用）。**删穷举触发词表，改为工具说明驱动**。
+- **反思层 LLM 化**（`agent/reflection.py` 新增）：LLM 事实核查（编号 + 数值 + 语义一致性），正则查 #id 降为护栏；`engine._verify_facts` 传入 intermediate_steps。
+- **执行层角色工具裁剪**（`engine._filter_tools_for_role`）：老年 4 工具、网格员去居民侧动作、居民全量——LLM 不被无关工具干扰。
+- **演示闭环机器人**（`data/db_demo_worker.py` 新增 + `config.DEMO_AUTO_WORKER` 默认开）：新工单自动「处理中→已解决→通知居民」，让「办」字闭环真的转；感知 monitor 挂载 `_check_demo_worker`。
+
+### P2 评测去自证
+- `agent/eval/eval_suite.py` 升级：三组场景（standard/unseen/**generic 关键词表外**）+ `--mode llm`。
+- **实测结果**（`agent/eval/report.md`）：关键词兜底 57.9%；**LLM 完整命中 100%**（8 个关键词表外全新说法全部正确路由）——真实泛化证据，非自证。
+
+### P3 老年语音回填
+- `ui/static/voice_input/index.html` + `ui/elderly_components.voice_input` 改为 `declare_component` 双向组件，识别文本真正回填输入框（不再是 iframe 内显示）。
+- `ui/pages_elderly/report.py` 接收返回值并回填。
+
+### 关键新增文件
+`agent/reflection.py`、`data/db_demo_worker.py`、`ui/static/voice_input/index.html`、`agent/eval/report.md`、`docs/OPTIMIZATION_PLAN_V2.md`、`docs/OPTIMIZATION_PLAN_V3.md`、`docs/REVIEW.md`
 
 ---
 
