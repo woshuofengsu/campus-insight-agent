@@ -130,7 +130,7 @@ TOKEN = _ThemeAwareToken(TOKEN_LIGHT, TOKEN_DARK)
       关键路径: 40 用例 (persona/路由/安全网/感知)
 ```
 
-**总计 318 测试，CI 自动化运行。** 覆盖每个 `@tool` 函数的边界输入、Persona Router 的全量路由规则、安全网的正确拦截/放行、空数据库的治理审计不崩溃。
+**总计 328 测试，CI 自动化运行。** 覆盖每个 `@tool` 函数的边界输入、Persona Router 的全量路由规则、安全网的正确拦截/放行、空数据库的治理审计不崩溃。
 
 **代码位置**：[tests/](../tests/)
 

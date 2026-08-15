@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>校园先知 · 技术实现报告 — 校园先知 CampusInsight Agent</title>
+<title>社区先知 · 技术实现报告 — 社区先知 CommunityInsight Agent</title>
 <style>
   :root {
     --text: #1a1a1a; --text2: #555;
@@ -104,15 +104,15 @@
 </style>
 </head>
 <body>
-<h1>校园先知 CampusInsight Agent — 技术实现报告</h1>
+<h1>社区先知 CommunityInsight Agent — 技术实现报告</h1>
 
-<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体OPC创新大赛<br><strong>赛道</strong>：基层治理<br><strong>项目</strong>：校园先知 CampusInsight Agent<br><strong>技术负责人</strong>：步承泽<br><strong>日期</strong>：2026年8月6日<br><strong>在线体验</strong>：https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/<br><strong>扫码体验</strong>：打开 <a href="扫码体验.html"><code>扫码体验.html</code></a>，手机扫二维码即可访问（推荐横屏操作）</div>
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体OPC创新大赛<br><strong>赛道</strong>：基层治理<br><strong>项目</strong>：社区先知 CommunityInsight Agent<br><strong>技术负责人</strong>：步承泽<br><strong>日期</strong>：2026年8月6日<br><strong>在线体验</strong>：https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/<br><strong>扫码体验</strong>：打开 <a href="扫码体验.html"><code>扫码体验.html</code></a>，手机扫二维码即可访问（推荐横屏操作）</div>
 
 <hr>
 
 <h3>📍 当前阶段</h3>
 
-<p>本项目为 <strong>Demo 版本</strong>，以预置种子数据（38 条工单、19 条提案、14 条百科条目）运行完整治理闭环。<strong>下一步计划：与学校后勤部门合作，接入真实工单系统</strong>，从验证阶段进入实际校园运营。</p>
+<p>本项目为 <strong>Demo 版本</strong>，以预置种子数据（39 条工单、20 条提案、15 条百科条目）运行完整治理闭环。<strong>下一步计划：与社区居委会、物业部门合作，接入真实接诉即办工单系统</strong>，从验证阶段进入实际社区运营。</p>
 
 <hr>
 
@@ -120,7 +120,7 @@
 
 <table>
 <th>层</th><th>技术选型</th><th>版本要求</th><th>说明</th>
-<tr><td><strong>UI 框架</strong></td><td>Streamlit</td><td>>=1.28.0</td><td>多页面导航 + 学生/教师双角色路由</td></tr>
+<tr><td><strong>UI 框架</strong></td><td>Streamlit</td><td>>=1.28.0</td><td>多页面导航 + 居民/网格员双角色路由</td></tr>
 <tr><td><strong>对话引擎</strong></td><td>LangChain + DeepSeek</td><td>langchain>=0.3.0</td><td><code>return_intermediate_steps=True</code> 捕获完整工具调用链</td></tr>
 <tr><td><strong>大语言模型</strong></td><td>DeepSeek (deepseek-chat)</td><td>—</td><td>兼容 OpenAI API 格式，支持 tools/functions 调用</td></tr>
 <tr><td><strong>LLM 适配层</strong></td><td>langchain-openai</td><td>>=0.2.0</td><td>ChatOpenAI 适配 DeepSeek base_url</td></tr>
@@ -151,9 +151,9 @@ campus-insight-agent/
 │   ├── query_*.py            #   查询类工具（脉搏/天气/工单/提案/议题/百科）
 │   └── action_*.py           #   操作类工具（上报/提案/附议/发表意见）
 ├── data/                     # 数据层：SQLite WAL + 15 表 + 种子数据
-├── ui/                       # 界面层：学生端 9 页 + 教师端 6 页
+├── ui/                       # 界面层：居民端 9 页 + 网格员端 6 页
 ├── utils/                    # 重试/文本/日志
-├── tests/                    # 318 测试（单元224 + 集成21 + e2e 7 + 冒烟17 + 关键路径40 + 消融6 + 兼容3）
+├── tests/                    # 328 测试（单元224 + 集成21 + e2e 7 + 冒烟17 + 关键路径40 + 消融6 + 语义6 + 派单3 + 老年4）
 └── docs/                     # 比赛材料
 </pre>
 
@@ -219,27 +219,27 @@ campus-insight-agent/
 
 <p>Agent 根据用户输入自主决定调用哪些工具，而非走预设分支。核心机制：</p>
 
-<p><strong>Persona 信号 → 工具偏好</strong>：<code>detect_persona()</code> 检测到"报修"意图后，System Prompt 中对应角色的工具描述会前置，提高 LLM 选择报修相关工具的概率。这是"引导"而非"限制"——Agent 仍然可以调用任意工具。</p>
+<p><strong>Persona 信号 → 工具偏好</strong>：<code>detect_persona()</code> 检测到"上报诉求"意图后，System Prompt 中对应角色的工具描述会前置，提高 LLM 选择接诉相关工具的概率。这是"引导"而非"限制"——Agent 仍然可以调用任意工具。</p>
 
 <p><strong>工具描述即决策依据</strong>：每个工具的 <code>description</code> 字段是 Agent 的唯一决策信息来源。工具描述采用结构化格式：<code>[阶段] 功能描述。参数: ...。适用于: ...。</code> 确保 LLM 能准确判断在什么场景下应该调用哪个工具。</p>
 
-<p><strong>参数推断</strong>：Agent 从自然语言输入中推断工具参数。例如"三教二楼男厕所水龙头漏水" → <code>report_issue(title="三教二楼男厕所水龙头漏水", category="设施维修", location="三教二楼男厕所", urgency="普通")</code>。分类推断结合了 LLM 语义理解和关键词匹配降级——LLM 分类失败时，回退到 70 个分类关键词的确定性匹配。</p>
+<p><strong>参数推断</strong>：Agent 从自然语言输入中推断工具参数。例如"3号楼2单元楼道灯不亮" → <code>report_issue(title="3号楼2单元楼道灯不亮", category="设施维修", location="3号楼2单元", urgency="普通")</code>。分类推断结合了 LLM 语义理解和关键词匹配降级——LLM 分类失败时，回退到 8 大分类关键词的确定性匹配。</p>
 
 <h3>4.2 多步编排逻辑</h3>
 
-<p>复杂请求需要 Agent 编排多个工具调用。以"报修+查询历史+统计趋势"组合请求为例：</p>
+<p>复杂请求需要 Agent 编排多个工具调用。以"上报诉求+查询历史+统计趋势"组合请求为例：</p>
 
 <pre>
-用户: "三教灯又坏了，最近这类问题多吗"
+用户: "3号楼电梯又坏了，最近这类问题多吗"
   │
-  ├─ Step 1: report_issue(title="三教灯故障", category="设施维修", ...)
+  ├─ Step 1: report_issue(title="3号楼电梯故障", category="设施维修", ...)
   │     └─ 返回工单号 #42
   │
   ├─ Step 2: query_issues(category="设施维修", status="待处理", limit=10)
-  │     └─ 返回同类别待处理列表（含位置分布）
+  │     └─ 返回同类别待处理列表（含楼栋分布）
   │
   └─ Step 3: get_governance_stats()
-        └─ 返回类别分布统计 → Agent 回复"最近7天设施维修类已有8件，主要集中在三教和食堂区域"
+        └─ 返回类别分布统计 → Agent 回复"最近7天设施维修类已有8件，主要集中在3号楼和2号楼区域"
 </pre>
 
 <p>每一步的工具调用由 LLM 根据前一步的返回结果动态决定。<code>return_intermediate_steps=True</code> 确保完整调用链被捕获，前端可展示推理过程。</p>
@@ -249,7 +249,7 @@ campus-insight-agent/
 <p>Agent 的 <code>enforce.py</code> 模块在 LLM 完成后检查工具调用完整性：</p>
 
 <ul>
-<li><strong>漏调检测</strong>：用户输入匹配到报修关键词但 <code>intermediate_steps</code> 中没有 report_issue → 强制补调用</li>
+<li><strong>漏调检测</strong>：用户输入匹配到上报关键词但 <code>intermediate_steps</code> 中没有 report_issue → 强制补调用</li>
 <li><strong>空回复检测</strong>：Agent 返回空字符串或过短回复 → 触发降级回复逻辑，走 DB 直查</li>
 <li><strong>幻觉检测</strong>：Agent 回复中包含工单号但对应工具调用不存在 → 标记为不可信，替换为如实描述</li>
 </ul>
@@ -274,7 +274,7 @@ campus-insight-agent/
 
 <table>
 <th>维度</th><th>分析方法</th><th>治理价值</th>
-<tr><td><strong>空间关联</strong></td><td>提取输入中的地点关键词，查同区域待处理工单</td><td>发现问题集中区域</td></tr>
+<tr><td><strong>空间关联</strong></td><td>提取输入中的地点关键词，查同区域待处理工单</td><td>发现问题集中楼栋/区域</td></tr>
 <tr><td><strong>时间趋势</strong></td><td>按类别统计近 7 天新增量</td><td>发现上升趋势</td></tr>
 <tr><td><strong>复发检测</strong></td><td>关键词匹配已解决工单</td><td>发现重复问题</td></tr>
 <tr><td><strong>异常检测</strong></td><td>本周 vs 前 4 周均值对比（阈值 1.5x + ≥3 件）</td><td>发现激增预警</td></tr>
@@ -302,11 +302,11 @@ campus-insight-agent/
 
 <table>
 <th>文件</th><th>函数名</th><th>阶段</th><th>核心参数</th><th>功能</th>
-<tr><td><code>query_campus_pulse.py</code></td><td><code>get_campus_pulse</code></td><td>知</td><td>无</td><td>校园脉搏快照（天气 + 事件 + KPI + 热点）</td></tr>
+<tr><td><code>query_community_pulse.py</code></td><td><code>get_community_pulse</code></td><td>知</td><td>无</td><td>社区脉搏快照（天气 + 事件 + KPI + 热点）</td></tr>
 <tr><td><code>query_weather.py</code></td><td><code>get_weather</code></td><td>知</td><td>无</td><td>当日+未来2天天气（API/模拟自动切换）</td></tr>
-<tr><td><code>query_campus_issues.py</code></td><td><code>query_issues</code></td><td>报</td><td>category, status, limit</td><td>多条件工单查询</td></tr>
-<tr><td><code>query_campus_issues.py</code></td><td><code>get_governance_stats</code></td><td>督</td><td>无</td><td>治理统计（总数+状态分布+类别分布+健康度）</td></tr>
-<tr><td><code>query_campus_issues.py</code></td><td><code>collect_feedback</code></td><td>议</td><td>topic</td><td>意见收集（含演示数据预览）</td></tr>
+<tr><td><code>query_community_issues.py</code></td><td><code>query_issues</code></td><td>报</td><td>category, status, limit</td><td>多条件工单查询</td></tr>
+<tr><td><code>query_community_issues.py</code></td><td><code>get_governance_stats</code></td><td>督</td><td>无</td><td>治理统计（总数+状态分布+类别分布+健康度）</td></tr>
+<tr><td><code>query_community_issues.py</code></td><td><code>collect_feedback</code></td><td>议</td><td>topic</td><td>意见收集（含演示数据预览）</td></tr>
 <tr><td><code>query_my_issues.py</code></td><td><code>query_my_issues</code></td><td>报</td><td>无（自动身份解析）</td><td>当前用户的全部工单及进度</td></tr>
 <tr><td><code>query_my_issues.py</code></td><td><code>query_my_proposals</code></td><td>议</td><td>无（自动身份解析）</td><td>当前用户的全部提案及状态</td></tr>
 <tr><td><code>action_report_issue.py</code></td><td><code>report_issue</code></td><td>报</td><td>title, category, location, urgency, description</td><td>创建工单（LLM分类+关键词降级+地点校验）</td></tr>
@@ -316,13 +316,13 @@ campus-insight-agent/
 <tr><td><code>query_topics.py</code></td><td><code>get_topics</code></td><td>议</td><td>无</td><td>活跃议题列表 + 热点自动发现</td></tr>
 <tr><td><code>query_topics.py</code></td><td><code>get_topic_detail</code></td><td>议</td><td>topic_id</td><td>议题详情 + 全部意见</td></tr>
 <tr><td><code>action_express_opinion.py</code></td><td><code>express_opinion</code></td><td>议</td><td>topic_id, content</td><td>发表议题意见</td></tr>
-<tr><td><code>query_knowledge.py</code></td><td><code>query_knowledge</code></td><td>知</td><td>query</td><td>字符 n-gram TF-IDF 检索校园百科</td></tr>
-<tr><td><code>query_knowledge.py</code></td><td><code>get_school_policy</code></td><td>知</td><td>topic</td><td>查询校规政策原文</td></tr>
+<tr><td><code>query_knowledge.py</code></td><td><code>query_knowledge</code></td><td>知</td><td>query</td><td>字符 n-gram TF-IDF 检索社区百科</td></tr>
+<tr><td><code>query_knowledge.py</code></td><td><code>get_community_policy</code></td><td>知</td><td>topic</td><td>查询社区公约/政策原文</td></tr>
 </table>
 
 <h3>6.3 预取机制</h3>
 
-<p>为避免 Agent 在简单场景下过度调用工具，<code>ui/prefetch.py</code> 根据用户输入关键词匹配意图，按需预取对应的一组数据（校园脉搏、治理统计、天气、热门提案、活跃议题、工单，共 6 类意图），通过系统标注注入用户消息。System Prompt 明确指示：看到 <code>[📊 系统已预取以下数据作为参考...]</code> 标记时可直接使用预取数据，需要更详细或更新信息时仍调用工具。</p>
+<p>为避免 Agent 在简单场景下过度调用工具，<code>ui/prefetch.py</code> 根据用户输入关键词匹配意图，按需预取对应的一组数据（社区脉搏、治理统计、天气、热门提案、活跃议题、工单，共 6 类意图），通过系统标注注入用户消息。System Prompt 明确指示：看到 <code>[📊 系统已预取以下数据作为参考...]</code> 标记时可直接使用预取数据，需要更详细或更新信息时仍调用工具。</p>
 
 <hr>
 
@@ -340,8 +340,8 @@ campus-insight-agent/
 
 <ul>
 <li><strong>意图路由</strong>：回退到纯关键词匹配（同一套 <code>_PERSONA_SIGNALS</code>，368 个关键词全覆盖）</li>
-<li><strong>工具调用</strong>：工单查询/提案查询/校园脉搏/天气 → 直接 SQL 查询，跳过 LLM 编排</li>
-<li><strong>报修分类</strong>：LLM 分类失败 → 70 个分类关键词确定性匹配（设施维修/环境卫生/安全隐患/教学设备/网络服务/餐饮问题/其他）</li>
+<li><strong>工具调用</strong>：工单查询/提案查询/社区脉搏/天气 → 直接 SQL 查询，跳过 LLM 编排</li>
+<li><strong>诉求分类</strong>：LLM 分类失败 → 8 大分类关键词确定性匹配（设施维修/环境卫生/安全隐患/停车管理/噪音扰民/物业服务/邻里矛盾/社区事务）</li>
 <li><strong>回复生成</strong>：使用预置回复模板 + 数据填充（如"当前共有 {pending} 件待处理工单，最近一件是 {title}"）</li>
 </ul>
 
@@ -363,13 +363,13 @@ campus-insight-agent/
 
 <table>
 <th>角色</th><th>关键词数</th><th>典型场景</th>
-<tr><td>报修助手</td><td>141</td><td>"教三楼灯坏了" → 自动分类+定级+生成工单</td></tr>
-<tr><td>议事顾问</td><td>108</td><td>"建议延长图书馆时间" → 查重→引导附议或创建</td></tr>
-<tr><td>数据分析师</td><td>77</td><td>"统计最近报修趋势" → 调取治理统计数据</td></tr>
-<tr><td>校园观察员</td><td>42</td><td>"校园脉搏" → 获取快照+播报</td></tr>
+<tr><td>接诉助手</td><td>141</td><td>"3号楼楼道灯坏了" → 自动分类+定级+生成工单</td></tr>
+<tr><td>议事顾问</td><td>108</td><td>"建议延长活动室开放时间" → 查重→引导附议或创建</td></tr>
+<tr><td>数据分析师</td><td>77</td><td>"统计最近诉求趋势" → 调取治理统计数据</td></tr>
+<tr><td>社区观察员</td><td>42</td><td>"社区脉搏" → 获取快照+播报</td></tr>
 </table>
 
-<p>优先级规则：强数据关键词（统计/分析/趋势）→ 数据分析师优先；提案关键词出现时议事顾问覆盖观察员；状态查询词（修好了吗/解决了吗）触发报修复向到数据查询。</p>
+<p>优先级规则：强数据关键词（统计/分析/趋势）→ 数据分析师优先；提案关键词出现时议事顾问覆盖观察员；状态查询词（修好了吗/解决了吗）触发接诉助手转向数据查询。</p>
 
 <hr>
 
@@ -380,9 +380,9 @@ campus-insight-agent/
 <h3>治理核心表（5 张）</h3>
 
 <pre>
--- 校园工单
-campus_issues (id, title, category, location, description, urgency, status,
-               author, reported_at, resolved_at)
+-- 社区工单
+community_issues (id, title, category, location, description, urgency, status,
+                  author, reported_at, resolved_at)
 
 -- 提案
 proposals (id, title, description, category, supporter_count, status,
@@ -401,7 +401,7 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 
 <h3>业务支撑表（6 张）</h3>
 
-<p><code>user_profile</code>（role/name/student_id）、<code>knowledge_base</code>、<code>courses</code>、<code>exams</code>、<code>events</code>、<code>club_activities</code>。</p>
+<p><code>user_profile</code>（role/name/resident_id）、<code>knowledge_base</code>（社区百科）、<code>meal_points</code>（助餐点）、<code>activity_rooms</code>（活动室）、<code>community_events</code>（社区活动安排）、<code>community_notices</code>（社区通知公告）。</p>
 
 <h3>系统支撑表（4 张）</h3>
 
@@ -423,33 +423,33 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 - 趋势：↓改善中(≥75) | →持平(≥45) | ↑需关注(&lt;45)
 </pre>
 
-<p>审计模块（<a href="../agent/governance_audit.py">agent/governance_audit.py</a>）在此基础上增加四维度交叉分析（工单管理/提案参与/公民参与/热点检测），参考 ISO 37120 市政治理指标体系，输出 A/B/C/D 等级 + Top 3 优先行动建议。</p>
+<p>审计模块（<a href="../agent/governance_audit.py">agent/governance_audit.py</a>）在此基础上增加四维度交叉分析（工单管理/提案参与/居民参与/热点检测），参考 ISO 37120 市政治理指标体系，输出 A/B/C/D 等级 + Top 3 优先行动建议。</p>
 
 <hr>
 
 <h2>十、双角色系统</h2>
 
-<h3>学生端（9 页）— 知·报·议·督 + 扩展功能</h3>
+<h3>居民端（9 页）— 知·报·议·督 + 扩展功能</h3>
 <ul>
-<li>对话：交互中枢，快速报修，空闲感知，推理链可视化</li>
-<li>校园脉搏：天气 + 事件 + 百科 + 热点分布</li>
-<li>随手报修：快速上报 + 工单追踪 + 分类统计</li>
-<li>有话说：提案排行 + 创建提案 + 议题讨论</li>
-<li>治理透明窗：健康度 + 趋势 + 类别明细</li>
-<li>健康防护：疾病风险预警 + 预防建议</li>
+<li>对话助手：交互中枢，快速上报诉求，空闲感知，推理链可视化</li>
+<li>社区脉搏：天气 + 事件 + 百科 + 热点分布</li>
+<li>接诉即办：快速上报 + 工单追踪 + 分类统计</li>
+<li>邻里议事：提案排行 + 创建提案 + 议题讨论</li>
+<li>社区治理看板：健康度 + 趋势 + 类别明细</li>
+<li>健康防护：疾病风险预警 + 预防建议（独居老人关怀）</li>
 <li>消息：工单状态变更通知</li>
 <li>我的：个人参与记录 + 我的上报 + 我的提案</li>
 <li>治理大屏：全屏实时数据，30s 自动刷新</li>
 </ul>
 
-<h3>教师端（6 页）— 管理后台</h3>
+<h3>网格员端（6 页）— 管理后台</h3>
 <ul>
 <li>工作台：KPI + 紧急工单 + 趋势 + 热门提案</li>
 <li>工单管理：表格视图 + 改状态 + 多重筛选</li>
 <li>提案管理：回复 + 采纳 + 实施</li>
 <li>内容发布：通知 + 百科 + 议题管理</li>
 <li>数据洞察：治理数据分析与可视化</li>
-<li>健康管理：校园健康监测</li>
+<li>健康管理：社区健康监测（独居老人关怀）</li>
 </ul>
 
 <hr>
@@ -494,7 +494,7 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 <ul>
 <li><strong>1.</strong> <strong>角色定义</strong>（~80 tokens）：根据 <code>detect_persona()</code> 的结果选择对应角色描述</li>
 <li><strong>2.</strong> <strong>工具映射表</strong>（~200 tokens）：16 个工具的结构化清单，每个工具一行：<code>[阶段] 函数名 — 参数 — 一句话说明</code></li>
-<li><strong>3.</strong> <strong>预取数据标注</strong>（~150 tokens）：当前已预取的校园脉搏/天气/工单数据，标记为可直接使用</li>
+<li><strong>3.</strong> <strong>预取数据标注</strong>（~150 tokens）：当前已预取的社区脉搏/天气/工单数据，标记为可直接使用</li>
 <li><strong>4.</strong> <strong>行为约束</strong>（~100 tokens）：禁止编造工单号、禁止跳过必要工具调用、失败时如实告知</li>
 </ul>
 
@@ -507,13 +507,13 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 <ul>
 <li><strong>阶段前缀</strong>：<code>[知]/[报]/[议]/[督]</code> 让 LLM 快速理解工具的治理定位</li>
 <li><strong>触发条件显式化</strong>：不写"查询工单"，写"当用户询问某类别/状态的工单列表时使用"</li>
-<li><strong>参数范围约束</strong>：<code>category 参数可选值：设施维修/环境卫生/安全隐患/教学设备/网络服务/餐饮问题/校园管理/其他</code></li>
+<li><strong>参数范围约束</strong>：<code>category 参数可选值：设施维修/环境卫生/安全隐患/停车管理/噪音扰民/物业服务/邻里矛盾/社区事务</code></li>
 <li><strong>反例引导</strong>：对于查询类工具，添加"如果系统已预取数据则跳过此调用"</li>
 </ul>
 
 <h3>12.3 Few-Shot 示例注入</h3>
 
-<p>在 System Prompt 中嵌入 4 组典型交互示例（每组 2 轮对话 + 工具调用），覆盖报修、查询、提案、闲聊四个场景。示例展示的不是"正确答案"而是"正确的工具调用模式"——让 LLM 学会在什么情况下应该调用哪个工具、应该传递什么参数。</p>
+<p>在 System Prompt 中嵌入 4 组典型交互示例（每组 2 轮对话 + 工具调用），覆盖上报诉求、查询、提案、闲聊四个场景。示例展示的不是"正确答案"而是"正确的工具调用模式"——让 LLM 学会在什么情况下应该调用哪个工具、应该传递什么参数。</p>
 
 <hr>
 
@@ -531,11 +531,11 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 <li><strong>数据库迁移</strong>：使用 try/except 兼容已有列，无需手动迁移</li>
 </ul>
 
-<h3>13.2 测试覆盖（318 tests, CI green）</h3>
+<h3>13.2 测试覆盖（328 tests, CI green）</h3>
 
 <pre>
         ┌──────┐
-        │ E2E  │  7 场景（报修/脉搏/提案/闭环/审计/降级/多轮对话）
+        │ E2E  │  7 场景（接诉/脉搏/提案/闭环/审计/降级/多轮对话）
        ┌┴──────┴┐
        │ 集成   │  21 用例（CRUD + 通知 + 活动 + 并发读）
       ┌┴────────┴┐
@@ -543,7 +543,9 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
      └───────────┘
       冒烟: 17 项全模块编译 + DB 往返 + 路由验证
       关键路径: 40 用例（persona/路由/校验/感知）
-      消融: 6 用例（组件开关对比） + 兼容: 3 用例（DeepSeek API）
+      消融: 6 用例（组件开关对比）
+      语义: 6 用例（意图路由泛化） + 派单: 3 用例 + 老年: 4 用例（平安打卡/SOS/用药）
+      兼容: 3 用例（DeepSeek API，默认跳过）
 </pre>
 
 <p>覆盖范围：每个工具函数的边界输入、Persona Router 的全量路由规则、工具调用的正确拦截与放行、空数据库下的审计稳定性、多线程并发读、通知已读/未读流转。</p>
@@ -568,13 +570,13 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 
 <table>
 <th>限制</th><th>当前方案</th><th>后续方向</th>
-<tr><td>场景数据依赖预置种子</td><td>38 条工单 + 19 条提案 + 14 条百科模拟数据</td><td>接入真实数据 API</td></tr>
+<tr><td>场景数据依赖预置种子</td><td>39 条工单 + 20 条提案 + 15 条百科模拟数据</td><td>接入真实数据 API</td></tr>
 <tr><td>后台推送依赖轮询</td><td>30s 空闲刷新触发</td><td>迁移 WebSocket 推送</td></tr>
 <tr><td>单用户模式</td><td>SQLite + session_state</td><td>引入用户路由 + PostgreSQL</td></tr>
 <tr><td>知识库检索非语义化</td><td>字符 n-gram TF-IDF</td><td>Embedding + 向量检索</td></tr>
-<tr><td>无身份认证</td><td>session 本地存储</td><td>接入 OAuth/CAS</td></tr>
+<tr><td>无身份认证</td><td>session 本地存储</td><td>接入实名认证/微信授权</td></tr>
 <tr><td>天气数据支持降级</td><td>API → 模拟自动切换</td><td>接入更多数据源</td></tr>
-<tr><td>未对接真实后勤系统</td><td>模拟数据 + 状态流转</td><td>与学校后勤部门合作，接入真实工单系统</td></tr>
+<tr><td>未对接真实接诉即办系统</td><td>模拟数据 + 状态流转</td><td>与社区居委会、物业部门合作，接入真实接诉即办工单系统</td></tr>
 </table>
 
 <hr>
@@ -593,7 +595,7 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 <tr><td>种子数据</td><td><code>data/seed.py</code></td><td>替换人物与场景名，保留数据规模和叙事结构</td></tr>
 </table>
 
-<p><strong>工作流引擎、15 张表结构、UI 组件、校验逻辑、318 个测试——不需要代码改动。</strong> 单场景迁移预计 6-8 小时。</p>
+<p><strong>工作流引擎、15 张表结构、UI 组件、校验逻辑、328 个测试——不需要代码改动。</strong> 单场景迁移预计 6-8 小时。</p>
 
 <hr>
 
@@ -614,7 +616,7 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 
 <h3>17.2 CI/CD</h3>
 
-<p><code>.github/workflows/test.yml</code> 配置了 push 和 PR 触发器：Python 3.10 + 安装依赖 + <code>pytest tests/ -q</code>。318 个测试在 30 秒内完成。CI 失败时阻止合并。</p>
+<p><code>.github/workflows/test.yml</code> 配置了 push 和 PR 触发器：Python 3.10 + 安装依赖 + <code>pytest tests/ -q</code>。328 个测试在 30 秒内完成。CI 失败时阻止合并。</p>
 
 <h3>17.3 监控与日志</h3>
 
@@ -635,18 +637,18 @@ feedback_items (id, topic, opinion, source, sentiment, created_at)
 
 <h3>18.1 分阶段推进</h3>
 
-<p>项目按数据层 → 工具层 → Agent 引擎 → UI 层 → 教师端 + 测试五个阶段推进，每阶段先定义接口再实现细节。架构决策（OODA 流程设计、三层降级、enforce 机制、Persona Router 结构）由人工完成，重复性代码生成和测试编写借助 AI 工具加速。</p>
+<p>项目按数据层 → 工具层 → Agent 引擎 → UI 层 → 网格员端 + 测试五个阶段推进，每阶段先定义接口再实现细节。架构决策（OODA 流程设计、三层降级、enforce 机制、Persona Router 结构）由人工完成，重复性代码生成和测试编写借助 AI 工具加速。</p>
 
 <h3>18.2 测试驱动</h3>
 
-<p>318 个测试在整个开发周期中作为"可执行的规格说明"，确保每个模块的行为与预期一致。所有 AI 生成的代码合入前经过 pytest + lint 自动化检查，以及人工审查（异常处理完整性、安全边界、依赖最小化）。</p>
+<p>328 个测试在整个开发周期中作为"可执行的规格说明"，确保每个模块的行为与预期一致。所有 AI 生成的代码合入前经过 pytest + lint 自动化检查，以及人工审查（异常处理完整性、安全边界、依赖最小化）。</p>
 
 <hr>
 
-<div class="meta">本报告为 2026年"京彩AI·智汇全球"首都大学生智能体OPC创新大赛参赛作品《校园先知 CampusInsight Agent》的技术实现文档。代码已开源。</div>
+<div class="meta">本报告为 2026年"京彩AI·智汇全球"首都大学生智能体OPC创新大赛参赛作品《社区先知 CommunityInsight Agent》的技术实现文档。代码已开源。</div>
 
 <div class="footer">
-校园先知 CampusInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
 作者：步承泽
 </div>
 </body>
