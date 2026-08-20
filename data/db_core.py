@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 18
+_SCHEMA_CURRENT_VERSION = 20
 
 
 def _create_schema_version_table(conn):
@@ -453,6 +453,25 @@ def _m18_knowledge_tables(conn):
     )
 
 
+def _m19_drop_dead_tables(conn):
+    """v19：删除校园时代遗留的死表（无任何代码引用）。"""
+    for t in ("club_activities", "courses", "events", "exams"):
+        conn.execute(f"DROP TABLE IF EXISTS {t}")
+
+
+def _m20_proposal_extra_cols(conn):
+    """v20：proposals 补提案模块必需的 6 列（审核时间/楼栋/执行时间/反馈）。"""
+    for col, decl in [
+        ("audited_at", "TIMESTAMP"),
+        ("community_building", "TEXT DEFAULT ''"),
+        ("resolved_at", "TIMESTAMP"),
+        ("feedback_at", "TIMESTAMP"),
+        ("feedback_reason", "TEXT DEFAULT ''"),
+        ("satisfaction", "TEXT DEFAULT ''"),
+    ]:
+        _add_column_if_missing(conn, "proposals", col, decl)
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -636,6 +655,8 @@ def init_db(db_path: str):
         (16, "notice_tables", _m16_notice_tables),
         (17, "elderly_tables", _m17_elderly_tables),
         (18, "knowledge_tables", _m18_knowledge_tables),
+        (19, "drop_dead_tables", _m19_drop_dead_tables),
+        (20, "proposal_extra_cols", _m20_proposal_extra_cols),
     ]
     for version, name, fn in post:
         if version <= current:

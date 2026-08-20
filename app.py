@@ -112,6 +112,8 @@ def main():
             st.Page("ui/pages_grid/dashboard.py", title="工作台", icon=":material/dashboard:", default=True),
             st.Page("ui/pages_grid/issues_mgmt.py", title="工单管理", icon=":material/assignment:"),
             st.Page("ui/pages_grid/proposals_mgmt.py", title="提案管理", icon=":material/lightbulb:"),
+            st.Page("ui/pages_grid/notices_mgmt.py", title="通知管理", icon=":material/campaign:"),
+            st.Page("ui/pages_grid/policy_mgmt.py", title="政策问答管理", icon=":material/quiz:"),
             st.Page("ui/pages_grid/content_mgmt.py", title="内容发布", icon=":material/campaign:"),
             st.Page("ui/pages_grid/insights.py", title="数据洞察", icon=":material/insights:"),
             st.Page("ui/pages_grid/health_mgmt.py", title="健康管理", icon=":material/health_and_safety:"),
@@ -135,6 +137,7 @@ def main():
             st.Page("ui/pages/issues.py", title="接诉即办", icon=":material/build:"),
             st.Page("ui/pages/voice.py", title="邻里议事", icon=":material/forum:"),
             st.Page("ui/pages/transparency.py", title="社区治理看板", icon=":material/bar_chart:"),
+            st.Page("ui/pages/policy.py", title="政策问答", icon=":material/quiz:"),
             # 个人与消息
             st.Page("ui/pages/mine.py", title="我的", icon=":material/person:"),
             st.Page("ui/pages/notifications.py", title="消息", icon=":material/notifications:"),

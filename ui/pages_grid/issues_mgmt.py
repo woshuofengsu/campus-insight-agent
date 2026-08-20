@@ -1,569 +1,412 @@
-"""📋 工单管理 — 表格视图、筛选、批量操作、指派、时效统计."""
+"""📋 工单管理 — 负责人报修工作台：待审核、派单、处理、特殊情况、改派、完整留痕。"""
 import csv
 import io
+import json
 import logging
+import re
 from datetime import datetime
 import streamlit as st
 from ui.guard import require_role
 
 require_role("grid")
 
-from ui.components import TOKEN, tag, page_header
-from ui.cache import cached_issues, cached_issues_stats, invalidate_issues
-from data.database import update_issue_status, get_db, review_dissatisfaction
-from data.db_sla import get_sla_summary
+from data.db_repair import (
+    STATUS_ALL,
+    get_issues, get_issue_timeline, get_pending_review_issues,
+    audit_issue, dispatch_issue, start_process, resolve_issue,
+    close_issue, transfer_issue, negotiate_issue,
+)
+from data.db_notifications import log_activity
+from ui.cache import invalidate_issues
+from ui.components import TOKEN, page_header
 
 _log = logging.getLogger(__name__)
 
-# 页面渲染
-page_header("📋 工单管理", "查看、筛选、处理所有社区诉求上报。")
+_PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 
-# 当前网格员身份（用于「我的待办」过滤：优先按 assignee_id 主键，旧数据回退姓名）
+# 状态 → 颜色（文档《01-报修.md》第七节，与居民端一致）
+_STATUS_COLORS = {
+    "待审核": "#f59e0b",        # 黄
+    "已审核待派单": "#2563eb",  # 蓝
+    "已派单": "#2563eb",        # 蓝
+    "处理中": "#059669",        # 绿
+    "待居民反馈": "#f97316",    # 橙
+    "处理结束": "#64748b",      # 灰
+    "已撤回": "#64748b",        # 灰
+    "退回补充信息": "#dc2626",  # 红
+    "已关闭": "#64748b",        # 灰
+    "待协商": "#f97316",        # 橙
+    "已转出": "#64748b",        # 灰
+}
+_TERMINAL = {"处理结束", "已关闭", "已转出", "已撤回"}
+_ACTIVE = {"待审核", "退回补充信息", "已审核待派单", "已派单", "处理中", "待协商", "待居民反馈"}
+
+_URGENCY_EMOJI = {"紧急": "🔴", "中等": "🟠", "一般": "🟡", "普通": "🔵"}
+
+page_header("📋 工单管理", "报修工单负责人工作台：审核、派单、处理、特殊情况、完整留痕。")
+
 _memory = st.session_state.get("memory")
-_profile = _memory.get_user_profile() if _memory is not None else {}
-_my_id = (_profile or {}).get("id")
-_my_name = (_profile.get("name") or "").strip() or (_profile.get("unit") or "").strip()
+_profile = _memory.get_user_profile() if _memory is not None else (st.session_state.get("user_profile") or {})
+_actor = (_profile.get("name") or "").strip() or "负责人"
 
-# 状态筛选
-status_choice = st.radio(
-    "状态筛选",
-    ["全部", "⏳ 待处理", "🔄 处理中", "🧐 待复核", "✅ 已解决"],
-    horizontal=True,
-    label_visibility="collapsed",
-    key="_issues_status_filter",
+
+def _status_badge(status: str) -> str:
+    color = _STATUS_COLORS.get(status, "#64748b")
+    return (
+        f'<span style="display:inline-block;background:{color}1f;border:1px solid {color};'
+        f'color:{color};border-radius:999px;padding:1px 10px;font-size:0.78em;'
+        f'font-weight:600;white-space:nowrap;">{status}</span>'
+    )
+
+
+def _mask_phone(phone: str) -> str:
+    phone = (phone or "").strip()
+    if len(phone) == 11:
+        return f"{phone[:3]}****{phone[7:]}"
+    return phone or "—"
+
+
+def _mask_name(name: str) -> str:
+    name = (name or "").strip()
+    if not name:
+        return "—"
+    if len(name) == 1:
+        return f"{name}**"
+    return f"{name[0]}{'*' * (len(name) - 1)}"
+
+
+def _do_audit(iid: int, decision: str, opinion: str):
+    """审核动作（通过 / 退回，退回必填意见）。"""
+    if decision == "✅ 通过":
+        ok, msg = audit_issue(iid, approve=True, actor=_actor)
+    elif not (opinion or "").strip():
+        ok, msg = False, "退回必须填写审核意见"
+    else:
+        ok, msg = audit_issue(iid, approve=False, opinion=opinion.strip(), actor=_actor)
+    if ok:
+        st.success("审核完成，状态已更新。")
+        invalidate_issues()
+        st.rerun()
+    else:
+        st.error(msg)
+
+
+def _render_audit_card(issue: dict):
+    """待审核队列卡片：电话核实后审核（通过 / 退回必填意见）。"""
+    iid = issue["id"]
+    status = issue.get("status", "")
+    with st.container(border=True):
+        st.markdown(
+            f'<span style="font-weight:700;color:{TOKEN["text"]};">#{iid} {issue.get("title","")[:40]}</span>'
+            f'&nbsp;{_status_badge(status)}'
+            + (f'&nbsp;{_URGENCY_EMOJI.get(issue.get("urgency",""), "")} {issue.get("urgency","")}' if issue.get("urgency") else ""),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            f'{issue.get("issue_type", "")} · {issue.get("category", "")} · '
+            f'📍 {issue.get("location") or "—"} · 🕐 {(issue.get("reported_at") or "")[:16]}'
+        )
+        st.caption(
+            f'报修人：{_mask_name(issue.get("reporter_name"))} · '
+            f'电话：{_mask_phone(issue.get("reporter_phone"))} · '
+            f'描述：{(issue.get("description") or issue.get("title") or "")[:60]}'
+        )
+        with st.form(key=f"pa_audit_{iid}"):
+            decision = st.radio("审核决定", ["✅ 通过", "↩️ 退回补充信息"], horizontal=True, key=f"pa_dec_{iid}")
+            opinion = st.text_input("审核意见（退回必填；电话无法联系请退回要求补充有效联系方式）", key=f"pa_opinion_{iid}")
+            aud_sub = st.form_submit_button("提交审核", width="stretch")
+        if aud_sub:
+            _do_audit(iid, decision, opinion)
+
+
+def _render_issue_card(issue: dict):
+    """主列表卡片：字段 + 详情（时间线、操作按钮按状态显示）。"""
+    iid = issue["id"]
+    status = issue.get("status", "")
+    with st.container(border=True):
+        st.markdown(
+            f'<span style="font-weight:700;color:{TOKEN["text"]};">#{iid} {issue.get("title","")[:40]}</span>'
+            f'&nbsp;{_status_badge(status)}'
+            + (f'&nbsp;{_URGENCY_EMOJI.get(issue.get("urgency",""), "")} {issue.get("urgency","")}' if issue.get("urgency") else "")
+            + (f'&nbsp;<span style="color:#dc2626;font-size:0.78em;font-weight:600;">🚧 违规搭建</span>' if issue.get("is_violation") else "")
+            + (f'&nbsp;<span style="color:#7c3aed;font-size:0.78em;font-weight:600;">非社区责任</span>' if issue.get("non_community_responsibility") else ""),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            f'{issue.get("issue_type", "")} · {issue.get("category", "")} · '
+            f'📍 {issue.get("location") or "—"} · 🕐 {(issue.get("reported_at") or "")[:16]} · '
+            f'报修人：{_mask_name(issue.get("reporter_name"))}'
+        )
+        with st.expander("📄 详情与操作", expanded=False):
+            _render_detail(issue)
+
+
+def _render_detail(issue: dict):
+    iid = issue["id"]
+    status = issue.get("status", "")
+    phone = (issue.get("reporter_phone") or "").strip()
+
+    st.markdown(f"**报修人**：{issue.get('reporter_name') or '—'} · **电话**：{_mask_phone(phone)}")
+    st.markdown(f"**报修住址**：{issue.get('location') or '—'}")
+    st.markdown(f"**分类**：{issue.get('issue_type', '—')} · **类别**：{issue.get('category', '—')} · **紧急程度**：{issue.get('urgency', '—')}")
+    st.markdown(f"**问题描述**：{issue.get('description') or '—'}")
+    if issue.get("is_agent_report"):
+        st.markdown(
+            f"**代报人**：{issue.get('agent_name') or '—'}（{issue.get('agent_relation') or ''}）"
+            f" · 电话 {_mask_phone(issue.get('agent_phone'))}"
+        )
+    if issue.get("assignee_name"):
+        st.markdown(f"**维修人员**：{issue['assignee_name']} · 电话 {_mask_phone(issue.get('assignee_phone'))}")
+    if issue.get("approved_at"):
+        st.markdown(f"**审核通过时间**：{(issue['approved_at'] or '')[:16]}")
+    if issue.get("resolve_note"):
+        st.markdown(f"**处理结果**：{issue['resolve_note']}")
+    if issue.get("no_photo_reason"):
+        st.markdown(f"**未上传照片原因**：{issue['no_photo_reason']}")
+    if issue.get("satisfaction"):
+        st.markdown(f"**满意度**：{issue['satisfaction']}" + (f"（{issue.get('satisfaction_reason')}）" if issue.get("satisfaction_reason") else ""))
+
+    # 查看完整手机号（二次确认 + 留痕）
+    if phone:
+        st.markdown("---")
+        st.markdown("**查看完整手机号**（需二次确认并留痕）：")
+        if st.button("👁️ 请求查看", key=f"m_phone_req_{iid}"):
+            st.session_state[f"_phone_confirm_{iid}"] = True
+            st.rerun()
+        if st.session_state.get(f"_phone_confirm_{iid}") and not st.session_state.get(f"_phone_shown_{iid}"):
+            st.caption(f"将记录留痕：{_actor} 查看工单 #{iid} 的报修人完整号码。")
+            if st.button("✅ 二次确认并查看", key=f"m_phone_ok_{iid}"):
+                log_activity(_actor, "查看完整手机号", "issue", iid,
+                             module="报修", detail=f"查看工单 #{iid} 报修人完整号码 {phone}")
+                st.session_state[f"_phone_shown_{iid}"] = True
+                st.rerun()
+        if st.session_state.get(f"_phone_shown_{iid}"):
+            st.code(phone)
+
+    # 完整留痕时间线（默认最近 3 条，可展开全部）
+    st.markdown("---")
+    st.markdown("**📜 完整留痕时间线**")
+    timeline = get_issue_timeline(iid)
+    if timeline:
+        show_all = st.checkbox("展开全部留痕", key=f"m_tl_all_{iid}")
+        shown = timeline if show_all else timeline[:3]
+        for t in shown:
+            before = t.get("before_value") or ""
+            after = t.get("after_value") or ""
+            trans = f"：{before} → {after}" if (before or after) else ""
+            tail = f" — {t['detail']}" if t.get("detail") else ""
+            st.caption(
+                f"🕐 {(t.get('created_at') or '')[:16]} · {t.get('actor') or ''} · "
+                f"{t.get('action')}{trans}{tail}"
+            )
+        if not show_all and len(timeline) > 3:
+            st.caption(f"…共 {len(timeline)} 条留痕，勾选上方展开全部。")
+    else:
+        st.caption("暂无留痕记录")
+
+    st.markdown("---")
+    st.markdown("**🔧 操作**")
+
+    # 1) 审核（待审核 / 退回补充信息）
+    if status in ("待审核", "退回补充信息"):
+        with st.form(key=f"m_audit_{iid}"):
+            decision = st.radio("审核决定", ["✅ 通过", "↩️ 退回补充信息"], horizontal=True, key=f"m_dec_{iid}")
+            opinion = st.text_input("审核意见（退回必填）", key=f"m_opinion_{iid}")
+            aud_sub = st.form_submit_button("提交审核", width="stretch")
+        if aud_sub:
+            _do_audit(iid, decision, opinion)
+
+    # 2) 分派 / 改派（已审核待派单 / 已派单 / 处理中）
+    if status in ("已审核待派单", "已派单", "处理中"):
+        is_reassign = status != "已审核待派单"
+        with st.form(key=f"m_dispatch_{iid}"):
+            st.markdown(f"**{'改派' if is_reassign else '分派维修人员'}**" + ("（处理中改派需二次确认）" if status == "处理中" else ""))
+            aname = st.text_input("维修人员姓名", value=issue.get("assignee_name") or "", key=f"m_aname_{iid}")
+            aphone = st.text_input("维修人员电话（手机号）", value=issue.get("assignee_phone") or "", key=f"m_aphone_{iid}")
+            confirm = False
+            reason = ""
+            if status == "处理中":
+                confirm = st.checkbox("二次确认：处理中改派，需记录原因并通知原维修人员取消任务", key=f"m_disp_confirm_{iid}")
+                reason = st.text_input("改派原因", key=f"m_disp_reason_{iid}")
+            disp_sub = st.form_submit_button("确认分派" if not is_reassign else "确认改派", width="stretch")
+        if disp_sub:
+            if not aname.strip():
+                st.error("请填写维修人员姓名。")
+            elif not _PHONE_RE.match(aphone.strip()):
+                st.error("请输入正确的维修人员手机号。")
+            elif status == "处理中" and not confirm:
+                st.error("处理中改派需二次确认。")
+            elif status == "处理中" and not reason.strip():
+                st.error("处理中改派需填写改派原因。")
+            else:
+                ok, msg = dispatch_issue(iid, aname.strip(), aphone.strip(), actor=_actor)
+                if ok:
+                    st.success("分派/改派完成，状态已更新为「已派单」。")
+                    invalidate_issues()
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+    # 3) 开始处理（已派单 / 待协商）
+    if status in ("已派单", "待协商"):
+        if st.button("🔨 开始处理（状态 → 处理中）", key=f"m_start_{iid}", width="stretch"):
+            ok, msg = start_process(iid, actor=_actor)
+            if ok:
+                st.success("已开始处理。")
+                invalidate_issues()
+                st.rerun()
+            else:
+                st.error(msg)
+
+    # 4) 填写处理结果（处理中）
+    if status == "处理中":
+        with st.form(key=f"m_resolve_{iid}"):
+            note = st.text_area("处理结果（必填）", key=f"m_note_{iid}")
+            photos = st.file_uploader("维修后照片（jpg/png，最多 3 张，选填）",
+                                      type=["jpg", "png"], accept_multiple_files=True, key=f"m_photos_{iid}")
+            no_photo_reason = st.text_input("未上传照片原因（未上传照片时必填）", key=f"m_nophoto_{iid}")
+            res_sub = st.form_submit_button("提交处理结果（状态 → 待居民反馈）", width="stretch")
+        if res_sub:
+            photo_after = json.dumps([p.name for p in (photos or [])][:3], ensure_ascii=False)
+            ok, msg = resolve_issue(iid, (note or "").strip(), photo_after=photo_after,
+                                    no_photo_reason=(no_photo_reason or "").strip(), actor=_actor)
+            if ok:
+                st.success("处理结果已提交，等待居民反馈。")
+                invalidate_issues()
+                st.rerun()
+            else:
+                st.error(msg)
+
+    # 5) 特殊情况：违规搭建转出（负责人手动批准；审核通过后）
+    if issue.get("is_violation") and status in _ACTIVE and status != "待审核":
+        st.markdown("---")
+        st.warning("🚧 该工单标记为**违规搭建**，需负责人手动批准转出，转出后流程结束。")
+        if st.button("🚧 转出（状态 → 已转出）", key=f"m_transfer_{iid}", width="stretch"):
+            ok, msg = transfer_issue(iid, actor=_actor)
+            if ok:
+                st.success("已转出，工单流程结束。")
+                invalidate_issues()
+                st.rerun()
+            else:
+                st.error(msg)
+
+    # 6) 特殊情况：室内费用协商 → 待协商（负责人触发）
+    if issue.get("issue_type") == "室内" and status in ("已审核待派单", "已派单", "处理中", "待居民反馈"):
+        st.markdown("---")
+        st.markdown("**室内维修费用协商**：居民不同意收费时转「待协商」。")
+        with st.form(key=f"m_negotiate_{iid}"):
+            neg_reason = st.text_input("协商原因（必填）", key=f"m_neg_reason_{iid}")
+            neg_sub = st.form_submit_button("转待协商", width="stretch")
+        if neg_sub:
+            if not neg_reason.strip():
+                st.error("协商原因必填。")
+            else:
+                ok, msg = negotiate_issue(iid, neg_reason.strip(), actor=_actor)
+                if ok:
+                    st.success("已转待协商。")
+                    invalidate_issues()
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+    # 7) 特殊情况：关闭（二次确认；仅特殊原因）
+    if status in _ACTIVE and status != "待审核":
+        st.markdown("---")
+        st.markdown("**特殊关闭**（需二次确认；仅限：居民放弃维修、工单重复且已处理、工单无效等）")
+        with st.form(key=f"m_close_{iid}"):
+            close_reason = st.text_input("关闭原因（必填）", key=f"m_close_reason_{iid}")
+            close_confirm = st.checkbox("二次确认：关闭后将通知居民并说明原因", key=f"m_close_confirm_{iid}")
+            close_sub = st.form_submit_button("确认关闭", width="stretch")
+        if close_sub:
+            if not close_reason.strip():
+                st.error("关闭原因必填。")
+            elif not close_confirm:
+                st.error("关闭需二次确认。")
+            else:
+                ok, msg = close_issue(iid, close_reason.strip(), actor=_actor)
+                if ok:
+                    st.success("工单已关闭，居民将收到通知。")
+                    invalidate_issues()
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+    if status in _TERMINAL:
+        st.caption("该工单已处于终态，无更多操作。")
+
+
+# ================= 页面主体 =================
+
+# ---------- 筛选 ----------
+f1, f2, f3 = st.columns(3)
+with f1:
+    status_choice = st.selectbox("状态筛选", ["全部"] + STATUS_ALL, key="mgmt_status")
+with f2:
+    type_choice = st.selectbox("分类", ["全部", "室外", "室内"], key="mgmt_type")
+with f3:
+    urg_choice = st.selectbox("紧急程度", ["全部", "紧急", "中等", "一般", "普通"], key="mgmt_urgency")
+search = st.text_input("🔍 搜索标题 / 描述 / 地址", key="mgmt_search", placeholder="输入关键词…")
+
+issues = get_issues(
+    status=None if status_choice == "全部" else status_choice,
+    issue_type=None if type_choice == "全部" else type_choice,
+    limit=300,
 )
-_STATUS_MAP = {"全部": None, "⏳ 待处理": "待处理", "🔄 处理中": "处理中",
-               "🧐 待复核": "待复核", "✅ 已解决": "已解决"}
-status_val = _STATUS_MAP.get(status_choice)
-
-# 筛选：2+2 网格，手机上堆成 4 行
-c1, c2 = st.columns(2)
-with c1:
-    cat_choice = st.selectbox(
-        "分类",
-        ["全部", "设施维修", "环境卫生", "安全隐患", "停车管理", "噪音扰民", "物业服务", "邻里矛盾", "社区事务", "其他"],
-        key="_issues_cat_filter",
-        label_visibility="collapsed",
-    )
-with c2:
-    search = st.text_input("搜索标题", placeholder="输入关键词...", key="_issues_search", label_visibility="collapsed")
-c3, c4 = st.columns(2)
-with c3:
-    urgency_choice = st.selectbox(
-        "紧急度",
-        ["全部", "紧急", "普通"],
-        key="_issues_urgency_filter",
-        label_visibility="collapsed",
-    )
-with c4:
-    batch_mode = st.toggle("🔲 批量", key="_issues_batch_mode")
-    show_mine = st.toggle("👷 我的待办", key="_issues_mine_filter")
-
-# 拉数据
-cat_val = None if cat_choice == "全部" else cat_choice
-urgency_val = None if urgency_choice == "全部" else urgency_choice
-
-issues = cached_issues(category=cat_val, status=status_val, urgency=urgency_val, limit=200)
-
+if urg_choice != "全部":
+    issues = [i for i in issues if i.get("urgency") == urg_choice]
 if search:
-    issues = [i for i in issues if search.lower() in (i.get("title") or "").lower()]
-
-# 「我的待办」：只看指派给当前网格员的工单（真派单闭环）
-# 优先按 assignee_id 主键匹配（同名不串单）；旧数据（无 assignee_id）回退姓名匹配
-if show_mine:
+    kw = search.lower()
     issues = [
         i for i in issues
-        if (i.get("assignee_id") is not None and i.get("assignee_id") == _my_id)
-        or (i.get("assignee_id") is None and (i.get("assignee") or "").strip() == _my_name)
+        if kw in (i.get("title") or "").lower()
+        or kw in (i.get("description") or "").lower()
+        or kw in (i.get("location") or "").lower()
     ]
+# 紧急优先，再按 id 新的在前
+_URG_PRIO = {"紧急": 0, "中等": 1, "一般": 2, "普通": 3}
+issues.sort(key=lambda x: (_URG_PRIO.get(x.get("urgency", ""), 9), -(x.get("id") or 0)))
 
-# 排序：紧急优先，再按状态优先级，最后新的在前
-_STATUS_PRIORITY = {"待处理": 0, "处理中": 1, "已解决": 2}
-issues.sort(key=lambda x: (
-    0 if x.get("urgency") == "紧急" else 1,
-    _STATUS_PRIORITY.get(x.get("status", ""), 99),
-    -(x.get("id") or 0),
-))
-
-
-# AI 分类建议（真 LLM；关键词兜底在 _llm_classify 里）
-def _suggest_category(title: str, description: str = "", stored: str = "") -> str:
-    """用公共 AI 分类器建议类别，拿不准就返回空串。
-
-    优先用上报时 LLM 存的 suggested_category；老数据没有就现场重新分类
-    （LLM 挂了还会退化到关键词匹配）。
-    """
-    if stored:
-        return stored
-    try:
-        from tools.action_report_issue import _llm_classify
-        cat, _ = _llm_classify(title, description)
-        return cat
-    except Exception:  # 出错就跳过，瞎建议还不如不建议
-        _log.debug("AI 分类建议对 '%s' 不可用", title)
-        return ""
-
-
-# 网格员处理统计
-with st.expander("📊 我的处理统计", expanded=False):
-    try:
-        with get_db() as conn:
-            my_processed = conn.execute(
-                "SELECT COUNT(*) as cnt FROM activity_log "
-                "WHERE action IN ('开始处理', '解决问题', '重新打开', '更新工单') "
-                "AND date(created_at, 'localtime') = date('now', 'localtime')"
-            ).fetchone()
-            today_processed = my_processed["cnt"] if my_processed else 0
-
-            my_week = conn.execute(
-                "SELECT COUNT(*) as cnt FROM activity_log "
-                "WHERE action IN ('开始处理', '解决问题') "
-                "AND created_at > date('now', '-7 days')"
-            ).fetchone()
-            week_processed = my_week["cnt"] if my_week else 0
-
-            # 本月平均解决时长
-            avg_days_row = conn.execute(
-                "SELECT ROUND(AVG(julianday(resolved_at) - julianday(reported_at)), 1) as avg_days "
-                "FROM community_issues WHERE status = '已解决' AND resolved_at > date('now', '-30 days')"
-            ).fetchone()
-            avg_days = avg_days_row["avg_days"] if avg_days_row and avg_days_row["avg_days"] is not None else None
-    except Exception:
-        _log.warning("加载网格员处理统计失败", exc_info=True)
-        today_processed, week_processed, avg_days = 0, 0, None
-
-    mc1, mc2, mc3 = st.columns(3)
-    with mc1:
-        st.metric("今日处理", f"{today_processed} 件")
-    with mc2:
-        st.metric("本周处理", f"{week_processed} 件")
-    with mc3:
-        st.metric("月均解决时间", f"{avg_days} 天" if avg_days else "—")
-
-# 统计条
-stats = cached_issues_stats()
-pending_c = stats["by_status"].get("待处理", 0)
-progress_c = stats["by_status"].get("处理中", 0)
-resolved_c = stats["by_status"].get("已解决", 0)
-
-# SLA 概览：按紧急度分级时限
-_sla = get_sla_summary()
-urgent_unresolved = _sla["urgent_pending"]
-overdue_total = _sla["total_overdue"]
-critical_overdue = _sla["critical_overdue"]
-normal_overdue = _sla["normal_overdue"]
-
-c_stats, c_export = st.columns([5, 1])
-with c_stats:
-    sla_parts = []
-    if urgent_unresolved > 0:
-        sla_parts.append(f'🔴 紧急未处理 {urgent_unresolved}')
-    if critical_overdue > 0:
-        sla_parts.append(f'🚨 紧急超时 {critical_overdue}')
-    if normal_overdue > 0:
-        sla_parts.append(f'⚠️ 普通超时 {normal_overdue}')
-    sla_str = ' · '.join(sla_parts) if sla_parts else ''
-    st.caption(
-        f'共 {len(issues)} 条 · '
-        f'⏳ 待处理 {pending_c} · 🔄 处理中 {progress_c} · ✅ 已解决 {resolved_c}'
-        + (f' · {sla_str}' if sla_str else '')
+# ---------- 导出 CSV（字段按文档第七节，电话脱敏，不含照片附件） ----------
+if issues:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["工单号", "报修人姓名", "电话", "报修住址", "分类", "紧急程度",
+                     "问题描述摘要", "提交时间", "状态", "审核通过时间", "维修人员", "处理结果"])
+    for i in issues:
+        writer.writerow([
+            i.get("id"), _mask_name(i.get("reporter_name")), _mask_phone(i.get("reporter_phone")),
+            i.get("location"), i.get("issue_type", ""), i.get("urgency", ""),
+            (i.get("title") or "")[:50], (i.get("reported_at") or "")[:16],
+            i.get("status", ""), (i.get("approved_at") or "")[:16] or "",
+            i.get("assignee_name", ""), i.get("resolve_note", ""),
+        ])
+    st.download_button(
+        "📥 导出工单数据（CSV）",
+        buf.getvalue(),
+        file_name=f"工单导出_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
     )
-with c_export:
-    if issues:
-        csv_buffer = io.StringIO()
-        writer = csv.writer(csv_buffer)
-        writer.writerow(["ID", "标题", "分类", "建议分类", "位置", "状态", "紧急度",
-                         "上报人", "指派人", "上报时间", "解决时间", "处理耗时(天)",
-                         "处理备注", "问题描述"])
-        for i in issues:
-            resolved_at = (i.get("resolved_at") or "")
-            reported_at = i.get("reported_at", "")
-            days_to_resolve = ""
-            if resolved_at and reported_at:
-                try:
-                    rd = datetime.strptime(resolved_at[:10], "%Y-%m-%d")
-                    rp = datetime.strptime(reported_at[:10], "%Y-%m-%d")
-                    days_to_resolve = str((rd - rp).days)
-                except (ValueError, TypeError):
-                    pass
-            writer.writerow([
-                i.get("id"), i.get("title"), i.get("category"),
-                i.get("suggested_category", ""), i.get("location"),
-                i.get("status"), i.get("urgency"), i.get("author"),
-                i.get("assignee", ""),
-                reported_at[:10] if reported_at else "",
-                resolved_at[:10] if resolved_at else "",
-                days_to_resolve,
-                i.get("processing_note", ""),
-                i.get("description", ""),
-            ])
-        st.download_button(
-            "📥 导出CSV",
-            csv_buffer.getvalue(),
-            file_name=f"工单导出_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv",
-            width="stretch",
-        )
-
-# 常用回复模板
-with st.expander("📋 常用回复模板", expanded=False):
-    templates = {
-        "已派维修": "已通知物业维修组前往处理，预计24小时内完成。",
-        "配件待购": "配件已采购，预计3-5天内到货后立即更换。",
-        "已列入计划": "问题已确认，已列入下周维修计划。",
-        "已修复": "已安排维修人员处理完毕，请邻居核实。",
-        "转交部门": "该问题已转交相关管理部门处理，请耐心等待。",
-        "需要进一步核实": "已收到反馈，需要进一步现场核实后再做处理。",
-    }
-    tcols = st.columns(3)
-    for i, (label, text) in enumerate(templates.items()):
-        with tcols[i % 3]:
-            if st.button(f"📝 {label}", key=f"tpl_{label}", width="stretch",
-                         help=f"点击选用：{text}"):
-                st.session_state["_quick_tpl"] = text
-                st.session_state["_quick_tpl_label"] = label
-
-    if st.session_state.get("_quick_tpl"):
-        selected_label = st.session_state.get("_quick_tpl_label", "")
-        selected_text = st.session_state["_quick_tpl"]
-        st.markdown("---")
-        st.markdown(f"**📋 已选模板：{selected_label}**")
-        st.code(selected_text, language=None)
-        st.caption("👆 点击右上角复制图标复制模板文本，可用于工单处理备注。")
-        if st.button("❌ 清除模板", key="_clear_tpl"):
-            st.session_state.pop("_quick_tpl", None)
-            st.session_state.pop("_quick_tpl_label", None)
 
 st.markdown("---")
 
+# ---------- 待审核队列 ----------
+pending = get_pending_review_issues(limit=100)
+with st.expander(f"⏳ 待审核队列（含退回待补 · {len(pending)} 条）", expanded=True):
+    if not pending:
+        st.caption("暂无待审核工单。")
+    for iss in pending:
+        _render_audit_card(iss)
 
-# 操作处理
-def _resolve_assignee_id(name: str) -> int | None:
-    """根据姓名找到网格员的用户 id（手动派单用）。"""
-    if not name:
-        return None
-    from data.db_user import list_users
-    for u in list_users(role="grid"):
-        if (u.get("name") or "").strip() == name or (u.get("username") or "") == name:
-            return u.get("id")
-    return None
+st.markdown("---")
 
-
-def _set_status(iid: int, new_status: str, note: str = "", assignee: str = ""):
-    assignee_id = _resolve_assignee_id(assignee) if assignee else None
-    update_issue_status(iid, new_status, processing_note=note,
-                        assignee=assignee, assignee_id=assignee_id)
-    invalidate_issues()
-
-
-def _available_actions(status: str) -> list[tuple[str, str]]:
-    """返回当前状态可执行的动作 [(label, new_status), ...]（用于 st.form 收敛）。"""
-    if status == "待处理":
-        return [("🔄 开始处理", "处理中"), ("✅ 标记已解决", "已解决")]
-    if status == "处理中":
-        return [("✅ 标记已解决", "已解决"), ("↩️ 退回待处理", "待处理")]
-    if status == "已解决":
-        return [("🔄 重新打开", "待处理")]
-    return []
-
-
-def _batch_set_status(selected_ids: list[int], new_status: str, note: str = ""):
-    """批量更新选中工单的状态。"""
-    count = 0
-    for iid in selected_ids:
-        update_issue_status(iid, new_status, processing_note=note)
-        count += 1
-    invalidate_issues()
-    return count
-
-
-# 展示用的上报人
-def _resolve_author_display(author: str) -> str:
-    if not author:
-        return "匿名"
-    return author
-
-
-# 计算处理时长
-def _compute_days(reported_at: str, resolved_at: str = "") -> tuple[int | None, int | None]:
-    """返回（已开启天数, 解决天数）。"""
-    days_open = None
-    days_to_resolve = None
-    try:
-        rd = datetime.strptime(reported_at[:10], "%Y-%m-%d")
-        days_open = (datetime.now() - rd).days
-        if resolved_at:
-            rv = datetime.strptime(resolved_at[:10], "%Y-%m-%d")
-            days_to_resolve = (rv - rd).days
-    except (ValueError, TypeError):
-        pass
-    return days_open, days_to_resolve
-
-
-# 批量操作栏
-if batch_mode and issues:
-    selected_ids: list[int] = []
-    for issue in issues:
-        iid = issue["id"]
-        if st.session_state.get(f"_batch_{iid}", False):
-            selected_ids.append(iid)
-
-    if selected_ids:
-        n = len(selected_ids)
-        with st.container(border=True):
-            st.markdown(
-                f'<span style="font-weight:600;color:{TOKEN["accent"]};font-size:0.88em;">'
-                f'✅ 已选 {n} 条</span>',
-                unsafe_allow_html=True,
-            )
-            # 批量备注
-            batch_note = st.text_input(
-                "批量处理备注", key="_batch_note",
-                placeholder="可选：为所选工单添加统一备注…",
-            )
-            b1, b2, b3, b4 = st.columns([1, 1, 1, 2])
-            with b1:
-                if st.button("🔄 标记处理中", key="_batch_progress", width="stretch"):
-                    cnt = _batch_set_status(selected_ids, "处理中", note=batch_note)
-                    st.toast(f"已将 {cnt} 条工单标记为「处理中」", icon="🔄")
-                    _clear_batch()
-                    st.rerun()
-            with b2:
-                if st.button("✅ 标记已解决", key="_batch_resolve", width="stretch"):
-                    cnt = _batch_set_status(selected_ids, "已解决", note=batch_note)
-                    st.toast(f"已将 {cnt} 条工单标记为「已解决」", icon="✅")
-                    _clear_batch()
-                    st.rerun()
-            with b3:
-                if st.button("🔄 重新打开", key="_batch_reopen", width="stretch"):
-                    cnt = _batch_set_status(selected_ids, "待处理", note=batch_note)
-                    st.toast(f"已将 {cnt} 条工单重新打开", icon="🔄")
-                    _clear_batch()
-                    st.rerun()
-            with b4:
-                pass
-    else:
-        st.caption("👆 勾选下方工单即可批量操作")
-
-    c_all, c_none = st.columns([1, 6])
-    with c_all:
-        if st.button("☑️ 全选", key="_batch_select_all"):
-            for issue in issues:
-                st.session_state[f"_batch_{issue['id']}"] = True
-            st.rerun()
-    with c_none:
-        if st.button("🔲 取消全选", key="_batch_deselect_all"):
-            _clear_batch()
-            st.rerun()
-
-    st.markdown("---")
-
-
-def _clear_batch():
-    """清空所有批量勾选。"""
-    for k in list(st.session_state.keys()):
-        if k.startswith("_batch_") and k != "_batch_note":
-            st.session_state[k] = False
-    if "_batch_note" in st.session_state:
-        del st.session_state["_batch_note"]
-
-
-# 工单表格
+# ---------- 工单列表 ----------
+st.caption(
+    f"共 {len(issues)} 条工单"
+    + (f" · 当前筛选：{status_choice} / {type_choice} / {urg_choice}"
+       if status_choice != "全部" or type_choice != "全部" or urg_choice != "全部" else "")
+)
 if not issues:
     st.info("暂无匹配的工单。")
 else:
-    # 列标题
-    col_hdr = st.columns([3, 2, 1.5, 1.5, 2])
-    with col_hdr[0]:
-        st.caption("📋 工单信息")
-    with col_hdr[1]:
-        st.caption("👤 上报人 / 指派人")
-    with col_hdr[2]:
-        st.caption("⏱️ 时效")
-    with col_hdr[3]:
-        st.caption("🏷️ 建议分类")
-    with col_hdr[4]:
-        st.caption("🔧 操作")
-
-    for i, issue in enumerate(issues):
-        iid = issue["id"]
-        status = issue.get("status", "")
-        urgency = issue.get("urgency", "")
-        title = issue.get("title", "")[:40]
-        cat = issue.get("category", "")
-        loc = issue.get("location", "")
-        author = issue.get("author", "")
-        reported = issue.get("reported_at", "")[:10]
-        desc = issue.get("description", "")
-        proc_note = issue.get("processing_note", "")
-        assignee = issue.get("assignee", "")
-        suggested_cat = issue.get("suggested_category", "")
-        resolved_at = (issue.get("resolved_at") or "")[:10]
-
-        days_open, days_to_resolve = _compute_days(
-            issue.get("reported_at", ""),
-            issue.get("resolved_at", ""),
-        )
-
-        urgency_icon = "🔴" if urgency == "紧急" else "🟡" if status == "待处理" else "🔵" if status == "处理中" else "🟢"
-
-        with st.container(border=True):
-            if batch_mode:
-                c_chk, c_main, c_assignee, c_time, c_suggest, c_act = st.columns([1, 3, 1.5, 1.2, 1.2, 2])
-                with c_chk:
-                    st.checkbox("选", key=f"_batch_{iid}", label_visibility="collapsed")
-            else:
-                c_main, c_assignee, c_time, c_suggest, c_act = st.columns([3, 1.5, 1.2, 1.2, 2])
-
-            # 第 1 列：工单信息
-            with c_main:
-                st.markdown(
-                    f'{urgency_icon} <strong>#{iid} {title}</strong>'
-                    f'&nbsp;{tag(status)}'
-                    f'{"&nbsp;" + tag(urgency) if urgency == "紧急" else ""}',
-                    unsafe_allow_html=True,
-                )
-                detail_parts = [cat]
-                if loc:
-                    detail_parts.append(f'📍 {loc}')
-                detail_parts.append(f'🕐 {reported}')
-                if status == "已解决" and resolved_at:
-                    detail_parts.append(f'✅ {resolved_at}')
-                st.caption(' · '.join(detail_parts))
-
-            # 第 2 列：上报人 + 指派人
-            with c_assignee:
-                st.caption(f"上报：{_resolve_author_display(author)}")
-                if assignee:
-                    st.caption(f"👷 {assignee}")
-
-            # 第 3 列：时效
-            with c_time:
-                if status == "已解决" and days_to_resolve is not None:
-                    time_color = TOKEN["success"] if days_to_resolve <= 3 else TOKEN["warning"] if days_to_resolve <= 7 else TOKEN["danger"]
-                    st.markdown(
-                        f'<span style="font-size:0.78em;color:{time_color};font-weight:600;">'
-                        f'✅ {days_to_resolve}天解决</span>',
-                        unsafe_allow_html=True,
-                    )
-                elif status in ("待处理", "处理中") and days_open is not None:
-                    if days_open > 14:
-                        time_color, icon = TOKEN["danger"], "🔴"
-                    elif days_open > 7:
-                        time_color, icon = TOKEN["warning"], "🟠"
-                    elif days_open > 3:
-                        time_color, icon = TOKEN["warning"], "🟡"
-                    else:
-                        time_color, icon = TOKEN["text_sec"], "⏳"
-                    st.markdown(
-                        f'<span style="font-size:0.78em;color:{time_color};font-weight:600;">'
-                        f'{icon} {days_open}天</span>',
-                        unsafe_allow_html=True,
-                    )
-
-            # 第 4 列：建议分类
-            with c_suggest:
-                suggested_cat = _suggest_category(title, desc, suggested_cat)
-                if suggested_cat and suggested_cat != cat:
-                    st.markdown(
-                        f'<span style="font-size:0.75em;background:{TOKEN["accent_bg"]};'
-                        f'color:{TOKEN["accent"]};padding:1px 6px;border-radius:4px;'
-                        f'font-weight:600;cursor:pointer;" title="AI建议将此类问题归类为「{suggested_cat}」">'
-                        f'🤖 {suggested_cat}</span>',
-                        unsafe_allow_html=True,
-                    )
-                elif suggested_cat == cat:
-                    st.caption("🤖 一致")
-
-            # 第 5 列：操作
-            with c_act:
-                if not batch_mode:
-                    # 详情按钮
-                    detail_key = f"_detail_{iid}"
-                    if st.button("📄 详情", key=f"detail_btn_{iid}", width="stretch"):
-                        st.session_state[detail_key] = not st.session_state.get(detail_key, False)
-                        st.rerun()
-
-            # 详情折叠区（在行下方）
-            detail_key = f"_detail_{iid}"
-            if st.session_state.get(detail_key, False):
-                with st.container(border=True):
-                    st.markdown(f"### 📄 工单 #{iid} 详情")
-                    st.write(f"**标题**：{title}")
-                    st.write(f"**分类**：{cat}")
-                    if suggested_cat and suggested_cat != cat:
-                        st.info(f"🤖 建议分类：**{suggested_cat}**")
-                    st.write(f"**位置**：{loc or '未指定'}")
-                    st.write(f"**状态**：{status} · **紧急度**：{urgency}")
-                    st.write(f"**上报人**：{_resolve_author_display(author)}")
-                    st.write(f"**上报时间**：{reported}")
-                    if resolved_at:
-                        st.write(f"**解决时间**：{resolved_at}")
-                    if days_open is not None:
-                        st.write(f"**已开启**：{days_open} 天"
-                                 + (f"（{days_to_resolve} 天解决）" if days_to_resolve else ""))
-                    if desc:
-                        st.markdown("**问题描述**：")
-                        st.info(desc)
-                    if proc_note:
-                        st.markdown("**📝 处理备注**：")
-                        st.success(proc_note)
-
-                    # 处理记录
-                    st.markdown("**📜 处理记录**：")
-                    try:
-                        with get_db() as conn:
-                            activity = conn.execute(
-                                "SELECT * FROM activity_log WHERE target_type = 'issue' "
-                                "AND target_id = ? ORDER BY created_at DESC LIMIT 10",
-                                (iid,),
-                            ).fetchall()
-                            if activity:
-                                for act in activity:
-                                    act_icon = {"上报问题": "📝", "开始处理": "🔄", "解决问题": "✅",
-                                                "重新打开": "🔓", "更新工单": "📋"}.get(act["action"], "📌")
-                                    st.caption(
-                                        f'{act_icon} {act["actor"]} · {act["action"]} · '
-                                        f'{(act["created_at"] or "")[:16]}'
-                                        + (f' — {act["detail"]}' if act.get("detail") else '')
-                                    )
-                            else:
-                                st.caption("暂无处理记录")
-                    except Exception:
-                        _log.debug("非致命错误", exc_info=True)
-                        st.caption("处理记录暂不可用")
-
-                    # 处理操作：st.form 收敛，不用手动清 session_state
-                    st.markdown("---")
-                    st.markdown("**🔧 处理操作**")
-
-                    if status == "待复核":
-                        st.caption("居民评价「不满意」，请确认是否重开：")
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if st.button("✅ 确认重开", key=f"review_reopen_{iid}", width="stretch"):
-                                review_dissatisfaction(iid, reopen=True)
-                                invalidate_issues()
-                                st.rerun()
-                        with c2:
-                            if st.button("↩️ 驳回（维持已解决）", key=f"review_dismiss_{iid}", width="stretch"):
-                                review_dissatisfaction(iid, reopen=False)
-                                invalidate_issues()
-                                st.rerun()
-                    else:
-                        actions = _available_actions(status)
-                        with st.form(key=f"detail_form_{iid}"):
-                            note = st.text_input("处理备注", placeholder="添加处理说明…",
-                                                 value=proc_note or "")
-                            assignee_input = st.text_input("指派处理人", placeholder="输入姓名…",
-                                                           value=assignee or "")
-                            chosen = st.radio("操作", [a[0] for a in actions], horizontal=True)
-                            submitted = st.form_submit_button("✅ 确认执行", width="stretch")
-                        if submitted:
-                            new_status = dict(actions)[chosen]
-                            _set_status(iid, new_status, note=note, assignee=assignee_input)
-                            st.rerun()
-
-                    if st.button("❌ 收起详情", key=f"detail_close_{iid}", width="stretch"):
-                        st.session_state[detail_key] = False
-                        st.rerun()
+    for issue in issues:
+        _render_issue_card(issue)

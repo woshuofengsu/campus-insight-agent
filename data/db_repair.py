@@ -370,6 +370,23 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
     return True, ""
 
 
+def resubmit_issue(issue_id: int, actor: str = "居民") -> tuple[bool, str]:
+    """居民把「退回补充信息」的工单重新提交回「待审核」（可修改一次）。"""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status FROM community_issues WHERE id=?", (issue_id,)
+        ).fetchone()
+        if row is None:
+            return False, "工单不存在"
+        if row["status"] != "退回补充信息":
+            return False, f"当前状态「{row['status']}」不支持重新提交"
+        conn.execute("UPDATE community_issues SET status='待审核' WHERE id=?", (issue_id,))
+        conn.commit()
+    log_activity(actor, "重新提交工单", "issue", issue_id, module=MODULE,
+                 before_value="退回补充信息", after_value="待审核")
+    return True, ""
+
+
 def get_issue(issue_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM community_issues WHERE id=?", (issue_id,)).fetchone()

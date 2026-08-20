@@ -1,26 +1,65 @@
 # tools/action_report_issue.py
-"""社区诉求上报工具 — 接诉即办核心功能。
+"""社区报修上报工具 — 报修模块工具层。
 
-居民随手提交社区诉求（设施损坏、卫生状况、安全隐患等），
-Agent 使用 LLM 自动分类、评估紧急程度、生成工单记录。
+居民提交报修工单，Agent 使用 LLM 自动分类（诉求类别）、评估紧急程度（四档：
+紧急/中等/一般/普通）、识别特殊情况（安全隐患/违规搭建/第三方施工），
 LLM 调用失败时自动降级为关键词匹配。
+数据落库统一走 data/db_repair.submit_issue（完整状态机：待审核 → … → 处理结束）。
 """
 import json
 import logging
+import re
+
+from langchain.tools import tool
+from data.db_repair import submit_issue
 
 _log = logging.getLogger(__name__)
-import re
-from langchain.tools import tool
-from data.database import report_issue as _db_report_issue
-from data.database import get_issues_stats as _db_get_stats
 
 # LLM 分类结果缓存（同一个会话里别重复调接口）
 _classify_cache: dict[str, tuple[str, str]] = {}
 _MAX_CACHE_SIZE = 200
 
+# 紧急程度四档（文档《01-报修.md》）：紧急/中等/一般/普通
+_URGENCY_LEVELS = ("紧急", "中等", "一般", "普通")
+# 旧三档（极急/紧急/普通）→ 新四档的映射，兼容 LLM 偶尔吐旧档位
+_LEGACY_URGENCY_MAP = {"极急": "紧急", "紧急": "中等", "普通": "一般"}
+
+# 室内/室外分类关键词：描述里出现这些词默认「室内」，否则「室外」
+_INDOOR_KEYWORDS = [
+    "家里", "室内", "我家", "卧室", "厨房", "卫生间", "客厅", "阳台",
+    "书房", "厕所", "浴室", "洗澡", "餐厅", "玄关",
+]
+
+
+def _detect_issue_type(title: str, description: str) -> str:
+    """根据标题+描述判断报修分类（室内/室外）。默认室外。"""
+    text = f"{title or ''} {description or ''}"
+    if any(kw in text for kw in _INDOOR_KEYWORDS):
+        return "室内"
+    return "室外"
+
+
+def _normalize_urgency(urgency: str) -> str:
+    """把任意来源的紧急程度归一化到四档（紧急/中等/一般/普通）。"""
+    if urgency in _URGENCY_LEVELS:
+        return urgency
+    if urgency in _LEGACY_URGENCY_MAP:
+        return _LEGACY_URGENCY_MAP[urgency]
+    return "一般"
+
+
+def _resolve_reporter_id() -> int | None:
+    """解析当前用户 ID（记录上报人，用于闭环通知）。"""
+    try:
+        from data.db_governance import _resolve_reporter_id
+        return _resolve_reporter_id()
+    except Exception:
+        _log.debug("解析 reporter_id 失败，按无用户处理", exc_info=True)
+        return None
+
 
 def _llm_classify(title: str, description: str) -> tuple[str, str]:
-    """用 LLM（DeepSeek）判断诉求类别 + 评估紧急度。
+    """用 LLM（DeepSeek）判断诉求类别 + 评估紧急程度（四档）。
 
     返回 (category, urgency) 元组。
     接口超时、限流等任何报错都退回关键词匹配。
@@ -48,13 +87,13 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
         )
 
         prompt = (
-            "你是社区诉求分类助手。根据标题和描述，判断类别和紧急程度。\n\n"
+            "你是社区报修分类助手。根据标题和描述，判断类别和紧急程度。\n\n"
             "类别选项：设施维修, 环境卫生, 安全隐患, 停车管理, 噪音扰民, 物业服务, 邻里矛盾, 社区事务\n"
-            "紧急程度：普通（一般问题）, 紧急（影响较大需尽快处理）, 极急（涉及人身安全或大面积影响）\n\n"
-            "甄别标准：\n"
-            "- 极急：火灾、漏电、大面积停电停水、电梯困人、严重漏水、人员受伤、煤气泄漏\n"
-            "- 紧急：停电、停水、玻璃碎裂、线路裸露、消防通道堵塞、电梯故障\n"
-            "- 普通：其他一般问题\n\n"
+            "紧急程度（四档，从高到低）：紧急、中等、一般、普通\n"
+            "- 紧急：涉及人身安全或大面积影响，需 1 小时内上门（火灾、漏电、大面积停水停电、电梯困人、严重漏水、人员受伤、燃气泄漏）\n"
+            "- 中等：影响较大需尽快处理，4 小时内上门（停电、停水、玻璃碎裂、线路裸露、消防通道堵塞、电梯故障）\n"
+            "- 一般：一般维修问题，24 小时内上门（如灯具损坏、门锁维修、下水道堵塞）\n"
+            "- 普通：轻微问题不影响正常生活，48 小时内解决（如小磕碰、美观类、咨询建议）\n\n"
             f"标题：{title}\n"
             f"描述：{description or '无'}\n\n"
             "只返回JSON，不要任何解释："
@@ -71,17 +110,15 @@ def _llm_classify(title: str, description: str) -> tuple[str, str]:
         if match:
             result = json.loads(match.group())
             category = result.get("category", "其他")
-            urgency = result.get("urgency", "普通")
+            urgency = result.get("urgency", "一般")
 
             valid_cats = {
                 "设施维修", "环境卫生", "安全隐患", "停车管理",
                 "噪音扰民", "物业服务", "邻里矛盾", "社区事务",
             }
-            valid_urg = {"普通", "紧急", "极急"}
             if category not in valid_cats:
                 category = "其他"
-            if urgency not in valid_urg:
-                urgency = "普通"
+            urgency = _normalize_urgency(urgency)
 
             # 缓存结果，超了先挤掉最旧的
             if len(_classify_cache) >= _MAX_CACHE_SIZE:
@@ -165,20 +202,24 @@ def _keyword_classify(title: str, description: str) -> str:
 
 
 def _keyword_urgency(title: str, description: str) -> str:
-    """关键词兜底紧急度判断 — LLM 不可用时用。"""
+    """关键词兜底紧急度判断 — LLM 不可用时用（四档：紧急/中等/一般/普通）。"""
     urgent_keywords = ["火灾", "漏电", "触电", "塌", "爆炸", "大面积停电", "电梯困人",
-                       "受伤", "流血", "煤气", "中毒", "严重漏水"]
-    high_keywords = ["停电", "停水", "电梯故障", "玻璃碎裂", "线路裸露", "消防",
-                     "通道堵塞", "大面积", "严重"]
+                       "受伤", "流血", "煤气", "中毒", "严重漏水", "起火", "冒烟"]
+    medium_keywords = ["停电", "停水", "电梯故障", "玻璃碎裂", "线路裸露", "消防",
+                       "通道堵塞", "大面积", "严重", "渗水", "管道破裂", "堵塞"]
+    low_keywords = ["小问题", "不影响", "轻微", "小事", "咨询", "建议", "美观", "顺手", "磕碰", "划痕", "掉漆"]
 
     text = f"{title} {description}"
     for kw in urgent_keywords:
         if kw in text:
-            return "极急"
-    for kw in high_keywords:
-        if kw in text:
             return "紧急"
-    return "普通"
+    for kw in medium_keywords:
+        if kw in text:
+            return "中等"
+    for kw in low_keywords:
+        if kw in text:
+            return "普通"
+    return "一般"
 
 
 # 表单用的 AI 分类（LLM + 关键词兜底）
@@ -188,27 +229,33 @@ def _auto_classify(title: str, description: str = "") -> str:
 
 
 def _auto_urgency(title: str, description: str = "") -> str:
-    """AI 紧急度评估 — 由 DeepSeek 判断紧急程度，失败时自动降级为关键词匹配。"""
+    """AI 紧急度评估 — 由 DeepSeek 判断紧急程度（四档），失败时自动降级为关键词匹配。"""
     return _llm_classify(title, description)[1]
+
+
+_URGENCY_EMOJI = {"紧急": "🔴", "中等": "🟠", "一般": "🟡", "普通": "🔵"}
 
 
 @tool
 def report_issue(title: str, category: str = "", location: str = "",
-                 description: str = "", urgency: str = "") -> str:
-    """上报社区诉求 — 发现设施损坏、环境卫生、安全隐患等问题时使用。
+                 description: str = "", urgency: str = "",
+                 reporter_name: str = "", reporter_phone: str = "") -> str:
+    """上报社区诉求 / 提交报修工单 — 发现设施损坏、环境卫生、安全隐患等问题时使用。
 
-    居民可以快速提交小区中发现的各类诉求。Agent 使用 DeepSeek 自动分析和分类，
-    根据语义理解（而非关键词匹配）判断诉求类别和紧急程度。LLM 不可用时自动降级为
-    关键词匹配。
+    居民提交报修，Agent 使用 DeepSeek 自动分析和分类，判断诉求类别、紧急程度
+    （四档：紧急/中等/一般/普通）、室内/室外分类并识别特殊情况。LLM 不可用时
+    自动降级为关键词匹配。
     参数：
-    - title: 诉求标题（如"3号楼2单元电梯困人"）
-    - category: 可选，诉求分类。留空则自动分类
-    - location: 诉求地点
-    - description: 诉求详细描述
-    - urgency: 可选，紧急程度。与 category 同时提供时跳过 LLM 分类（快速路径）
+    - title: 问题描述（如"3号楼2单元电梯困人"）
+    - category: 可选，诉求类别（设施维修等）。留空则自动分类
+    - location: 报修地址（小区/院落名称 + 楼栋单元房号）
+    - description: 可选，补充详细描述
+    - urgency: 可选，紧急程度（紧急/中等/一般/普通）。与 category 同时提供时跳过 LLM 分类
+    - reporter_name: 报修人姓名
+    - reporter_phone: 报修人联系电话（手机号，系统自动校验格式）
     """
     if not title.strip():
-        return "❌ 请至少提供诉求标题，例如：'3号楼2单元电梯困人了'"
+        return "❌ 请至少提供问题描述，例如：'3号楼2单元电梯困人了'"
 
     # 楼栋/单元类诉求先校验位置
     loc_err = validate_location(title, location)
@@ -225,14 +272,20 @@ def report_issue(title: str, category: str = "", location: str = "",
     else:
         _, urgency = _llm_classify(title, description)
 
-    issue_id = _db_report_issue(
+    category = (category or "其他").strip() or "其他"
+    urgency = _normalize_urgency(urgency)
+    issue_type = _detect_issue_type(title, description)
+
+    issue_id, hint = submit_issue(
         title=title.strip(),
         category=category,
+        issue_type=issue_type,
         location=location.strip(),
         description=description.strip(),
         urgency=urgency,
-        author="",  # 空着，让 _resolve_author() 从用户资料自动补
-        suggested_category=category,  # 把 AI 分类存下来，网格员审核时能对照
+        reporter_name=reporter_name.strip(),
+        reporter_phone=reporter_phone.strip(),
+        reporter_id=_resolve_reporter_id(),
     )
 
     # 清网格员那边的缓存，新工单立刻能看见
@@ -242,31 +295,42 @@ def report_issue(title: str, category: str = "", location: str = "",
     except Exception:
         pass
 
-    # 顺手取一下统计数据，回复里好带上
-    stats = _db_get_stats()
+    # 特殊情况提示文案
+    if hint == "safety":
+        return (
+            "⚠️ **已记录安全提醒，不生成维修工单**\n\n"
+            "您描述的情况存在安全隐患，请先拨打紧急电话：\n"
+            "- 🚒 消防：**119**\n"
+            "- 🔥 燃气：**96777**\n\n"
+            "系统已记录您的安全提醒，社区负责人会同步跟进。"
+        )
+    if hint == "third_party":
+        return (
+            "⚠️ 检测到该问题可能属于**第三方施工责任**，建议先联系施工方。\n\n"
+            f"✅ 已按您的要求生成工单 **#{issue_id}** 并标记「非社区责任」，"
+            "负责人会核实处理；如确认属第三方责任，将由负责人关闭工单并说明原因。"
+        )
+    if hint == "violation":
+        return (
+            f"⚠️ 工单 **#{issue_id}** 已生成并标记「**违规搭建**」。\n\n"
+            "负责人审核通过后将按流程转出处理（转城管/社区治理），进度可在报修工单中查看。"
+        )
+    if issue_id <= 0:
+        return f"❌ 提交失败：{hint}"
 
-    urgency_emoji = {"普通": "🔵", "紧急": "🟠", "极急": "🔴"}
-    ue = urgency_emoji.get(urgency, "🔵")
-
+    # 正常成功
+    ue = _URGENCY_EMOJI.get(urgency, "🔵")
     lines = [
-        "✅ 诉求已上报成功！",
-        f"",
+        "✅ 报修工单已提交！",
+        "",
         f"  📋 工单编号：#{issue_id}",
-        f"  📂 分类：{category}",
+        f"  📂 分类：{category}（{issue_type}）",
         f"  {ue} 紧急程度：{urgency}",
         f"  📍 地点：{location or '未指定'}",
-        f"",
-        f"📊 社区治理数据：当前共有 {stats['total']} 个上报诉求，"
-        f"其中 {stats['by_status'].get('待处理', 0)} 个待处理。",
+        f"  ⏳ 当前状态：待审核",
+        "",
+        "社区负责人会尽快电话核实，请保持电话畅通。",
     ]
-
-    if urgency in ("紧急", "极急"):
-        lines.append(
-            f"\n⚠️ 该诉求已被标记为 **{urgency}**，建议同步电话通知网格员/物业。"
-        )
-    else:
-        lines.append(
-            "\n网格员/物业将尽快处理，进度可在「接诉即办」中追踪。"
-        )
-
+    if urgency in ("紧急", "中等"):
+        lines.append(f"\n⚠️ 该工单为 **{urgency}** 级别，已建议优先处理。")
     return "\n".join(lines)

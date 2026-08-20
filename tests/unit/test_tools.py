@@ -47,7 +47,7 @@ class TestReportIssue(unittest.TestCase):
         from tools.action_report_issue import report_issue
         result = report_issue.invoke({"title": "", "category": "", "location": "", "description": ""})
         self.assertIn("❌", result)
-        self.assertIn("标题", result)
+        self.assertIn("问题描述", result)
 
     def test_whitespace_title_returns_error(self):
         from tools.action_report_issue import report_issue
@@ -62,6 +62,8 @@ class TestReportIssue(unittest.TestCase):
             "location": "3号楼",
             "description": "楼道灯不亮",
             "urgency": "普通",
+            "reporter_name": "王阿姨",
+            "reporter_phone": "13800138000",
         })
         self.assertIn("✅", result)
         self.assertIn("#", result)
@@ -73,8 +75,10 @@ class TestReportIssue(unittest.TestCase):
             "title": "楼道堆放杂物",
             "category": "物业服务",
             "location": "3号楼2单元",
-            "description": "",
+            "description": "楼道堆了很多杂物影响通行",
             "urgency": "紧急",
+            "reporter_name": "王阿姨",
+            "reporter_phone": "13800138000",
         })
         self.assertIn("✅", result)
         self.assertIn("物业服务", result)
@@ -94,11 +98,12 @@ class TestReportIssue(unittest.TestCase):
 
     def test_keyword_urgency_fallback(self):
         from tools.action_report_issue import _keyword_urgency
-        self.assertEqual(_keyword_urgency("漏电了", ""), "极急")
-        self.assertEqual(_keyword_urgency("大面积停电", ""), "极急")
-        self.assertEqual(_keyword_urgency("电梯故障了", ""), "紧急")
-        self.assertEqual(_keyword_urgency("玻璃碎裂了", ""), "紧急")
-        self.assertEqual(_keyword_urgency("灯坏了", ""), "普通")
+        self.assertEqual(_keyword_urgency("漏电了", ""), "紧急")
+        self.assertEqual(_keyword_urgency("大面积停电", ""), "紧急")
+        self.assertEqual(_keyword_urgency("电梯故障了", ""), "中等")
+        self.assertEqual(_keyword_urgency("玻璃碎裂了", ""), "中等")
+        self.assertEqual(_keyword_urgency("灯坏了", ""), "一般")
+        self.assertEqual(_keyword_urgency("轻微划痕", ""), "普通")
 
     def test_validate_location_dorm_no_location(self):
         from tools.action_report_issue import validate_location
@@ -135,8 +140,10 @@ class TestReportIssue(unittest.TestCase):
             "title": "测试上报唯一标题xyz",
             "category": "社区事务",
             "location": "测试地点",
-            "description": "测试",
+            "description": "测试上报的描述内容",
             "urgency": "普通",
+            "reporter_name": "王阿姨",
+            "reporter_phone": "13800138000",
         })
         self.assertIn("#", result)
         self.assertTrue(re.search(r'#\d+', result))
@@ -228,8 +235,10 @@ class TestGovernanceStats(unittest.TestCase):
             "title": "测试统计用",
             "category": "设施维修",
             "location": "测试",
-            "description": "",
+            "description": "测试统计用的描述内容",
             "urgency": "普通",
+            "reporter_name": "王阿姨",
+            "reporter_phone": "13800138000",
         })
         result = get_governance_stats.invoke("")
         self.assertIn("总数", result)
@@ -336,17 +345,20 @@ class TestCreateProposal(unittest.TestCase):
             "description": "详细描述",
             "category": "不存在的分类",
         })
-        self.assertIn("无效", result)
+        self.assertIn("五选一", result)
 
     def test_valid_proposal_creation(self):
         from tools.action_create_proposal import create_proposal
         result = create_proposal.invoke({
             "title": "这是一个独特标题用于测试",
             "description": "这是一个详细的提案描述",
-            "category": "社区事务",
+            "category": "公共设施",
+            "is_public": True,
+            "reporter_name": "王阿姨",
+            "reporter_phone": "13800138000",
         })
         self.assertIn("✅", result)
-        self.assertIn("#", result)
+        self.assertIn("P", result)
 
     def test_duplicate_check_keyword_overlap(self):
         from tools.action_create_proposal import _check_duplicate
@@ -379,7 +391,7 @@ class TestSupportProposal(unittest.TestCase):
 
     def test_nonexistent_proposal(self):
         from tools.action_support_proposal import support_proposal
-        result = support_proposal.invoke({"proposal_id": 99999})
+        result = support_proposal.invoke({"proposal_id": 99999, "score": 5})
         self.assertIn("未找到", result)
 
 

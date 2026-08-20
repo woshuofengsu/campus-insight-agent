@@ -1,252 +1,377 @@
-"""🔧 接诉即办 · 报 — 直接上报、追踪工单、看分类分布."""
-import streamlit as st
-import altair as alt
-import pandas as pd
-from data.database import get_issues, report_issue as db_report_issue
-from ui.cache import cached_issues_stats as get_issues_stats, invalidate_issues
-from tools.action_report_issue import _llm_classify, validate_location
-from ui.components import TOKEN, section, stat, issue_card, info_card, ooda_nav, CAT_LABEL, resolve_author, configure_altair, page_header
+"""🔧 接诉即办 · 报修 — 居民端报修工单页：提交、我的工单、详情时间线、反馈、补充、撤回、草稿。"""
+import re
 import logging
+import streamlit as st
+
+from data.db_repair import (
+    submit_issue, create_draft, get_drafts, delete_draft,
+    get_issues, get_issue_timeline,
+    feedback_issue, supplement_issue, withdraw_issue, reopen_issue,
+)
+from tools.action_report_issue import _llm_classify, validate_location
+from ui.components import TOKEN, section, info_card, ooda_nav, page_header, resolve_author
+
 _log = logging.getLogger(__name__)
 
-agent = st.session_state.get("agent")
+_PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
+
+# 状态 → 颜色（文档《01-报修.md》第七节）
+_STATUS_COLORS = {
+    "待审核": "#f59e0b",        # 黄
+    "已审核待派单": "#2563eb",  # 蓝
+    "已派单": "#2563eb",        # 蓝
+    "处理中": "#059669",        # 绿
+    "待居民反馈": "#f97316",    # 橙
+    "处理结束": "#64748b",      # 灰
+    "已撤回": "#64748b",        # 灰
+    "退回补充信息": "#dc2626",  # 红
+    "已关闭": "#64748b",        # 灰
+    "待协商": "#f97316",        # 橙
+    "已转出": "#64748b",        # 灰
+}
+_TERMINAL = {"处理结束", "已关闭", "已转出", "已撤回"}
+
+_URGENCY_EMOJI = {"紧急": "🔴", "中等": "🟠", "一般": "🟡", "普通": "🔵"}
+_URGENCY_LEVELS = ["紧急", "中等", "一般", "普通"]
+
 memory = st.session_state.get("memory")
-if memory is not None:
-    profile = memory.get_user_profile()
-else:
-    profile = {}
-
-# 从档案里取上报人身份
+profile = memory.get_user_profile() if memory is not None else (st.session_state.get("user_profile") or {})
 _author = resolve_author(profile)
+_my_name = (profile.get("name") or "").strip()
 
-page_header("🔧 接诉即办", "发现社区诉求？一句话上报，自动分类定级。", "报")
+
+def _current_user_id() -> int | None:
+    try:
+        from data.db_user import get_current_user
+        return (get_current_user() or {}).get("id")
+    except Exception:
+        return None
+
+
+def _status_badge(status: str) -> str:
+    color = _STATUS_COLORS.get(status, "#64748b")
+    return (
+        f'<span style="display:inline-block;background:{color}1f;border:1px solid {color};'
+        f'color:{color};border-radius:999px;padding:1px 10px;font-size:0.78em;'
+        f'font-weight:600;white-space:nowrap;">{status}</span>'
+    )
+
+
+def _mask_phone(phone: str) -> str:
+    phone = (phone or "").strip()
+    if len(phone) == 11:
+        return f"{phone[:3]}****{phone[7:]}"
+    return phone or "未填写"
+
+
+def _my_issues(uid: int | None) -> list[dict]:
+    """当前居民的工单：按 reporter_id 主键匹配，老数据回退 reporter_name / author。"""
+    all_issues = get_issues(limit=300)
+    mine = []
+    for it in all_issues:
+        if uid and it.get("reporter_id") == uid:
+            mine.append(it)
+        elif it.get("reporter_name") and _my_name and it["reporter_name"] == _my_name:
+            mine.append(it)
+        elif (it.get("author") or "") and _author and it["author"] == _author:
+            mine.append(it)
+    return mine
+
+
+page_header("🔧 接诉即办 · 报修", "发现社区问题？提交报修工单，全程可追踪、可反馈。", "报")
 
 ooda_nav("issues")
 
-# 快捷上报：原生表单，不用走对话
+uid = _current_user_id()
 
-def _do_issues_report():
-    """快捷上报的回调，在页面重渲染之前执行。"""
-    title = st.session_state.quick_report_title.strip()
-    loc = st.session_state.quick_report_location.strip()
-    if not title:
-        st.session_state._report_error = "请至少输入问题描述。"
-        return
-    # 去重检查：简单的标题包含匹配
-    existing = get_issues(limit=100)
-    dup = None
-    title_lower = title.lower()
-    for e in existing:
-        e_title_lower = e.get("title", "").lower()
-        # 看两个标题谁包含谁（查得全，误报少）
-        if len(title_lower) >= 4 and len(e_title_lower) >= 4:
-            if title_lower in e_title_lower or e_title_lower in title_lower:
-                dup = e
-                break
-    if dup:
-        st.session_state._report_error = (
-            f"⚠️ 检测到相似问题已存在：#{dup['id']}「{dup['title'][:30]}」（{dup['status']}）\n"
-            f"建议先关注该工单进展，如确是新问题请修改描述后重试。"
-        )
-        return
-    # 校验楼栋位置格式
-    loc_err = validate_location(title, loc)
-    if loc_err:
-        st.session_state._report_error = loc_err
-        return
-    # 自动分类（一次 LLM 调用，有缓存）再提交
-    category, urgency = _llm_classify(title, "")
-    # 匿名上报：公开的 author 存固定假名，reporter_id 仍
-    # 记录真实身份，方便闭环通知
-    anonymous = st.session_state.get("quick_report_anonymous", False)
-    try:
-        issue_id = db_report_issue(
-            title=title,
-            category=category,
-            location=loc,
-            description="",
-            urgency=urgency,
-            author=_author,
-            suggested_category=category,  # 把 AI 分类存下来，给网格员端参考
-            anonymous=anonymous,
-        )
-        urgency_emoji = {"普通": "🔵", "紧急": "🟠", "极急": "🔴"}
-        invalidate_issues()  # 刷新缓存，让「我的」页显示最新数据
-        st.session_state._report_result = (
-            f"✅ 工单 #{issue_id} 已生成！分类：{category} · 紧急程度：{urgency_emoji.get(urgency, '🔵')} {urgency}"
-        )
-        st.session_state._report_error = ""
-        st.session_state.quick_report_title = ""
-        st.session_state.quick_report_location = ""
-    except Exception as e:
-        _log.debug("非致命错误", exc_info=True)
-        st.session_state._report_error = f"上报失败：{e}"
-        st.session_state._report_result = ""
-        import traceback
-        st.session_state._report_trace = traceback.format_exc()
+# ---------- 草稿恢复入口 ----------
+drafts = get_drafts(uid) if uid else []
+if drafts:
+    with st.container(border=True):
+        st.warning(f"📝 您有 {len(drafts)} 份未完成的报修草稿，可继续填写。")
+        for d in drafts:
+            c1, c2, c3 = st.columns([3, 1, 1])
+            with c1:
+                st.caption(
+                    f"**{((d.get('title') or '')[:30]) or '（未填写标题）'}** · "
+                    f"{d.get('issue_type', '')} · {d.get('urgency', '')} · 更新于 {(d.get('updated_at') or '')[:16]}"
+                )
+            with c2:
+                if st.button("✏️ 继续填写", key=f"draft_cont_{d['id']}", width="stretch"):
+                    st.session_state["rep_form_title"] = d.get("title", "")
+                    st.session_state["rep_form_location"] = d.get("location", "")
+                    st.session_state["rep_form_name"] = d.get("reporter_name", "")
+                    st.session_state["rep_form_phone"] = d.get("reporter_phone", "")
+                    st.session_state["rep_form_type"] = d.get("issue_type", "室外")
+                    st.session_state["rep_form_urgency"] = d.get("urgency", "一般")
+                    st.session_state["_active_draft_id"] = d["id"]
+                    st.rerun()
+            with c3:
+                if st.button("🗑️ 删除", key=f"draft_del_{d['id']}", width="stretch"):
+                    delete_draft(d["id"])
+                    st.rerun()
 
-
+# ---------- 快速报修表单 ----------
 with st.container(border=True):
     st.markdown(
         f'<div style="font-size:0.92em;font-weight:700;color:{TOKEN["text"]};margin-bottom:6px;">'
-        f'⚡ 快速上报</div>',
+        f'⚡ 快速报修</div>',
         unsafe_allow_html=True,
     )
-    st.text_input(
-        "问题描述",
-        placeholder="比如：3号楼二楼卫生间水龙头漏水、小区广场地面有个坑...",
-        label_visibility="collapsed",
-        key="quick_report_title",
-    )
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        st.text_input(
-            "📍 地点（可选）",
-            placeholder="比如：3号楼二楼卫生间",
-            key="quick_report_location",
+    with st.form("repair_form"):
+        title = st.text_input(
+            "问题描述（必填，5–200 字）",
+            placeholder="比如：3号楼二楼卫生间水龙头漏水、小区广场地面有个坑…",
+            key="rep_form_title",
         )
-        st.checkbox("🙈 匿名上报（不公开我的信息）", key="quick_report_anonymous")
-    with c2:
-        st.button("上报", type="primary", width="stretch", key="quick_report_btn", on_click=_do_issues_report)
-
-# 显示回调里的结果/错误（重渲染后还能看到）
-if st.session_state.get("_report_error"):
-    st.error(st.session_state.pop("_report_error"))
-    if st.session_state.get("_report_trace"):
-        st.code(st.session_state.pop("_report_trace"))
-if st.session_state.get("_report_result"):
-    st.success(st.session_state.pop("_report_result"))
-
-st.markdown("---")
-
-# 统计概览
-
-try:
-    stats = get_issues_stats()
-except Exception as e:
-    st.error(f"⚠️ 数据加载失败：{e}")
-    st.stop()
-total = stats["total"]
-
-if total == 0:
-    info_card("在上方输入框描述问题，成为第一个让社区变好的人！")
-    st.stop()
-
-by_status = stats.get("by_status", {})
-pending = by_status.get("待处理", 0)
-processing = by_status.get("处理中", 0)
-resolved = by_status.get("已解决", 0)
-
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    stat("总数", str(total), TOKEN["accent"])
-with c2:
-    stat("待处理", str(pending), TOKEN["warning"])
-with c3:
-    stat("处理中", str(processing), TOKEN["accent"])
-with c4:
-    stat("已解决", str(resolved), TOKEN["success"])
-
-st.markdown("")
-
-# 工单状态分布图
-
-section("工单状态分布")
-
-if by_status:
-    status_order = ["待处理", "处理中", "已解决"]
-    status_colors = {
-        "待处理": TOKEN["danger"], "处理中": TOKEN["warning"], "已解决": TOKEN["success"],
-    }
-    df_status = pd.DataFrame([
-        {"状态": s, "数量": by_status.get(s, 0), "颜色": status_colors.get(s, TOKEN["accent"])}
-        for s in status_order if by_status.get(s, 0) > 0
-    ])
-    if not df_status.empty:
-        chart = configure_altair(
-            alt.Chart(df_status)
-            .mark_bar(size=24)
-            .encode(
-                x=alt.X("数量:Q"),
-                y=alt.Y("状态:N", title=None, sort=status_order),
-                color=alt.Color("状态:N", scale=alt.Scale(
-                    domain=list(status_colors.keys()),
-                    range=list(status_colors.values()),
-                ), legend=None),
+        location = st.text_input(
+            "报修地址（必填，小区/院落 + 楼栋单元房号）",
+            placeholder="比如：幸福小区3号楼2单元302",
+            key="rep_form_location",
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            issue_type = st.radio(
+                "分类（必选）", ["室外", "室内"], horizontal=True,
+                key="rep_form_type",
+                help="室外：社区公共区域，费用由社区承担；室内：您家里，费用自理。",
             )
-            .properties(height=100)
-        )
-        st.altair_chart(chart, width="stretch")
-
-st.markdown("---")
-
-# 类别分布
-
-section("问题类别分布")
-
-by_cat = stats.get("by_category", {})
-if by_cat:
-    df_cat = pd.DataFrame([
-        {"类别": CAT_LABEL.get(k, k), "数量": v}
-        for k, v in sorted(by_cat.items(), key=lambda x: -x[1])
-    ])
-    col_chart, col_table = st.columns([3, 2])
-    with col_chart:
-        chart = configure_altair(
-            alt.Chart(df_cat)
-            .mark_bar(color=TOKEN["warning"], opacity=0.85, size=20)
-            .encode(
-                x=alt.X("数量:Q"),
-                y=alt.Y("类别:N", title=None, sort="-x"),
+        with c2:
+            urgency = st.selectbox(
+                "紧急程度",
+                _URGENCY_LEVELS,
+                index=2,  # 默认「一般」
+                key="rep_form_urgency",
+                help="紧急：1小时内上门 · 中等：4小时内上门 · 一般：24小时内上门 · 普通：48小时内解决",
             )
-            .properties(height=200)
+        c3, c4 = st.columns(2)
+        with c3:
+            reporter_name = st.text_input("报修人姓名", value=_my_name, key="rep_form_name")
+        with c4:
+            reporter_phone = st.text_input("联系电话（手机号）", placeholder="138****1234", key="rep_form_phone")
+        submitted = st.form_submit_button("📨 提交报修", type="primary", width="stretch")
+        saved = st.form_submit_button("💾 保存草稿", width="stretch")
+
+    if saved:
+        if not (title or "").strip():
+            st.error("请至少填写问题描述后再保存草稿。")
+        elif not uid:
+            st.error("暂无法识别当前用户，无法保存草稿。")
+        else:
+            create_draft(
+                uid, title=(title or "").strip(),
+                category="", issue_type=issue_type,
+                location=(location or "").strip(),
+                description=(title or "").strip(),
+                urgency=urgency,
+                reporter_name=(reporter_name or "").strip(),
+                reporter_phone=(reporter_phone or "").strip(),
+            )
+            st.success("草稿已保存，可在上方草稿区继续填写。")
+
+    if submitted:
+        title_t = (title or "").strip()
+        loc_t = (location or "").strip()
+        name_t = (reporter_name or "").strip()
+        phone_t = (reporter_phone or "").strip()
+
+        # —— 前端校验（数据层 submit_issue 也会再校验一遍）——
+        if not title_t:
+            st.error("请填写问题描述。")
+        elif len(title_t) < 5:
+            st.error("问题描述太短，请至少写 5 个字。")
+        elif len(title_t) > 200:
+            st.error("问题描述过长，请控制在 200 字以内。")
+        elif not loc_t:
+            st.error("请填写报修地址（小区/院落名称 + 楼栋单元房号）。")
+        else:
+            loc_err = validate_location(title_t, loc_t)
+            if loc_err:
+                st.error(loc_err)
+            elif not name_t:
+                st.error("请填写报修人姓名。")
+            elif not _PHONE_RE.match(phone_t):
+                st.error("请输入正确的手机号（11 位，1 开头）。")
+            else:
+                # 诉求类别交给 AI 分类（紧急程度由居民自选）
+                category, _ = _llm_classify(title_t, "")
+                draft_id = st.session_state.get("_active_draft_id")
+                issue_id, hint = submit_issue(
+                    title=title_t,
+                    category=category,
+                    issue_type=issue_type,
+                    location=loc_t,
+                    description=title_t,
+                    urgency=urgency,
+                    reporter_name=name_t,
+                    reporter_phone=phone_t,
+                    reporter_id=uid,
+                    draft_id=draft_id,
+                )
+                if hint == "safety":
+                    st.error(
+                        "⚠️ **已记录安全提醒，不生成维修工单**\n\n"
+                        "请先拨打紧急电话：🚒 消防 **119** · 🔥 燃气 **96777**\n"
+                        "系统已记录您的安全提醒，社区负责人会同步跟进。"
+                    )
+                elif hint == "third_party":
+                    st.warning(
+                        f"⚠️ 该问题可能属第三方施工责任，已生成工单 **#{issue_id}** 并标记「非社区责任」，"
+                        "负责人将核实处理。"
+                    )
+                elif hint == "violation":
+                    st.warning(
+                        f"⚠️ 工单 **#{issue_id}** 已生成并标记「违规搭建」，负责人审核通过后将按流程转出处理。"
+                    )
+                elif issue_id > 0:
+                    st.success(
+                        f"✅ 工单 **#{issue_id}** 已提交！分类：{category}（{issue_type}）· "
+                        f"{_URGENCY_EMOJI.get(urgency, '🔵')} {urgency} · 状态：待审核\n\n"
+                        "社区负责人会尽快电话核实，请保持电话畅通。"
+                    )
+                    # 清空表单（含已恢复的草稿）
+                    for k in ("rep_form_title", "rep_form_location", "rep_form_name",
+                              "rep_form_phone", "_active_draft_id"):
+                        st.session_state.pop(k, None)
+                else:
+                    st.error(f"提交失败：{hint}")
+
+def _render_detail(issue: dict):
+    iid = issue["id"]
+    status = issue.get("status", "")
+    reporter_actor = (issue.get("reporter_name") or "").strip() or _my_name or "居民"
+
+    st.markdown(f"**分类**：{issue.get('issue_type', '—')} · **类别**：{issue.get('category', '—')}")
+    st.markdown(f"**紧急程度**：{issue.get('urgency', '—')}")
+    st.markdown(f"**地址**：{issue.get('location') or '未填写'}")
+    st.markdown(f"**问题描述**：{issue.get('description') or '—'}")
+    st.markdown(
+        f"**报修人**：{issue.get('reporter_name') or '—'} · "
+        f"**电话**：{_mask_phone(issue.get('reporter_phone'))}"
+    )
+    if issue.get("assignee_name"):
+        st.markdown(
+            f"**维修人员**：{issue['assignee_name']} · "
+            f"电话 {_mask_phone(issue.get('assignee_phone'))}"
         )
-        st.altair_chart(chart, width="stretch")
-    with col_table:
-        st.dataframe(
-            df_cat.set_index("类别"),
-            column_config={"数量": st.column_config.NumberColumn(width="small")},
-            width="stretch",
-            height=220,
-        )
+    if issue.get("resolve_note"):
+        st.markdown(f"**处理结果**：{issue['resolve_note']}")
+    if issue.get("no_photo_reason"):
+        st.markdown(f"**未上传照片原因**：{issue['no_photo_reason']}")
+    if issue.get("satisfaction"):
+        icon = "😊" if issue.get("satisfaction") == "满意" else "😞"
+        st.markdown(f"**满意度**：{icon} {issue['satisfaction']}")
+
+    # 状态时间线
+    st.markdown("**📜 状态时间线**")
+    timeline = get_issue_timeline(iid)
+    if timeline:
+        for t in timeline:
+            before = t.get("before_value") or ""
+            after = t.get("after_value") or ""
+            trans = f"：{before} → {after}" if (before or after) else ""
+            tail = f" — {t['detail']}" if t.get("detail") else ""
+            st.caption(f"🕐 {(t.get('created_at') or '')[:16]} · {t.get('actor') or ''} · {t.get('action')}{trans}{tail}")
+    else:
+        st.caption("暂无留痕记录")
+
+    # 居民操作（按状态）
+    if status == "待审核":
+        st.markdown("---")
+        if st.button("↩️ 撤回工单", key=f"withdraw_{iid}", width="stretch"):
+            ok, msg = withdraw_issue(iid, actor=reporter_actor)
+            if ok:
+                st.success("工单已撤回。")
+                st.rerun()
+            else:
+                st.error(msg)
+    elif status == "已撤回":
+        st.markdown("---")
+        st.caption("工单已撤回，可重新打开（回到待审核，负责人需重新电话核实）。")
+        if st.button("🔓 重新打开工单", key=f"reopen_{iid}", width="stretch"):
+            ok, msg = reopen_issue(iid, actor=reporter_actor)
+            if ok:
+                st.success("工单已重新打开，回到待审核。")
+                st.rerun()
+            else:
+                st.error(msg)
+    elif status == "退回补充信息":
+        st.markdown("---")
+        st.info("负责人已退回工单，请补充有效信息（如联系方式/更清晰的描述），负责人将重新审核。")
+
+    # 待居民反馈：满意度
+    if status == "待居民反馈":
+        st.markdown("---")
+        st.markdown("**满意度反馈**：")
+        with st.form(key=f"feedback_{iid}"):
+            choice = st.radio("本次维修结果您是否满意？", ["😊 满意", "😞 不满意"], horizontal=True)
+            reason = st.text_input("如不满意，请填写原因（必填）")
+            fb_sub = st.form_submit_button("提交反馈", width="stretch")
+        if fb_sub:
+            satisfied = choice == "😊 满意"
+            ok, msg = feedback_issue(iid, satisfied=satisfied, reason=(reason or "").strip(), actor=reporter_actor)
+            if ok:
+                st.success("感谢您的反馈！" if satisfied else "已记录您的不满，负责人将重新处理（时限重新计算）。")
+                st.rerun()
+            else:
+                st.error(msg)
+
+    # 补充信息（非终态）
+    if status not in _TERMINAL:
+        st.markdown("---")
+        st.markdown("**补充信息**（24 小时内最多 2 次）")
+        with st.form(key=f"supp_{iid}"):
+            content = st.text_area("补充内容", placeholder="补充说明您的情况…（不修改原始内容）")
+            sup_sub = st.form_submit_button("提交补充", width="stretch")
+        if sup_sub:
+            ok, msg = supplement_issue(iid, (content or "").strip(), actor=reporter_actor)
+            if ok:
+                st.success("补充信息已提交，负责人将收到通知。")
+                st.rerun()
+            else:
+                st.error(msg)
+
 
 st.markdown("---")
 
-# 全部工单，可筛选
+# ---------- 我的工单 ----------
+section("我的工单")
+mine = _my_issues(uid)
 
-section("全部工单")
-
-# 接收脉搏页传过来的类别筛选（走 session_state）
-cross_filter = st.session_state.pop("_filter_category", None)
-
-f1, f2 = st.columns(2)
-with f1:
-    status_filter = st.radio(
-        "按状态筛选", ["全部", "待处理", "处理中", "已解决"],
-        horizontal=True, key="issue_status_filter",
-    )
-with f2:
-    cat_options = ["全部"] + sorted(set(
-        i.get("category", "其他") for i in get_issues(limit=200)
-    ))
-    # 有跨页筛选就用它，否则默认「全部」
-    default_idx = cat_options.index(cross_filter) if cross_filter in cat_options else 0
-    cat_filter = st.selectbox(
-        "按类别筛选", cat_options,
-        index=default_idx,
-        key="issue_cat_filter",
-    )
-
-all_issues = get_issues(limit=200)
-if status_filter != "全部":
-    all_issues = [i for i in all_issues if i.get("status") == status_filter]
-if cat_filter != "全部":
-    all_issues = [i for i in all_issues if i.get("category") == cat_filter]
-
-if not all_issues:
-    st.info("该状态下暂无工单。")
+if not mine:
+    info_card("您还没有报修工单。", "在上方提交报修后，可在这里查看进度和反馈。")
 else:
-    cols = st.columns(2)
-    for idx, issue in enumerate(all_issues):
-        with cols[idx % 2]:
-            issue_card(issue)
+    total = len(mine)
+    pending = sum(1 for i in mine if i.get("status") in ("待审核", "退回补充信息"))
+    processing = sum(1 for i in mine if i.get("status") in ("已审核待派单", "已派单", "处理中", "待协商", "待居民反馈"))
+    done = sum(1 for i in mine if i.get("status") in ("处理结束", "已关闭", "已转出", "已撤回"))
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("我的工单", f"{total} 件")
+    with c2:
+        st.metric("待审核", f"{pending} 件")
+    with c3:
+        st.metric("处理中", f"{processing} 件")
+    with c4:
+        st.metric("已结束", f"{done} 件")
+
+    for issue in mine:
+        iid = issue["id"]
+        status = issue.get("status", "")
+        title = issue.get("title", "") or ""
+        urgency = issue.get("urgency", "")
+        with st.container(border=True):
+            st.markdown(
+                f'<span style="font-size:1.02em;font-weight:700;color:{TOKEN["text"]};">'
+                f'#{iid} {title[:40]}</span>'
+                f'&nbsp;{_status_badge(status)}'
+                + (f'&nbsp;{_URGENCY_EMOJI.get(urgency, "")} {urgency}' if urgency else ""),
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                f'{issue.get("issue_type", "")} · {issue.get("category", "")} · '
+                f'📍 {issue.get("location") or "未填写"} · 🕐 {(issue.get("reported_at") or "")[:16]}'
+            )
+            with st.expander("📄 查看详情与操作", expanded=False):
+                _render_detail(issue)

@@ -35,9 +35,41 @@ issue_drafts / safety_reminders / issue_supplements / proposal_votes / proposal_
 
 ## 阶段 2~7：进行中（6 个并行子任务）
 
-- 报修收尾（工具+UI）
-- 提案模块
+- 报修收尾 ✅ 已完成（工具层四档紧急度+室内外分类、居民端/负责人端重写、11状态全覆盖）
+- 提案模块 ✅ 已完成（14状态机+匿名投票+55项冒烟测试；补 audited_at/resolved_at/community_building/feedback_at/feedback_reason/satisfaction 6列）
 - 老年端
-- 政策问答
-- 通知发布
-- 天气 + 疾病预防
+- 政策问答 ✅ 已完成（68 项冒烟断言；知识库审核版本/自动回答转人工/3次循环/高频统计）
+- 通知发布 ✅ 已完成（55 项冒烟测试通过）
+- 天气 + 疾病预防 ✅ 已完成（数据层+核心逻辑约60项断言；天气预警检测/检查任务升级/健康内容审核/健康咨询/联动）
+
+## 阶段 2~7：验证中发现的 bug 与修复
+
+1. **提案 submit_proposal SQL bug（已修复）**：`data/db_proposal.py` 的 INSERT 语句中 `is_public` 列被误硬编码为 `'待审核'`，导致 17 列只给 16 值（`16 values for 17 columns`）。修复：`VALUES (?,?,?,?,0,'待审核',?,'待审核',...)`，is_public 改为参数占位符。修复后验证：提交/审核/确认公开/投票全链路跑通，投票匿名正确（proposal_votes 只存分数、proposal_vote_dedup 只存 user_id，两表物理隔离，均分 4.5）。
+
+## 整合阶段待办清单（子任务全部完成后执行）
+
+1. 注册新页面路由到 app.py：`ui/pages_grid/notices_mgmt.py`（通知管理）、`ui/pages_grid/policy_mgmt.py`（政策问答管理）、居民端 `ui/pages/policy.py` 等新增页面。
+2. 首页强制弹窗 + 未读角标接入（居民端 home.py、老年端 home.py）。
+3. 清理临时文件：`_smoke_*.py`、`tests/_tmp_*.py` 等子任务遗留的冒烟测试脚本。
+4. 适配 seed.py 到新状态机（工单 11 状态、提案新字段）。
+5. 改写旧测试（64 处旧状态「待处理/处理中/已解决」「讨论中/已回应/已采纳」引用）。
+6. 补数据层函数：报修 `resubmit_issue`（居民把「退回补充信息」重新提交回「待审核」）、提案同理（提案 subagent 已实现 resubmit_proposal）。
+7. 更新 `agent/enforce.py` 安全网调用（传 reporter_phone，适配四档紧急度+手机号强校验）。
+8. 旧页面遗留：`ui/pages_grid/dashboard.py`、`ui/sidebar.py`、`ui/pages/mine.py`、`transparency.py` 等仍读旧三态，需适配新状态机。
+9. 全量测试 + 审查优化。
+
+## 整合阶段（进行中）
+
+**已完成**
+1. 注册新页面路由到 app.py：grid 端加「通知管理」「政策问答管理」，居民端加「政策问答」。
+2. schema v20：proposals 补 6 列（audited_at/community_building/resolved_at/feedback_at/feedback_reason/satisfaction），解决测试库缺列问题。
+3. 改写 9 个失效旧测试（test_tools.py）适配新逻辑：四档紧急度、手机号强校验、提案 5 类+必填、附议改投票。
+4. 补数据层函数 `resubmit_issue`（居民把退回单重新提交回待审核）。
+5. 全量测试 328 passed 全绿（回到基线）。
+
+**待完成**
+- 天气/疾病预防 UI 页面（6 个：居民端天气/疾病预防、老年端天气、负责人端天气管理/疾病预防管理）
+- 旧页面遗留适配（dashboard/sidebar/mine/transparency 用旧三态）
+- seed.py 适配新状态机
+- resubmit UI 调用（issues.py 加「重新提交」按钮）
+- agent/enforce.py 适配手机号校验

@@ -1,61 +1,76 @@
 # tools/query_knowledge.py
-"""社区知识检索 — 字符 n-gram TF-IDF 检索社区规章、活动安排、办事指南、FAQ 等信息。
+"""社区知识检索 — 对接政策问答数据层（data/db_policy.py）。
 
-升级自原来的 SQL LIKE 关键词匹配，现在使用字符 n-gram TF-IDF
-检索，通过字符重叠度匹配近似表达，而非仅精确关键词。
-
-例如："电梯几点检修" 能匹配到 "电梯检修时间安排" 条目，
-即使"检修"和"时间安排"没有共同关键词。
+只检索「已审核发布且未失效」的知识条目，自动回答优先引用「通俗解读」
+并附「依据：XX政策（Vn）」；来源为社区整理的内容自动附带
+「本指引由社区整理，仅供参考」标注。不再检索草稿/待审核/已下架内容。
 """
 import logging
 from langchain.tools import tool
-from agent.rag import semantic_search, rag_search, get_rag_context
 
 _log = logging.getLogger(__name__)
 
 
+def _published_search(query: str, top_k: int = 3,
+                      category: str | None = None) -> list[dict]:
+    """只检索已发布且未失效的条目（数据层实现），失败返回空列表。"""
+    try:
+        from data.db_policy import search_published_knowledge
+        return search_published_knowledge(query, top_k=top_k, category=category)
+    except Exception as e:
+        _log.debug("search_published_knowledge 挂了: %s", e, exc_info=True)
+        return []
+
+
+def _render(results: list[dict], query: str, with_original: bool = False) -> str:
+    """把检索结果格式化成 markdown（通俗解读 + 依据：XX政策）。"""
+    from data.db_policy import format_knowledge_answer
+    lines = [f"📚 **知识检索**：「{query}」相关条目：\n"]
+    for i, r in enumerate(results, 1):
+        lines.append(
+            f"**{i}. {r['title']}** `相关度 {r.get('score', 0):.2f}`\n"
+            f"{format_knowledge_answer(r)}\n"
+        )
+        if with_original:
+            body = (r.get("content") or "").strip()
+            if body:
+                lines.append(
+                    f"📄 政策原文：\n{body[:500]}{'...' if len(body) > 500 else ''}\n"
+                )
+    return "\n".join(lines)
+
+
 @tool
 def query_knowledge(query: str) -> str:
-    """搜索社区知识库——社区规章、活动安排、办事指南、通知、FAQ等。
+    """搜索社区知识库——社区规章、办事指引、政策解读、通知、FAQ等。
 
-    使用字符 n-gram TF-IDF 检索，通过字符重叠度匹配近似表达（如"检修"可匹配"时间安排"），
-    不限于精确关键词匹配。
-    适合回答：社区规章、办事流程、电梯检修/垃圾清运时间、活动安排等。
+    只检索已通过负责人审核发布且未失效的知识条目，自动回答优先引用「通俗解读」
+    并附「依据：XX政策（版本号）」；社区整理内容附带「本指引由社区整理，仅供参考」。
 
     参数：
-        query: 自然语言查询，如 "电梯检修时间" 或 "垃圾分类驿站位置"
+        query: 自然语言查询，如 "养老金怎么领取" 或 "高龄补贴需要什么材料"
 
-    返回：最相关的知识库条目，按相关度排序。
+    返回：最相关的知识库条目（通俗解读 + 依据），按相关度排序。
     """
-    try:
-        return rag_search(query, top_k=5)
-    except Exception as e:
-        _log.debug("rag_search 挂了: %s", e, exc_info=True)
-        return f"⚠️ 社区知识搜索暂不可用：{e}\n请稍后重试。"
+    results = _published_search(query, top_k=3)
+    if not results:
+        return "暂未找到相关社区政策信息。建议您咨询社区居委会（62310001）或拨打12345，也可以转人工咨询。"
+    return _render(results, query)
 
 
 @tool
 def get_community_policy(topic: str) -> str:
     """查询社区规章制度和政策的原文——用于AI回答需要引用规章的场景。
 
-    与 query_knowledge 不同，本工具专注于 governance 和 notice 类别的
-    官方信息，会返回完整的政策原文，适合需要"引用社区规章原文回答"的场景。
+    与 query_knowledge 不同，本工具在通俗解读之外还会返回政策原文正文，
+    只检索已发布且未失效的条目。
 
     参数：
         topic: 政策主题，如 "居民公约" 或 "物业收费标准"
 
-    返回：相关政策原文 + 相关度评分。
+    返回：相关政策通俗解读 + 依据 + 政策原文。
     """
-    try:
-        results = semantic_search(topic, top_k=3, category="governance")
-        if not results:
-            results = semantic_search(topic, top_k=3)
-        if not results:
-            return f"未找到与「{topic}」相关的社区规章。"
-        lines = [f"📋 **规章检索**：「{topic}」相关条目：\n"]
-        for i, r in enumerate(results, 1):
-            lines.append(f"**{i}. {r['title']}** `相关度 {r.get('score', 0):.2f}`\n{r['content']}\n")
-        return "\n".join(lines)
-    except Exception as e:
-        _log.debug("semantic_search（get_community_policy）挂了: %s", e, exc_info=True)
-        return f"⚠️ 规章检索暂不可用：{e}"
+    results = _published_search(topic, top_k=3)
+    if not results:
+        return f"未找到与「{topic}」相关的社区规章。"
+    return _render(results, topic, with_original=True)
