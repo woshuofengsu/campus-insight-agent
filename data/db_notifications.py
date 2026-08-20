@@ -212,13 +212,21 @@ def mark_all_read(user_id: int) -> int:
 
 def log_activity(actor: str, action: str, target_type: str = "",
                  target_id: int | None = None, target_title: str = "",
-                 detail: str = "") -> int:
-    """记一条动态，供时间线用。返回新日志 ID。"""
+                 detail: str = "", module: str = "",
+                 before_value: str = "", after_value: str = "") -> int:
+    """记一条留痕。返回新日志 ID。
+
+    文档要求全局留痕字段：操作人、时间、类型、前值、后值、关联编号、模块来源。
+    before_value / after_value 记录变更前/后值（状态、分类、紧急程度等），
+    module 记录模块来源（报修/提案/天气/疾病预防/通知/老年端/政策问答）。
+    """
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO activity_log (actor, action, target_type, target_id, "
-            "target_title, detail) VALUES (?, ?, ?, ?, ?, ?)",
-            (actor, action, target_type, target_id, target_title, detail),
+            "target_title, detail, module, before_value, after_value) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (actor, action, target_type, target_id, target_title, detail,
+             module, before_value, after_value),
         )
         conn.commit()
         return cur.lastrowid

@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 10
+_SCHEMA_CURRENT_VERSION = 18
 
 
 def _create_schema_version_table(conn):
@@ -200,6 +200,256 @@ def _m10_create_sos_log(conn):
         "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
         "status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
         "handled_at TIMESTAMP)"
+    )
+
+
+def _add_column_if_missing(conn, table: str, col: str, decl: str):
+    """给表补一列（幂等，用 PRAGMA 检查，避免 ALTER 重复报错）。"""
+    cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+    if col not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
+def _m11_activity_log_audit_fields(conn):
+    """v11：activity_log 扩展留痕字段（模块来源 + 前值/后值）。"""
+    _add_column_if_missing(conn, "activity_log", "module", "TEXT DEFAULT ''")
+    _add_column_if_missing(conn, "activity_log", "before_value", "TEXT DEFAULT ''")
+    _add_column_if_missing(conn, "activity_log", "after_value", "TEXT DEFAULT ''")
+
+
+def _m12_issue_tables(conn):
+    """v12：报修模块 — community_issues 扩展 + 草稿/安全提醒/补充信息表。"""
+    issue_cols = [
+        ("issue_type", "TEXT DEFAULT '室内'"),
+        ("reporter_name", "TEXT DEFAULT ''"),
+        ("reporter_phone", "TEXT DEFAULT ''"),
+        ("audit_status", "TEXT DEFAULT ''"),
+        ("approved_at", "TIMESTAMP"),
+        ("assignee_name", "TEXT DEFAULT ''"),
+        ("assignee_phone", "TEXT DEFAULT ''"),
+        ("resolve_note", "TEXT DEFAULT ''"),
+        ("photo_before", "TEXT DEFAULT '[]'"),
+        ("photo_after", "TEXT DEFAULT '[]'"),
+        ("no_photo_reason", "TEXT DEFAULT ''"),
+        ("is_agent_report", "INTEGER DEFAULT 0"),
+        ("agent_name", "TEXT DEFAULT ''"),
+        ("agent_phone", "TEXT DEFAULT ''"),
+        ("agent_relation", "TEXT DEFAULT ''"),
+        ("is_violation", "INTEGER DEFAULT 0"),
+        ("non_community_responsibility", "INTEGER DEFAULT 0"),
+        ("supplement_count", "INTEGER DEFAULT 0"),
+        ("supplemented_at", "TIMESTAMP"),
+    ]
+    for col, decl in issue_cols:
+        _add_column_if_missing(conn, "community_issues", col, decl)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS issue_drafts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "title TEXT DEFAULT '', category TEXT DEFAULT '', issue_type TEXT DEFAULT '室内', "
+        "location TEXT DEFAULT '', description TEXT DEFAULT '', urgency TEXT DEFAULT '普通', "
+        "reporter_name TEXT DEFAULT '', reporter_phone TEXT DEFAULT '', "
+        "photo_before TEXT DEFAULT '[]', is_agent_report INTEGER DEFAULT 0, "
+        "agent_name TEXT DEFAULT '', agent_phone TEXT DEFAULT '', agent_relation TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS safety_reminders ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "description TEXT DEFAULT '', location TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS issue_supplements ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, issue_id INTEGER NOT NULL, "
+        "content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+        "FOREIGN KEY (issue_id) REFERENCES community_issues(id))"
+    )
+
+
+def _m13_proposal_tables(conn):
+    """v13：提案模块 — proposals 扩展 + 匿名投票/防重复/草稿表。"""
+    prop_cols = [
+        ("is_public", "INTEGER DEFAULT 1"),
+        ("audit_status", "TEXT DEFAULT ''"),
+        ("audit_opinion", "TEXT DEFAULT ''"),
+        ("visibility_confirmed", "INTEGER DEFAULT 0"),
+        ("published_at", "TIMESTAMP"),
+        ("voting_started_at", "TIMESTAMP"),
+        ("voting_ended_at", "TIMESTAMP"),
+        ("reopen_count", "INTEGER DEFAULT 0"),
+        ("executor_dept", "TEXT DEFAULT ''"),
+        ("execution_result", "TEXT DEFAULT ''"),
+        ("decision_reason", "TEXT DEFAULT ''"),
+        ("attachment_public", "INTEGER DEFAULT 0"),
+        ("reporter_name", "TEXT DEFAULT ''"),
+        ("reporter_phone", "TEXT DEFAULT ''"),
+        ("is_agent_report", "INTEGER DEFAULT 0"),
+        ("agent_name", "TEXT DEFAULT ''"),
+        ("agent_phone", "TEXT DEFAULT ''"),
+        ("agent_relation", "TEXT DEFAULT ''"),
+    ]
+    for col, decl in prop_cols:
+        _add_column_if_missing(conn, "proposals", col, decl)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS proposal_votes ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, proposal_id INTEGER NOT NULL, "
+        "score INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS proposal_vote_dedup ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, proposal_id INTEGER NOT NULL, "
+        "user_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+        "UNIQUE(proposal_id, user_id))"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS proposal_drafts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "title TEXT DEFAULT '', description TEXT DEFAULT '', category TEXT DEFAULT '', "
+        "is_public INTEGER DEFAULT 1, reporter_name TEXT DEFAULT '', reporter_phone TEXT DEFAULT '', "
+        "attachment_public INTEGER DEFAULT 0, is_agent_report INTEGER DEFAULT 0, "
+        "agent_name TEXT DEFAULT '', agent_phone TEXT DEFAULT '', agent_relation TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
+def _m14_weather_tables(conn):
+    """v14：天气模块 — 缓存/预警/检查任务表。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS weather_cache ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, city TEXT DEFAULT '', "
+        "data_json TEXT DEFAULT '{}', updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS weather_alerts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, alert_id TEXT DEFAULT '', "
+        "alert_type TEXT DEFAULT '', level TEXT DEFAULT '', "
+        "effective_time TIMESTAMP, expire_time TIMESTAMP, "
+        "status TEXT DEFAULT 'active', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS weather_check_tasks ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, alert_id TEXT DEFAULT '', "
+        "alert_type TEXT DEFAULT '', level TEXT DEFAULT '', checklist_json TEXT DEFAULT '[]', "
+        "status TEXT DEFAULT '待检查', checker TEXT DEFAULT '', "
+        "result TEXT DEFAULT '', note TEXT DEFAULT '', checked_at TIMESTAMP, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
+def _m15_health_tables(conn):
+    """v15：疾病预防 — 内容发布 + 健康咨询表。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS health_contents ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT DEFAULT '', "
+        "content_type TEXT DEFAULT '', body TEXT DEFAULT '', source TEXT DEFAULT '', "
+        "publisher TEXT DEFAULT '', auditor TEXT DEFAULT '', audit_opinion TEXT DEFAULT '', "
+        "status TEXT DEFAULT '草稿', is_pinned INTEGER DEFAULT 0, pinned_at TIMESTAMP, "
+        "weather_link_json TEXT DEFAULT '[]', elderly_reminder_text TEXT DEFAULT '', "
+        "info_updated_at TEXT DEFAULT '', expire_at TEXT DEFAULT '', "
+        "published_at TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+        "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS health_consults ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "name TEXT DEFAULT '', phone TEXT DEFAULT '', consult_type TEXT DEFAULT '', "
+        "content TEXT DEFAULT '', building TEXT DEFAULT '', attachment_json TEXT DEFAULT '[]', "
+        "is_agent_report INTEGER DEFAULT 0, agent_name TEXT DEFAULT '', "
+        "agent_phone TEXT DEFAULT '', agent_relation TEXT DEFAULT '', "
+        "status TEXT DEFAULT '待回复', reply TEXT DEFAULT '', reply_doctor_guide TEXT DEFAULT '', "
+        "reply_need_offline INTEGER DEFAULT 0, reply_at TIMESTAMP, "
+        "feedback TEXT DEFAULT '', feedback_reason TEXT DEFAULT '', feedback_at TIMESTAMP, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
+def _m16_notice_tables(conn):
+    """v16：通知发布 — 广播通知 + 已读记录表。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notices ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT DEFAULT '', "
+        "notice_type TEXT DEFAULT '社区公告', publish_scope TEXT DEFAULT '全体居民', "
+        "body TEXT DEFAULT '', elderly_summary TEXT DEFAULT '', publisher TEXT DEFAULT '', "
+        "scheduled_at TIMESTAMP, published_at TIMESTAMP, expire_at TIMESTAMP, "
+        "is_pinned INTEGER DEFAULT 0, is_urgent INTEGER DEFAULT 0, "
+        "attachment_json TEXT DEFAULT '[]', status TEXT DEFAULT '草稿', "
+        "down_reason TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+        "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notice_reads ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, notice_id INTEGER NOT NULL, "
+        "client_type TEXT DEFAULT 'resident', user_id INTEGER NOT NULL, "
+        "read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(notice_id, client_type, user_id))"
+    )
+
+
+def _m17_elderly_tables(conn):
+    """v17：老年端 — 用药提醒/紧急联系人/紧急求助表。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS medication_reminders ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "patient_name TEXT DEFAULT '', drug_name TEXT DEFAULT '', dosage TEXT DEFAULT '', "
+        "times_json TEXT DEFAULT '[]', repeat_rule TEXT DEFAULT '每天', "
+        "start_date TEXT DEFAULT '', end_date TEXT DEFAULT '', note TEXT DEFAULT '', "
+        "photo TEXT DEFAULT '', setter_id INTEGER, status TEXT DEFAULT '待审核', "
+        "audit_opinion TEXT DEFAULT '', audited_at TIMESTAMP, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS emergency_contacts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "name TEXT DEFAULT '', phone TEXT DEFAULT '', relation TEXT DEFAULT '', "
+        "setter_id INTEGER, status TEXT DEFAULT '待审核', audit_opinion TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS emergency_calls ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "call_type TEXT DEFAULT 'contact', target_name TEXT DEFAULT '', target_phone TEXT DEFAULT '', "
+        "result TEXT DEFAULT '', status TEXT DEFAULT '求助中', "
+        "handle_note TEXT DEFAULT '', handled_at TIMESTAMP, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
+def _m18_knowledge_tables(conn):
+    """v18：政策问答 — knowledge_base 扩展 + 版本/提问表。"""
+    kb_cols = [
+        ("audit_status", "TEXT DEFAULT '已发布'"),
+        ("audit_opinion", "TEXT DEFAULT ''"),
+        ("source", "TEXT DEFAULT ''"),
+        ("effective_date", "TEXT DEFAULT ''"),
+        ("expire_date", "TEXT DEFAULT ''"),
+        ("version", "INTEGER DEFAULT 1"),
+        ("cite_count", "INTEGER DEFAULT 0"),
+        ("plain_interpretation", "TEXT DEFAULT ''"),
+        ("summary", "TEXT DEFAULT ''"),
+        ("publisher", "TEXT DEFAULT ''"),
+        ("auditor", "TEXT DEFAULT ''"),
+        ("policy_number", "TEXT DEFAULT ''"),
+        ("applicable_area", "TEXT DEFAULT ''"),
+        ("attachment", "TEXT DEFAULT ''"),
+    ]
+    for col, decl in kb_cols:
+        _add_column_if_missing(conn, "knowledge_base", col, decl)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS knowledge_versions ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, knowledge_id INTEGER NOT NULL, "
+        "version INTEGER DEFAULT 1, title TEXT DEFAULT '', content TEXT DEFAULT '', "
+        "plain_interpretation TEXT DEFAULT '', summary TEXT DEFAULT '', source TEXT DEFAULT '', "
+        "effective_date TEXT DEFAULT '', expire_date TEXT DEFAULT '', "
+        "snapshot_json TEXT DEFAULT '{}', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS policy_questions ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "question TEXT DEFAULT '', summary TEXT DEFAULT '', q_type TEXT DEFAULT '', "
+        "source TEXT DEFAULT '居民端', status TEXT DEFAULT '已自动回答', "
+        "auto_answer TEXT DEFAULT '', answer TEXT DEFAULT '', cited_knowledge_id INTEGER, "
+        "answered_by TEXT DEFAULT '', answered_at TIMESTAMP, "
+        "feedback TEXT DEFAULT '', feedback_reason TEXT DEFAULT '', feedback_at TIMESTAMP, "
+        "loop_count INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
     )
 
 
@@ -378,6 +628,14 @@ def init_db(db_path: str):
         (8, "create_event_memory", _m8_create_event_memory),
         (9, "create_elderly_profile", _m9_create_elderly_profile),
         (10, "create_sos_log", _m10_create_sos_log),
+        (11, "activity_log_audit_fields", _m11_activity_log_audit_fields),
+        (12, "issue_tables", _m12_issue_tables),
+        (13, "proposal_tables", _m13_proposal_tables),
+        (14, "weather_tables", _m14_weather_tables),
+        (15, "health_tables", _m15_health_tables),
+        (16, "notice_tables", _m16_notice_tables),
+        (17, "elderly_tables", _m17_elderly_tables),
+        (18, "knowledge_tables", _m18_knowledge_tables),
     ]
     for version, name, fn in post:
         if version <= current:
