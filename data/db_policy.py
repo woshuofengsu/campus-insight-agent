@@ -829,7 +829,7 @@ def reply_question(question_id: int, reply: str, actor: str = "负责人",
     row = get_question(question_id)
     if not row:
         return False, "提问不存在", 0
-    if row["status"] != "已转人工":
+    if row["status"] not in ("已转人工", "超时未回复", "继续回复"):
         return False, f"当前状态「{row['status']}」不支持回复", question_id
 
     answer = r
@@ -1027,6 +1027,9 @@ def mark_overdue_questions(actor: str = "系统") -> list[dict]:
         conn.commit()
     for q in marked:
         info = get_question_deadline_info(q)
+        with get_db() as conn:
+            conn.execute("UPDATE policy_questions SET status='超时未回复' WHERE id=?", (q["id"],))
+            conn.commit()
         log_activity(actor, "超时未回复", "policy_question", q["id"], q["summary"],
                      module=MODULE, before_value="已转人工", after_value="超时未回复",
                      detail=f"超时 {info['remaining_hours']:.1f} 小时")

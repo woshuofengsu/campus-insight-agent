@@ -37,6 +37,8 @@ from data.db_health_content import (  # noqa: E402  数据层，只调用不写 
     take_down_content,
     list_contents,
     list_consults,
+    export_contents_csv,
+    export_consults_csv,
     reply_consult,
     mark_overdue_consults,
     log_diagnosis_disclaimer_shown,
@@ -160,6 +162,9 @@ with t_content:
     with stat_c3:
         stat("已发布", str(len([x for x in all_contents if x.get("status") == "已发布"])), TOKEN["success"],
              sub="居民端可见")
+    csv_data, csv_name = export_contents_csv()
+    st.download_button("📥 导出内容列表（CSV）", data=csv_data, file_name=csv_name, mime="text/csv",
+                       key="hc_export_contents")
 
     with st.expander("➕ 创建健康内容（草稿）", expanded=False):
         with st.form("content_create_form"):
@@ -379,6 +384,10 @@ with t_consult:
     with cs3:
         stat("已回复/继续", str(len([x for x in consults if x.get("status") in ("已回复", "继续回复")])),
              TOKEN["info"], sub="待居民反馈")
+
+    csv_data2, csv_name2 = export_consults_csv()
+    st.download_button("📥 导出咨询列表（CSV，脱敏）", data=csv_data2, file_name=csv_name2, mime="text/csv",
+                       key="hc_export_consults")
 
     k1, k2, k3 = st.columns(3)
     with k1:

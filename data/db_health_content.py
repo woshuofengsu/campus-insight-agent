@@ -373,6 +373,7 @@ def review_content(content_id: int, approve: bool, opinion: str = "",
         conn.execute(
             "UPDATE health_contents SET status=?, audit_opinion=?, "
             "published_at=CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE published_at END, "
+            "pinned_at=CASE WHEN is_pinned=1 AND pinned_at IS NULL THEN CURRENT_TIMESTAMP ELSE pinned_at END, "
             "updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (new_status, opinion.strip(), 1 if approve else 0, content_id),
         )
@@ -1200,3 +1201,45 @@ def get_elderly_linkage_reminders() -> list[dict]:
                 "content_type": c["content_type"],
             })
     return out
+
+
+def export_contents_csv(status: str | None = None,
+                        content_type: str | None = None) -> tuple[str, str]:
+    """导出健康内容列表 CSV。返回 (csv 文本, 文件名)。"""
+    import csv
+    import io
+    from datetime import datetime
+
+    rows = list_contents(status=status, content_type=content_type)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["标题", "内容类型", "来源", "发布人", "审核人", "状态", "发布时间", "是否置顶"])
+    for r in rows:
+        w.writerow([
+            r.get("title", ""), r.get("content_type", ""), r.get("source", ""),
+            r.get("publisher", ""), r.get("auditor", ""), r.get("status", ""),
+            r.get("published_at") or "", "是" if r.get("is_pinned") else "否",
+        ])
+    return buf.getvalue(), f"健康内容导出_{datetime.now().strftime('%Y%m%d')}.csv"
+
+
+def export_consults_csv(status: str | None = None,
+                        consult_type: str | None = None) -> tuple[str, str]:
+    """导出健康咨询列表 CSV（电话脱敏，不含附件与内部备注）。"""
+    import csv
+    import io
+    from datetime import datetime
+
+    rows = list_consults(status=status, consult_type=consult_type)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["咨询编号", "昵称", "电话", "类型", "提交时间", "状态", "回复人", "回复时间", "是否超时"])
+    for r in rows:
+        phone = r.get("phone", "") or ""
+        masked = (phone[:3] + "****" + phone[-4:]) if len(phone) == 11 else phone
+        w.writerow([
+            r.get("id", ""), r.get("name", ""), masked, r.get("consult_type", ""),
+            r.get("created_at") or "", r.get("status", ""), r.get("reply_by", "") or "",
+            r.get("reply_at") or "", "是" if r.get("status") == "超时未回复" else "否",
+        ])
+    return buf.getvalue(), f"健康咨询导出_{datetime.now().strftime('%Y%m%d')}.csv"

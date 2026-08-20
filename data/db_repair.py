@@ -469,3 +469,42 @@ def get_pending_review_issues(limit: int = 50) -> list[dict]:
             "ORDER BY reported_at DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+# 报修超时时限（从审核通过时间 approved_at 计时）
+_URGENCY_DEADLINE_HOURS = {"紧急": 1, "中等": 4, "一般": 24, "普通": 48}
+
+
+def get_overdue_issues() -> list[dict]:
+    """查超时工单（spec 二、时限规则：审核通过后紧急1h/中等4h/一般24h/普通48h）。
+
+    未结束的状态都算（已审核待派单/已派单/处理中/待居民反馈）。
+    """
+    clauses = " OR ".join(
+        f"(urgency='{u}' AND approved_at < datetime('now', '-{h} hours'))"
+        for u, h in _URGENCY_DEADLINE_HOURS.items()
+    )
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM community_issues WHERE approved_at IS NOT NULL "
+            "AND status IN ('已审核待派单','已派单','处理中','待居民反馈') "
+            f"AND ({clauses}) ORDER BY approved_at"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def mark_issue_overdue_notice(actor: str = "系统") -> list[dict]:
+    """报修超时自动升级（scheduler 调用）：超时工单留痕 + 通知负责人。"""
+    overdue = get_overdue_issues()
+    for i in overdue:
+        log_activity(actor, "工单超时升级", "issue", i["id"], i.get("title", ""),
+                     module=MODULE, detail=f"{i.get('urgency', '')}级工单超时，请尽快处理")
+        try:
+            from data.db_user import list_users
+            for u in list_users(role="grid"):
+                from data.db_notifications import create_notification
+                create_notification(u["id"], "sla", "工单超时提醒",
+                                    f"工单 #{i['id']}（{i.get('title', '')[:20]}）已超时，请尽快处理。")
+        except Exception:
+            pass  # 通知不是硬依赖
+    return overdue

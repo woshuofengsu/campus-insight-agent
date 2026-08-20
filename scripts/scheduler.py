@@ -30,6 +30,7 @@ def run_all() -> dict:
         results["weather_detect"] = db_weather.run_alert_detection()  # 极端天气预警检测
         results["weather_overdue"] = db_weather.mark_overdue_tasks()  # 检查任务超时标记
         db_weather.escalate_overdue_tasks()  # 超时升级（在线负责人未建模，默认全网格员）
+        db_weather.expire_alerts()  # 预警解除自动关任务（审查补：之前无调用方）
     except Exception as e:  # noqa: BLE001
         _log.warning("天气自动任务失败: %s", e)
     try:
@@ -45,6 +46,23 @@ def run_all() -> dict:
         results["monthly"] = db_health_content.monthly_update_reminder()  # 月度更新提醒
     except Exception as e:  # noqa: BLE001
         _log.warning("疾病预防自动任务失败: %s", e)
+    try:
+        from data import db_policy as _pol
+        results["policy_expire"] = _pol.auto_expire_knowledge()  # 政策到期自动下架
+        results["policy_overdue"] = _pol.mark_overdue_questions()  # 人工回复 24h 超时标记
+        results["policy_close"] = _pol.auto_close_stale_questions()  # 7 天未反馈自动结束
+    except Exception as e:  # noqa: BLE001
+        _log.warning("政策问答自动任务失败: %s", e)
+    try:
+        from data import db_elderly_care as _ec
+        from data import db_repair as _rep
+        # 老年端：紧急求助 10 分钟未响应升级（遍历求助中）
+        _sos = _ec.get_sos_calls(status="求助中", limit=50)
+        results["sos_escalated"] = sum(1 for s in _sos if _ec.escalate_sos(s["id"], actor="系统")[0])
+        # 报修：超时工单升级通知
+        results["issue_overdue"] = len(_rep.mark_issue_overdue_notice())
+    except Exception as e:  # noqa: BLE001
+        _log.warning("老年端/报修自动任务失败: %s", e)
     return results
 
 
