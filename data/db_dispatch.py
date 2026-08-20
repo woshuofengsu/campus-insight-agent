@@ -102,29 +102,49 @@ def auto_dispatch(issue_id: int) -> dict | None:
 
 
 def discover_and_dispatch(limit: int = 20) -> list[dict]:
-    """主动扫描未派单的开放工单并自动派单（战线二）。
+    """主动扫描「已审核待派单」的工单并自动分派（spec 报修：系统自动分派维修人员）。
 
-    极急/紧急的排前面先派。返回本次自动派出的列表，每项
-    {issue_id, title, category, assignee, assignee_id}。
+    按类别→部门→网格员找处理人，调 db_repair.dispatch_issue 推进状态到「已派单」
+    （更新 assignee_name/assignee_phone），并下发站内通知。紧急/中等优先。
+    返回本次自动派出的列表，每项 {issue_id, title, category, assignee, assignee_id}。
     """
+    from data.db_repair import dispatch_issue
+
     with get_db() as conn:
         rows = conn.execute(
             "SELECT id, title, category, urgency, assignee, assignee_id "
-            "FROM community_issues "
-            "WHERE status IN ('待处理', '处理中') AND (assignee_id IS NULL OR assignee = '') "
-            "ORDER BY (urgency IN ('极急', '紧急')) DESC, id DESC LIMIT ?",
+            "FROM community_issues WHERE status='已审核待派单' "
+            "AND (assignee_id IS NULL OR assignee = '') "
+            "ORDER BY CASE urgency WHEN '紧急' THEN 0 WHEN '中等' THEN 1 ELSE 2 END, id "
+            "LIMIT ?",
             (limit,),
         ).fetchall()
 
     dispatched: list[dict] = []
     for r in rows:
-        result = auto_dispatch(r["id"])
-        if result:
+        dept = CATEGORY_DEPT_MAP.get(r["category"], "网格办")
+        worker = _grid_worker_for(dept) or _grid_worker_for("网格办") or _any_grid_worker()
+        if not worker:
+            continue
+        name = _worker_display_name(worker)
+        phone = worker.get("phone") or "13900139000"
+        ok, _ = dispatch_issue(r["id"], name, phone)
+        if ok:
+            try:
+                from data.db_notifications import create_notification
+                create_notification(
+                    worker["id"], "new_dispatch",
+                    f"新工单派发：#{r['id']}「{r['title'][:20]}」",
+                    f"类别：{r['category']}。请前往「工单管理」处理。",
+                    related_id=r["id"],
+                )
+            except Exception:
+                _log.warning("自动分派通知失败（工单 #%d，不影响）", r["id"], exc_info=True)
             dispatched.append({
                 "issue_id": r["id"],
                 "title": r["title"],
                 "category": r["category"],
-                "assignee": result["assignee"],
-                "assignee_id": result["assignee_id"],
+                "assignee": name,
+                "assignee_id": worker.get("id"),
             })
     return dispatched

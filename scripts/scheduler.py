@@ -37,9 +37,11 @@ def run_all() -> dict:
     """跑一遍全部自动任务，返回每类结果摘要。任务本身幂等，失败记录到异常日志。"""
     from data import db_notice, db_proposal, db_health_content, db_weather
     from data import db_policy as _pol, db_elderly_care as _ec, db_repair as _rep
+    from data import db_dispatch as _dispatch
 
     results: dict = {}
     results["notice"] = _safe("通知", db_notice.run_auto_tasks)
+    results["auto_dispatch"] = _safe("自动分派", lambda: len(_dispatch.discover_and_dispatch(limit=20)))
     results["weather_detect"] = _safe("天气预警", db_weather.run_alert_detection)
     results["weather_overdue"] = _safe("天气超时", db_weather.mark_overdue_tasks)
     _safe("天气升级", db_weather.escalate_overdue_tasks)
