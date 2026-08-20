@@ -6,7 +6,7 @@ import streamlit as st
 from data.db_repair import (
     submit_issue, create_draft, get_drafts, delete_draft,
     get_issues, get_issue_timeline,
-    feedback_issue, supplement_issue, withdraw_issue, reopen_issue, resubmit_issue,
+    feedback_issue, supplement_issue, withdraw_issue, reopen_issue, resubmit_issue, edit_issue,
 )
 from tools.action_report_issue import _llm_classify, validate_location
 from ui.components import TOKEN, section, info_card, ooda_nav, page_header, resolve_author
@@ -278,6 +278,23 @@ def _render_detail(issue: dict):
     # 居民操作（按状态）
     if status == "待审核":
         st.markdown("---")
+        # 修改工单（撤回/退回后回到待审核时可用，全流程仅一次）
+        with st.expander("✏️ 修改工单内容（仅一次机会）", expanded=False):
+            with st.form(key=f"edit_{iid}"):
+                e_title = st.text_input("问题标题", value=i.get("title", ""))
+                e_loc = st.text_input("报修地址", value=i.get("location", ""))
+                e_desc = st.text_area("问题描述", value=i.get("description", ""))
+                e_urg = st.selectbox("紧急程度", ["紧急", "中等", "一般", "普通"],
+                                     index=["紧急", "中等", "一般", "普通"].index(i.get("urgency", "一般")))
+                e_sub = st.form_submit_button("保存修改", width="stretch")
+            if e_sub:
+                ok, msg = edit_issue(iid, actor=reporter_actor, title=e_title,
+                                     location=e_loc, description=e_desc, urgency=e_urg)
+                if ok:
+                    st.success("工单内容已更新，负责人将重新核实。")
+                    st.rerun()
+                else:
+                    st.error(msg)
         if st.button("↩️ 撤回工单", key=f"withdraw_{iid}", width="stretch"):
             ok, msg = withdraw_issue(iid, actor=reporter_actor)
             if ok:

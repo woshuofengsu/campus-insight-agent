@@ -387,6 +387,44 @@ def resubmit_issue(issue_id: int, actor: str = "居民") -> tuple[bool, str]:
     return True, ""
 
 
+def edit_issue(issue_id: int, actor: str = "居民",
+               title: str = "", location: str = "", description: str = "",
+               urgency: str = "") -> tuple[bool, str]:
+    """居民修改工单内容（仅「待审核」状态，全流程最多一次）。
+
+    spec：撤回/退回后重新打开，居民可修改一次，负责人需重新核实。
+    用 activity_log 里「修改工单」的条数做次数限制。
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status, title, location, description, urgency FROM community_issues WHERE id=?",
+            (issue_id,),
+        ).fetchone()
+        if row is None:
+            return False, "工单不存在"
+        if row["status"] != "待审核":
+            return False, f"仅「待审核」状态可修改工单内容（当前：{row['status']}）"
+        cnt = conn.execute(
+            "SELECT COUNT(*) AS c FROM activity_log WHERE target_type='issue' "
+            "AND target_id=? AND action='修改工单'", (issue_id,),
+        ).fetchone()["c"]
+        if cnt >= 1:
+            return False, "工单内容仅可修改一次，如需补充请使用「补充信息」"
+        new_title = (title or row["title"]).strip()
+        new_loc = (location or row["location"]).strip()
+        new_desc = (description or row["description"]).strip()
+        new_urg = (urgency or row["urgency"]).strip()
+        conn.execute(
+            "UPDATE community_issues SET title=?, location=?, description=?, urgency=? WHERE id=?",
+            (new_title, new_loc, new_desc, new_urg, issue_id),
+        )
+        conn.commit()
+    log_activity(actor, "修改工单", "issue", issue_id, module=MODULE,
+                 before_value=row["title"], after_value=new_title,
+                 detail=f"地址/描述/紧急度已更新（仅一次机会）")
+    return True, ""
+
+
 def get_issue(issue_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM community_issues WHERE id=?", (issue_id,)).fetchone()
