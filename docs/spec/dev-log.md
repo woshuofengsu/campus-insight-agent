@@ -67,9 +67,15 @@ issue_drafts / safety_reminders / issue_supplements / proposal_votes / proposal_
 4. 补数据层函数 `resubmit_issue`（居民把退回单重新提交回待审核）。
 5. 全量测试 328 passed 全绿（回到基线）。
 
-**待完成**
-- 天气/疾病预防 UI 页面（6 个：居民端天气/疾病预防、老年端天气、负责人端天气管理/疾病预防管理）
-- 旧页面遗留适配（dashboard/sidebar/mine/transparency 用旧三态）
-- seed.py 适配新状态机
-- resubmit UI 调用（issues.py 加「重新提交」按钮）
-- agent/enforce.py 适配手机号校验
+**已完成（阶段 1~7 全部完成）**
+- 天气/疾病预防 UI 页面（居民端天气 weather.py / 居民端疾病预防 health.py / 负责人端天气管理 weather_mgmt.py / 负责人端疾病预防管理 health_mgmt.py / 老年端大字版天气 home.py），已注册路由。
+- 旧页面适配：统计函数聚合兼容新状态机（get_issues_stats/get_proposals_stats 保留旧键+新键）、UI 状态颜色映射（components.py 补全 11 状态+提案状态颜色）。
+- seed.py 适配新状态机（工单 11 状态、提案新状态、四档紧急度）。
+- resubmit UI 调用（居民端 issues.py 加「重新提交」按钮）。
+- agent/enforce.py 适配手机号校验（从用户资料读 name/phone）。
+- schema v21：user_profile 加 phone 字段；seed 给 demo 用户填手机号。
+
+**验证**
+- 全量测试 328 passed 全绿（回到基线）。
+- Streamlit AppTest 端到端：启动无异常、Agent 初始化 16 工具、demo_resident 登录成功、居民端渲染无异常。
+- 各模块数据层冒烟验证：报修 11 状态闭环、提案匿名投票（两表物理隔离）、老年端紧急求助闭环、政策问答审核版本+自动回答+转人工、通知 55 项、天气+疾病预防约 60 项、统计聚合、seed 新状态分布。

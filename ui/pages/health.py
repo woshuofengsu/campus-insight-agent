@@ -146,6 +146,19 @@ def _linkage_from_records() -> list[dict]:
     return cards
 
 
+def _linkage_triggered_today_already() -> bool:
+    """当天是否已触发过联动（监测端或本页），避免重复调用数据层触发造成重复通知。"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        return any(
+            r.get("action") == "联动提醒触发" and str(r.get("created_at") or "").startswith(today)
+            for r in get_linkage_records(limit=100)
+        )
+    except Exception:
+        _log.debug("检查当天联动触发状态失败", exc_info=True)
+        return False
+
+
 def _get_linkage_cards() -> list[dict]:
     """当天联动卡片：触发结果优先，留痕兜底，按优先级排序。"""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -154,13 +167,14 @@ def _get_linkage_cards() -> list[dict]:
         return st.session_state[cache_key]
 
     cards: list[dict] = []
-    event = _current_weather_event()
-    if event:
-        try:
-            result = trigger_weather_linkage(event, actor="系统")
-            cards.extend(result.get("triggered") or [])
-        except Exception:
-            _log.debug("触发天气联动失败", exc_info=True)
+    if not _linkage_triggered_today_already():
+        event = _current_weather_event()
+        if event:
+            try:
+                result = trigger_weather_linkage(event, actor="系统")
+                cards.extend(result.get("triggered") or [])
+            except Exception:
+                _log.debug("触发天气联动失败", exc_info=True)
     # 兜底：从当天留痕恢复（同日去重后 trigger 返回空的情况）
     for c in _linkage_from_records():
         if c["id"] not in {x["id"] for x in cards}:
