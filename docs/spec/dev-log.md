@@ -92,3 +92,19 @@ issue_drafts / safety_reminders / issue_supplements / proposal_votes / proposal_
 **集成**：app.py 启动时 `ensure_scheduler_started()` 启动守护线程（进程级单例，幂等任务，失败不影响主流程）；也可独立运行 `python scripts/scheduler.py`。
 
 **验证**：run_all 全部任务执行成功（还实测触发了一个雷电黄色预警）；328 测试全绿；AppTest 确认调度器线程随 app 启动。
+
+## 遗留项（用户白天处理）
+
+按用户指示「遇到解决不了的问题跳过，白天来解决」，以下两项记录为遗留：
+
+1. **照片/附件真实文件存储**：当前只存文件名（photo_before/photo_after、attachment_json 存元数据），未做真实上传。本地可做（uploads 目录 + st.file_uploader），但 Streamlit Cloud 文件系统临时会重置，需外部存储（S3/对象存储 + 配置）才稳定——留待用户白天决定是否接。
+2. **在线负责人列表**：紧急升级通知默认发全部 grid 角色（escalate_overdue_tasks 已预留 online_user_ids 参数）。Web 应用无长连接，心跳机制不精确，需额外架构——留待用户白天决定。
+
+**其他已知限制（首版合理简化）**：匹配阈值/联动阈值存进程内（重启回默认）；投票防重复表对多账号不强制关联；附件只存文件名。
+
+## 最终审查（完成）
+
+- **27 个注册页面全部可加载**：init_db 后逐页 import 25/27 直接通过，dashboard.py / home.py 2 处裸环境误报（无 Streamlit session 时顶层代码访问会话对象），AppTest 实测居民端登录 + grid 端登录均**异常数 0**，确认运行时正常。
+- 端到端验证链：app 启动 → 居民端登录（demo_resident）→ 渲染 → grid 端登录（demo_grid）→ 工作台渲染，全部通过。
+- 7 模块核心闭环数据层冒烟验证全过；328 测试全绿；后台调度器随 app 启动。
+- 遗留项（用户白天处理）：照片/附件真实存储（上云重置，需外部存储）、在线负责人列表（Web 无长连接）。
