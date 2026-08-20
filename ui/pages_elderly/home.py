@@ -281,6 +281,15 @@ def _cached_weather():
         return None, "", False
 
 
+@st.cache_data(ttl=600)  # 大字版简化天气补充（预警标签 + 更新时间），每 10 分钟同步
+def _cached_simplified_weather(city: str = ""):
+    try:
+        from data.db_weather import get_simplified_weather
+        return get_simplified_weather(city)
+    except Exception:
+        return None
+
+
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     if st.button(f"🌤️ {_weather_label()}", key="go_weather", width="stretch"):
@@ -349,6 +358,23 @@ if st.session_state.get("_show_weather"):
                   f"{t.get('advice', '')}。")
     else:
         st.info("天气数据暂时不可用，请稍后再试。")
+
+    # 大字版补充：官方极端天气预警标签 + 数据更新时间（get_simplified_weather，失败不影响主卡片）
+    try:
+        sim = _cached_simplified_weather((profile or {}).get("community") or "")
+        if sim and sim.get("alert_tags"):
+            _sim_colors = {"黄色": "#eab308", "橙色": "#f97316", "红色": "#dc2626"}
+            tags = "".join(
+                f'<span style="display:inline-block;background:{_sim_colors.get(t.get("level",""),"#eab308")};'
+                f'color:#ffffff;border-radius:99px;padding:6px 18px;font-size:1.25em;font-weight:800;'
+                f'margin:4px 6px 4px 0;">⚠️ {t.get("type","")}{t.get("level","")}预警</span>'
+                for t in sim["alert_tags"]
+            )
+            big_card(f"<div style='text-align:center;'>{tags}</div>", bg="#fef2f2", border="#dc2626")
+        if sim and sim.get("updated_at"):
+            st.caption(f"天气数据更新于{str(sim.get('updated_at'))[11:16]}")
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------- 政策问答（内联，查知识库）
 if st.session_state.get("_show_policy"):

@@ -114,6 +114,7 @@ def main():
             st.Page("ui/pages_grid/proposals_mgmt.py", title="提案管理", icon=":material/lightbulb:"),
             st.Page("ui/pages_grid/notices_mgmt.py", title="通知管理", icon=":material/campaign:"),
             st.Page("ui/pages_grid/policy_mgmt.py", title="政策问答管理", icon=":material/quiz:"),
+            st.Page("ui/pages_grid/weather_mgmt.py", title="天气管理", icon=":material/cloud:"),
             st.Page("ui/pages_grid/content_mgmt.py", title="内容发布", icon=":material/campaign:"),
             st.Page("ui/pages_grid/insights.py", title="数据洞察", icon=":material/insights:"),
             st.Page("ui/pages_grid/health_mgmt.py", title="健康管理", icon=":material/health_and_safety:"),
@@ -134,6 +135,7 @@ def main():
             # 核心四件套：知·报·议·督
             st.Page("ui/pages/home.py", title="对话", icon=":material/chat:", default=True),
             st.Page("ui/pages/pulse.py", title="社区脉搏", icon=":material/waves:"),
+            st.Page("ui/pages/weather.py", title="天气", icon=":material/cloud:"),
             st.Page("ui/pages/issues.py", title="接诉即办", icon=":material/build:"),
             st.Page("ui/pages/voice.py", title="邻里议事", icon=":material/forum:"),
             st.Page("ui/pages/transparency.py", title="社区治理看板", icon=":material/bar_chart:"),

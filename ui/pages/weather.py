@@ -8,7 +8,7 @@
 - 数据源故障缓存降级提示（"数据更新于XX时间，当前不可用"）。
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import streamlit as st
 
