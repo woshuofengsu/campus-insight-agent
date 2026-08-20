@@ -32,6 +32,22 @@ if last_interaction and (now - last_interaction) > threshold and (now - last_che
         memory.add_message("assistant", alert_msg)
         reminder(alert["title"], alert["message"])
 
+# 紧急通知首页强制弹窗（spec 05：直到点「我知道了」，未读每次进入页面再弹）
+try:
+    from data.db_notice import get_active_urgent_notices, mark_notice_read
+    from data.db_user import get_current_user as _get_u
+    _u = _get_u() or {}
+    _uid = _u.get("id")
+    if _uid:
+        for _urgent in get_active_urgent_notices("resident", _uid)[:1]:
+            st.markdown("---")
+            st.error(f"🚨 **紧急通知：{_urgent['title']}**\n\n{(_urgent.get('body') or '')[:200]}")
+            if st.button("我知道了", key=f"home_urgent_ack_{_urgent['id']}", type="primary", width="stretch"):
+                mark_notice_read(_urgent["id"], "resident", _uid)
+                st.rerun()
+except Exception:
+    pass  # 弹窗不是硬依赖，失败静默
+
 # 页头
 page_header("对话", "用自然语言上报问题、查看社区动态、参与提案讨论。", "社区助手")
 ooda_nav("home")

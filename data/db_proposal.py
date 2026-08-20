@@ -583,8 +583,8 @@ def vote_proposal(pid: int, user_id: int, score: int, actor: str = "居民") -> 
             conn.rollback()
             return False, "您已经投过票了，每人每提案限投一票"
 
-    # 留痕：只记「有居民评分」，不记个体、不记分数
-    log_activity(actor, "投票", "proposal", pid, row["title"] or "",
+    # 留痕：只记「有居民评分」，不记个体、不记分数（spec：系统日志不记录个体与分数的关联）
+    log_activity("匿名居民", "投票", "proposal", pid, row["title"] or "",
                  module=MODULE, detail="收到居民匿名评分（不记录个体与分数）",
                  after_value="公示中")
     return True, ""
@@ -1241,6 +1241,7 @@ def get_export_rows() -> list[dict]:
             "状态": p.get("status"),
             "投票人数": s.get("vote_count", 0),
             "平均分": s.get("avg_score", "") if s.get("avg_score") is not None else "",
+            "排名": s.get("rank", ""),
             "执行部门": p.get("executor_dept") or "",
             "执行结果": p.get("execution_result") or "",
             "反馈状态": p.get("satisfaction") or "",

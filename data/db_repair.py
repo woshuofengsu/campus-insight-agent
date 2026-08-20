@@ -303,7 +303,9 @@ def close_issue(issue_id: int, reason: str, actor: str = "负责人") -> tuple[b
     if not reason:
         return False, "关闭原因必填"
     with get_db() as conn:
-        row = conn.execute("SELECT status FROM community_issues WHERE id=?", (issue_id,)).fetchone()
+        row = conn.execute(
+            "SELECT status, reporter_id, title FROM community_issues WHERE id=?", (issue_id,)
+        ).fetchone()
         if row is None:
             return False, "工单不存在"
         old = row["status"]
@@ -311,6 +313,15 @@ def close_issue(issue_id: int, reason: str, actor: str = "负责人") -> tuple[b
         conn.commit()
     log_activity(actor, "关闭工单", "issue", issue_id, module=MODULE,
                  before_value=old, after_value="已关闭", detail=reason)
+    # 自动通知居民关闭原因（spec 17）
+    try:
+        if row["reporter_id"]:
+            from data.db_notifications import create_notification
+            create_notification(row["reporter_id"], "issue",
+                                "工单已关闭",
+                                f"工单 #{issue_id}（{row['title'][:20]}）已关闭，原因：{reason}")
+    except Exception:
+        pass  # 通知不是硬依赖
     return True, ""
 
 
