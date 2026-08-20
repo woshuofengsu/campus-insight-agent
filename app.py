@@ -125,6 +125,7 @@ def main():
             st.Page("ui/pages_grid/content_mgmt.py", title="内容发布", icon=":material/campaign:"),
             st.Page("ui/pages_grid/insights.py", title="数据洞察", icon=":material/insights:"),
             st.Page("ui/pages_grid/health_mgmt.py", title="健康管理", icon=":material/health_and_safety:"),
+            st.Page("ui/pages_grid/elderly_care_mgmt.py", title="老年关怀管理", icon=":material/elderly:"),
         ])
     elif role == "elderly":
         nav = st.navigation([
