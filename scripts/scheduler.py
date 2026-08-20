@@ -14,55 +14,51 @@ import time
 _log = logging.getLogger(__name__)
 
 
-def run_all() -> dict:
-    """跑一遍全部自动任务，返回每类结果摘要。
+def _safe(name: str, fn) -> object:
+    """执行任务并记录失败到异常日志（不拖累其他任务）。"""
+    try:
+        return fn()
+    except Exception as e:  # noqa: BLE001
+        _log.warning("%s 自动任务失败: %s", name, e)
+        try:
+            from data.db_notifications import log_exception
+            log_exception(name, f"自动任务失败: {e}")
+        except Exception:  # noqa: BLE001
+            pass
+        return None
 
-    每个任务单独 try，一个失败不拖累其他。任务本身幂等。
-    """
+
+def _clean_exceptions():
+    from data.db_notifications import clean_exception_log
+    return clean_exception_log(days=7)
+
+
+def run_all() -> dict:
+    """跑一遍全部自动任务，返回每类结果摘要。任务本身幂等，失败记录到异常日志。"""
     from data import db_notice, db_proposal, db_health_content, db_weather
+    from data import db_policy as _pol, db_elderly_care as _ec, db_repair as _rep
 
     results: dict = {}
-    try:
-        results["notice"] = db_notice.run_auto_tasks()  # 定时发布 / 到期取消置顶 / 紧急通知到期
-    except Exception as e:  # noqa: BLE001
-        _log.warning("通知自动任务失败: %s", e)
-    try:
-        results["weather_detect"] = db_weather.run_alert_detection()  # 极端天气预警检测
-        results["weather_overdue"] = db_weather.mark_overdue_tasks()  # 检查任务超时标记
-        db_weather.escalate_overdue_tasks()  # 超时升级（在线负责人未建模，默认全网格员）
-        db_weather.expire_alerts()  # 预警解除自动关任务（审查补：之前无调用方）
-    except Exception as e:  # noqa: BLE001
-        _log.warning("天气自动任务失败: %s", e)
-    try:
-        results["proposal_confirm"] = db_proposal.auto_confirm_overdue()  # 逾期默认确认公开/私有
-        results["proposal_end"] = db_proposal.auto_end_unfeedback()  # 逾期未反馈视为满意
-    except Exception as e:  # noqa: BLE001
-        _log.warning("提案自动任务失败: %s", e)
-    try:
-        results["consult_overdue"] = db_health_content.mark_overdue_consults()  # 咨询 24h 超时
-        results["consult_close"] = db_health_content.auto_close_stale_consults()  # 咨询 7 天未反馈
-        results["content_expire"] = db_health_content.expire_contents()  # 疫苗类到期下架
-        results["unpin"] = db_health_content.auto_unpin_expired()  # 置顶超 7 天取消
-        results["monthly"] = db_health_content.monthly_update_reminder()  # 月度更新提醒
-    except Exception as e:  # noqa: BLE001
-        _log.warning("疾病预防自动任务失败: %s", e)
-    try:
-        from data import db_policy as _pol
-        results["policy_expire"] = _pol.auto_expire_knowledge()  # 政策到期自动下架
-        results["policy_overdue"] = _pol.mark_overdue_questions()  # 人工回复 24h 超时标记
-        results["policy_close"] = _pol.auto_close_stale_questions()  # 7 天未反馈自动结束
-    except Exception as e:  # noqa: BLE001
-        _log.warning("政策问答自动任务失败: %s", e)
-    try:
-        from data import db_elderly_care as _ec
-        from data import db_repair as _rep
-        # 老年端：紧急求助 10 分钟未响应升级（遍历求助中）
-        _sos = _ec.get_sos_calls(status="求助中", limit=50)
-        results["sos_escalated"] = sum(1 for s in _sos if _ec.escalate_sos(s["id"], actor="系统")[0])
-        # 报修：超时工单升级通知
-        results["issue_overdue"] = len(_rep.mark_issue_overdue_notice())
-    except Exception as e:  # noqa: BLE001
-        _log.warning("老年端/报修自动任务失败: %s", e)
+    results["notice"] = _safe("通知", db_notice.run_auto_tasks)
+    results["weather_detect"] = _safe("天气预警", db_weather.run_alert_detection)
+    results["weather_overdue"] = _safe("天气超时", db_weather.mark_overdue_tasks)
+    _safe("天气升级", db_weather.escalate_overdue_tasks)
+    _safe("天气预警解除", db_weather.expire_alerts)
+    results["proposal_confirm"] = _safe("提案确认", db_proposal.auto_confirm_overdue)
+    results["proposal_end"] = _safe("提案反馈", db_proposal.auto_end_unfeedback)
+    results["consult_overdue"] = _safe("咨询超时", db_health_content.mark_overdue_consults)
+    results["consult_close"] = _safe("咨询关闭", db_health_content.auto_close_stale_consults)
+    results["content_expire"] = _safe("内容到期", db_health_content.expire_contents)
+    results["unpin"] = _safe("置顶取消", db_health_content.auto_unpin_expired)
+    results["monthly"] = _safe("月度提醒", db_health_content.monthly_update_reminder)
+    results["policy_expire"] = _safe("政策到期", _pol.auto_expire_knowledge)
+    results["policy_overdue"] = _safe("政策超时", _pol.mark_overdue_questions)
+    results["policy_close"] = _safe("政策关闭", _pol.auto_close_stale_questions)
+    results["sos_escalated"] = _safe("SOS升级", lambda: sum(
+        1 for s in _ec.get_sos_calls(status="求助中", limit=50)
+        if _ec.escalate_sos(s["id"], actor="系统")[0]))
+    results["issue_overdue"] = _safe("报修超时", lambda: len(_rep.mark_issue_overdue_notice()))
+    results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
     return results
 
 

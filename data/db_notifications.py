@@ -232,6 +232,27 @@ def log_activity(actor: str, action: str, target_type: str = "",
         return cur.lastrowid
 
 
+def log_exception(module: str, error: str, detail: str = "") -> int:
+    """记录系统异常日志（单独保存 7 天，不混入业务留痕）。返回日志 ID。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO exception_log (module, error, detail) VALUES (?, ?, ?)",
+            (module, (error or "")[:500], (detail or "")[:2000]),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def clean_exception_log(days: int = 7) -> int:
+    """清理超过 N 天的异常日志（scheduler 定时调用）。返回删除条数。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            f"DELETE FROM exception_log WHERE created_at < datetime('now', '-{days} days')"
+        )
+        conn.commit()
+        return cur.rowcount
+
+
 def get_activity_feed(limit: int = 20) -> list[dict]:
     """查最近动态，新的在前。"""
     with get_db() as conn:

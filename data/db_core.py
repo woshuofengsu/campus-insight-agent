@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 21
+_SCHEMA_CURRENT_VERSION = 22
 
 
 def _create_schema_version_table(conn):
@@ -477,6 +477,16 @@ def _m21_user_phone(conn):
     _add_column_if_missing(conn, "user_profile", "phone", "TEXT DEFAULT ''")
 
 
+def _m22_exception_log(conn):
+    """v22：建 exception_log 表（系统异常日志单独保存 7 天，不混入业务留痕）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS exception_log ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, module TEXT DEFAULT '', "
+        "error TEXT DEFAULT '', detail TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -663,6 +673,7 @@ def init_db(db_path: str):
         (19, "drop_dead_tables", _m19_drop_dead_tables),
         (20, "proposal_extra_cols", _m20_proposal_extra_cols),
         (21, "user_phone", _m21_user_phone),
+        (22, "exception_log", _m22_exception_log),
     ]
     for version, name, fn in post:
         if version <= current:
