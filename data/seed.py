@@ -285,11 +285,23 @@ def _seed_issues():
          "声控灯坏了，晚上上下楼要打手电，老人夜里很危险。",
          "普通", "已解决", d(8), authors[2]),
     ]
+    def _map_status(old: str, title: str) -> str:
+        """旧三态 → 新 11 状态机（演示审核/派单/处理/反馈全流程）。"""
+        if old == "已解决":
+            return "处理结束"
+        if old == "处理中":
+            return "处理中"
+        # 待处理分散到「待审核/已审核待派单」，演示审核与派单阶段
+        return "待审核" if _stable_hash(title, 3) == 0 else "已审核待派单"
+
+    def _map_urgency(old: str) -> str:
+        return {"极急": "紧急", "紧急": "紧急", "普通": "一般"}.get(old, "一般")
+
     with get_db() as conn:
         for title, cat, loc, desc, urg, status, rd, author in issues:
             conn.execute(
                 "INSERT INTO community_issues (title, category, location, description, urgency, status, reported_at, author) VALUES (?,?,?,?,?,?,?,?)",
-                (title, cat, loc, desc, urg, status, rd, author),
+                (title, cat, loc, desc, _map_urgency(urg), _map_status(status, title), rd, author),
             )
             if status == "已解决":
                 resolve_delay = 1 + _stable_hash(title, 4)
@@ -363,12 +375,35 @@ def _seed_proposals():
          "广场舞噪音扰民。建议划定活动区域、限定时段，安装分贝监测，平衡健身与休息需求。",
          "噪音扰民", 51, "已回应", "已划定活动区域，晚9点后禁止高音喇叭，安装分贝监测仪实时提醒。", authors[0]),
     ]
+    def _map_prop_status(old: str, title: str) -> str:
+        """旧状态 → 新提案状态机（审核/公示/执行/反馈闭环）。"""
+        if old == "已采纳":
+            return "已完成"
+        if old == "已回应":
+            return "执行中"
+        # 讨论中分散到「公示中/待确认公示·私有」，演示公示与确认阶段
+        return "公示中" if _stable_hash(title, 2) == 0 else "待确认公示/私有"
+
     with get_db() as conn:
         for title, desc, cat, supporters, status, response, author in proposals:
+            new_status = _map_prop_status(status, title)
             conn.execute(
-                "INSERT INTO proposals (title, description, category, supporter_count, status, response_text, author) VALUES (?,?,?,?,?,?,?)",
-                (title, desc, cat, supporters, status, response, author),
+                "INSERT INTO proposals (title, description, category, supporter_count, status, "
+                "response_text, author, is_public, reporter_name, audit_status) VALUES (?,?,?,?,?,?,?,1,?,'')",
+                (title, desc, cat, supporters, new_status, response, author, author),
             )
+            if new_status == "公示中":
+                conn.execute(
+                    "UPDATE proposals SET voting_started_at=datetime('now','-3 days'), "
+                    "voting_ended_at=datetime('now','+4 days') WHERE title=? AND status='公示中'",
+                    (title,),
+                )
+            if new_status == "已完成":
+                conn.execute(
+                    "UPDATE proposals SET resolved_at=datetime('now','-2 days'), "
+                    "satisfaction='满意' WHERE title=? AND status='已完成'",
+                    (title,),
+                )
         conn.commit()
 
 
