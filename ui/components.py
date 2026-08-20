@@ -75,6 +75,7 @@ CAT_COLOR_BG = {
 # 状态标签
 
 _STATUS_TOKEN_KEYS = {
+    # 旧状态（兼容老看板）
     "待处理": ("danger_bg", "danger_border", "danger"),
     "处理中": ("warning_bg", "warning_border", "warning"),
     "已解决": ("success_bg", "success_border", "success"),
@@ -82,6 +83,29 @@ _STATUS_TOKEN_KEYS = {
     "已回应": ("info_bg", "info_border", "info"),
     "已采纳": ("success_bg", "success_border", "success"),
     "已实施": ("success_bg", "success_border", "success"),
+    # 报修 11 状态（spec 01 第七节颜色：黄/蓝/蓝/绿/橙/灰/灰/红/灰/橙/灰）
+    "待审核": ("warning_bg", "warning_border", "warning"),
+    "已审核待派单": ("info_bg", "info_border", "info"),
+    "已派单": ("info_bg", "info_border", "info"),
+    "待居民反馈": ("warning_bg", "warning_border", "warning"),
+    "处理结束": ("accent_bg", "border", "text_muted"),
+    "已撤回": ("accent_bg", "border", "text_muted"),
+    "退回补充信息": ("danger_bg", "danger_border", "danger"),
+    "已关闭": ("accent_bg", "border", "text_muted"),
+    "待协商": ("warning_bg", "warning_border", "warning"),
+    "已转出": ("accent_bg", "border", "text_muted"),
+    # 提案状态（spec 02 第七节颜色）
+    "退回修改": ("danger_bg", "danger_border", "danger"),
+    "待确认公示/私有": ("info_bg", "info_border", "info"),
+    "公示中": ("info_bg", "info_border", "info"),
+    "待执行": ("info_bg", "info_border", "info"),
+    "执行中": ("success_bg", "success_border", "success"),
+    "待提案人反馈": ("warning_bg", "warning_border", "warning"),
+    "已完成": ("accent_bg", "border", "text_muted"),
+    "重新执行": ("warning_bg", "warning_border", "warning"),
+    "不予执行": ("accent_bg", "border", "text_muted"),
+    "违规下架": ("accent_bg", "border", "text_muted"),
+    "已结束": ("accent_bg", "border", "text_muted"),
 }
 
 

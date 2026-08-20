@@ -151,7 +151,17 @@ def get_issues(category: str | None = None, status: str | None = None,
 
 
 def get_issues_stats() -> dict:
-    """给看板查工单统计：按分类和状态计数。"""
+    """给看板查工单统计：按分类和状态计数。
+
+    状态字段已升级为报修 11 状态机，这里同时保留原始新状态键和
+    聚合旧键（待处理/处理中/已解决），让老看板不感知也能正常统计。
+    """
+    # 新状态 → 旧三态聚合（兼容老看板）
+    _AGG = {
+        "待审核": "待处理", "退回补充信息": "待处理", "已审核待派单": "待处理",
+        "已派单": "处理中", "处理中": "处理中", "待协商": "处理中",
+        "处理结束": "已解决", "已关闭": "已解决", "已转出": "已解决", "已撤回": "已解决",
+    }
     with get_db() as conn:
         by_category = conn.execute(
             "SELECT category, COUNT(*) as cnt FROM community_issues GROUP BY category"
@@ -163,10 +173,17 @@ def get_issues_stats() -> dict:
         today_new = conn.execute(
             "SELECT COUNT(*) as cnt FROM community_issues WHERE date(reported_at, 'localtime') = date('now', 'localtime')"
         ).fetchone()
+        raw = {r["status"]: r["cnt"] for r in by_status}
+        agg = {"待处理": 0, "处理中": 0, "已解决": 0}
+        for s, cnt in raw.items():
+            agg[s] = cnt  # 保留原始新状态键
+            key = _AGG.get(s)
+            if key:
+                agg[key] = agg.get(key, 0) + cnt
         return {
             "total": total["cnt"] if total else 0,
             "by_category": {r["category"]: r["cnt"] for r in by_category},
-            "by_status": {r["status"]: r["cnt"] for r in by_status},
+            "by_status": agg,
             "today_new": today_new["cnt"] if today_new else 0,
         }
 
@@ -519,7 +536,18 @@ def update_proposal_status(proposal_id: int, status: str,
 
 
 def get_proposals_stats() -> dict:
-    """查提案统计。"""
+    """查提案统计。
+
+    兼容新旧状态：保留原始新状态键，同时聚合成旧三态
+    （讨论中/已回应/已采纳），老看板不感知也能正常统计。
+    """
+    _AGG = {
+        "待审核": "讨论中", "退回修改": "讨论中", "待确认公示/私有": "讨论中",
+        "公示中": "讨论中", "待执行": "讨论中", "执行中": "已回应",
+        "待提案人反馈": "已回应", "已完成": "已采纳", "已结束": "已采纳",
+        "重新执行": "已回应", "不予执行": "已关闭",
+        "违规下架": "已关闭", "已关闭": "已关闭", "已撤回": "已关闭",
+    }
     with get_db() as conn:
         total = conn.execute("SELECT COUNT(*) as cnt FROM proposals").fetchone()
         by_category = conn.execute(
@@ -528,10 +556,17 @@ def get_proposals_stats() -> dict:
         by_status = conn.execute(
             "SELECT status, COUNT(*) as cnt FROM proposals GROUP BY status"
         ).fetchall()
+        raw = {r["status"]: r["cnt"] for r in by_status}
+        agg = {"讨论中": 0, "已回应": 0, "已采纳": 0, "已关闭": 0}
+        for s, cnt in raw.items():
+            agg[s] = cnt  # 保留原始新状态键
+            key = _AGG.get(s)
+            if key:
+                agg[key] = agg.get(key, 0) + cnt
         return {
             "total": total["cnt"] if total else 0,
             "by_category": {r["category"]: r["cnt"] for r in by_category},
-            "by_status": {r["status"]: r["cnt"] for r in by_status},
+            "by_status": agg,
         }
 
 
