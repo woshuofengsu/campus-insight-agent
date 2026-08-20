@@ -23,17 +23,22 @@ def _stable_hash(text: str, mod: int = 4) -> int:
 def _seed_users():
     """种演示账号 — 居民 + 网格员，比赛 demo 用。"""
     users = [
-        ("demo_resident", "", "resident", "海淀小区", "3号楼", "2单元501", "王阿姨", "HD0302501"),
-        ("demo_grid", "demo123", "grid", "海淀小区", "网格一组", "", "刘网格员", "G2026001"),
-        ("demo_grid2", "demo123", "grid", "海淀小区", "物业", "", "王物业", "G2026002"),
-        ("demo_elderly", "", "elderly", "海淀小区", "11号楼", "3单元301", "张大爷", "HD1103301"),
+        ("demo_resident", "", "resident", "海淀小区", "3号楼", "2单元501", "王阿姨", "HD0302501", "13800138000"),
+        ("demo_grid", "demo123", "grid", "海淀小区", "网格一组", "", "刘网格员", "G2026001", "13900139000"),
+        ("demo_grid2", "demo123", "grid", "海淀小区", "物业", "", "王物业", "G2026002", "13900139001"),
+        ("demo_elderly", "", "elderly", "海淀小区", "11号楼", "3单元301", "张大爷", "HD1103301", "13700137000"),
     ]
     with get_db() as conn:
-        for username, pw, role, community, building, unit, name, rid in users:
+        for username, pw, role, community, building, unit, name, rid, phone in users:
             existing = conn.execute(
                 "SELECT id FROM user_profile WHERE username = ?", (username,)
             ).fetchone()
             if existing:
+                # 老库补手机号
+                conn.execute(
+                    "UPDATE user_profile SET phone=? WHERE username=? AND (phone IS NULL OR phone='')",
+                    (phone, username),
+                )
                 continue
             pw_hash = ""
             if pw:
@@ -41,8 +46,8 @@ def _seed_users():
                 pw_hash = _hash_password(pw)
             conn.execute(
                 "INSERT INTO user_profile (username, password_hash, role, community, building, "
-                "unit, name, resident_id, onboarding_done) VALUES (?,?,?,?,?,?,?,?,1)",
-                (username, pw_hash, role, community, building, unit, name, rid),
+                "unit, name, resident_id, phone, onboarding_done) VALUES (?,?,?,?,?,?,?,?,?,1)",
+                (username, pw_hash, role, community, building, unit, name, rid, phone),
             )
         conn.commit()
 

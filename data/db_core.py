@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 20
+_SCHEMA_CURRENT_VERSION = 21
 
 
 def _create_schema_version_table(conn):
@@ -472,6 +472,11 @@ def _m20_proposal_extra_cols(conn):
         _add_column_if_missing(conn, "proposals", col, decl)
 
 
+def _m21_user_phone(conn):
+    """v21：user_profile 加 phone 字段（报修/提案/咨询的手机号从用户资料带出）。"""
+    _add_column_if_missing(conn, "user_profile", "phone", "TEXT DEFAULT ''")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -657,6 +662,7 @@ def init_db(db_path: str):
         (18, "knowledge_tables", _m18_knowledge_tables),
         (19, "drop_dead_tables", _m19_drop_dead_tables),
         (20, "proposal_extra_cols", _m20_proposal_extra_cols),
+        (21, "user_phone", _m21_user_phone),
     ]
     for version, name, fn in post:
         if version <= current:

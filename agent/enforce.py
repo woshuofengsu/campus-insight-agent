@@ -75,6 +75,13 @@ def enforce_tool_call(response: str, user_input: str,
     try:
         from tools.action_report_issue import report_issue, _keyword_classify, _keyword_urgency
         from agent.helpers import extract_location
+        try:
+            from data.db_user import get_current_user
+            _u = get_current_user() or {}
+            reporter_name = _u.get("name") or ""
+            reporter_phone = _u.get("phone") or ""
+        except Exception:
+            reporter_name, reporter_phone = "", ""
 
         # 把标题里的预取上下文剥掉
         clean_input = user_input.split("\n\n[📊")[0].strip()
@@ -96,6 +103,8 @@ def enforce_tool_call(response: str, user_input: str,
             "location": location,
             "description": clean_input,
             "urgency": urg,       # 快路径：跳过 _llm_classify
+            "reporter_name": reporter_name,
+            "reporter_phone": reporter_phone,
         })
 
         # 结果还是报错，说明被 validate_location 拦了。
@@ -111,6 +120,8 @@ def enforce_tool_call(response: str, user_input: str,
                 "location": location or clean_input[:60],
                 "description": clean_input,
                 "urgency": urg,
+                "reporter_name": reporter_name,
+                "reporter_phone": reporter_phone,
             })
 
         _log.info("安全网：report_issue 返回结果=%r", str(result)[:120])
