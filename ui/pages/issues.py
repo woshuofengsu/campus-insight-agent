@@ -6,7 +6,7 @@ import streamlit as st
 from data.db_repair import (
     submit_issue, create_draft, get_drafts, delete_draft,
     get_issues, get_issue_timeline,
-    feedback_issue, supplement_issue, withdraw_issue, reopen_issue,
+    feedback_issue, supplement_issue, withdraw_issue, reopen_issue, resubmit_issue,
 )
 from tools.action_report_issue import _llm_classify, validate_location
 from ui.components import TOKEN, section, info_card, ooda_nav, page_header, resolve_author
@@ -298,6 +298,13 @@ def _render_detail(issue: dict):
     elif status == "退回补充信息":
         st.markdown("---")
         st.info("负责人已退回工单，请补充有效信息（如联系方式/更清晰的描述），负责人将重新审核。")
+        if st.button("📤 重新提交", key=f"resubmit_{iid}", width="stretch"):
+            ok, msg = resubmit_issue(iid, actor=reporter_actor)
+            if ok:
+                st.success("已重新提交，回到待审核。")
+                st.rerun()
+            else:
+                st.error(msg)
 
     # 待居民反馈：满意度
     if status == "待居民反馈":
