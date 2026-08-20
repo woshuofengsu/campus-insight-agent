@@ -82,6 +82,13 @@ def main():
         st.error(f"😅 系统初始化失败：{e}\n请检查 .env 中的 API Key 是否正确。")
         st.stop()
 
+    # 后台调度器（守护线程，自动任务幂等，失败不影响主流程）
+    try:
+        from scripts.scheduler import ensure_scheduler_started
+        ensure_scheduler_started(interval=60)
+    except Exception:
+        pass  # 调度器不是必须的，别卡住启动
+
     # 建 RAG 索引（不阻塞启动，建过就跳过）
     try:
         build_index(force=False)

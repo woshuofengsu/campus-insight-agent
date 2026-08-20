@@ -79,3 +79,16 @@ issue_drafts / safety_reminders / issue_supplements / proposal_votes / proposal_
 - 全量测试 328 passed 全绿（回到基线）。
 - Streamlit AppTest 端到端：启动无异常、Agent 初始化 16 工具、demo_resident 登录成功、居民端渲染无异常。
 - 各模块数据层冒烟验证：报修 11 状态闭环、提案匿名投票（两表物理隔离）、老年端紧急求助闭环、政策问答审核版本+自动回答+转人工、通知 55 项、天气+疾病预防约 60 项、统计聚合、seed 新状态分布。
+
+## 后台调度器（补充完成）
+
+**做了什么**
+新建 `scripts/scheduler.py`：后台守护线程，每 60 秒轮询一次全部幂等自动任务，让 spec 要求的「系统自动触发」（A 类停机点）在无人操作时也真正执行。
+- 通知：定时发布 / 紧急通知到期取消 / 置顶到期取消（db_notice.run_auto_tasks）
+- 天气：极端天气预警检测 / 检查任务超时标记 / 超时升级（db_weather）
+- 提案：逾期默认确认公开私有 / 逾期未反馈视为满意（db_proposal）
+- 疾病预防：咨询 24h 超时 / 7 天未反馈关闭 / 疫苗内容到期下架 / 置顶取消 / 月度更新提醒（db_health_content）
+
+**集成**：app.py 启动时 `ensure_scheduler_started()` 启动守护线程（进程级单例，幂等任务，失败不影响主流程）；也可独立运行 `python scripts/scheduler.py`。
+
+**验证**：run_all 全部任务执行成功（还实测触发了一个雷电黄色预警）；328 测试全绿；AppTest 确认调度器线程随 app 启动。
