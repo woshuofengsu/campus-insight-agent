@@ -4,7 +4,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
-import { elderly } from '../../api'
+import { elderly, notices } from '../../api'
 import { useSpeech } from '../../composables/useSpeech'
 
 const router = useRouter()
@@ -15,6 +15,7 @@ const { speak } = useSpeech()
 const home = ref(null)
 const vol = ref(1.0)
 const volLabels = { 低: 0.5, 中: 1.0, 高: 1.5 }
+const urgentNotice = ref(null)
 // 紧急求助（长按 3 秒 → 确认 → 10 秒超时自动取消）
 const sosConfirm = ref(false)
 let sosTimer = null
@@ -28,6 +29,17 @@ const contacts = ref([])
 onMounted(async () => {
   try { home.value = await elderly.home() } catch { /* 忽略 */ }
   try { contacts.value = (await elderly.contacts()) || [] } catch { /* 忽略 */ }
+  // 紧急通知主动弹窗 + 语音（重复两次）
+  try {
+    const nl = (await notices.list()) || []
+    const urgent = nl.find((n) => n.is_urgent && !n.is_read)
+    if (urgent) {
+      urgentNotice.value = urgent
+      const txt = `紧急通知：${urgent.elderly_summary || urgent.title}`
+      speak(txt, vol.value)
+      setTimeout(() => speak(txt, vol.value), 3500)
+    }
+  } catch { /* 忽略 */ }
   if (home.value?.due_medications > 0) {
     speak(`您有 ${home.value.due_medications} 条用药提醒，请注意。`, vol.value)
   }
@@ -36,6 +48,16 @@ onMounted(async () => {
     speak(`注意！当前有极端天气预警：${tags}，请尽量减少外出。`, vol.value)
   }
 })
+
+async function closeUrgent() {
+  const n = urgentNotice.value
+  urgentNotice.value = null
+  if (n && !n.is_read) {
+    try {
+      await notices.action(n.id, { action: 'mark_read' })
+    } catch { /* 忽略 */ }
+  }
+}
 
 onBeforeUnmount(() => {
   if (sosTimer) clearInterval(sosTimer)
@@ -223,5 +245,11 @@ function cancelCall() {
              :content="callContact ? `将呼叫 ${callContact.name}（${callContact.phone}），10 秒内未确认将取消` : ''"
              positive-text="确认拨打" negative-text="取消"
              @positive-click="confirmCall" @negative-click="cancelCall" />
+
+    <!-- 紧急通知主动弹窗（我知道了） -->
+    <n-modal :show="!!urgentNotice" @update:show="(v) => { if (!v) urgentNotice = null }" preset="dialog" type="error"
+             :title="urgentNotice ? ('🚨 ' + urgentNotice.title) : ''"
+             :content="urgentNotice ? (urgentNotice.elderly_summary || urgentNotice.body) : ''"
+             positive-text="我知道了" @positive-click="closeUrgent" />
   </div>
 </template>
