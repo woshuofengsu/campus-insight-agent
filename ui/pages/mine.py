@@ -74,6 +74,43 @@ if profile:
 
 stats = cached_my_stats(author)
 
+# ---------- 老年关怀绑定（家属绑定老人 → 老年端免登录代操作，spec 06） ----------
+with st.container(border=True):
+    section("👴 老年关怀")
+    _me = memory.get_user_profile() if memory is not None else {}
+    _me_id = (_me or {}).get("id")
+    if _me_id:
+        from data.db_user import get_bound_elderly, bind_elderly, unbind_elderly
+        bound = get_bound_elderly(_me_id)
+        if bound:
+            st.success(f"✅ 已绑定老人：{bound.get('name') or '（无姓名）'}")
+            st.caption("您登录后会自动以老人身份进入老年关怀端，可代为设置用药提醒、紧急联系人等。")
+            if st.button("🔓 解除绑定", key="mine_unbind"):
+                unbind_elderly(_me_id)
+                st.rerun()
+        else:
+            st.caption("绑定家里老人后，可进入老年关怀端代为设置用药提醒、紧急联系人等。")
+            with st.form("mine_bind_form"):
+                elderly_user = st.text_input("老人账号（如 demo_elderly）", key="mine_bind_user")
+                bind_sub = st.form_submit_button("绑定老人", width="stretch")
+            if bind_sub:
+                if not elderly_user.strip():
+                    st.error("请填写老人账号")
+                else:
+                    from data.db_user import get_user_by_username
+                    e = get_user_by_username(elderly_user.strip())
+                    if e is None:
+                        st.error("未找到该老人账号")
+                    elif e["role"] != "elderly":
+                        st.error("该账号不是老年关怀账号")
+                    else:
+                        ok, msg = bind_elderly(_me_id, e["id"])
+                        if ok:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+
 with st.container(border=True):
     section("我的影响力")
 

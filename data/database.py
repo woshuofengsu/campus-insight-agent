@@ -32,6 +32,9 @@ from data.db_user import (
     update_user_profile,
     set_onboarding_done,
     reset_onboarding,
+    bind_elderly,
+    unbind_elderly,
+    get_bound_elderly,
 )
 
 from data.db_knowledge import (

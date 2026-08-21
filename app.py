@@ -114,6 +114,18 @@ def main():
         profile = {}
     role = profile.get("role", "resident")
 
+    # 家属绑定模式：绑定了老人的家属可进入老年端（以老人身份免登录操作，spec 06）
+    if role != "elderly" and profile.get("id"):
+        try:
+            from data.db_user import get_bound_elderly
+            _elder = get_bound_elderly(profile["id"])
+            if _elder:
+                role = "elderly"
+                st.session_state["_elderly_uid"] = _elder["id"]
+                st.session_state["_elderly_name"] = _elder.get("name") or "大爷/阿姨"
+        except Exception:
+            pass
+
     if role == "grid":
         nav = st.navigation([
             st.Page("ui/pages_grid/dashboard.py", title="工作台", icon=":material/dashboard:", default=True),

@@ -11,7 +11,7 @@ inject_elderly_css()
 
 memory = st.session_state.get("memory")
 profile = memory.get_user_profile() if memory is not None else {}
-uid = (profile or {}).get("id")
+uid = st.session_state.get("_elderly_uid") or (profile or {}).get("id")
 
 if uid:
     migrate_legacy_profile(uid)  # 旧 JSON 数据一次性迁到新表（幂等）

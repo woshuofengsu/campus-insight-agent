@@ -7,7 +7,7 @@ inject_elderly_css()
 
 memory = st.session_state.get("memory")
 profile = memory.get_user_profile() if memory is not None else {}
-uid = (profile or {}).get("id")
+uid = st.session_state.get("_elderly_uid") or (profile or {}).get("id")
 
 st.markdown('<div class="elderly-title">📋 我的工单</div>', unsafe_allow_html=True)
 st.caption("您上报过的问题，都在这里。")

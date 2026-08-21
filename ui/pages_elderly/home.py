@@ -24,8 +24,8 @@ inject_elderly_css()
 
 memory = st.session_state.get("memory")
 profile = memory.get_user_profile() if memory is not None else {}
-uid = (profile or {}).get("id")
-name = (profile or {}).get("name", "") or "大爷/阿姨"
+uid = st.session_state.get("_elderly_uid") or (profile or {}).get("id")
+name = st.session_state.get("_elderly_name") or (profile or {}).get("name", "") or "大爷/阿姨"
 
 if uid:
     touch_active(uid)          # 进入即平安打卡

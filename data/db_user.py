@@ -252,3 +252,49 @@ def reset_onboarding(user_id: int | None = None) -> None:
 def get_or_create_user() -> dict:
     """旧接口：拿当前用户资料。新代码直接用 get_current_user()。"""
     return get_current_user()
+
+
+# ---------- 家属绑定（老年免登录，spec 06） ----------
+
+def bind_elderly(guardian_id: int, elderly_id: int) -> tuple[bool, str]:
+    """家属绑定老人（一个家属最多绑定一位老人）。返回 (ok, msg)。"""
+    with get_db() as conn:
+        g = conn.execute("SELECT id, name FROM user_profile WHERE id=?", (guardian_id,)).fetchone()
+        if g is None:
+            return False, "家属账号不存在"
+        e = conn.execute("SELECT id, name, role FROM user_profile WHERE id=?", (elderly_id,)).fetchone()
+        if e is None:
+            return False, "老人账号不存在"
+        if e["role"] != "elderly":
+            return False, "被绑定账号不是老年关怀账号"
+        conn.execute("UPDATE user_profile SET bound_elderly_id=? WHERE id=?",
+                     (elderly_id, guardian_id))
+        conn.commit()
+    try:
+        from data.db_notifications import log_activity
+        _e_name = e["name"] if e["name"] else "（无姓名）"
+        log_activity(g["name"] or "家属", "绑定老人", "elderly_binding", elderly_id,
+                     _e_name, module="老年端", after_value=str(elderly_id))
+    except Exception:
+        pass
+    return True, f"已绑定老人：{e['name'] if e['name'] else '（无姓名）'}"
+
+
+def unbind_elderly(guardian_id: int) -> tuple[bool, str]:
+    """家属解除绑定。"""
+    with get_db() as conn:
+        conn.execute("UPDATE user_profile SET bound_elderly_id=0 WHERE id=?", (guardian_id,))
+        conn.commit()
+    return True, "已解除绑定"
+
+
+def get_bound_elderly(guardian_id: int) -> dict | None:
+    """查家属绑定的老人资料（老年免登录时用老人身份渲染）。"""
+    if not guardian_id:
+        return None
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT e.* FROM user_profile g JOIN user_profile e ON g.bound_elderly_id=e.id "
+            "WHERE g.id=? AND g.bound_elderly_id>0", (guardian_id,),
+        ).fetchone()
+        return dict(row) if row else None
