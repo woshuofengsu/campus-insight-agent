@@ -1,5 +1,5 @@
 <script setup>
-// 政策问答管理：知识库列表 + 待处理提问 + 统计与阈值
+// 政策问答管理：知识库维护（创建/审核/下架）+ 提问处理（回复）+ 统计与阈值
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { knowledge, qa } from '../../api'
@@ -10,6 +10,15 @@ const questions = ref([])
 const stats = ref(null)
 const threshold = ref(0.6)
 const tab = ref('kb')
+const replyMap = ref({}) // qid -> reply
+const kForm = ref({
+  title: '', category: '社保医保', plain_interpretation: '', content: '',
+  summary: '', source: '社区整理', keywords: '', effective_date: '', expire_date: '',
+  policy_number: '', attachment: '',
+})
+const kOp = ref({}) // kid -> {opinion, reason}
+
+const KB_CATS = ['社保医保', '养老服务', '住房保障', '民政救助', '户籍居住证', '就业创业', '其他']
 
 onMounted(async () => {
   try { kb.value = (await knowledge.list()) || [] } catch { /* 忽略 */ }
@@ -32,10 +41,52 @@ async function transfer(q) {
   }
 }
 
+async function reply(q) {
+  const text = (replyMap.value[q.id] || '').trim()
+  if (!text) return message.warning('请填写回复内容')
+  try {
+    await qa.reply(q.id, { reply: text })
+    message.success(`提问 #${q.id} 已回复`)
+    replyMap.value[q.id] = ''
+    questions.value = (await qa.questions()) || []
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
 async function saveThreshold() {
   try {
     const r = await qa.setThreshold(threshold.value)
     message.success(`匹配阈值已更新为 ${r.threshold}`)
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+// 知识库管理
+async function createKb() {
+  const f = kForm.value
+  if (!f.title || !f.plain_interpretation) return message.warning('请填写标题和通俗解读')
+  try {
+    await knowledge.create(f)
+    message.success('已创建并提交审核')
+    kForm.value = { title: '', category: '社保医保', plain_interpretation: '', content: '', summary: '', source: '社区整理', keywords: '', effective_date: '', expire_date: '', policy_number: '', attachment: '' }
+    kb.value = (await knowledge.list()) || []
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+function kOpOf(k) {
+  if (!kOp.value[k.id]) kOp.value[k.id] = {}
+  return kOp.value[k.id]
+}
+
+async function kAct(k, data, okMsg) {
+  try {
+    await knowledge.action(k.id, data)
+    message.success(okMsg || '操作成功')
+    kb.value = (await knowledge.list()) || []
   } catch (e) {
     message.error(e.message)
   }
@@ -49,13 +100,64 @@ async function saveThreshold() {
 
     <n-tabs v-model:value="tab" type="line">
       <n-tab-pane name="kb" tab="知识库">
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:700;margin-bottom:8px;">➕ 新建知识条目（创建即提交审核，审核人≠发布人）</div>
+          <n-form label-placement="top">
+            <n-grid :cols="2" :x-gap="12">
+              <n-form-item-gi label="标题">
+                <n-input v-model:value="kForm.title" placeholder="政策标题" />
+              </n-form-item-gi>
+              <n-form-item-gi label="分类">
+                <n-select v-model:value="kForm.category" :options="KB_CATS.map(v=>({label:v,value:v}))" />
+              </n-form-item-gi>
+            </n-grid>
+            <n-form-item label="通俗解读（必填）">
+              <n-input v-model:value="kForm.plain_interpretation" type="textarea" :rows="2" placeholder="给居民看的一句话解读" />
+            </n-form-item>
+            <n-form-item label="正文">
+              <n-input v-model:value="kForm.content" type="textarea" :rows="3" placeholder="政策原文/详细内容（选填）" />
+            </n-form-item>
+            <n-grid :cols="2" :x-gap="12">
+              <n-form-item-gi label="来源">
+                <n-input v-model:value="kForm.source" placeholder="社区整理" />
+              </n-form-item-gi>
+              <n-form-item-gi label="政策文号">
+                <n-input v-model:value="kForm.policy_number" placeholder="如 京人社发〔2026〕1号" />
+              </n-form-item-gi>
+            </n-grid>
+            <n-grid :cols="2" :x-gap="12">
+              <n-form-item-gi label="生效日期">
+                <n-input v-model:value="kForm.effective_date" placeholder="如 2026-01-01" />
+              </n-form-item-gi>
+              <n-form-item-gi label="失效日期">
+                <n-input v-model:value="kForm.expire_date" placeholder="如 2027-12-31（到期自动下架）" />
+              </n-form-item-gi>
+            </n-grid>
+            <n-button type="primary" @click="createKb">📤 创建并提交审核</n-button>
+          </n-form>
+        </div>
         <div v-for="k in kb" :key="k.id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ k.title }}</b>
-            <n-tag size="small" :type="k.status === '已发布' ? 'success' : 'default'">{{ k.status }}</n-tag>
+            <n-tag size="small" :type="k.status === '已发布' ? 'success' : k.status === '待审核' ? 'warning' : 'default'">{{ k.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ k.category }} · {{ (k.updated_at || '').slice(0, 16) }}</div>
           <div style="margin-top:8px;font-size:0.9rem;">{{ k.plain_interpretation }}</div>
+          <div v-if="k.audit_opinion" class="muted" style="font-size:0.8rem;margin-top:4px;">审核意见：{{ k.audit_opinion }}</div>
+          <div v-if="['待审核', '已发布'].includes(k.status)" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <template v-if="k.status === '待审核'">
+              <n-input v-model:value="kOpOf(k).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:220px;" />
+              <n-button size="small" type="success" @click="kAct(k, { action: 'audit', approve: true, opinion: kOpOf(k).opinion || '同意' }, '已通过发布')">✅ 通过</n-button>
+              <n-button size="small" type="warning" @click="kAct(k, { action: 'audit', approve: false, opinion: kOpOf(k).opinion || '请补充' }, '已退回')">↩️ 退回</n-button>
+            </template>
+            <template v-if="k.status === '已发布'">
+              <n-input v-model:value="kOpOf(k).reason" placeholder="下架原因（必填）" size="small" style="max-width:200px;" />
+              <n-popconfirm @positive-click="kAct(k, { action: 'offline', reason: kOpOf(k).reason || '内容过期' }, '已下架')">
+                <template #trigger><n-button size="small" quaternary type="error">📛 下架</n-button></template>
+                确认下架？将记录原因
+              </n-popconfirm>
+            </template>
+          </div>
         </div>
         <n-empty v-if="kb.length === 0" description="暂无知识库条目" />
       </n-tab-pane>
@@ -64,14 +166,18 @@ async function saveThreshold() {
         <div v-for="q in questions" :key="q.id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ q.summary }}</b>
-            <n-tag size="small" :type="q.status === '已转人工' || q.status === '超时未回复' ? 'warning' : 'default'">{{ q.status }}</n-tag>
+            <n-tag size="small" :type="q.status === '已转人工' || q.status === '超时未回复' ? 'warning' : q.status === '已回复' ? 'success' : 'default'">{{ q.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ q.q_type }} · {{ (q.created_at || '').slice(0, 16) }}</div>
-          <div v-if="q.status === '已转人工'" style="margin-top:8px;">
-            <n-popconfirm @positive-click="transfer(q)">
-              <template #trigger><n-button size="small" type="primary">🙋 转人工处理</n-button></template>
-              确认转人工并通知负责人？
-            </n-popconfirm>
+          <div v-if="q.auto_answer" style="margin-top:6px;font-size:0.9rem;">🤖 自动回答：{{ q.auto_answer }}</div>
+          <div v-if="q.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
+            💬 已回复：{{ q.reply }}
+          </div>
+          <div v-if="['待人工回复', '处理中', '已转人工', '超时未回复'].includes(q.status)" style="margin-top:10px;">
+            <div style="display:flex;gap:8px;">
+              <n-input v-model:value="replyMap[q.id]" placeholder="人工回复内容（≤2000字）" />
+              <n-button type="primary" @click="reply(q)">💬 回复</n-button>
+            </div>
           </div>
         </div>
         <n-empty v-if="questions.length === 0" description="暂无提问" />

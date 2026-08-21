@@ -902,6 +902,8 @@ def web_knowledge_list(request: Request, category: str = "", limit: int = 50):
         "plain_interpretation": k.get("plain_interpretation"), "summary": k.get("summary"),
         "status": k.get("audit_status"), "updated_at": k.get("updated_at") or k.get("created_at"),
         "attachment": k.get("attachment"),
+        "audit_opinion": k.get("audit_opinion") or "",
+        "auditor": k.get("auditor") or "",
     } for k in rows])
 
 
@@ -1201,6 +1203,7 @@ class KnowledgeCreate(BaseModel):
     effective_date: str = Field(default="")
     expire_date: str = Field(default="")
     policy_number: str = Field(default="")
+    attachment: str = Field(default="")
 
 
 @app.post("/api/web/knowledge")
@@ -1213,7 +1216,7 @@ def web_knowledge_create(req: KnowledgeCreate, request: Request):
         content=req.content, summary=req.summary, source=req.source,
         keywords=req.keywords, effective_date=req.effective_date,
         expire_date=req.expire_date, policy_number=req.policy_number,
-        actor=actor,
+        attachment=req.attachment, actor=actor,
     )
     if kid <= 0:
         return fail(2001, err or "创建失败")

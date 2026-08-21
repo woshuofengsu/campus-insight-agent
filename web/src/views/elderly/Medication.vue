@@ -26,6 +26,16 @@ async function add() {
     message.error(e.message)
   }
 }
+
+async function toggle(m, action) {
+  try {
+    await elderly.toggleMedication(m.id, action)
+    message.success(action === 'pause' ? '已暂停（暂停期间不播报）' : '已恢复播报')
+    load()
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 </script>
 
 <template>
@@ -36,7 +46,11 @@ async function add() {
     <div v-for="m in list" :key="m.id" class="card" style="font-size:1.2rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <b>{{ m.drug_name }} <span class="muted" v-if="m.dosage">（{{ m.dosage }}）</span></b>
-        <n-tag size="large" :type="m.status === '审核通过' ? 'success' : 'warning'">{{ m.status }}</n-tag>
+        <div>
+          <n-tag size="large" :type="m.status === '审核通过' ? 'success' : m.status === '已暂停' ? 'default' : 'warning'">{{ m.status }}</n-tag>
+          <n-button v-if="m.status === '审核通过'" size="small" style="margin-left:8px;" @click="toggle(m, 'pause')">⏸️ 暂停</n-button>
+          <n-button v-if="m.status === '已暂停'" size="small" type="primary" style="margin-left:8px;" @click="toggle(m, 'resume')">▶️ 恢复</n-button>
+        </div>
       </div>
       <div class="muted" style="font-size:1.05rem;margin-top:6px;">⏰ {{ m.times }} · {{ m.repeat_rule }}</div>
     </div>

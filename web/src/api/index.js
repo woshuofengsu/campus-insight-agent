@@ -92,10 +92,14 @@ export const qa = {
   stats: () => api.get('/qa/stats'),
   getThreshold: () => api.get('/qa/threshold'),
   setThreshold: (threshold) => api.post('/qa/threshold', { threshold }),
+  reply: (qid, data) => api.post(`/qa/questions/${qid}/reply`, data),
+  feedback: (qid, data) => api.post(`/qa/questions/${qid}/feedback`, data),
 }
 
 export const knowledge = {
   list: (params) => api.get('/knowledge', { params }),
+  create: (data) => api.post('/knowledge', data),
+  action: (id, data) => api.post(`/knowledge/${id}/action`, data),
 }
 
 // 健康
@@ -129,10 +133,13 @@ export const elderly = {
   voiceReport: (data) => api.post('/elderly/voice-report', data),
   medications: () => api.get('/elderly/medications'),
   createMedication: (data) => api.post('/elderly/medications', data),
+  toggleMedication: (id, action) => api.post(`/elderly/medications/${id}/toggle`, { action }),
   emergency: () => api.post('/elderly/emergency'),
   emergencyStatus: () => api.get('/elderly/emergency/status'),
+  contactCall: (data) => api.post('/elderly/contact', data),
   contacts: () => api.get('/elderly/emergency-contacts'),
   addContact: (data) => api.post('/elderly/emergency-contacts', data),
+  deleteContact: (id) => api.post(`/elderly/emergency-contacts/${id}/delete`),
   // 老年关怀管理（负责人）
   manageMeds: (params) => api.get('/elderly/manage/medications', { params }),
   auditMedication: (id, data) => api.post(`/elderly/manage/medications/${id}/audit`, data),
