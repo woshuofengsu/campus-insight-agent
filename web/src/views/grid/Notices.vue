@@ -8,7 +8,7 @@ const message = useMessage()
 const list = ref([])
 const loading = ref(true)
 
-const form = ref({ title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0 })
+const form = ref({ title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '' })
 const creating = ref(false)
 
 const TYPES = ['社区公告', '活动通知', '停水停电通知', '政策通知', '温馨提示', '其他']
@@ -22,11 +22,12 @@ onMounted(load)
 
 async function create() {
   if (!form.value.title || !form.value.body) return message.warning('请填写标题和正文')
+  if (form.value.is_urgent && !form.value.elderly_summary) return message.warning('紧急通知必填老年端播报摘要')
   creating.value = true
   try {
     await notices.create(form.value)
     message.success('通知已创建并发布')
-    form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0 }
+    form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '' }
     load()
   } catch (e) {
     message.error(e.message)
@@ -67,9 +68,18 @@ async function act(n, data, okMsg) {
       <n-form-item label="发布范围">
         <n-select v-model:value="form.publish_scope" :options="['全体居民','指定小区','指定楼栋','仅老年端'].map(v=>({label:v,value:v}))" />
       </n-form-item>
-      <n-checkbox v-model:checked="form.is_urgent">🚨 紧急通知（自动置顶 + 弹窗）</n-checkbox>
+      <n-checkbox v-model:checked="form.is_urgent">🚨 紧急通知（自动置顶 + 弹窗，需二次确认）</n-checkbox>
+      <n-form-item v-if="form.is_urgent" label="老年端播报摘要（紧急必填，≤30字）">
+        <n-input v-model:value="form.elderly_summary" maxlength="30" placeholder="口语化一句话" />
+      </n-form-item>
       <div style="margin-top:10px;">
-        <n-button type="primary" :loading="creating" @click="create">📨 创建并发布</n-button>
+        <n-popconfirm v-if="form.is_urgent" @positive-click="create" :positive-button-props="{ type: 'error' }">
+          <template #trigger>
+            <n-button type="error" :loading="creating">📨 发布紧急通知</n-button>
+          </template>
+          紧急通知将自动置顶并在居民端/老年端强制弹窗，确认内容无误？
+        </n-popconfirm>
+        <n-button v-else type="primary" :loading="creating" @click="create">📨 创建并发布</n-button>
       </div>
     </div>
 
@@ -88,12 +98,21 @@ async function act(n, data, okMsg) {
         <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ n.notice_type }} · {{ (n.published_at || n.created_at || '').slice(0, 16) }}</div>
         <div style="margin-top:8px;">{{ n.body }}</div>
         <div style="margin-top:10px;display:flex;gap:8px;">
-          <n-popconfirm v-if="n.status === '已发布'" @positive-click="act(n, { action: 'take_down', reason: '演示下架' }, '已下架')">
+          <n-popconfirm v-if="n.status === '已发布'" @positive-click="act(n, { action: 'take_down', reason: '已处理完成' }, '已下架')">
             <template #trigger><n-button size="small" type="warning">⏬ 下架</n-button></template>
             下架后居民端不再显示，确认？
           </n-popconfirm>
           <n-button v-if="n.status === '已发布' && !n.is_pinned" size="small" @click="act(n, { action: 'pin' }, '已置顶')">📌 置顶</n-button>
           <n-button v-if="n.is_pinned" size="small" quaternary @click="act(n, { action: 'unpin' }, '已取消置顶')">📌 取消置顶</n-button>
+          <n-popconfirm v-if="n.status === '待发布'" @positive-click="act(n, { action: 'withdraw' }, '已撤回为草稿')">
+            <template #trigger><n-button size="small">⏪ 撤回</n-button></template>
+            撤回为草稿？
+          </n-popconfirm>
+          <n-button v-if="n.status === '待发布'" size="small" type="primary" @click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')">🚀 立即发布</n-button>
+          <n-popconfirm v-if="n.status === '草稿'" @positive-click="act(n, { action: 'delete' }, '已删除')">
+            <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除</n-button></template>
+            删除该草稿？
+          </n-popconfirm>
         </div>
       </div>
       <n-empty v-if="!loading && list.length === 0" description="暂无通知" />

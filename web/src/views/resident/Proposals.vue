@@ -64,7 +64,7 @@ async function addComment(p) {
     <n-spin :show="loading">
       <div v-for="p in list" :key="p.id" class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <b>{{ p.title }}</b>
+          <b style="cursor:pointer;" @click="$router.push('/resident/proposals/' + p.id)">{{ p.title }} ›</b>
           <n-tag size="small" :type="p.status === '公示中' ? 'success' : 'default'">{{ p.status }}</n-tag>
         </div>
         <div class="muted" style="font-size:0.85rem;margin-top:6px;">

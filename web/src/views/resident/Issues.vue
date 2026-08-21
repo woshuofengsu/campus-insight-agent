@@ -46,7 +46,7 @@ async function act(id, data) {
     <n-spin :show="loading">
       <div v-for="i in list" :key="i.id" class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <b>#{{ i.id }} {{ i.title }}</b>
+          <b style="cursor:pointer;" @click="$router.push('/resident/work-orders/' + i.id)">#{{ i.id }} {{ i.title }} ›</b>
           <n-tag :type="STATUS_COLOR[i.status] || 'default'" size="small">{{ i.status }}</n-tag>
         </div>
         <div class="muted" style="font-size:0.85rem;margin-top:6px;">
