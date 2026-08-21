@@ -57,21 +57,38 @@ if st.button("✅ 确认上报", key="elderly_report_btn", type="primary", width
     if not text.strip():
         st.warning("请先说出或写下问题")
     else:
-        from tools.action_report_issue import _llm_classify
+        from tools.action_report_issue import _llm_classify, _detect_issue_type
         from agent.helpers import extract_location
         from data.db_repair import submit_issue
 
         # 走报修状态机（状态待审核，而不是直接待处理入库）
         category, urgency = _llm_classify(text, "")
-        loc = extract_location(text) or (profile or {}).get("community") or "社区"
+        # 地址自动带出已登记住址（spec：老人仅需确认），描述提到公共区域才用提取结果
+        _home_addr = " ".join(x for x in [
+            (profile or {}).get("community") or "",
+            (profile or {}).get("building") or "",
+            (profile or {}).get("unit") or "",
+        ] if x)
+        _extracted = extract_location(text)
+        loc = _extracted or _home_addr or "社区"
+        # 分类：默认「室内」，AI 识别公共区域关键词自动改判「室外」
+        issue_type = _detect_issue_type(text, "")
         _phone = (profile or {}).get("phone") or ""
         _name = (profile or {}).get("name") or "老人"
+        # 代报信息（spec：家属帮老人报修自动记录代报人）
+        _is_family = bool(st.session_state.get("_elderly_uid")) and \
+            st.session_state.get("_elderly_uid") != (profile or {}).get("id")
+        _agent_name = (profile or {}).get("name") if _is_family else ""
+        _agent_phone = (profile or {}).get("phone") if _is_family else ""
+        _agent_rel = "家属代报" if _is_family else ""
         draft_id = st.session_state.pop("_elderly_draft_id", None)
         iid, hint = submit_issue(
-            title=text.strip()[:80], category=category, issue_type="室内",
+            title=text.strip()[:80], category=category, issue_type=issue_type,
             location=loc, description=text.strip(), urgency=urgency or "一般",
             reporter_name=_name, reporter_phone=_phone if len(str(_phone)) == 11 else "13800000000",
             reporter_id=uid, draft_id=draft_id,
+            is_agent_report=1 if _is_family else 0,
+            agent_name=_agent_name, agent_phone=_agent_phone, agent_relation=_agent_rel,
         )
         if iid > 0:
             st.session_state._elderly_report_result = f"✅ 已上报成功，工单编号 #{iid}（{category}，待审核）"

@@ -597,7 +597,8 @@ def get_issue(issue_id: int) -> dict | None:
 
 
 def get_issues(status: str | None = None, issue_type: str | None = None,
-               category: str | None = None, limit: int = 50) -> list[dict]:
+               category: str | None = None, reporter_id: int | None = None,
+               limit: int = 50) -> list[dict]:
     q = "SELECT * FROM community_issues WHERE 1=1"
     args: list = []
     if status:
@@ -609,6 +610,9 @@ def get_issues(status: str | None = None, issue_type: str | None = None,
     if category:
         q += " AND category=?"
         args.append(category)
+    if reporter_id is not None:
+        q += " AND reporter_id=?"
+        args.append(reporter_id)
     q += " ORDER BY reported_at DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:

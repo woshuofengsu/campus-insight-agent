@@ -250,8 +250,8 @@ with _top_r:
                 st.session_state.pop(k, None)
         st.rerun()
 
-st.markdown(f'<div class="elderly-title">👴 {name}，您好！</div>', unsafe_allow_html=True)
-st.caption("点下面的大按钮就行，有事随时按红色按钮。")
+st.markdown(f'<div class="elderly-title">🏘️ 社区服务</div>', unsafe_allow_html=True)
+st.caption(f"您好，{name}！点下面的大按钮就行，有事随时按红色按钮。")
 
 # 音量设置（spec：语音按老人设置音量）
 _vol_map = {"低": 0.5, "中": 1.0, "高": 1.5}
@@ -324,7 +324,7 @@ if info_parts:
 
 st.markdown("---")
 
-# ---------------------------------------------------------------- 第一行：天气 / 通知 / 报修 / 政策问答
+# ---------------------------------------------------------------- 两行三列大按钮（spec：天气/通知/报修/联系社区/用药提醒/语音帮助）
 def _weather_label() -> str:
     days, _, _ = _cached_weather()
     if days and days[0]:
@@ -350,21 +350,18 @@ def _cached_simplified_weather(city: str = ""):
         return None
 
 
-c1, c2, c3, c4 = st.columns(4)
-with c1:
+# 第一行：天气 / 通知 / 报修（两行三列之一）
+r1a, r1b, r1c = st.columns(3)
+with r1a:
     if st.button(f"🌤️ {_weather_label()}", key="go_weather", width="stretch"):
         st.session_state["_show_weather"] = not st.session_state.get("_show_weather", False)
         st.rerun()
-with c2:
+with r1b:
     if st.button(f"🔔 通知（{unread}条未读）", key="go_notify", width="stretch"):
         st.switch_page("ui/pages_elderly/notify.py")
-with c3:
+with r1c:
     if st.button("🛠️ 报修", key="go_report", width="stretch"):
         st.switch_page("ui/pages_elderly/report.py")
-with c4:
-    if st.button("🧾 政策问答", key="go_policy", width="stretch"):
-        st.session_state["_show_policy"] = not st.session_state.get("_show_policy", False)
-        st.rerun()
 
 # ---------------------------------------------------------------- 第二行：联系社区 / 用药提醒 / 语音帮助
 meds = list_medication_reminders(uid) if uid else []
@@ -392,6 +389,11 @@ with c3:
         st.rerun()
 if st.session_state.get("_help_tts"):
     tts_speak(DEFAULT_HELP_TEXT)
+
+# 政策问答（两行三列外的附加入口，保留语音问答功能）
+if st.button("📖 政策问答（语音提问）", key="go_policy", width="stretch"):
+    st.session_state["_show_policy"] = not st.session_state.get("_show_policy", False)
+    st.rerun()
 
 # ---------------------------------------------------------------- 天气（大字版，内联）
 if st.session_state.get("_show_weather"):
