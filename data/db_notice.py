@@ -139,6 +139,15 @@ def _validate(title: str, notice_type: str, publish_scope: str, body: str,
         return "老年端播报摘要最多 30 字"
     if publish_time and expire_at and expire_at < publish_time:
         return "下架时间不能早于发布时间"
+    # 敏感词拦截（标题 + 正文 + 老年摘要）
+    try:
+        from utils.text import check_sensitive
+        for _f in (title, body, elderly_summary):
+            hit, word = check_sensitive(_f or "")
+            if hit:
+                return f"内容包含敏感词「{word}」，请修改后重试"
+    except Exception:
+        pass
     return ""
 
 
@@ -320,6 +329,17 @@ def publish_notice(notice_id: int, user_id: int, actor: str,
                         n["elderly_summary"], n["is_urgent"], now, n["expire_at"] or "")
         if err:
             return False, err
+        # 发布前附件复检：附件路径必须真实存在，缺失则拒绝发布并提示（spec：附件保存失败不能静默发布）
+        try:
+            _att_missing = []
+            for _a in json.loads(n.get("attachment_json") or "[]"):
+                _p = (_a or {}).get("path") or ""
+                if _p and not _resolve_upload_path(_p):
+                    _att_missing.append((_a or {}).get("name") or _p)
+            if _att_missing:
+                return False, f"附件文件缺失（{'、'.join(_att_missing[:3])}），请重新上传附件后再发布"
+        except Exception:
+            pass
         # 紧急通知自动置顶（不受 3 条限制）；普通置顶要查名额
         is_pinned = 1 if n["is_urgent"] else n["is_pinned"]
         if is_pinned and not n["is_urgent"] and not _check_pin_quota(conn, notice_id):
@@ -615,11 +635,39 @@ def process_expired() -> dict:
     return {"pins": len(pins), "urgent": len(urgents)}
 
 
+def _resolve_upload_path(rel_path: str) -> str | None:
+    """校验附件相对路径真实存在（发布前复检）。"""
+    try:
+        from utils.uploads import resolve_path
+        return resolve_path(rel_path)
+    except Exception:
+        return None
+
+
 def run_auto_tasks() -> dict:
-    """一键跑定时发布 + 到期清理（供定时器/入口统一调用）。"""
+    """一键跑定时发布 + 到期清理 + 草稿清理（供定时器/入口统一调用）。"""
     published = process_due_notices()
     expired = process_expired()
-    return {"published": published, **expired}
+    cleaned = clean_notice_drafts(days=7)
+    return {"published": published, **expired, "draft_cleaned": cleaned}
+
+
+def clean_notice_drafts(days: int = 7) -> int:
+    """清理超过 N 天的通知草稿（spec：草稿保存 7 天，超期删除）。"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, title FROM notices WHERE status=? "
+            "AND created_at < datetime('now', ?)",
+            (STATUS_DRAFT, f"-{days} days"),
+        ).fetchall()
+        for r in rows:
+            conn.execute("DELETE FROM notices WHERE id=?", (r["id"],))
+        conn.commit()
+    for r in rows:
+        log_activity("系统", "通知草稿超期清理", "notice", r["id"], r["title"] or "",
+                     module=MODULE, before_value="草稿", after_value="已删除(超期)",
+                     detail=f"草稿超过 {days} 天未处理，系统自动清理")
+    return len(rows)
 
 
 # ---- 已读 / 统计 ----
@@ -701,7 +749,9 @@ def get_active_urgent_notices(client_type: str, user_id: int) -> list[dict]:
         if exp and exp <= now:
             continue
         out.append(n)
-    out.sort(key=lambda x: -(x.get("id") or 0))
+    # 多条紧急通知：按发布时间倒序（spec：新发的优先弹），无发布时间用创建时间
+    out.sort(key=lambda x: ((x.get("published_at") or x.get("created_at") or ""), -(x.get("id") or 0)),
+             reverse=True)
     return out
 
 
@@ -812,11 +862,23 @@ def get_notice_timeline(notice_id: int) -> list[dict]:
 def export_notices_csv(notice_type: str | None = None, status: str | None = None,
                        publish_scope: str | None = None, keyword: str | None = None,
                        actor: str = "负责人") -> tuple[str, str]:
-    """导出通知列表 + 已读统计（不含正文和附件）。返回 (csv 内容, 文件名)。"""
+    """导出通知列表 + 已读统计（不含正文和附件）。返回 (csv 内容, 文件名)。
+
+    导出异常时记异常日志并返回空（不中断页面）。
+    """
     import csv
     import io
 
-    notices = get_notices_with_stats(notice_type, status, publish_scope, keyword, limit=500)
+    try:
+        notices = get_notices_with_stats(notice_type, status, publish_scope, keyword, limit=500)
+    except Exception as e:  # noqa: BLE001
+        _log.warning("通知导出数据查询失败：%s", e)
+        try:
+            from data.db_notifications import log_exception
+            log_exception(MODULE, f"通知导出失败: {e}")
+        except Exception:
+            pass
+        return "", ""
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["通知编号", "标题", "类型", "发布范围", "发布时间", "状态",

@@ -32,3 +32,25 @@ def split_thinking(content: str) -> tuple[str, str]:
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     thinking = "\n\n---\n\n".join(reversed(thinking_parts)) if thinking_parts else ""
     return cleaned, thinking
+
+
+# ---- 敏感词检测（通知/内容发布前拦截，spec 05/04：涉政治、暴力、诈骗、隐私等）----
+
+_SENSITIVE_WORDS = [
+    # 涉政/违法（演示用最小集，可扩展）
+    "共产党", "习近平", "习主席", "法轮功", "台独", "藏独", "疆独", "港独",
+    "颠覆国家", "恐怖", "爆炸物", "枪支弹药",
+    # 诈骗/隐私
+    "转账给我", "打钱到", "汇款账号", "银行卡号", "身份证号", "密码发我",
+    # 辱骂/色情
+    "傻逼", "妈的", "操你", "妓女", "嫖娼", "赌博",
+]
+
+
+def check_sensitive(text: str) -> tuple[bool, str]:
+    """敏感词检测：返回 (是否含敏感词, 命中的敏感词)。"""
+    text = text or ""
+    for w in _SENSITIVE_WORDS:
+        if w and w in text:
+            return True, w
+    return False, ""

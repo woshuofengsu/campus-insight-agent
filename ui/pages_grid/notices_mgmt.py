@@ -166,11 +166,21 @@ def _render_new_form():
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("✅ 确认发布", key="nm_confirm_yes", type="primary", width="stretch"):
-                    if mode == "publish":
-                        ok, msg = publish_notice(int(pending_id), _user_id, _actor, confirm_urgent=True)
-                    else:
-                        sched = st.session_state.get("_nm_pending_scheduled")
-                        ok, msg = schedule_notice(int(pending_id), sched, _user_id, _actor, confirm_urgent=True)
+                    try:
+                        if mode == "publish":
+                            ok, msg = publish_notice(int(pending_id), _user_id, _actor, confirm_urgent=True)
+                        else:
+                            sched = st.session_state.get("_nm_pending_scheduled")
+                            ok, msg = schedule_notice(int(pending_id), sched, _user_id, _actor, confirm_urgent=True)
+                    except Exception as e:  # noqa: BLE001
+                        # 二次确认发布异常：记录异常日志，避免静默失败
+                        _log.warning("紧急通知二次确认发布异常：%s", e, exc_info=True)
+                        try:
+                            from data.db_notifications import log_exception
+                            log_exception("通知", f"紧急通知二次确认发布失败 notice#{pending_id}: {e}")
+                        except Exception:
+                            pass
+                        ok, msg = False, f"发布过程发生异常：{e}"
                     st.session_state.pop("_nm_pending_urgent", None)
                     st.session_state.pop("_nm_pending_mode", None)
                     st.session_state.pop("_nm_pending_scheduled", None)
@@ -385,6 +395,11 @@ def _render_list_fragment():
         scope_f = st.selectbox("范围", ["全部"] + PUBLISH_SCOPES, key="nml_scope")
     with c4:
         keyword_f = st.text_input("关键词（标题/正文）", key="nml_keyword")
+    c5, c6 = st.columns(2)
+    with c5:
+        period_f = st.selectbox("时间范围", ["全部", "近7天", "近30天"], key="nml_period")
+    with c6:
+        st.caption("按发布时间过滤")
 
     notices = get_notices_with_stats(
         notice_type=None if type_f == "全部" else type_f,
@@ -393,6 +408,10 @@ def _render_list_fragment():
         keyword=keyword_f.strip() or None,
         limit=200,
     )
+    if period_f != "全部":
+        from datetime import timedelta
+        _cut = (datetime.now() - timedelta(days={"近7天": 7, "近30天": 30}[period_f])).strftime("%Y-%m-%d %H:%M:%S")
+        notices = [n for n in notices if ((n.get("published_at") or n.get("created_at") or "")) >= _cut]
 
     # 导出
     if notices:
