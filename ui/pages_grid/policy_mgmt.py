@@ -440,6 +440,28 @@ with tab_questions:
                 f'{masked_nickname(q["user_id"])} · {q["source"]} · {q["q_type"]} · '
                 f'{(q["created_at"] or "")[:16]}'
             )
+            # 查看完整手机号（二次确认 + 留痕，spec 07.27）
+            if not st.session_state.get(f"_pol_phone_shown_{qid}"):
+                if st.button("👁️ 查看完整手机号", key=f"pol_phone_req_{qid}"):
+                    st.session_state[f"_pol_phone_confirm_{qid}"] = True
+                if st.session_state.get(f"_pol_phone_confirm_{qid}"):
+                    if st.button("✅ 二次确认并查看（留痕）", key=f"pol_phone_ok_{qid}"):
+                        try:
+                            from data.db_user import get_user_by_id
+                            _u = get_user_by_id(q["user_id"]) or {}
+                            _phone = _u.get("phone") or "（无手机号）"
+                        except Exception:
+                            _phone = "（无手机号）"
+                        st.session_state[f"_pol_phone_val_{qid}"] = _phone
+                        st.session_state[f"_pol_phone_shown_{qid}"] = True
+                        try:
+                            from data.db_notifications import log_activity
+                            log_activity(_actor, "查看完整手机号", "policy_question", qid,
+                                         q["summary"], module="政策问答", detail="二次确认后查看")
+                        except Exception:
+                            pass
+            else:
+                st.success(f"📞 {st.session_state.get(f'_pol_phone_val_{qid}', '—')}")
             with st.expander("📄 详情"):
                 st.markdown(f"**完整提问**：{q['question']}")
                 if q.get("auto_answer"):

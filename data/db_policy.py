@@ -776,6 +776,21 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
     }
 
 
+def _notify_managers(qid: int, summary: str) -> None:
+    """转人工后通知负责人（有新的待回复提问，spec 07）。"""
+    try:
+        from data.db_user import list_users
+        from data.db_notifications import create_notification
+        for u in list_users(role="grid"):
+            create_notification(
+                u["id"], "policy_question", "有新的政策问答待回复",
+                f"提问「{summary[:20]}」已转人工，请在24小时内回复。",
+                related_id=qid,
+            )
+    except Exception:
+        pass
+
+
 def transfer_to_human(question_id: int | None = None, user_id: int | None = None,
                       question: str = "", summary: str = "", q_type: str = "",
                       source: str = "居民端", actor: str = "居民") -> tuple[bool, str, int]:
@@ -794,6 +809,7 @@ def transfer_to_human(question_id: int | None = None, user_id: int | None = None
             conn.commit()
         log_activity(actor, "转人工", "policy_question", question_id, row["summary"],
                      module=MODULE, before_value=row["status"], after_value="已转人工")
+        _notify_managers(question_id, row["summary"])
         return True, "已转人工，负责人将在24小时内回复您", question_id
 
     q = (question or "").strip()
@@ -815,6 +831,7 @@ def transfer_to_human(question_id: int | None = None, user_id: int | None = None
         conn.commit()
     log_activity(actor, "提问并转人工", "policy_question", qid, summary,
                  module=MODULE, after_value="已转人工")
+    _notify_managers(qid, summary)
     return True, "已转人工，负责人将在24小时内回复您", qid
 
 
