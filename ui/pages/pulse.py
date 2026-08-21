@@ -123,9 +123,18 @@ if days:
             f'🌬️ 风力：{wind_str or "—"}<br>'
             f'🌧️ 降水概率：{d.get("rain_prob","—")}%{rain}{wind_show}<br>'
             f'{"🟢" if is_real else "🟡"} {source}'
-            f'</div></div>',
+            f'</div>'
+            f'<div style="margin-top:8px;font-size:0.8em;">👉 <a href="#" onclick="return false;" '
+            f'style="color:{TOKEN["accent"]};text-decoration:none;font-weight:600;">查看完整天气与预警（天气页）</a></div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
+    st.markdown(
+        '<div style="text-align:right;font-size:0.8em;margin-top:4px;">'
+        f'<a href="javascript:void(0)" style="color:{TOKEN["accent"]};text-decoration:none;">'
+        '完整 3 天预报、极端天气预警与检查任务请到「☀️ 天气」页查看 →</a></div>',
+        unsafe_allow_html=True,
+    )
 
 # 疾病防治：健康风险卡片
 

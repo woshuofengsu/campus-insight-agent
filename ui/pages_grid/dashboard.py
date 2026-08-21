@@ -288,8 +288,22 @@ if overdue_issues:
     section("⏰ SLA 超时预警")
     st.caption("以下工单已超过办理时限（极急 6h / 紧急 24h / 普通 72h），请优先处理。")
 
-    for oi in overdue_issues[:5]:
+    # 去重：已在「需要立即处理」（紧急）区显示的跳过；报修工单超时在「工单管理」按报修时限正确展示，这里不重复
+    _urgent_ids = {i["id"] for i in urgent_issues}
+    _repair_statuses = {
+        "待审核", "退回补充信息", "已审核待派单", "已派单", "处理中",
+        "待居民反馈", "已撤回", "已关闭", "待协商", "已转出",
+    }
+    _shown = 0
+    for oi in overdue_issues:
+        if _shown >= 5:
+            break
         oi_id = oi["id"]
+        if oi_id in _urgent_ids:
+            continue
+        if oi.get("status") in _repair_statuses:
+            continue
+        _shown += 1
         oi_title = (oi.get("title") or "")[:35]
         oi_cat = oi.get("category", "")
         oi_loc = oi.get("location", "")
@@ -321,8 +335,8 @@ if overdue_issues:
                     invalidate_issues()
                     st.rerun()
 
-# SLA 升级工单：超时两倍自动升级
-escalated_issues = get_escalated_issues(limit=5)
+# SLA 升级工单：超时两倍自动升级（报修工单除外，其在工单管理按报修时限展示）
+escalated_issues = [e for e in get_escalated_issues(limit=5) if e.get("status") not in _repair_statuses]
 if escalated_issues:
     st.markdown("---")
     section("⏫ SLA 升级工单")
