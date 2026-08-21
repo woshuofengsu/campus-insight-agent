@@ -27,6 +27,16 @@ async function vote(p, score) {
   }
 }
 
+async function act(p, data, okMsg) {
+  try {
+    await proposals.action(p.id, data)
+    message.success(okMsg || '操作成功')
+    load()
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
 // 展开议论（匿名可见）
 async function toggleComments(p) {
   commentList.value[p.id] = null
@@ -69,7 +79,21 @@ async function addComment(p) {
         </div>
         <div class="muted" style="font-size:0.85rem;margin-top:6px;">
           {{ p.category }} · {{ p.is_public ? '公开' : '私有' }} · 提案人 {{ p.reporter_name || '—' }}
+          <n-tag v-if="p.mine" size="tiny" type="info" style="margin-left:6px;">我的提案</n-tag>
         </div>
+
+        <!-- 我的提案：待审核撤回 / 已撤回重开 / 退回修改重提 / 待确认公示私有 -->
+        <div v-if="p.mine" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <n-button v-if="p.status === '待审核'" size="small" quaternary @click="act(p, { action: 'withdraw' }, '已撤回')">↩️ 撤回</n-button>
+          <n-button v-if="p.status === '已撤回'" size="small" type="info" @click="act(p, { action: 'reopen_mine' }, '已重新打开，待审核')">🔓 重新打开</n-button>
+          <n-button v-if="p.status === '退回修改'" size="small" type="warning" @click="act(p, { action: 'resubmit' }, '已重新提交，待审核')">📤 修改后重新提交</n-button>
+          <template v-if="p.status === '待确认公示/私有'">
+            <span class="muted" style="font-size:0.85rem;">请确认公开方式：</span>
+            <n-button size="small" type="success" @click="act(p, { action: 'confirm', is_public: 1 }, '已确认公开，进入公示')">🌐 确认公开</n-button>
+            <n-button size="small" type="default" @click="act(p, { action: 'confirm', is_public: 0 }, '已确认私有')">🔒 确认私有</n-button>
+          </template>
+        </div>
+
         <div v-if="p.status === '公示中'" style="margin-top:10px;display:flex;gap:6px;align-items:center;">
           <span class="muted" style="font-size:0.85rem;">评分（1-5）：</span>
           <n-button v-for="s in 5" :key="'v' + s" size="small" :type="s === 5 ? 'primary' : 'default'"

@@ -60,6 +60,9 @@ export const proposals = {
   action: (id, data) => api.post(`/proposals/${id}/action`, data),
   comments: (id) => api.get(`/proposals/${id}/comments`),
   addComment: (id, data) => api.post(`/proposals/${id}/comments`, data),
+  drafts: () => api.get('/proposals/drafts'),
+  saveDraft: (data) => api.post('/proposals/drafts', data),
+  deleteDraft: (id) => api.delete(`/proposals/drafts/${id}`),
 }
 
 // 通知

@@ -40,6 +40,19 @@ async function feedback(satisfied) {
     load()
   } catch (e) { message.error(e.message) }
 }
+
+// 附件路径列表
+function attachments() {
+  try { return JSON.parse(p.value.attachment || '[]') } catch { return [] }
+}
+
+async function changeVis(isPublic) {
+  try {
+    await proposals.action(p.value.id, { action: 'change_visibility', is_public: isPublic })
+    message.success('公开/私有已修改（仅一次机会）')
+    load()
+  } catch (e) { message.error(e.message) }
+}
 </script>
 
 <template>
@@ -51,8 +64,25 @@ async function feedback(satisfied) {
 
       <div class="card">
         <div class="muted" style="line-height:2;">{{ p.description }}</div>
+        <div v-if="p.community_building" class="muted" style="margin-top:6px;font-size:0.9rem;">🏠 所属楼栋：{{ p.community_building }}</div>
         <div v-if="p.vote_stats" class="muted" style="margin-top:6px;font-size:0.9rem;">
           🗳️ 投票：{{ p.vote_stats.vote_count || 0 }} 人 · 平均 {{ p.vote_stats.avg_score || '—' }} 分
+        </div>
+        <!-- 附件（本人或公开） -->
+        <div v-if="attachments().length" style="margin-top:8px;">
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📎 附件（{{ p.attachment_public ? '公开' : '仅本人可见' }}）</div>
+          <div v-for="(a, i) in attachments()" :key="i" style="display:inline-block;margin-right:8px;">
+            <img :src="a" style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid var(--border);" :alt="'附件' + (i + 1)" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 我的提案：确认前/私有待执行时修改公开方式（7 天内一次机会） -->
+      <div v-if="p.mine && ['待确认公示/私有', '待执行'].includes(p.status)" class="card">
+        <div style="font-weight:700;margin-bottom:8px;">🔀 修改公开/私有（审核通过后 7 天内仅一次机会）</div>
+        <div style="display:flex;gap:8px;">
+          <n-button size="small" type="success" @click="changeVis(1)">🌐 改为公开</n-button>
+          <n-button size="small" type="default" @click="changeVis(0)">🔒 改为私有</n-button>
         </div>
       </div>
 

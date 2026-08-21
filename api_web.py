@@ -491,6 +491,13 @@ class ProposalCreate(BaseModel):
     is_public: int = Field(default=1)
     reporter_name: str = Field(default="")
     reporter_phone: str = Field(default="")
+    community_building: str = Field(default="")
+    attachment_public: int = Field(default=0)
+    attachment: str = Field(default="[]")
+    is_agent_report: int = Field(default=0)
+    agent_name: str = Field(default="")
+    agent_phone: str = Field(default="")
+    agent_relation: str = Field(default="")
 
 
 @app.post("/api/web/proposals")
@@ -502,10 +509,57 @@ def web_proposal_create(req: ProposalCreate, request: Request):
         reporter_name=req.reporter_name or u.get("name") or "居民",
         reporter_phone=req.reporter_phone, is_public=req.is_public,
         reporter_id=u.get("uid"),
+        community_building=req.community_building,
+        attachment_public=req.attachment_public, attachment=req.attachment,
+        is_agent_report=req.is_agent_report, agent_name=req.agent_name,
+        agent_phone=req.agent_phone, agent_relation=req.agent_relation,
     )
     if pid <= 0:
         return fail(2001, msg or "提交失败")
     return ok({"proposal_id": pid}, "提交成功")
+
+
+# 提案草稿（崩溃/超时留草稿，7 天有效）
+
+class ProposalDraft(BaseModel):
+    title: str = Field(default="")
+    description: str = Field(default="")
+    category: str = Field(default="其他")
+    is_public: int = Field(default=1)
+    reporter_name: str = Field(default="")
+    reporter_phone: str = Field(default="")
+    attachment_public: int = Field(default=0)
+
+
+@app.get("/api/web/proposals/drafts")
+def web_proposal_drafts(request: Request):
+    from data.db_proposal import get_drafts
+    u = _user(request)
+    return ok(get_drafts(u.get("uid")))
+
+
+@app.post("/api/web/proposals/drafts")
+def web_proposal_draft_save(req: ProposalDraft, request: Request):
+    from data.db_proposal import save_draft
+    u = _user(request)
+    did = save_draft(
+        u.get("uid"), title=req.title, description=req.description,
+        category=req.category, is_public=req.is_public,
+        reporter_name=req.reporter_name, reporter_phone=req.reporter_phone,
+        attachment_public=req.attachment_public,
+    )
+    return ok({"draft_id": did}, "草稿已保存")
+
+
+@app.delete("/api/web/proposals/drafts/{did}")
+def web_proposal_draft_delete(did: int, request: Request):
+    from data.db_proposal import get_draft, delete_draft
+    u = _user(request)
+    d = get_draft(did, u.get("uid"))
+    if not d:
+        return fail(1004, "草稿不存在")
+    delete_draft(did)
+    return ok({"deleted": did}, "草稿已删除")
 
 
 @app.get("/api/web/proposals")
@@ -515,12 +569,14 @@ def web_proposal_list(request: Request, status: str = "", limit: int = 300):
     rows = get_proposals(status=status or None, limit=limit)
     out = []
     for p in rows:
-        # 居民：只看公示中/已公开的，且姓名脱敏
+        # 居民：只看自己提交的（含私有/待审核等）+ 公开公示链上的，且他人姓名脱敏
         if u.get("role") != "grid":
-            if p.get("status") not in ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成"):
-                continue
-            if not p.get("is_public"):
-                continue
+            mine = p.get("reporter_id") == u.get("uid")
+            if not mine:
+                if p.get("status") not in ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成"):
+                    continue
+                if not p.get("is_public"):
+                    continue
         out.append({
             "id": p.get("id"), "title": p.get("title"), "category": p.get("category"),
             "status": p.get("status"), "is_public": p.get("is_public"),
@@ -528,6 +584,7 @@ def web_proposal_list(request: Request, status: str = "", limit: int = 300):
             else ((p.get("reporter_name") or "")[:1] + "**" if p.get("reporter_name") else "—"),
             "created_at": p.get("created_at"),
             "reopen_count": p.get("reopen_count") or 0,
+            "mine": u.get("role") != "grid" and p.get("reporter_id") == u.get("uid"),
         })
     return ok(out)
 
@@ -580,7 +637,7 @@ def web_proposal_comment_add(pid: int, req: ProposalCommentCreate, request: Requ
 
 
 class ProposalAction(BaseModel):
-    action: str = Field(..., pattern="^(audit|confirm|decide|execute|resolve|feedback|reopen|close|take_down)$")
+    action: str = Field(..., pattern="^(audit|confirm|decide|execute|resolve|feedback|reopen|close|take_down|resubmit|withdraw|reopen_mine|change_visibility|update_category|view_phone|remind|extend_voting)$")
     approve: bool = Field(default=True)
     opinion: str = Field(default="")
     is_public: int = Field(default=1)
@@ -589,6 +646,8 @@ class ProposalAction(BaseModel):
     result: str = Field(default="")
     satisfied: bool = Field(default=True)
     close: bool = Field(default=False)
+    category: str = Field(default="")
+    minutes: int = Field(default=1440)
 
 
 @app.post("/api/web/proposals/{pid}/action")
@@ -596,12 +655,14 @@ def web_proposal_action(pid: int, req: ProposalAction, request: Request):
     from data.db_proposal import (
         audit_proposal, confirm_visibility, decide_execute, start_execute,
         resolve_proposal, feedback_proposal, handle_reopen, close_proposal,
-        take_down_proposal,
+        take_down_proposal, resubmit_proposal, withdraw_proposal,
+        reopen_proposal, change_visibility, update_category, view_full_phone,
+        remind_confirm, extend_voting,
     )
     u = _user(request)
     role = u.get("role")
-    # 权限：管理动作仅负责人；居民可确认公开/私有与反馈（spec：负责人不能代替居民确认）
-    resident_actions = {"confirm", "feedback"}
+    # 权限：管理动作仅负责人；居民可确认公开/私有、反馈、撤回、重新提交、重新打开、改公开方式
+    resident_actions = {"confirm", "feedback", "resubmit", "withdraw", "reopen_mine", "change_visibility"}
     if role != "grid" and req.action not in resident_actions:
         return fail(1003, "无权限执行该操作（仅负责人可管理提案）")
     actor = u.get("name") or "负责人"
@@ -622,9 +683,29 @@ def web_proposal_action(pid: int, req: ProposalAction, request: Request):
         elif a == "reopen":
             ok_, msg = handle_reopen(pid, close=req.close, reason=req.reason, actor=actor)
         elif a == "close":
-            ok_, msg = close_proposal(pid, actor=actor)
+            ok_, msg = close_proposal(pid, req.reason, actor=actor)
         elif a == "take_down":
             ok_, msg = take_down_proposal(pid, req.reason, actor=actor)
+        elif a == "resubmit":
+            ok_, msg = resubmit_proposal(pid, title=req.opinion, description=req.result,
+                                         category=req.category, actor=actor)
+        elif a == "withdraw":
+            ok_, msg = withdraw_proposal(pid, actor=actor)
+        elif a == "reopen_mine":
+            ok_, msg = reopen_proposal(pid, actor=actor)
+        elif a == "change_visibility":
+            ok_, msg = change_visibility(pid, req.is_public, actor=actor)
+        elif a == "update_category":
+            ok_, msg = update_category(pid, req.category, actor=actor)
+        elif a == "view_phone":
+            phone = view_full_phone(pid, actor)
+            if not phone:
+                return fail(1004, "提案不存在")
+            return ok({"phone": phone}, "已留痕查看完整手机号")
+        elif a == "remind":
+            ok_, msg = remind_confirm(pid, actor=actor)
+        elif a == "extend_voting":
+            ok_, msg = extend_voting(pid, req.minutes, actor=actor)
         else:
             return fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001
@@ -841,16 +922,23 @@ def web_proposal_detail(pid: int, request: Request):
     p = get_proposal(pid)
     if not p:
         return fail(1004, "提案不存在")
-    # 居民：只能看已公开的公示提案，隐藏敏感字段
-    if u.get("role") != "grid" and (not p.get("is_public") or p.get("status") not in
-                                    ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成")):
-        return fail(1003, "无权限查看该提案")
+    # 居民：只能看自己提交的（含私有/待审核）+ 公开公示链上的提案，隐藏敏感字段
+    if u.get("role") != "grid":
+        mine = p.get("reporter_id") == u.get("uid")
+        if not mine:
+            if not p.get("is_public") or p.get("status") not in (
+                "公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成"
+            ):
+                return fail(1003, "无权限查看该提案")
     stats = get_proposal_vote_stats(pid) or {}
     out = dict(p)
     if u.get("role") != "grid":
-        out.pop("reporter_phone", None)
-        out["reporter_name"] = ((p.get("reporter_name") or "")[:1] + "**") if p.get("reporter_name") else "—"
-        out.pop("attachment", None)
+        mine = p.get("reporter_id") == u.get("uid")
+        out["mine"] = bool(mine)
+        if not mine:
+            out.pop("reporter_phone", None)
+            out["reporter_name"] = ((p.get("reporter_name") or "")[:1] + "**") if p.get("reporter_name") else "—"
+            out.pop("attachment", None)
     out["vote_stats"] = stats
     try:
         out["timeline"] = get_proposal_timeline(pid, limit=20)
