@@ -370,6 +370,17 @@ with tab_mine:
                     f'{c.get("content","")[:200]}</div>',
                     unsafe_allow_html=True,
                 )
+                # 我的咨询显示附件（spec：附件仅负责人和居民本人可见）
+                try:
+                    import json as _json
+                    from utils.uploads import resolve_path as _resolve
+                    _paths = _json.loads(c.get("attachment_json") or "[]")
+                    _imgs = [x for x in (_resolve(x) for x in _paths) if x]
+                    if _imgs:
+                        st.markdown("**📎 附件图片**")
+                        st.image(_imgs, width=140)
+                except Exception:
+                    pass
                 if c.get("reply"):
                     reply_display = c.get("reply", "")
                     if c.get("reply_need_offline"):

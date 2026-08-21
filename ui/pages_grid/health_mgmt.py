@@ -50,6 +50,7 @@ from data.db_health_content import (  # noqa: E402  数据层，只调用不写 
     is_disease_prevention_manager,
     mask_phone,
 )
+from data.db_core import get_db  # noqa: E402
 
 _log = logging.getLogger(__name__)
 
@@ -419,6 +420,14 @@ with t_consult:
                     f' · {(c.get("created_at") or "")[:16]}</span>',
                     unsafe_allow_html=True,
                 )
+                # 电话可点击拨打（spec：负责人端联系电话可直接拨打）
+                _pnum = (c.get("phone") or "").strip()
+                if len(_pnum) == 11:
+                    st.markdown(
+                        f'<a href="tel:{_pnum}" style="color:{TOKEN["accent"]};text-decoration:none;'
+                        f'font-size:0.85em;">📞 拨打 {_pnum[:3]}****{_pnum[-4:]}</a>',
+                        unsafe_allow_html=True,
+                    )
                 st.markdown(f'<span style="font-size:0.85em;color:{TOKEN["text"]};">{_consult_remaining(c)}</span>',
                             unsafe_allow_html=True)
                 # 列表不直接展示内容和附件（《04-疾病预防.md》）
@@ -428,6 +437,25 @@ with t_consult:
                         st.caption(f'楼栋：{c.get("building")}')
                     if c.get("is_agent_report"):
                         st.caption(f'代报：{c.get("agent_name")}（{c.get("agent_relation") or "关系未填"}）')
+                    # 状态流转留痕（spec：咨询全程留痕可查）
+                    try:
+                        with get_db() as _conn:
+                            _acts = _conn.execute(
+                                "SELECT actor, action, created_at, detail FROM activity_log "
+                                "WHERE module='疾病预防' AND target_type='health_consult' AND target_id=? "
+                                "ORDER BY id DESC LIMIT 10",
+                                (cid,),
+                            ).fetchall()
+                        if _acts:
+                            st.markdown("**📜 处理留痕**")
+                            for _a in _acts:
+                                st.caption(
+                                    f"{(str(_a['created_at']) or '')[:16]} · {_a['actor'] or ''} · "
+                                    f"{_a['action'] or ''}"
+                                    + (f" · {(str(_a['detail']) or '')[:60]}" if _a.get("detail") else "")
+                                )
+                    except Exception:
+                        pass
                     try:
                         atts = json.loads(c.get("attachment_json") or "[]")
                     except (ValueError, TypeError):

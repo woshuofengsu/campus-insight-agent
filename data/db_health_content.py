@@ -478,7 +478,7 @@ def auto_unpin_expired() -> list[int]:
 
 
 def expire_contents() -> list[dict]:
-    """疫苗类内容到期自动下架并提醒负责人；失败记录异常通知手动下架。"""
+    """疫苗类内容到期自动下架并提醒负责人；失败记录异常并通知手动下架（二次确认）。"""
     today = _fmt(_now())[:10]
     results: list[dict] = []
     with get_db() as conn:
@@ -487,20 +487,32 @@ def expire_contents() -> list[dict]:
             "AND status='已发布' AND expire_at!='' AND expire_at<?",
             (today,),
         ).fetchall()
-        for r in rows:
-            conn.execute(
-                "UPDATE health_contents SET status='已下架', updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                (r["id"],),
-            )
+    for r in rows:
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE health_contents SET status='已下架', updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (r["id"],),
+                )
+                conn.commit()
             results.append({"id": r["id"], "title": r["title"]})
-        conn.commit()
-    for item in results:
-        log_activity("系统", "疫苗内容到期自动下架", "health_content", item["id"],
-                     item["title"], module=MODULE, before_value="已发布", after_value="已下架",
-                     detail="信息有效期已到，自动下架并提醒负责人")
-        _notify_managers(f"💉 疫苗提醒内容已到期下架：{item['title']}",
-                         "该疫苗接种提醒内容已过信息有效期，已自动下架，请确认是否需要更新后重新发布。",
-                         related_id=item["id"])
+            log_activity("系统", "疫苗内容到期自动下架", "health_content", r["id"],
+                         r["title"], module=MODULE, before_value="已发布", after_value="已下架",
+                         detail="信息有效期已到，自动下架并提醒负责人")
+            _notify_managers(f"💉 疫苗提醒内容已到期下架：{r['title']}",
+                             "该疫苗接种提醒内容已过信息有效期，已自动下架，请确认是否需要更新后重新发布。",
+                             related_id=r["id"])
+        except Exception as e:  # noqa: BLE001
+            # 自动下架失败 → 记录异常 + 通知负责人手动下架（仍须二次确认）
+            _log.warning("疫苗内容 #%s 自动下架失败：%s", r["id"], e)
+            try:
+                from data.db_notifications import log_exception
+                log_exception(MODULE, f"疫苗内容自动下架失败 content#{r['id']}: {e}")
+            except Exception:
+                pass
+            _notify_managers(f"⚠️ 疫苗提醒内容自动下架失败：{r['title']}",
+                             "系统自动下架失败，请手动下架（下架需二次确认）。",
+                             related_id=r["id"])
     return results
 
 
@@ -851,8 +863,7 @@ def mark_overdue_consults() -> list[dict]:
         rows = conn.execute(
             "SELECT id, name, consult_type FROM health_consults "
             "WHERE status IN ('待回复','继续回复') "
-            "AND julianday('now') - julianday(COALESCE("
-            "CASE WHEN status='继续回复' THEN feedback_at ELSE NULL END, created_at)) > ?",
+            "AND julianday('now') - julianday(COALESCE(feedback_at, created_at)) > ?",
             (REPLY_HOURS / 24.0,),
         ).fetchall()
         for r in rows:

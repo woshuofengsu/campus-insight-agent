@@ -63,6 +63,33 @@ def _weather_tasks(db_weather) -> dict:
     return out
 
 
+def _health_linkage_tasks(db_weather, db_health) -> list[dict]:
+    """健康天气联动自动触发：对生效窗口内（≤12h）的 active 预警逐条联动（每日去重）。"""
+    out: list[dict] = []
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        cutoff = (_dt.now() + _td(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+        for a in db_weather.get_active_alerts():
+            eff = (a.get("effective_time") or "")
+            if eff and eff > cutoff:
+                continue  # 生效时间 >12h 不触发（与预警触发规则一致）
+            ev = {
+                "alert_type": a.get("alert_type", ""),
+                "level": a.get("level", ""),
+                "effective_time": eff,
+                "expire_time": a.get("expire_time", ""),
+            }
+            out.append(db_health.trigger_weather_linkage(ev, actor="系统"))
+    except Exception as e:  # noqa: BLE001
+        _log.warning("健康天气联动任务失败: %s", e)
+        try:
+            from data.db_notifications import log_exception
+            log_exception("疾病预防", f"健康天气联动自动触发失败: {e}")
+        except Exception:
+            pass
+    return out
+
+
 def run_all() -> dict:
     """跑一遍全部自动任务，返回每类结果摘要。任务本身幂等，失败记录到异常日志。"""
     from data import db_notice, db_proposal, db_health_content, db_weather
@@ -84,6 +111,7 @@ def run_all() -> dict:
     results["unpin"] = _safe("置顶取消", db_health_content.auto_unpin_expired)
     results["monthly"] = _safe("月度提醒", db_health_content.monthly_update_reminder)
     results["resubmit_remind"] = _safe("退回修改提醒", db_health_content.resubmit_reminder)
+    results["health_linkage"] = _safe("健康天气联动", lambda: _health_linkage_tasks(db_weather, db_health_content))
     results["policy_expire"] = _safe("政策到期", _pol.auto_expire_knowledge)
     results["policy_overdue"] = _safe("政策超时", _pol.mark_overdue_questions)
     results["policy_close"] = _safe("政策关闭", _pol.auto_close_stale_questions)
