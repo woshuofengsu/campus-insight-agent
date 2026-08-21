@@ -7,11 +7,17 @@ import { issues } from '../../api'
 const message = useMessage()
 const list = ref([])
 const loading = ref(true)
+const op = ref({}) // { [id]: { reason, content } }
 
 const STATUS_COLOR = {
   待审核: 'warning', 退回补充信息: 'error', 已审核待派单: 'info',
   已派单: 'info', 处理中: 'success', 待居民反馈: 'warning',
   处理结束: 'default', 已关闭: 'default', 已撤回: 'default', 待协商: 'warning', 已转出: 'default',
+}
+
+function opOf(i) {
+  if (!op.value[i.id]) op.value[i.id] = {}
+  return op.value[i.id]
 }
 
 async function load() {
@@ -48,31 +54,20 @@ async function act(id, data) {
         </div>
         <div v-if="i.resolve_note" class="muted" style="font-size:0.85rem;">📋 处理结果：{{ i.resolve_note }}</div>
 
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <!-- 待居民反馈 → 满意度反馈 -->
           <template v-if="i.status === '待居民反馈'">
-            <n-popconfirm @positive-click="act(i.id, { action: 'feedback', satisfied: true })">
-              <template #trigger><n-button size="small" type="success">✅ 满意，结单</n-button></template>
-              确认问题已解决？
-            </n-popconfirm>
-            <n-popconfirm @positive-click="act(i.id, { action: 'feedback', satisfied: false, reason: '还想再修一下' })">
-              <template #trigger><n-button size="small" type="warning">😕 不满意</n-button></template>
-              将退回重新处理，确认？
-            </n-popconfirm>
+            <n-input v-model:value="opOf(i).reason" placeholder="不满意原因（可选）" size="small" style="max-width:220px;" />
+            <n-button size="small" type="success" @click="act(i.id, { action: 'feedback', satisfied: true })">✅ 满意，结单</n-button>
+            <n-button size="small" type="warning" @click="act(i.id, { action: 'feedback', satisfied: false, reason: opOf(i).reason || '还需处理' })">😕 不满意</n-button>
           </template>
           <!-- 待审核 → 撤回 -->
-          <template v-if="i.status === '待审核'">
-            <n-popconfirm @positive-click="act(i.id, { action: 'withdraw' })">
-              <template #trigger><n-button size="small" quaternary>↩️ 撤回</n-button></template>
-              确认撤回该工单？
-            </n-popconfirm>
-          </template>
+          <n-button v-if="i.status === '待审核'" size="small" quaternary @click="act(i.id, { action: 'withdraw' })">↩️ 撤回</n-button>
           <!-- 补充信息 -->
-          <n-popconfirm v-if="['已审核待派单','已派单','处理中'].includes(i.status)"
-                        @positive-click="act(i.id, { action: 'supplement', opinion: '补充：情况说明如下' })">
-            <template #trigger><n-button size="small">📝 补充信息</n-button></template>
-            补充信息将通知负责人确认（演示版固定文案）
-          </n-popconfirm>
+          <template v-if="['已审核待派单', '已派单', '处理中'].includes(i.status)">
+            <n-input v-model:value="opOf(i).content" placeholder="补充内容（必填）" size="small" style="max-width:240px;" />
+            <n-button size="small" @click="act(i.id, { action: 'supplement', opinion: opOf(i).content || '补充说明' })">📝 补充信息</n-button>
+          </template>
         </div>
       </div>
       <n-empty v-if="!loading && list.length === 0" description="还没有报修工单">
