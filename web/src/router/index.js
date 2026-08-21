@@ -58,6 +58,7 @@ const routes = [
       { path: 'medication', name: 'e-medication', component: () => import('../views/elderly/Medication.vue'), meta: { title: '用药提醒' } },
       { path: 'notices', name: 'e-notices', component: () => import('../views/elderly/Notices.vue'), meta: { title: '听通知' } },
       { path: 'contacts', name: 'e-contacts', component: () => import('../views/elderly/Contacts.vue'), meta: { title: '紧急联系人' } },
+      { path: 'orders', name: 'e-orders', component: () => import('../views/elderly/Orders.vue'), meta: { title: '我的报修' } },
       { path: 'qa', name: 'e-qa', component: () => import('../views/elderly/QA.vue'), meta: { title: '政策问答' } },
     ],
   },
