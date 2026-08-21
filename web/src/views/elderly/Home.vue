@@ -1,19 +1,26 @@
 <script setup>
-// 老年端首页：两行三列大按钮 + 用药/通知摘要 + 紧急求助
+// 老年端首页：两行三列大按钮 + 用药/通知摘要 + 紧急求助 + 语音播报 + 音量设置
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { elderly, weather } from '../../api'
+import { useSpeech } from '../../composables/useSpeech'
 
 const router = useRouter()
 const store = useUserStore()
+const { speak } = useSpeech()
 
 const home = ref(null)
 const w = ref(null)
+const vol = ref(1.0)
+const volLabels = { 低: 0.5, 中: 1.0, 高: 1.5 }
 
 onMounted(async () => {
   try { home.value = await elderly.home() } catch { /* 忽略 */ }
   try { w.value = await weather.current() } catch { /* 忽略 */ }
+  if (home.value?.due_medications > 0) {
+    speak(`您有 ${home.value.due_medications} 条用药提醒，请注意。`, vol.value)
+  }
 })
 
 const rows = [
@@ -24,7 +31,7 @@ const rows = [
 async function sos() {
   try {
     await elderly.emergency()
-    alert('🆘 紧急求助已发出！负责人会尽快联系您。')
+    speak('紧急求助已发出，负责人会尽快联系您', vol.value)
   } catch (e) {
     alert(e.message || '触发失败')
   }
@@ -34,6 +41,14 @@ async function sos() {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">你好，{{ home?.name || '大爷/阿姨' }}</div>
+
+    <!-- 音量设置（方案：语音按老人设置音量） -->
+    <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px;">
+      <span style="font-size:1.1rem;">🔊 音量：</span>
+      <n-button-group size="large">
+        <n-button v-for="(v, k) in volLabels" :key="k" :type="vol === v ? 'primary' : 'default'" @click="vol = v; speak('音量已设置', v)">{{ k }}</n-button>
+      </n-button-group>
+    </div>
 
     <!-- 天气摘要 -->
     <div v-if="w" class="card" style="text-align:center;background:#f0f9ff;font-size:1.2rem;">
@@ -60,9 +75,9 @@ async function sos() {
       </n-button>
     </div>
 
-    <!-- 紧急求助 -->
+    <!-- 紧急求助（方案：底部红色大按钮） -->
     <div style="margin-top:20px;">
-      <n-button size="large" type="error" block class="elderly-btn" style="min-height:84px;font-size:1.6rem;" @click="sos">
+      <n-button size="large" type="error" block class="elderly-btn" style="min-height:84px;font-size:1.6rem;background:#dc2626;" @click="sos">
         🆘 紧急求助
       </n-button>
     </div>

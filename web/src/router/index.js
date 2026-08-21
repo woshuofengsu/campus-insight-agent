@@ -5,6 +5,7 @@ import { useUserStore } from '../stores/user'
 const routes = [
   { path: '/', redirect: '/login' },
   { path: '/login', name: 'login', component: () => import('../views/Login.vue') },
+  { path: '/screen', name: 'screen', component: () => import('../views/Screen.vue'), meta: { title: '治理大屏' } },
 
   // 居民端
   {
@@ -64,7 +65,7 @@ const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach((to) => {
   const store = useUserStore()
-  if (to.path === '/login') return true
+  if (to.path === '/login' || to.path === '/screen') return true
   if (!store.token) return '/login'
   const required = to.meta.role
   if (required && store.role !== required) {
