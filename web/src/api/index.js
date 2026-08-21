@@ -16,6 +16,8 @@ api.interceptors.request.use((config) => {
 // 统一响应解包 + 401 跳登录
 api.interceptors.response.use(
   (res) => {
+    // Blob（文件下载）直接返回，不做 JSON 解包
+    if (res.data instanceof Blob) return res.data
     const body = res.data
     if (body && body.success === false) {
       return Promise.reject(new Error(body.error || body.message || '请求失败'))
@@ -102,6 +104,21 @@ export const elderly = {
   createMedication: (data) => api.post('/elderly/medications', data),
   emergency: () => api.post('/elderly/emergency'),
   emergencyStatus: () => api.get('/elderly/emergency/status'),
+  // 老年关怀管理（负责人）
+  manageMeds: (params) => api.get('/elderly/manage/medications', { params }),
+  auditMedication: (id, data) => api.post(`/elderly/manage/medications/${id}/audit`, data),
+  manageContacts: (params) => api.get('/elderly/manage/contacts', { params }),
+  auditContact: (id, data) => api.post(`/elderly/manage/contacts/${id}/audit`, data),
+  manageSos: (params) => api.get('/elderly/manage/sos', { params }),
+  sosAction: (id, data) => api.post(`/elderly/emergency/${id}/action`, data),
+}
+
+// 导出
+export const exportApi = {
+  issues: () => api.get('/export/issues', { responseType: 'blob' }),
+  proposals: () => api.get('/export/proposals', { responseType: 'blob' }),
+  notices: () => api.get('/export/notices', { responseType: 'blob' }),
+  knowledge: () => api.get('/export/knowledge', { responseType: 'blob' }),
 }
 
 // 上传

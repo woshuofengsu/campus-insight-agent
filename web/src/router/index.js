@@ -40,6 +40,7 @@ const routes = [
       { path: 'qa', name: 'g-qa', component: () => import('../views/grid/QA.vue'), meta: { title: '政策问答管理' } },
       { path: 'weather', name: 'g-weather', component: () => import('../views/grid/Weather.vue'), meta: { title: '天气管理' } },
       { path: 'health', name: 'g-health', component: () => import('../views/grid/Health.vue'), meta: { title: '健康管理' } },
+      { path: 'elderly-care', name: 'g-elderly', component: () => import('../views/grid/ElderlyCare.vue'), meta: { title: '老年关怀管理' } },
     ],
   },
 

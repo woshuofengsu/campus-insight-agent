@@ -20,6 +20,7 @@ const menus = computed(() => {
       { key: '/grid/qa', label: '政策问答', icon: '📖' },
       { key: '/grid/weather', label: '天气管理', icon: '🌤️' },
       { key: '/grid/health', label: '健康管理', icon: '🏥' },
+      { key: '/grid/elderly-care', label: '老年关怀', icon: '👴' },
     ]
   }
   return [

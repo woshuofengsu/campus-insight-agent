@@ -1,9 +1,9 @@
 <script setup>
-// 提交报修
+// 提交报修（含现场照片上传，jpg/png ≤5MB 最多3张）
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import { issues } from '../../api'
+import { issues, upload } from '../../api'
 
 const router = useRouter()
 const message = useMessage()
@@ -18,7 +18,9 @@ const form = ref({
   urgency: '一般',
   reporter_name: '',
   reporter_phone: '',
+  photo_before: '[]',
 })
+const files = ref([]) // 上传的文件列表（n-upload）
 
 const submit = async () => {
   if (!form.value.title || !form.value.location) {
@@ -26,6 +28,12 @@ const submit = async () => {
   }
   loading.value = true
   try {
+    // 先传照片（最多3张，≤5MB），再提交工单
+    if (files.value.length) {
+      const fileObjs = files.value.map((f) => f.file)
+      const up = await upload(fileObjs, 'issues')
+      form.value.photo_before = JSON.stringify(up.paths || [])
+    }
     const data = await issues.create(form.value)
     message.success(`工单 #${data.issue_id} 已提交，状态：待审核`)
     router.push('/resident/work-orders')
@@ -57,6 +65,10 @@ const submit = async () => {
             <n-select v-model:value="form.urgency" :options="['紧急','中等','一般','普通'].map(v=>({label:v,value:v}))" />
           </n-form-item-gi>
         </n-grid>
+        <n-form-item label="现场照片（选填，jpg/png，≤5MB，最多3张）">
+          <n-upload v-model:file-list="files" accept="image/jpeg,image/png" :max="3"
+                    list-type="image-card" :default-upload="false" />
+        </n-form-item>
         <n-form-item label="报修人姓名">
           <n-input v-model:value="form.reporter_name" placeholder="选填，默认当前账号姓名" />
         </n-form-item>

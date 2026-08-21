@@ -1002,6 +1002,162 @@ def web_qa_feedback(qid: int, req: QaFeedback, request: Request):
     return ok({"question_id": qid}, "反馈已提交")
 
 
+# ---------------- 导出（复用数据层导出函数，统一 CSV） ----------------
+
+@app.get("/api/web/export/issues")
+def web_export_issues(request: Request):
+    """导出报修工单 CSV（负责人，脱敏，留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_repair import get_issues
+    import csv
+    from io import StringIO
+    rows = get_issues(limit=1000)
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["编号", "标题", "分类", "类型", "紧急度", "状态", "地址", "报修人", "电话", "维修人员", "提交时间"])
+    for r in rows:
+        p = r.get("reporter_phone") or ""
+        w.writerow([r.get("id"), r.get("title"), r.get("category"), r.get("issue_type"),
+                    r.get("urgency"), r.get("status"), r.get("location"),
+                    r.get("reporter_name"), (p[:3] + "****" + p[-4:]) if len(p) == 11 else "****",
+                    r.get("assignee_name") or "", (r.get("reported_at") or "")[:16]])
+    from data.db_notifications import log_activity
+    log_activity(_user(request).get("name") or "负责人", "导出工单数据", module="报修",
+                 detail=f"导出 {len(rows)} 条（脱敏，不含照片附件）")
+    from fastapi.responses import Response
+    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=issues.csv"})
+
+
+@app.get("/api/web/export/proposals")
+def web_export_proposals(request: Request):
+    """导出提案 CSV（负责人，含排名/脱敏，留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_proposal import get_export_rows, log_export
+    rows = get_export_rows()
+    import csv
+    from io import StringIO
+    buf = StringIO()
+    if rows:
+        w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+        w.writeheader()
+        w.writerows(rows)
+    log_export(actor=_user(request).get("name") or "负责人")
+    from fastapi.responses import Response
+    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=proposals.csv"})
+
+
+@app.get("/api/web/export/notices")
+def web_export_notices(request: Request):
+    """导出通知列表 + 已读统计（负责人，留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_notice import export_notices_csv
+    from fastapi.responses import Response
+    content, fname = export_notices_csv(actor=_user(request).get("name") or "负责人")
+    return Response(content.encode("utf-8-sig"), media_type="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={fname}"})
+
+
+@app.get("/api/web/export/knowledge")
+def web_export_knowledge(request: Request):
+    """导出政策知识库 CSV（负责人，脱敏留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_policy import get_knowledge_list
+    import csv
+    from io import StringIO
+    rows = get_knowledge_list(limit=1000)
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["ID", "标题", "分类", "状态", "版本", "有效期", "引用次数", "更新时间"])
+    for k in rows:
+        w.writerow([k.get("id"), (k.get("title") or "")[:40], k.get("category"),
+                    k.get("audit_status"), k.get("version") or 1,
+                    f"{k.get('effective_date') or ''}~{k.get('expire_date') or ''}",
+                    k.get("cite_count") or 0, (k.get("updated_at") or k.get("created_at") or "")[:16]])
+    from data.db_notifications import log_activity
+    log_activity(_user(request).get("name") or "负责人", "导出知识库", module="政策问答",
+                 detail=f"导出 {len(rows)} 条（不含正文全文与审核意见）")
+    from fastapi.responses import Response
+    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=knowledge.csv"})
+
+
+# ---------------- 老年关怀管理（负责人端：用药审核 / 联系人审核 / SOS 响应） ----------------
+
+@app.get("/api/web/elderly/manage/medications")
+def web_manage_medications(request: Request, status: str = ""):
+    """负责人端用药提醒列表（全部老人）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_elderly_care import list_medication_reminders
+    rows = list_medication_reminders(status=status or None)
+    return ok([dict(r) for r in rows])
+
+
+class MedicationAudit(BaseModel):
+    approve: bool = Field(default=True)
+    opinion: str = Field(default="")
+
+
+@app.post("/api/web/elderly/manage/medications/{rid}/audit")
+def web_manage_medication_audit(rid: int, req: MedicationAudit, request: Request):
+    """负责人审核用药提醒。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_elderly_care import audit_medication
+    actor = _user(request).get("name") or "负责人"
+    ok_, msg = audit_medication(rid, req.approve, opinion=req.opinion, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"reminder_id": rid}, "审核完成")
+
+
+@app.get("/api/web/elderly/manage/contacts")
+def web_manage_contacts(request: Request, status: str = ""):
+    """负责人端紧急联系人列表（全部老人）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_elderly_care import list_emergency_contacts
+    rows = list_emergency_contacts()
+    out = [dict(r) for r in rows]
+    if status:
+        out = [c for c in out if c.get("status") == status]
+    return ok(out)
+
+
+class ContactAudit(BaseModel):
+    approve: bool = Field(default=True)
+    opinion: str = Field(default="")
+
+
+@app.post("/api/web/elderly/manage/contacts/{cid}/audit")
+def web_manage_contact_audit(cid: int, req: ContactAudit, request: Request):
+    """负责人审核紧急联系人。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_elderly_care import audit_emergency_contact
+    actor = _user(request).get("name") or "负责人"
+    ok_, msg = audit_emergency_contact(cid, req.approve, opinion=req.opinion, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"contact_id": cid}, "审核完成")
+
+
+@app.get("/api/web/elderly/manage/sos")
+def web_manage_sos(request: Request, status: str = ""):
+    """负责人端紧急求助列表。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_elderly_care import get_sos_calls
+    rows = get_sos_calls(status=status or None, limit=50)
+    return ok([dict(r) for r in rows])
+
+
 # ---- 老年端补充：联系人 / SOS 响应结束 / 用药暂停恢复 / 联系拨打 ----
 
 class ContactCreate(BaseModel):
