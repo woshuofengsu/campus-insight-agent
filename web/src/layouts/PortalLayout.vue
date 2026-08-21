@@ -62,7 +62,7 @@ function logout() {
           <n-button size="small" quaternary @click="logout">退出</n-button>
         </div>
       </n-layout-header>
-      <n-layout-content content-style="background:#f5f7f5;">
+      <n-layout-content content-style="background:var(--bg);">
         <router-view />
       </n-layout-content>
     </n-layout>

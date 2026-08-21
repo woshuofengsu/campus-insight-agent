@@ -44,7 +44,7 @@ const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
     <div v-if="w?.forecast?.length" class="card">
       <div style="font-weight:700;margin-bottom:10px;">📅 未来预报</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-        <div v-for="(d, i) in w.forecast" :key="i" style="text-align:center;background:#f5f7f5;border-radius:10px;padding:12px;">
+        <div v-for="(d, i) in w.forecast" :key="i" style="text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;">
           <div class="muted">{{ (d.date || '').slice(5) }}</div>
           <div style="font-size:1.6rem;">{{ d.emoji }}</div>
           <div>{{ d.condition }}</div>

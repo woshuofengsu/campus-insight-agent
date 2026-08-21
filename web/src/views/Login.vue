@@ -42,7 +42,7 @@ async function demo(role) {
 
 <template>
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2E7D32 0%,#1b5e20 100%);">
-    <div style="background:#fff;border-radius:20px;padding:40px 36px;width:380px;box-shadow:0 16px 48px rgba(0,0,0,0.25);">
+    <div style="background:var(--card-bg);border-radius:20px;padding:40px 36px;width:380px;box-shadow:0 16px 48px rgba(0,0,0,0.25);">
       <div style="text-align:center;margin-bottom:24px;">
         <div style="font-size:2.4rem;">🏘️</div>
         <div style="font-size:1.4rem;font-weight:800;color:#1f2937;">社区先知</div>
