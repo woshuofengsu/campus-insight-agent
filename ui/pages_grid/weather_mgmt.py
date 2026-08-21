@@ -284,18 +284,25 @@ st.markdown("---")
 # ============================================================
 section("📜 历史检查任务记录")
 
-hf1, hf2 = st.columns(2)
+hf1, hf2, hf3 = st.columns(3)
 with hf1:
     h_type = st.selectbox("天气类型", ["全部", "暴雨", "台风", "高温", "寒潮", "大风", "雷电", "冰雹", "大雾"],
                           key="weather_history_type")
 with hf2:
     h_status = st.selectbox("任务状态", ["全部", "待检查", "已确认", "超时未确认"], key="weather_history_status")
+with hf3:
+    h_period = st.selectbox("时间范围", ["全部", "近7天", "近30天"], key="weather_history_period")
 
 history = get_check_task_history(
     alert_type=None if h_type == "全部" else h_type,
     status=None if h_status == "全部" else h_status,
-    limit=100,
+    limit=200,
 )
+# 时间范围过滤（spec 03.17：支持按时间筛选）
+if h_period != "全部":
+    from datetime import datetime, timedelta
+    _cut = (datetime.now() - timedelta(days={"近7天": 7, "近30天": 30}[h_period])).strftime("%Y-%m-%d %H:%M:%S")
+    history = [t for t in history if (t.get("created_at") or "") >= _cut]
 if not history:
     st.caption("暂无历史检查任务记录。")
 else:
