@@ -212,6 +212,16 @@ def _render_sos_dialing(uid, name, latest, contacts):
             tts_speak("电话未接通，请稍后再试。")
 
     if st.session_state.get("_sos_all_failed"):
+        # 全部未接通：通知负责人端（spec：同时通知负责人端，可代为跟进）
+        if not st.session_state.get("_sos_all_failed_notified"):
+            st.session_state["_sos_all_failed_notified"] = True
+            try:
+                from data.db_elderly_care import _notify_grids
+                _notify_grids(f"📵 紧急求助联系人全部未接通（#{latest['id']}）",
+                              f"老人 {name} 的紧急求助电话全部未接通，请负责人主动联系老人或其家属确认情况。",
+                              related_id=latest["id"])
+            except Exception:
+                pass
         st.link_button("🚨 拨打 120", "tel:120", width="stretch")
 
     ac1, ac2, ac3 = st.columns(3)

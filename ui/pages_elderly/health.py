@@ -65,6 +65,26 @@ if contacts:
         st.caption(f"{c.get('relation', '')} {c.get('name', '')}　{_label}"
                    + (f"　审核意见：{c.get('audit_opinion', '')}" if c.get("audit_opinion") else ""),
                    unsafe_allow_html=True)
+        # 修改（重新审核，原联系人审核通过前仍显示）
+        mod_key = f"_mod_contact_{c['id']}"
+        if st.button(f"✏️ 修改 {c.get('name', '')}", key=f"mod_c_{c['id']}", width="stretch"):
+            st.session_state[mod_key] = True
+        if st.session_state.get(mod_key):
+            with st.form(key=f"mod_form_{c['id']}"):
+                m_name = st.text_input("联系人姓名", value=c.get("name", ""), key=f"mod_name_{c['id']}")
+                m_phone = st.text_input("联系人电话（11 位手机号）", value=c.get("phone", ""), key=f"mod_phone_{c['id']}")
+                m_rel = st.text_input("与老人关系", value=c.get("relation", ""), key=f"mod_rel_{c['id']}")
+                m_sub = st.form_submit_button("提交修改（需重新审核）", width="stretch")
+            if m_sub:
+                from data.db_elderly_care import modify_emergency_contact
+                ok, msg = modify_emergency_contact(c["id"], m_name, m_phone, m_rel,
+                                                   actor=(profile or {}).get("name") or "老人")
+                st.session_state.pop(mod_key, None)
+                if ok:
+                    st.success("修改已提交，负责人审核通过后生效。")
+                else:
+                    st.error(msg)
+                st.rerun()
         # 删除（二次确认；最后一个拦截在数据层）
         del_key = f"_del_contact_{c['id']}"
         if st.button(f"🗑️ 删除 {c.get('name', '')}", key=f"del_c_{c['id']}", width="stretch"):

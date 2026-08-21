@@ -190,15 +190,41 @@ def _notify_user(user_id: int | None, type_: str, title: str, content: str = "",
 
 
 def _notify_grids(title: str, content: str = "", related_id: int | None = None) -> int:
-    """通知所有负责人（grid 角色）。返回收件人数。"""
-    try:
-        from data.db_user import list_users
-        grids = list_users(role="grid")
-        for g in grids:
-            _notify_user(g["id"], "sos", title, content, related_id)
-        return len(grids)
-    except Exception:
-        return 0
+    """通知所有负责人（grid 角色）。返回收件人数。
+
+    发送失败自动重试一次（spec：升级通知发送失败 → 记录失败日志再尝试一次，
+    仍失败通知负责人手动处理）。
+    """
+    for attempt in range(2):
+        try:
+            from data.db_user import list_users
+            grids = list_users(role="grid")
+            sent = 0
+            for g in grids:
+                try:
+                    _notify_user(g["id"], "sos", title, content, related_id)
+                    sent += 1
+                except Exception:
+                    pass
+            if sent >= len(grids):
+                return sent
+            # 部分失败：重试一次
+            if attempt == 1:
+                try:
+                    from data.db_notifications import log_exception
+                    log_exception("老年端", f"紧急求助通知负责人失败（{title[:30]}）：{sent}/{len(grids)} 送达")
+                except Exception:
+                    pass
+                return sent
+        except Exception:
+            if attempt == 1:
+                try:
+                    from data.db_notifications import log_exception
+                    log_exception("老年端", f"紧急求助通知负责人异常（{title[:30]}）")
+                except Exception:
+                    pass
+                return 0
+    return 0
 
 
 # =====================================================================
@@ -783,6 +809,45 @@ def audit_emergency_contact(contact_id: int, approve: bool, opinion: str = "",
     return True, ""
 
 
+def modify_emergency_contact(contact_id: int, name: str, phone: str, relation: str,
+                             actor: str = "") -> tuple[bool, str]:
+    """修改紧急联系人（spec：老人/家属可修改，修改后需重新审核）。
+
+    修改即置回「待审核」重新走审核；旧信息在审核意见中保留以便负责人核对。
+    """
+    name = (name or "").strip()
+    phone = (phone or "").strip()
+    relation = (relation or "").strip()
+    if not name:
+        return False, "联系人姓名不能为空"
+    if len(phone) != 11 or not phone.isdigit() or not phone.startswith("1"):
+        return False, "请输入正确的 11 位手机号"
+    if not relation:
+        return False, "请填写与老人关系"
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM emergency_contacts WHERE id=?", (contact_id,)
+        ).fetchone()
+        if row is None:
+            return False, "紧急联系人不存在"
+        old = f"{row['relation']} {row['name']} {row['phone'][:3]}****{row['phone'][-4:]}"
+        conn.execute(
+            "UPDATE emergency_contacts SET name=?, phone=?, relation=?, status='待审核', "
+            "audit_opinion='', updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (name, phone, relation, contact_id),
+        )
+        conn.commit()
+    log_activity(actor or name, "修改紧急联系人", "emergency_contact", contact_id,
+                 f"{relation} - {name}", module=MODULE,
+                 before_value=old, after_value=f"{relation} {name} {phone[:3]}****{phone[-4:]}",
+                 detail="修改后需重新审核；修改前信息：{}".format(old))
+    _notify_user(row["user_id"], "emergency_contact",
+                 "📝 紧急联系人已修改，待重新审核",
+                 f"{name}（{relation}）修改已提交，负责人审核通过后生效。",
+                 related_id=contact_id)
+    return True, ""
+
+
 def delete_emergency_contact(contact_id: int, actor: str = "") -> tuple[bool, str]:
     """删除紧急联系人（二次确认由页面负责）。删除最后一个要拦截。"""
     with get_db() as conn:
@@ -968,8 +1033,8 @@ def end_sos(call_id: int, handle_note: str, actor: str = "负责人") -> tuple[b
     return True, ""
 
 
-def escalate_sos(call_id: int, actor: str = "系统", minutes: int = 10) -> tuple[bool, str]:
-    """负责人 10 分钟未响应 → 升级通知所有负责人（最多 3 次）。
+def escalate_sos(call_id: int, actor: str = "系统", minutes: int | None = None) -> tuple[bool, str]:
+    """负责人未响应升级：首次 10 分钟未响应升级，之后每 5 分钟提醒一次，最多 3 次（spec）。
 
     幂等：时间不足/已升级满 3 次返回 False 不重复通知。状态保持「求助中」。
     """
@@ -986,6 +1051,10 @@ def escalate_sos(call_id: int, actor: str = "系统", minutes: int = 10) -> tupl
             created_dt = datetime.strptime(str(created)[:19], "%Y-%m-%d %H:%M:%S")
         except ValueError:
             return False, ""
+        # 已升级次数：0 次 → 首升等 10 分钟；之后每 5 分钟提醒（spec）
+        _prev_count = (row["result"] or "").count("已升级")
+        if minutes is None:
+            minutes = 10 if _prev_count == 0 else 5
         age_min = (datetime.utcnow() - created_dt).total_seconds() / 60.0
         if age_min < minutes:
             return False, ""
