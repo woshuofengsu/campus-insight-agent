@@ -101,10 +101,20 @@ export const knowledge = {
 // 健康
 export const health = {
   articles: (params) => api.get('/health/articles', { params }),
+  articleDetail: (id) => api.get(`/health/articles/${id}`),
+  createArticle: (data) => api.post('/health/articles', data),
+  articleAction: (id, data) => api.post(`/health/articles/${id}/action`, data),
   consults: (params) => api.get('/health/consults', { params }),
+  consultDetail: (id) => api.get(`/health/consults/${id}`),
   createConsult: (data) => api.post('/health/consults', data),
   replyConsult: (id, data) => api.post(`/health/consults/${id}/reply`, data),
   toggleConsult: (id, data) => api.post(`/health/consults/${id}/toggle`, data),
+  feedbackConsult: (id, data) => api.post(`/health/consults/${id}/feedback`, data),
+  unread: () => api.get('/health/unread-reply-count'),
+  linkageRecords: (params) => api.get('/health/linkage/records', { params }),
+  linkageThresholds: () => api.get('/health/linkage/thresholds'),
+  setLinkageThresholds: (data) => api.post('/health/linkage/thresholds', data),
+  linkageAction: (key, data) => api.post(`/health/linkage/${key}/action`, data),
 }
 
 // 消息中心
@@ -138,6 +148,8 @@ export const exportApi = {
   proposals: () => api.get('/export/proposals', { responseType: 'blob' }),
   notices: () => api.get('/export/notices', { responseType: 'blob' }),
   knowledge: () => api.get('/export/knowledge', { responseType: 'blob' }),
+  healthContents: () => api.get('/export/health-contents', { responseType: 'blob' }),
+  healthConsults: () => api.get('/export/health-consults', { responseType: 'blob' }),
 }
 
 // 上传
