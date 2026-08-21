@@ -173,6 +173,26 @@ def render_sidebar(profile: dict, role: str):
             invalidate_all()
             st.rerun()
 
+    # 系统运行状态（轻量徽标：离线/在线模式 + 数据更新时间）
+    try:
+        from config import OFFLINE_MODE
+        _off = OFFLINE_MODE or st.session_state.get("_force_offline", False)
+        _mode_txt = "离线规则引擎" if _off else "AI 引擎"
+        _mode_color = "#f59e0b" if _off else "#059669"
+        from data.db_core import get_db as _gdb
+        with _gdb() as _conn:
+            _r = _conn.execute("SELECT MAX(updated_at) AS t FROM weather_cache").fetchone()
+            _data_t = (_r["t"] or "")[:16] if _r else "—"
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:6px 10px;'
+            f'border:1px solid {bd};border-radius:8px;font-size:0.72em;">'
+            f'<span style="color:{_mode_color};font-weight:700;">● {_mode_txt}</span>'
+            f'<span style="color:{tx3};margin-left:auto;">数据 {_data_t}</span></div>',
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
     st.caption("知 · 报 · 议 · 督 · 社区治理")
 
 
