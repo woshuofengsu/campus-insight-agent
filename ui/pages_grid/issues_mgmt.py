@@ -163,6 +163,18 @@ def _render_detail(issue: dict):
         st.markdown(f"**处理结果**：{issue['resolve_note']}")
     if issue.get("no_photo_reason"):
         st.markdown(f"**未上传照片原因**：{issue['no_photo_reason']}")
+    try:
+        from ui.pages.issues import _load_photos
+        _pb = _load_photos(issue.get("photo_before"))
+        _pa = _load_photos(issue.get("photo_after"))
+        if _pb:
+            st.markdown("**📷 现场照片**")
+            st.image(_pb, width=160)
+        if _pa:
+            st.markdown("**📷 维修后照片**")
+            st.image(_pa, width=160)
+    except Exception:
+        pass
     if issue.get("satisfaction"):
         st.markdown(f"**满意度**：{issue['satisfaction']}" + (f"（{issue.get('satisfaction_reason')}）" if issue.get("satisfaction_reason") else ""))
 
@@ -267,7 +279,14 @@ def _render_detail(issue: dict):
             no_photo_reason = st.text_input("未上传照片原因（未上传照片时必填）", key=f"m_nophoto_{iid}")
             res_sub = st.form_submit_button("提交处理结果（状态 → 待居民反馈）", width="stretch")
         if res_sub:
-            photo_after = json.dumps([p.name for p in (photos or [])][:3], ensure_ascii=False)
+            photo_after = "[]"
+            try:
+                from utils.uploads import save_uploaded_files
+                _saved = save_uploaded_files(photos, folder="issues")
+                if _saved:
+                    photo_after = json.dumps(_saved, ensure_ascii=False)
+            except Exception:
+                pass
             ok, msg = resolve_issue(iid, (note or "").strip(), photo_after=photo_after,
                                     no_photo_reason=(no_photo_reason or "").strip(), actor=_actor)
             if ok:

@@ -149,6 +149,9 @@ with st.container(border=True):
             reporter_name = st.text_input("报修人姓名", value=_my_name, key="rep_form_name")
         with c4:
             reporter_phone = st.text_input("联系电话（手机号）", placeholder="138****1234", key="rep_form_phone")
+        photos = st.file_uploader("现场照片（选填，jpg/png，≤5MB，最多3张）",
+                                  type=["jpg", "jpeg", "png"], accept_multiple_files=True,
+                                  help="照片仅负责人和您本人可见")
         submitted = st.form_submit_button("📨 提交报修", type="primary", width="stretch")
         saved = st.form_submit_button("💾 保存草稿", width="stretch")
 
@@ -195,6 +198,15 @@ with st.container(border=True):
             else:
                 # 诉求类别交给 AI 分类（紧急程度由居民自选）
                 category, _ = _llm_classify(title_t, "")
+                photo_before = "[]"
+                try:
+                    from utils.uploads import save_uploaded_files
+                    _saved = save_uploaded_files(photos, folder="issues")
+                    if _saved:
+                        import json
+                        photo_before = json.dumps(_saved, ensure_ascii=False)
+                except Exception:
+                    pass
                 draft_id = st.session_state.get("_active_draft_id")
                 issue_id, hint = submit_issue(
                     title=title_t,
@@ -206,6 +218,7 @@ with st.container(border=True):
                     reporter_name=name_t,
                     reporter_phone=phone_t,
                     reporter_id=uid,
+                    photo_before=photo_before,
                     draft_id=draft_id,
                 )
                 if hint == "safety":
@@ -236,6 +249,17 @@ with st.container(border=True):
                 else:
                     st.error(f"提交失败：{hint}")
 
+def _load_photos(raw: str | None) -> list[str]:
+    """解析照片路径 JSON，返回可显示的绝对路径列表（仅负责人和本人可见）。"""
+    import json
+    try:
+        paths = json.loads(raw or "[]")
+    except Exception:
+        paths = []
+    from utils.uploads import resolve_path
+    return [p for p in (resolve_path(x) for x in paths) if p]
+
+
 def _render_detail(issue: dict):
     iid = issue["id"]
     status = issue.get("status", "")
@@ -258,6 +282,14 @@ def _render_detail(issue: dict):
         st.markdown(f"**处理结果**：{issue['resolve_note']}")
     if issue.get("no_photo_reason"):
         st.markdown(f"**未上传照片原因**：{issue['no_photo_reason']}")
+    _photos_b = _load_photos(issue.get("photo_before"))
+    _photos_a = _load_photos(issue.get("photo_after"))
+    if _photos_b:
+        st.markdown("**📷 现场照片**")
+        st.image(_photos_b, width=160)
+    if _photos_a:
+        st.markdown("**📷 维修后照片**")
+        st.image(_photos_a, width=160)
     if issue.get("satisfaction"):
         icon = "😊" if issue.get("satisfaction") == "满意" else "😞"
         st.markdown(f"**满意度**：{icon} {issue['satisfaction']}")
