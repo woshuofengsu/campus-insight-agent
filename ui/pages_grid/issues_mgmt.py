@@ -282,11 +282,15 @@ def _render_detail(issue: dict):
             photo_after = "[]"
             try:
                 from utils.uploads import save_uploaded_files
-                _saved = save_uploaded_files(photos, folder="issues")
+                _saved, _errs = save_uploaded_files(photos, folder="issues")
+                if _errs:
+                    st.error("；".join(_errs))
+                    return
                 if _saved:
                     photo_after = json.dumps(_saved, ensure_ascii=False)
             except Exception:
-                pass
+                st.error("维修后照片上传失败，请重试。")
+                return
             ok, msg = resolve_issue(iid, (note or "").strip(), photo_after=photo_after,
                                     no_photo_reason=(no_photo_reason or "").strip(), actor=_actor)
             if ok:

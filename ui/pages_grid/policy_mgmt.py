@@ -157,11 +157,15 @@ with tab_kb:
             try:
                 if f_attach_file:
                     from utils.uploads import save_uploaded_files
-                    _saved = save_uploaded_files([f_attach_file], folder="knowledge", max_count=1)
+                    _saved, _errs = save_uploaded_files([f_attach_file], folder="knowledge", max_count=1)
+                    if _errs:
+                        st.error("；".join(_errs))
+                        st.stop()
                     if _saved:
                         _attach_val = _saved[0]
             except Exception:
-                pass
+                st.error("政策附件上传失败，请重试。")
+                st.stop()
             kw = dict(title=f_title, category=f_cat, plain_interpretation=f_interp,
                       source=f_source, keywords=f_keywords, effective_date=f_eff,
                       content=f_content, summary=f_summary, expire_date=f_exp,

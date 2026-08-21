@@ -30,6 +30,7 @@ from data.db_proposal import (
     auto_confirm_overdue,
     auto_end_unfeedback,
     proposal_no,
+    mask_name as db_mask_name,
     VALID_CATEGORIES,
     EXECUTOR_DEPTS,
     STATUS_ALL,
@@ -151,7 +152,7 @@ else:
             st.markdown(head, unsafe_allow_html=True)
             st.caption(
                 f'{p.get("category","")} · {"🔓 公开" if is_public else "🔒 私有"} · '
-                f'👤 {p.get("reporter_name") or p.get("author") or "—"} '
+                f'👤 {db_mask_name(p.get("reporter_name") or p.get("author") or "") or "—"} '
                 f'（{p.get("reporter_phone")[:3] + "****" + p.get("reporter_phone")[-4:] if p.get("reporter_phone") and len(p.get("reporter_phone"))==11 else "****"}）'
                 f' · {p.get("community_building") or "楼栋未知"} · 🕐 {(p.get("created_at") or "")[:16]}'
             )
@@ -324,9 +325,9 @@ else:
                     acted = True
                     st.markdown(
                         f"**🔁 重新执行处理**（第 {reopen_n} 次）"
-                        + ("：已超过 2 次，请选择「关闭」或「继续」" if reopen_n >= 2 else "")
+                        + ("：已超过 2 次，请选择「关闭」或「继续」" if reopen_n > 2 else "")
                     )
-                    if reopen_n >= 2:
+                    if reopen_n > 2:
                         st.warning("重新执行已超过 2 次，请选择关闭或继续（留痕）。")
                     if p.get("is_public"):
                         st.markdown("公开提案：继续将重新公示 3 天并重新投票（数据清零）。")

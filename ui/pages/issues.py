@@ -241,14 +241,21 @@ def _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency_val, issue_type_va
     """真正提交工单（校验已通过；AI 分类 + 照片保存 + 结果提示）。"""
     category, _ = _llm_classify(title_t, "")
     photo_before = "[]"
+    upload_errs: list[str] = []
     try:
         from utils.uploads import save_uploaded_files
-        _saved = save_uploaded_files(photos_list, folder="issues")
+        _saved, upload_errs = save_uploaded_files(photos_list, folder="issues")
         if _saved:
             import json
             photo_before = json.dumps(_saved, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        # spec：照片上传失败 → 提示重试，不生成工单
+        _log.warning("报修照片上传失败：%s", e)
+        upload_errs = ["照片上传失败，请重试"]
+    if upload_errs:
+        st.error("；".join(upload_errs))
+        st.info("照片未保存，问题描述仍保留，请检查照片后重新提交。")
+        return
     draft_id = st.session_state.get("_active_draft_id")
     issue_id, hint = submit_issue(
         title=title_t, category=category, issue_type=issue_type_val,

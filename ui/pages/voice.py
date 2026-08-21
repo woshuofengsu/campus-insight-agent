@@ -177,12 +177,25 @@ else:
             elif s == "公示中":
                 days = get_voting_remaining_days(pid)
                 st.caption(f"🔵 公示中" + (f"，剩余 {days} 天" if days is not None else "") + f" · {_vote_line(pid)}")
+                # 公开附件展示给所有居民（spec：公开提案公示期间附件可见）
+                if p.get("attachment_public"):
+                    try:
+                        import json as _json
+                        from utils.uploads import resolve_path as _resolve
+                        _paths = _json.loads(p.get("attachment") or "[]")
+                        _imgs = [x for x in (_resolve(x) for x in _paths) if x]
+                        if _imgs:
+                            st.image(_imgs, width=140)
+                    except Exception:
+                        pass
             elif s == "待执行":
                 st.caption("🔵 私有提案，等待负责人转部门执行。")
             elif s == "执行中":
                 st.caption(f"🟢 执行中 · 执行部门：{p.get('executor_dept') or '待定'}")
             elif s == "待提案人反馈":
                 st.caption(f"🟠 执行已完成，请反馈满意度（7 天内，逾期视为满意）。")
+                if not p.get("is_public"):
+                    st.info("您的反馈将直接影响提案后续处理，请如实填写。")
                 if p.get("execution_result"):
                     st.markdown(
                         f'<div style="font-size:0.82em;color:{TOKEN["text_sec"]};background:{TOKEN["success_bg"]};'
@@ -202,7 +215,7 @@ else:
                     else:
                         st.error(msg)
             elif s == "重新执行":
-                st.caption("🟠 重新执行处理中（负责人处理中）。" + ("超过 2 次，等待负责人决定关闭或继续。" if (p.get("reopen_count") or 0) >= 2 else ""))
+                st.caption("🟠 重新执行处理中（负责人处理中）。" + ("已超过 2 次，等待负责人决定关闭或继续。" if (p.get("reopen_count") or 0) > 2 else ""))
             elif s == "已完成":
                 st.caption(f"✅ 已完成。{p.get('satisfaction') or '满意'}")
             elif s == "不予执行":
@@ -364,14 +377,20 @@ with st.container(border=True):
             st.session_state._create_proposal_feedback = ""
         else:
             _attach = "[]"
+            _upload_errs: list[str] = []
             try:
                 from utils.uploads import save_uploaded_files
-                _saved = save_uploaded_files(prop_files, folder="proposals")
+                _saved, _upload_errs = save_uploaded_files(prop_files, folder="proposals")
                 if _saved:
                     import json
                     _attach = json.dumps(_saved, ensure_ascii=False)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                _log.warning("提案附件上传失败：%s", e)
+                _upload_errs = ["附件上传失败，请重试"]
+            if _upload_errs:
+                st.session_state._create_proposal_error = "；".join(_upload_errs)
+                st.session_state._create_proposal_feedback = "附件未保存，已填内容保留在表单中，请重试。"
+                st.rerun()
             pid, msg = db_submit_proposal(
                 title=title, description=desc, category=prop_category,
                 reporter_name=prop_name.strip(), reporter_phone=prop_phone.strip(),

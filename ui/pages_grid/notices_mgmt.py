@@ -97,10 +97,14 @@ def _parse_files(files) -> str:
             return ""
         try:
             from utils.uploads import save_uploaded_files
-            saved = save_uploaded_files([f], folder="notices", max_count=1)
+            saved, _errs = save_uploaded_files([f], folder="notices", max_count=1)
+            if _errs:
+                st.error("；".join(_errs))
+                return ""
             path = saved[0] if saved else ""
         except Exception:
-            path = ""
+            st.error(f"附件「{f.name}」保存失败，请重试。")
+            return ""
         meta.append({"name": f.name, "size": f.size, "type": f.type or ext, "ext": ext, "path": path})
     return json.dumps(meta, ensure_ascii=False)
 

@@ -514,6 +514,11 @@ def _m26_knowledge_timestamps(conn):
     _add_column_if_missing(conn, "knowledge_base", "updated_at", "TEXT DEFAULT ''")
 
 
+def _m27_proposal_auditor(conn):
+    """v27：proposals 加 auditor（最后审核人），支撑「退回修改后仍由原审核人审核」。"""
+    _add_column_if_missing(conn, "proposals", "auditor", "TEXT DEFAULT ''")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -705,6 +710,7 @@ def init_db(db_path: str):
         (24, "proposal_attachment", _m24_proposal_attachment),
         (25, "settings", _m25_settings),
         (26, "knowledge_timestamps", _m26_knowledge_timestamps),
+        (27, "proposal_auditor", _m27_proposal_auditor),
     ]
     for version, name, fn in post:
         if version <= current:

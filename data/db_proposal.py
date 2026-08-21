@@ -345,7 +345,8 @@ def audit_proposal(pid: int, approve: bool, opinion: str = "",
     with get_db() as conn:
         _ensure_schema(conn)
         row = conn.execute(
-            "SELECT status, title, attachment_public, audit_opinion FROM proposals WHERE id=?",
+            "SELECT status, title, attachment_public, audit_opinion, auditor "
+            "FROM proposals WHERE id=?",
             (pid,),
         ).fetchone()
         if row is None:
@@ -356,6 +357,9 @@ def audit_proposal(pid: int, approve: bool, opinion: str = "",
         opinion = (opinion or "").strip()
         if not approve and not opinion:
             return False, "退回必须填写审核意见"
+        # spec 验收 3：退回修改后重新提交，仍由原审核人审核
+        if old == "退回修改" and row["auditor"] and row["auditor"] != actor:
+            return False, f"该提案由「{row['auditor']}」审核并退回，请由原审核人重新审核"
 
         new_status = "待确认公示/私有" if approve else "退回修改"
         attach_note = ""
@@ -366,9 +370,9 @@ def audit_proposal(pid: int, approve: bool, opinion: str = "",
         conn.execute(
             "UPDATE proposals SET status=?, audit_status=?, audit_opinion=?, "
             "audited_at=CASE WHEN ?=1 THEN CURRENT_TIMESTAMP ELSE audited_at END, "
-            "attachment_public=? WHERE id=?",
+            "attachment_public=?, auditor=? WHERE id=?",
             (new_status, "通过" if approve else "退回",
-             f"{opinion}{attach_note}", 1 if approve else 0, new_attach, pid),
+             f"{opinion}{attach_note}", 1 if approve else 0, new_attach, actor, pid),
         )
         conn.commit()
     log_activity(actor, "审核通过" if approve else "退回修改", "proposal", pid,
@@ -584,6 +588,11 @@ def vote_proposal(pid: int, user_id: int, score: int, actor: str = "居民") -> 
         except sqlite3.IntegrityError:
             conn.rollback()
             return False, "您已经投过票了，每人每提案限投一票"
+        except Exception:
+            # spec：评分保存失败 → 提示重试，不记录评分（回滚保证）
+            conn.rollback()
+            _log.warning("投票保存失败 proposal#%s user#%s", pid, user_id, exc_info=True)
+            return False, "评分失败，请重试"
 
     # 留痕：只记「有居民评分」，不记个体、不记分数（spec：系统日志不记录个体与分数的关联）
     log_activity("匿名居民", "投票", "proposal", pid, row["title"] or "",
@@ -1232,6 +1241,21 @@ def get_export_rows() -> list[dict]:
     """导出数据（字段脱敏，不含个体投票明细、附件、其他隐私）。"""
     props = get_proposals(limit=1000)
     stats = get_vote_stats_batch([p["id"] for p in props])
+    # 排名：按投票人数降序（并列同票同名次，按出现顺序推进），没投票的不占排名
+    ranked_ids = sorted(
+        (pid for pid, s in stats.items() if s.get("vote_count", 0) > 0),
+        key=lambda pid: (-stats[pid]["vote_count"], -(stats[pid]["avg_score"] or 0), pid),
+    )
+    rank_map: dict[int, str] = {}
+    i = 0
+    prev_key = None
+    for pid in ranked_ids:
+        i += 1
+        key = (stats[pid]["vote_count"], stats[pid]["avg_score"])
+        if key != prev_key:
+            cur_rank = i
+            prev_key = key
+        rank_map[pid] = str(cur_rank)
     out = []
     for p in props:
         s = stats.get(p["id"], {})
@@ -1247,7 +1271,7 @@ def get_export_rows() -> list[dict]:
             "状态": p.get("status"),
             "投票人数": s.get("vote_count", 0),
             "平均分": s.get("avg_score", "") if s.get("avg_score") is not None else "",
-            "排名": s.get("rank", ""),
+            "排名": rank_map.get(p["id"], ""),
             "执行部门": p.get("executor_dept") or "",
             "执行结果": p.get("execution_result") or "",
             "反馈状态": p.get("satisfaction") or "",

@@ -317,14 +317,18 @@ with tab_ask:
 
     if submitted:
         _attach = "[]"
+        _upload_errs: list[str] = []
         try:
             from utils.uploads import save_uploaded_files
-            _saved = save_uploaded_files(c_files, folder="consults")
+            _saved, _upload_errs = save_uploaded_files(c_files, folder="consults")
             if _saved:
                 import json
                 _attach = json.dumps(_saved, ensure_ascii=False)
         except Exception:
-            pass
+            _upload_errs = ["附件上传失败，请重试"]
+        if _upload_errs:
+            st.error("；".join(_upload_errs) + "。已填内容保留，请重试。")
+            st.stop()
         cid, msg, code = submit_consult(
             uid, c_name, c_phone, c_type, c_content, building=c_building,
             attachment_json=_attach,

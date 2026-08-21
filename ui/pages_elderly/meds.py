@@ -102,10 +102,14 @@ def _render_med_form(uid, existing: dict | None, rid: int | None = None):
                 return
             try:
                 from utils.uploads import save_uploaded_files
-                _saved = save_uploaded_files([photo], folder="meds", max_count=1)
+                _saved, _errs = save_uploaded_files([photo], folder="meds", max_count=1)
+                if _errs:
+                    st.error("；".join(_errs))
+                    return
                 photo_name = _saved[0] if _saved else ""
             except Exception:
-                photo_name = ""
+                st.error("药品照片上传失败，请重试。")
+                return
         elif existing:
             photo_name = existing.get("photo") or ""
         if rid:

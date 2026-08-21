@@ -10,6 +10,9 @@ import uuid
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _UPLOAD_DIR = os.path.join(_BASE, "uploads")
 
+# spec：单张附件 ≤5MB（报修/提案/通知/健康/用药统一口径）
+MAX_FILE_SIZE = 5 * 1024 * 1024
+
 
 def _folder_path(folder: str) -> str:
     p = os.path.join(_UPLOAD_DIR, folder)
@@ -22,11 +25,21 @@ def save_uploaded_files(files, folder: str = "issues", max_count: int = 3) -> li
 
     files: st.file_uploader 返回的对象列表（含 None）。
     folder: 子目录（issues / proposals / notices / consults / meds）。
+    单文件超过 5MB 跳过并记入返回值中的错误列表——用 (saved, errors) 双返回。
     """
     saved: list[str] = []
+    errors: list[str] = []
     folder_dir = _folder_path(folder)
     for f in files[:max_count]:
         if f is None:
+            continue
+        size = 0
+        try:
+            size = f.size or 0
+        except Exception:
+            pass
+        if size > MAX_FILE_SIZE:
+            errors.append(f"{f.name or '文件'} 超过 5MB，已跳过")
             continue
         ext = os.path.splitext(f.name or "")[1].lower() or ".jpg"
         fname = f"{uuid.uuid4().hex}{ext}"
@@ -34,7 +47,7 @@ def save_uploaded_files(files, folder: str = "issues", max_count: int = 3) -> li
         with open(path, "wb") as out:
             out.write(f.getbuffer())
         saved.append(f"uploads/{folder}/{fname}")
-    return saved
+    return saved, errors
 
 
 def delete_upload(rel_path: str | None) -> None:
