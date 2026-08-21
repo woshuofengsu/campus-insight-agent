@@ -429,7 +429,251 @@ def web_proposal_vote(pid: int, req: ProposalVote, request: Request):
     return ok({"proposal_id": pid}, "投票成功")
 
 
-# ---------------- 静态托管（Vue3 dist，P2 后启用） ----------------
+# ---------------- 提案闭环（复用 db_proposal） ----------------
+
+class ProposalAction(BaseModel):
+    action: str = Field(..., pattern="^(audit|confirm|decide|execute|resolve|feedback|reopen|close|take_down)$")
+    approve: bool = Field(default=True)
+    opinion: str = Field(default="")
+    is_public: int = Field(default=1)
+    reason: str = Field(default="")
+    dept: str = Field(default="")
+    result: str = Field(default="")
+    satisfied: bool = Field(default=True)
+    close: bool = Field(default=False)
+
+
+@app.post("/api/web/proposals/{pid}/action")
+def web_proposal_action(pid: int, req: ProposalAction, request: Request):
+    from data.db_proposal import (
+        audit_proposal, confirm_visibility, decide_execute, start_execute,
+        resolve_proposal, feedback_proposal, handle_reopen, close_proposal,
+        take_down_proposal,
+    )
+    actor = _user(request).get("name") or "负责人"
+    a = req.action
+    try:
+        if a == "audit":
+            ok_, msg = audit_proposal(pid, req.approve, opinion=req.opinion, actor=actor)
+        elif a == "confirm":
+            ok_, msg = confirm_visibility(pid, req.is_public, actor=actor)
+        elif a == "decide":
+            ok_, msg = decide_execute(pid, req.approve, reason=req.reason, actor=actor)
+        elif a == "execute":
+            ok_, msg = start_execute(pid, req.dept, actor=actor)
+        elif a == "resolve":
+            ok_, msg = resolve_proposal(pid, req.result, actor=actor)
+        elif a == "feedback":
+            ok_, msg = feedback_proposal(pid, req.satisfied, reason=req.reason, actor=actor)
+        elif a == "reopen":
+            ok_, msg = handle_reopen(pid, close=req.close, reason=req.reason, actor=actor)
+        elif a == "close":
+            ok_, msg = close_proposal(pid, actor=actor)
+        elif a == "take_down":
+            ok_, msg = take_down_proposal(pid, req.reason, actor=actor)
+        else:
+            return fail(1001, "不支持的操作")
+    except Exception as e:  # noqa: BLE001
+        return fail(2001, f"操作失败：{e}")
+    if not ok_:
+        return fail(2001, msg or "操作被拒绝")
+    return ok({"proposal_id": pid}, msg or "操作成功")
+
+
+# ---------------- 通知模块（复用 db_notice） ----------------
+
+class NoticeCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=50)
+    notice_type: str = Field(..., pattern="^(社区公告|活动通知|停水停电通知|政策通知|温馨提示|紧急通知|其他)$")
+    publish_scope: str = Field(default="全体居民", pattern="^(全体居民|指定小区|指定楼栋|仅老年端)$")
+    body: str = Field(..., min_length=1)
+    elderly_summary: str = Field(default="")
+    is_urgent: int = Field(default=0)
+    is_pinned: int = Field(default=0)
+    expire_at: str = Field(default="")
+    scheduled_at: str = Field(default="")
+    attachment_json: str = Field(default="[]")
+    scope_target_json: str = Field(default="[]")
+
+
+@app.post("/api/web/notices")
+def web_notice_create(req: NoticeCreate, request: Request):
+    from data.db_notice import create_notice
+    actor = _user(request).get("name") or "负责人"
+    nid = create_notice(
+        title=req.title, notice_type=req.notice_type, publish_scope=req.publish_scope,
+        body=req.body, elderly_summary=req.elderly_summary, publisher=actor,
+        is_pinned=req.is_pinned, is_urgent=req.is_urgent, expire_at=req.expire_at,
+        attachment_json=req.attachment_json, scope_target_json=req.scope_target_json,
+        actor=actor,
+    )
+    if nid <= 0:
+        return fail(2001, "通知类型或敏感词校验不通过")
+    # 定时 / 立即发布
+    if req.scheduled_at:
+        from data.db_notice import schedule_notice
+        ok_, msg = schedule_notice(nid, req.scheduled_at, _user(request).get("uid"), actor,
+                                   confirm_urgent=bool(req.is_urgent))
+        if not ok_:
+            return fail(2001, msg)
+    elif req.notice_type != "紧急通知":
+        from data.db_notice import publish_notice
+        ok_, msg = publish_notice(nid, _user(request).get("uid"), actor)
+        if not ok_:
+            return fail(2001, msg)
+    return ok({"notice_id": nid}, "通知已创建")
+
+
+@app.get("/api/web/notices")
+def web_notice_list(request: Request, limit: int = 100):
+    from data.db_notice import get_visible_notices
+    u = _user(request)
+    role = u.get("role")
+    client_type = "elderly" if role == "elderly" else "resident"
+    rows = get_visible_notices(client_type, u.get("uid"), limit=limit)
+    out = [{
+        "id": n.get("id"), "title": n.get("title"), "notice_type": n.get("notice_type"),
+        "body": n.get("body"), "is_urgent": n.get("is_urgent"), "is_pinned": n.get("is_pinned"),
+        "published_at": n.get("published_at"), "elderly_summary": n.get("elderly_summary"),
+        "is_read": n.get("is_read", 0),
+    } for n in rows]
+    return ok(out)
+
+
+@app.get("/api/web/notices/manage")
+def web_notice_manage(request: Request, status: str = "", limit: int = 200):
+    """负责人端通知管理列表（含已读统计）。"""
+    from ui.cache import cached_notices_with_stats
+    _r = _require_role(request, "grid")
+    if _r:
+        return _r
+    rows = cached_notices_with_stats(status=status or None, limit=limit)
+    return ok(rows)
+
+
+class NoticeAction(BaseModel):
+    action: str = Field(..., pattern="^(publish|schedule|withdraw|take_down|pin|unpin|mark_read|delete)$")
+    scheduled_at: str = Field(default="")
+    reason: str = Field(default="")
+    confirm_urgent: bool = Field(default=False)
+
+
+@app.post("/api/web/notices/{nid}/action")
+def web_notice_action(nid: int, req: NoticeAction, request: Request):
+    from data.db_notice import (
+        publish_notice, schedule_notice, withdraw_notice, take_down_notice,
+        set_pinned, mark_notice_read, delete_notice,
+    )
+    from ui.cache import invalidate_notices
+    u = _user(request)
+    actor = u.get("name") or "负责人"
+    a = req.action
+    try:
+        if a == "publish":
+            ok_, msg = publish_notice(nid, u.get("uid"), actor, confirm_urgent=req.confirm_urgent)
+        elif a == "schedule":
+            ok_, msg = schedule_notice(nid, req.scheduled_at, u.get("uid"), actor,
+                                       confirm_urgent=req.confirm_urgent)
+        elif a == "withdraw":
+            ok_, msg = withdraw_notice(nid, actor)
+        elif a == "take_down":
+            ok_, msg = take_down_notice(nid, req.reason, actor)
+        elif a == "pin":
+            ok_, msg = set_pinned(nid, True, actor)
+        elif a == "unpin":
+            ok_, msg = set_pinned(nid, False, actor)
+        elif a == "mark_read":
+            mark_notice_read(nid, "elderly" if u.get("role") == "elderly" else "resident", u.get("uid"))
+            return ok({"notice_id": nid}, "已标记已读")
+        elif a == "delete":
+            delete_notice(nid, actor)
+            invalidate_notices()
+            return ok({"notice_id": nid}, "已删除")
+        else:
+            return fail(1001, "不支持的操作")
+    except Exception as e:  # noqa: BLE001
+        return fail(2001, f"操作失败：{e}")
+    if not ok_:
+        return fail(2001, msg or "操作被拒绝")
+    invalidate_notices()
+    return ok({"notice_id": nid}, msg or "操作成功")
+
+
+# ---------------- 政策问答（复用 db_policy） ----------------
+
+class AskQuestion(BaseModel):
+    question: str = Field(..., min_length=1, max_length=200)
+    category: str = Field(default="")
+    source: str = Field(default="居民端")
+
+
+@app.post("/api/web/qa/ask")
+def web_qa_ask(req: AskQuestion, request: Request):
+    from data.db_policy import ask_question
+    u = _user(request)
+    r = ask_question(u.get("uid"), req.question, source=req.source, category=req.category or None)
+    if r.get("matched"):
+        return ok({
+            "matched": True, "question_id": r.get("question_id"),
+            "answer": r.get("auto_answer"), "score": r.get("score"),
+            "title": (r.get("knowledge") or {}).get("title"),
+        }, "已自动回答")
+    # 未匹配/敏感/医疗 → 转人工提示
+    return ok({
+        "matched": False, "reason": r.get("reason"),
+        "manual_text": r.get("manual_text", "暂未找到答案，可转人工。"),
+        "expired_hint": r.get("expired_hint", ""),
+    }, "未自动回答")
+
+
+class TransferHuman(BaseModel):
+    question: str = Field(default="")
+
+
+@app.post("/api/web/qa/{qid}/transfer")
+def web_qa_transfer(qid: int, req: TransferHuman, request: Request):
+    from data.db_policy import transfer_to_human
+    u = _user(request)
+    try:
+        ok_ = transfer_to_human(qid) if qid > 0 else transfer_to_human(
+            user_id=u.get("uid"), question=req.question, source="居民端")
+        return ok({"question_id": qid}, "已转人工")
+    except Exception as e:  # noqa: BLE001
+        return fail(2001, f"转人工失败：{e}")
+
+
+@app.get("/api/web/qa/questions")
+def web_qa_questions(request: Request, status: str = "", limit: int = 50):
+    from data.db_policy import get_questions
+    u = _user(request)
+    if u.get("role") == "grid":
+        rows = get_questions(status=status or None, limit=limit)
+    else:
+        rows = get_questions(user_id=u.get("uid"), limit=limit)
+    return ok([dict(r) for r in rows])
+
+
+@app.get("/api/web/knowledge")
+def web_knowledge_list(request: Request, category: str = "", limit: int = 50):
+    from data.db_policy import get_knowledge_list
+    u = _user(request)
+    status = None if u.get("role") == "grid" else "已发布"
+    rows = get_knowledge_list(status=status, category=category or None, limit=limit)
+    return ok([{
+        "id": k.get("id"), "title": k.get("title"), "category": k.get("category"),
+        "plain_interpretation": k.get("plain_interpretation"), "summary": k.get("summary"),
+        "status": k.get("audit_status"), "updated_at": k.get("updated_at") or k.get("created_at"),
+        "attachment": k.get("attachment"),
+    } for k in rows])
+
+
+@app.get("/api/web/qa/high-freq")
+def web_qa_high_freq(request: Request, limit: int = 10):
+    from data.db_policy import get_common_questions
+    return ok(get_common_questions(limit=limit))
+
+
+
 
 _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
 

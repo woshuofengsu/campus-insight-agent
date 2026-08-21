@@ -157,3 +157,66 @@ def test_jwt_tamper(client):
     token = r["token"][:-2] + "xx"
     r = client.get("/api/web/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 401
+
+
+def test_notice_flow(client):
+    """通知创建 → 列表（居民可见）→ 下架。"""
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    r = client.post("/api/web/notices", json={
+        "title": "停水通知", "notice_type": "停水停电通知", "publish_scope": "全体居民",
+        "body": "明早 8 点停水检修，请提前储水。",
+    }, headers=gh)
+    assert r.status_code == 200, r.text
+    nid = r.json()["data"]["notice_id"]
+
+    # 居民可见
+    res = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {res['token']}"}
+    r = client.get("/api/web/notices", headers=rh)
+    assert r.json()["success"] and any(n["id"] == nid for n in r.json()["data"])
+
+    # 非法类型被拒
+    r = client.post("/api/web/notices", json={
+        "title": "x", "notice_type": "不存在", "publish_scope": "全体居民", "body": "x",
+    }, headers=gh)
+    assert r.status_code == 422
+
+    # 下架
+    r = client.post(f"/api/web/notices/{nid}/action",
+                    json={"action": "take_down", "reason": "已检修完成"}, headers=gh)
+    assert r.json()["success"], r.text
+    r = client.get("/api/web/notices", headers=rh)
+    assert not any(n["id"] == nid for n in r.json()["data"]), "下架后居民不可见"
+
+
+def test_qa_ask_and_transfer(client):
+    """政策提问：自动回答或转人工。"""
+    res = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {res['token']}"}
+    r = client.post("/api/web/qa/ask", json={"question": "医保报销需要带什么材料？"}, headers=rh)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success"]
+    # 要么自动回答，要么给出未匹配提示
+    assert "matched" in body["data"]
+
+    # 敏感词 → 转人工（不自动回答）
+    r = client.post("/api/web/qa/ask", json={"question": "请问怎么转账给我银行卡号123456"}, headers=rh)
+    assert r.json()["success"] and r.json()["data"]["matched"] is False
+    assert r.json()["data"]["reason"] == "manual"
+
+    # 负责人提问列表可见
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    r = client.get("/api/web/qa/questions", headers=gh)
+    assert r.json()["success"]
+
+
+def test_knowledge_list(client):
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    r = client.get("/api/web/knowledge", headers=gh)
+    assert r.json()["success"]
+    r = client.get("/api/web/qa/high-freq", headers=gh)
+    assert r.json()["success"]
