@@ -538,6 +538,8 @@ def audit_knowledge(knowledge_id: int, approve: bool, opinion: str = "",
         log_activity(actor, "审核通过并发布", "knowledge", knowledge_id, row.get("title", ""),
                      module=MODULE, before_value="待审核", after_value="已发布",
                      detail=f"V{new_version} 发布，旧版本已自动下架")
+        # 跨模块联动 #9：知识库更新 → 提示负责人处理关联的「政策通知」
+        _notify_related_policy_notices(row.get("title", ""), "知识库已更新")
         return True, "已发布，可被自动回答引用"
     else:
         with get_db() as conn:
@@ -627,7 +629,38 @@ def take_down_knowledge(knowledge_id: int, reason: str,
         conn.commit()
     log_activity(actor, "下架知识库", "knowledge", knowledge_id, row.get("title", ""),
                  module=MODULE, before_value="已发布", after_value="已下架", detail=reason)
+    # 跨模块联动 #9：知识库下架 → 提示负责人处理关联的「政策通知」
+    _notify_related_policy_notices(row.get("title", ""), "知识库已下架")
     return True, ""
+
+
+def _notify_related_policy_notices(kb_title: str, event: str) -> None:
+    """跨模块联动 #9（最小方案）：知识库更新/下架时，若存在标题或正文含该政策名的
+    已发布「政策通知」，提示负责人处理（可选择下架或更新通知）。"""
+    if not kb_title:
+        return
+    try:
+        from data.db_core import get_db as _gdb
+        kw = kb_title[:8]
+        with _gdb() as conn:
+            rows = conn.execute(
+                "SELECT id, title FROM notices WHERE notice_type='政策通知' AND status='已发布' "
+                "AND (title LIKE ? OR body LIKE ?) LIMIT 5",
+                (f"%{kw}%", f"%{kw}%"),
+            ).fetchall()
+        if not rows:
+            return
+        names = "、".join(f"#{r['id']} {r['title']}" for r in rows)
+        from data.db_user import list_users
+        for u in list_users(role="grid"):
+            from data.db_notifications import create_notification
+            create_notification(
+                u["id"], "policy",
+                f"🔗 {event}，请处理关联政策通知",
+                f"知识库「{kb_title[:20]}」{event}，检测到关联政策通知（{names}），请选择下架或更新通知。",
+            )
+    except Exception:
+        pass
 
 
 def auto_expire_knowledge(actor: str = "系统") -> list[dict]:
