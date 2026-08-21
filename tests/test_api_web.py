@@ -386,6 +386,75 @@ def test_elderly_contacts_sos_medication_clean(client):
     assert r.json()["success"], r.text
 
 
+def test_proposal_comments_anonymous(client):
+    """提案公示期匿名议论：匿名可见/匿名发言/状态限制。"""
+    res = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {res['token']}"}
+    r = client.post("/api/web/proposals", json={
+        "title": "议论测试", "description": "测试公示期匿名议论功能完整性",
+        "category": "其他", "is_public": 1, "reporter_name": "王阿姨",
+        "reporter_phone": "13800138000",
+    }, headers=rh)
+    pid = r.json()["data"]["proposal_id"]
+
+    # 待审核不能议论
+    r = client.post(f"/api/web/proposals/{pid}/comments", json={"content": "支持"}, headers=rh)
+    assert not r.json()["success"], "待审核不能议论"
+
+    from data.db_proposal import audit_proposal, confirm_visibility
+    audit_proposal(pid, True, opinion="同意", actor="网格员A")
+    confirm_visibility(pid, 1, actor="王阿姨")
+
+    # 公示中可匿名议论
+    r = client.post(f"/api/web/proposals/{pid}/comments", json={"content": "我觉得很有必要！"}, headers=rh)
+    assert r.json()["success"], r.text
+    r = client.post(f"/api/web/proposals/{pid}/comments", json={"content": "支持支持"}, headers=rh)
+    assert r.json()["success"], r.text
+    r = client.get(f"/api/web/proposals/{pid}/comments", headers=rh)
+    assert r.json()["success"] and len(r.json()["data"]) == 2
+    authors = {c["author"] for c in r.json()["data"]}
+    assert len(authors) == 1 and "匿名居民#" in list(authors)[0], "同人议论应显示同一匿名伪名"
+
+    # 敏感词拦截
+    r = client.post(f"/api/web/proposals/{pid}/comments", json={"content": "傻逼"}, headers=rh)
+    assert not r.json()["success"] and "敏感词" in r.json()["error"]
+
+
+def test_issue_permission_guard(client):
+    """P0 权限加固：居民不能调管理动作、不能看他人工单。"""
+    res = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {res['token']}"}
+    e = _login(client, "demo_elderly", "")
+    eh = {"Authorization": f"Bearer {e['token']}"}
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+
+    # 老人提交工单
+    r = client.post("/api/web/elderly/voice-report", json={"text": "楼道灯坏了"}, headers=eh)
+    iid = r.json()["data"]["issue_id"]
+
+    # 居民尝试审核他人工单 → 403
+    r = client.post(f"/api/web/issues/{iid}/action", json={"action": "audit", "approve": True}, headers=rh)
+    assert r.status_code == 400 and r.json()["code"] == 1003, "居民不能审核"
+    # 居民查看他人工单详情 → 403
+    r = client.get(f"/api/web/issues/{iid}", headers=rh)
+    assert r.status_code == 400 and r.json()["code"] == 1003, "居民不能看他人工单"
+    # 负责人可查看（含完整电话）
+    r = client.get(f"/api/web/issues/{iid}", headers=gh)
+    assert r.json()["success"] and len(r.json()["data"]["reporter_phone"]) == 11
+
+    # 居民查看他人提案详情（私有）→ 403
+    r = client.post("/api/web/proposals", json={
+        "title": "私有提案测试", "description": "测试私有提案权限过滤完整",
+        "category": "其他", "is_public": 0, "reporter_name": "王阿姨", "reporter_phone": "13800138000",
+    }, headers=rh)
+    pid = r.json()["data"]["proposal_id"]
+    from data.db_proposal import audit_proposal as ap2
+    ap2(pid, True, opinion="同意", actor="网格员A")
+    r = client.get(f"/api/web/proposals/{pid}", headers=eh)
+    assert r.status_code == 400 and r.json()["code"] == 1003, "居民不能看他人私有提案"
+
+
 def test_elderly_free_login(client):
     """老年端免登录：家属绑定后 elder_id 参数以老人身份访问。"""
     from data.db_core import get_db

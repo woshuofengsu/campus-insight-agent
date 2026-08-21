@@ -524,6 +524,16 @@ def _m28_issue_supplement_pending(conn):
     _add_column_if_missing(conn, "community_issues", "supplement_pending", "INTEGER DEFAULT 0")
 
 
+def _m29_proposal_comments(conn):
+    """v29：proposal_comments 提案公示议论表（匿名：不存身份展示，user_id 仅用于防刷与伪名）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS proposal_comments ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, proposal_id INTEGER NOT NULL, "
+        "user_id INTEGER NOT NULL, content TEXT NOT NULL, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -717,6 +727,7 @@ def init_db(db_path: str):
         (26, "knowledge_timestamps", _m26_knowledge_timestamps),
         (27, "proposal_auditor", _m27_proposal_auditor),
         (28, "issue_supplement_pending", _m28_issue_supplement_pending),
+        (29, "proposal_comments", _m29_proposal_comments),
     ]
     for version, name, fn in post:
         if version <= current:

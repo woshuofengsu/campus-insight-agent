@@ -50,9 +50,12 @@ export const issues = {
 // 提案
 export const proposals = {
   list: (params) => api.get('/proposals', { params }),
+  detail: (id) => api.get(`/proposals/${id}`),
   create: (data) => api.post('/proposals', data),
   vote: (id, score) => api.post(`/proposals/${id}/vote`, { score }),
   action: (id, data) => api.post(`/proposals/${id}/action`, data),
+  comments: (id) => api.get(`/proposals/${id}/comments`),
+  addComment: (id, data) => api.post(`/proposals/${id}/comments`, data),
 }
 
 // 通知

@@ -110,6 +110,39 @@ def _ensure_db():
     _db_ready = True
 
 
+_scheduler_started = False
+
+
+def _ensure_scheduler():
+    """启动后台调度器（守护线程）：定时发布/超时升级/自动分派/预警检测/到期清理等
+    A 类自动任务（spec 九）。幂等：进程内只启动一次。"""
+    global _scheduler_started
+    if _scheduler_started:
+        return
+    try:
+        from scripts.scheduler import ensure_scheduler_started
+        ensure_scheduler_started(interval=60)
+        _scheduler_started = True
+        _log.info("Web 服务调度器已启动（自动任务每 60 秒轮询）")
+    except Exception as e:  # noqa: BLE001
+        _log.warning("调度器启动失败（不影响 API）：%s", e)
+
+
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(app):
+    _ensure_db()
+    _ensure_scheduler()
+    yield
+
+
+app = FastAPI(title="CommunityInsight Web API", version="3.0.0",
+              docs_url="/web/docs", redoc_url="/web/redoc", openapi_url="/web/openapi.json",
+              lifespan=_lifespan)
+
+
 # 公开路径：登录 + 文档 + 前端静态
 _PUBLIC_PATHS = {"/api/web/auth/login", "/api/web/auth/demo", "/web/docs", "/web/redoc",
                  "/web/openapi.json", "/", "/index.html", "/favicon.ico"}
@@ -298,17 +331,30 @@ def web_issue_list(request: Request, status: str = "", limit: int = 200):
         rows = get_issues(status=status or None, limit=limit)
     else:
         rows = get_issues(reporter_id=u.get("uid"), limit=limit)
-    return ok([_issue_view(r) for r in rows])
+    # 非负责人：手机号脱敏
+    out = []
+    for r in rows:
+        v = _issue_view(r)
+        if u.get("role") != "grid" and v.get("reporter_phone"):
+            v["reporter_phone"] = v["reporter_phone"][:3] + "****" + v["reporter_phone"][-4:]
+        out.append(v)
+    return ok(out)
 
 
 @app.get("/api/web/issues/{issue_id}")
 def web_issue_detail(issue_id: int, request: Request):
     from data.db_repair import get_issues, get_issue_timeline
+    u = _user(request)
     rows = get_issues(limit=1000)
     row = next((r for r in rows if r["id"] == issue_id), None)
     if not row:
         return fail(1004, "工单不存在")
+    # 权限：居民只能看自己的工单
+    if u.get("role") != "grid" and row.get("reporter_id") != u.get("uid"):
+        return fail(1003, "无权限查看该工单")
     detail = _issue_view(row)
+    if u.get("role") != "grid" and detail.get("reporter_phone"):
+        detail["reporter_phone"] = detail["reporter_phone"][:3] + "****" + detail["reporter_phone"][-4:]
     detail["timeline"] = [dict(t) for t in get_issue_timeline(issue_id)]
     return ok(detail)
 
@@ -345,7 +391,13 @@ def web_issue_action(issue_id: int, req: IssueAction, request: Request):
         withdraw_issue, close_issue, transfer_issue, negotiate_issue,
         supplement_issue, confirm_supplement, update_issue_category,
     )
-    actor = _user(request).get("name") or "负责人"
+    u = _user(request)
+    role = u.get("role")
+    # 权限（spec 六）：状态管理类操作仅负责人；居民可 反馈/撤回/补充
+    resident_actions = {"feedback", "withdraw", "supplement"}
+    if role != "grid" and req.action not in resident_actions:
+        return fail(1003, "无权限执行该操作（仅负责人可管理工单状态）")
+    actor = u.get("name") or "负责人"
     a = req.action
     try:
         if a == "audit":
@@ -415,10 +467,18 @@ def web_proposal_list(request: Request, status: str = "", limit: int = 300):
     rows = get_proposals(status=status or None, limit=limit)
     out = []
     for p in rows:
+        # 居民：只看公示中/已公开的，且姓名脱敏
+        if u.get("role") != "grid":
+            if p.get("status") not in ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成"):
+                continue
+            if not p.get("is_public"):
+                continue
         out.append({
             "id": p.get("id"), "title": p.get("title"), "category": p.get("category"),
             "status": p.get("status"), "is_public": p.get("is_public"),
-            "reporter_name": p.get("reporter_name"), "created_at": p.get("created_at"),
+            "reporter_name": p.get("reporter_name") if u.get("role") == "grid"
+            else ((p.get("reporter_name") or "")[:1] + "**" if p.get("reporter_name") else "—"),
+            "created_at": p.get("created_at"),
             "reopen_count": p.get("reopen_count") or 0,
         })
     return ok(out)
@@ -438,7 +498,38 @@ def web_proposal_vote(pid: int, req: ProposalVote, request: Request):
     return ok({"proposal_id": pid}, "投票成功")
 
 
-# ---------------- 提案闭环（复用 db_proposal） ----------------
+# ---------------- 提案议论（公示期匿名讨论） ----------------
+
+class ProposalCommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+
+
+@app.get("/api/web/proposals/{pid}/comments")
+def web_proposal_comments(pid: int, request: Request, limit: int = 100):
+    """公示提案的匿名议论列表（作者为匿名伪名，匿名可见）。"""
+    from data.db_proposal import get_proposal_comments, get_proposal
+    p = get_proposal(pid)
+    if not p:
+        return fail(1004, "提案不存在")
+    u = _user(request)
+    if u.get("role") != "grid" and (not p.get("is_public") or p.get("status") not in
+                                    ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行")):
+        return fail(1003, "该提案暂不支持议论")
+    return ok(get_proposal_comments(pid, limit=limit))
+
+
+@app.post("/api/web/proposals/{pid}/comments")
+def web_proposal_comment_add(pid: int, req: ProposalCommentCreate, request: Request):
+    """匿名发表议论（自己能看到、别人能看到，均不显示真实身份）。"""
+    from data.db_proposal import add_proposal_comment
+    u = _user(request)
+    ok_, msg = add_proposal_comment(pid, u.get("uid"), req.content)
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"proposal_id": pid}, "议论已发布（匿名）")
+
+
+
 
 class ProposalAction(BaseModel):
     action: str = Field(..., pattern="^(audit|confirm|decide|execute|resolve|feedback|reopen|close|take_down)$")
@@ -459,7 +550,13 @@ def web_proposal_action(pid: int, req: ProposalAction, request: Request):
         resolve_proposal, feedback_proposal, handle_reopen, close_proposal,
         take_down_proposal,
     )
-    actor = _user(request).get("name") or "负责人"
+    u = _user(request)
+    role = u.get("role")
+    # 权限：管理动作仅负责人；居民可确认公开/私有与反馈（spec：负责人不能代替居民确认）
+    resident_actions = {"confirm", "feedback"}
+    if role != "grid" and req.action not in resident_actions:
+        return fail(1003, "无权限执行该操作（仅负责人可管理提案）")
+    actor = u.get("name") or "负责人"
     a = req.action
     try:
         if a == "audit":
@@ -692,11 +789,20 @@ def web_qa_high_freq(request: Request, limit: int = 10):
 @app.get("/api/web/proposals/{pid}")
 def web_proposal_detail(pid: int, request: Request):
     from data.db_proposal import get_proposal, get_proposal_vote_stats, get_proposal_timeline
+    u = _user(request)
     p = get_proposal(pid)
     if not p:
         return fail(1004, "提案不存在")
+    # 居民：只能看已公开的公示提案，隐藏敏感字段
+    if u.get("role") != "grid" and (not p.get("is_public") or p.get("status") not in
+                                    ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成")):
+        return fail(1003, "无权限查看该提案")
     stats = get_proposal_vote_stats(pid) or {}
     out = dict(p)
+    if u.get("role") != "grid":
+        out.pop("reporter_phone", None)
+        out["reporter_name"] = ((p.get("reporter_name") or "")[:1] + "**") if p.get("reporter_name") else "—"
+        out.pop("attachment", None)
     out["vote_stats"] = stats
     try:
         out["timeline"] = get_proposal_timeline(pid, limit=20)
@@ -778,10 +884,17 @@ def web_health_article_action(cid: int, req: HealthArticleAction, request: Reque
 @app.get("/api/web/health/consults/{cid}")
 def web_consult_detail(cid: int, request: Request):
     from data.db_health_content import get_consult
+    u = _user(request)
     c = get_consult(cid)
     if not c:
         return fail(1004, "咨询不存在")
-    return ok(c)
+    # 权限：居民只能看自己的咨询；负责人可看全部
+    if u.get("role") != "grid" and c.get("user_id") != u.get("uid"):
+        return fail(1003, "无权限查看该咨询")
+    out = dict(c)
+    if u.get("role") != "grid" and out.get("phone"):
+        out["phone"] = out["phone"][:3] + "****" + out["phone"][-4:]
+    return ok(out)
 
 
 class ConsultFeedback(BaseModel):

@@ -601,6 +601,64 @@ def vote_proposal(pid: int, user_id: int, score: int, actor: str = "居民") -> 
     return True, ""
 
 
+def _proposal_comment_author(user_id: int) -> str:
+    """议论匿名伪名：同一个人多次议论显示同一伪名（可识别自己），别人对不上号。"""
+    import hashlib
+    digest = hashlib.sha256(f"proposal-comment:{user_id}".encode()).hexdigest()[:6]
+    return f"匿名居民#{digest}"
+
+
+def add_proposal_comment(pid: int, user_id: int, content: str) -> tuple[bool, str]:
+    """公示中公开提案匿名议论（spec 补充：匿名看到别人议论、自己也能匿名议论）。"""
+    content = (content or "").strip()
+    if not content:
+        return False, "议论内容不能为空"
+    if len(content) > 500:
+        return False, "议论最多 500 字"
+    if not user_id:
+        return False, "请先登录"
+    # 敏感词拦截
+    try:
+        from utils.text import check_sensitive
+        hit, word = check_sensitive(content)
+        if hit:
+            return False, f"议论包含敏感词「{word}」"
+    except Exception:
+        pass
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status, title FROM proposals WHERE id=?", (pid,)
+        ).fetchone()
+        if row is None:
+            return False, "提案不存在"
+        if row["status"] not in ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行"):
+            return False, f"当前状态「{row['status']}」不支持议论"
+        cur = conn.execute(
+            "INSERT INTO proposal_comments (proposal_id, user_id, content) VALUES (?, ?, ?)",
+            (pid, user_id, content),
+        )
+        cid = cur.lastrowid
+        conn.commit()
+    log_activity("匿名居民", "提案议论", "proposal", pid, row["title"] or "",
+                 module=MODULE, detail=f"新增匿名议论（{_proposal_comment_author(user_id)}）")
+    return True, ""
+
+
+def get_proposal_comments(pid: int, limit: int = 100) -> list[dict]:
+    """公示提案的匿名议论列表（按时间正序；作者为匿名伪名）。"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, user_id, content, created_at FROM proposal_comments "
+            "WHERE proposal_id=? ORDER BY id ASC LIMIT ?", (pid, limit),
+        ).fetchall()
+    return [{
+        "id": r["id"],
+        "content": r["content"],
+        "author": _proposal_comment_author(r["user_id"]),
+        "created_at": (r["created_at"] or "")[:16],
+    } for r in rows]
+
+
 def has_voted(pid: int, user_id: int) -> bool:
     """是否已投过票（仅防重复判断，不暴露任何评分信息）。"""
     if not user_id:
