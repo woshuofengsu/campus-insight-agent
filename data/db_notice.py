@@ -588,7 +588,22 @@ def process_expired() -> dict:
             (STATUS_PUBLISHED,),
         ).fetchall()
         for r in list(pins) + list(urgents):
-            conn.execute("UPDATE notices SET is_pinned=0 WHERE id=?", (r["id"],))
+            try:
+                conn.execute("UPDATE notices SET is_pinned=0 WHERE id=?", (r["id"],))
+            except Exception:
+                # 失败自动重试一次（spec 补充：仍失败标记「自动取消失败」通知负责人手动取消）
+                try:
+                    conn.execute("UPDATE notices SET is_pinned=0 WHERE id=?", (r["id"],))
+                except Exception as e:  # noqa: BLE001
+                    _log.warning("自动取消置顶失败（notice #%s）：%s", r["id"], e)
+                    try:
+                        conn.execute(
+                            "INSERT INTO exception_log (module, error, detail) "
+                            "VALUES ('通知', ?, ?)",
+                            (f"自动取消置顶失败 notice#{r['id']}", str(e)[:200]),
+                        )
+                    except Exception:
+                        pass
         conn.commit()
     for r in pins:
         log_activity("系统", "普通置顶超期自动取消", "notice", r["id"], r["title"],

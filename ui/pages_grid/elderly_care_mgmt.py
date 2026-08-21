@@ -136,9 +136,13 @@ with tab3:
                         st.rerun()
             if s["status"] in ("求助中", "已响应"):
                 note = st.text_area("处理结果（结束必填）", key=f"sos_note_{s['id']}")
+                confirm_end = st.checkbox("二次确认：结束求助并通知老人端「您的紧急求助已处理」",
+                                          key=f"sos_end_confirm_{s['id']}")
                 if st.button("🏁 结束求助", key=f"sos_end_{s['id']}"):
                     if not note.strip():
                         st.error("处理结果不能为空")
+                    elif not confirm_end:
+                        st.error("请先勾选二次确认。")
                     else:
                         ok, msg = end_sos(s["id"], note.strip(), actor="负责人")
                         st.success(msg or "已结束，老人端将收到通知") if ok else st.error(msg)
