@@ -433,7 +433,13 @@ with t_consult:
                     except (ValueError, TypeError):
                         atts = []
                     if atts:
-                        st.caption(f'📎 附件 {len(atts)} 张（仅处理人和咨询人本人可见）')
+                        from utils.uploads import resolve_path
+                        _imgs = [x for x in (resolve_path(x) for x in atts) if x]
+                        if _imgs:
+                            st.markdown("**📎 附件图片**（仅处理人和咨询人本人可见）")
+                            st.image(_imgs, width=140)
+                        else:
+                            st.caption(f'📎 附件 {len(atts)} 张（仅处理人和咨询人本人可见）')
                     if c.get("reply"):
                         reply_display = c.get("reply", "")
                         if c.get("reply_need_offline"):

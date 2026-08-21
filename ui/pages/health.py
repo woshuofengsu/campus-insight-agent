@@ -311,11 +311,23 @@ with tab_ask:
         c_type = st.selectbox("咨询类型", CONSULT_TYPES, key="hc_type")
         c_content = st.text_area("咨询内容（5-500 字）", height=120, key="hc_content")
         c_building = st.text_input("所属小区/楼栋（选填）", key="hc_building")
+        c_files = st.file_uploader("附件图片（选填，jpg/png，≤5MB，最多3张，仅负责人和您本人可见）",
+                                   type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="hc_files")
         submitted = st.form_submit_button("🩺 提交咨询", type="primary", width="stretch")
 
     if submitted:
+        _attach = "[]"
+        try:
+            from utils.uploads import save_uploaded_files
+            _saved = save_uploaded_files(c_files, folder="consults")
+            if _saved:
+                import json
+                _attach = json.dumps(_saved, ensure_ascii=False)
+        except Exception:
+            pass
         cid, msg, code = submit_consult(
             uid, c_name, c_phone, c_type, c_content, building=c_building,
+            attachment_json=_attach,
         )
         if cid:
             st.success(
