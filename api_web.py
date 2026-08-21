@@ -937,7 +937,7 @@ def web_emergency_status(request: Request):
     return ok(get_latest_sos(u.get("uid")))
 
 
-_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
+_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "dist")
 
 
 @app.get("/{full_path:path}")

@@ -12,3 +12,5 @@ docs/superpowers/
 
 uploads/
 *.db
+web/dist/
+web/node_modules/
