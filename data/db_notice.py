@@ -788,10 +788,12 @@ def get_visible_notices(client_type: str, user_id: int, notice_type: str | None 
         out.append(n)
         if len(out) >= limit:
             break
+    # 先按发布时间倒序（定时发布场景下，发布时间晚的新在前，不用创建 id）
+    out.sort(key=lambda x: str(x.get("published_at") or ""), reverse=True)
+    # 稳定排序：紧急置顶 > 普通置顶 > 其他（同优先级内保持时间倒序）
     out.sort(key=lambda x: (
         0 if (x.get("is_urgent") and x.get("is_pinned")) else
         1 if x.get("is_pinned") else 2,
-        -(x.get("id") or 0),
     ))
     return out
 
