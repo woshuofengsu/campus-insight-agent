@@ -154,11 +154,19 @@ with tab3:
     if not sos_all:
         st.caption("暂无求助记录。")
     for s in sos_all:
-        st.markdown(
-            f"**#{s['id']}** {s['status']} · {s['created_at']}"
-            f"{' · ' + s['target_name'] if s.get('target_name') else ''}"
-            f"{' · ' + (s.get('handle_note') or '')[:40] if s.get('handle_note') else ''}"
-        )
+        with st.expander(f"#{s['id']} {s['status']} · {s['created_at']} {s.get('target_name') or ''}", expanded=False):
+            st.caption(f"求助内容：{s.get('content') or s.get('description') or '—'}")
+            # 完整留痕时间线（spec：负责人可查看紧急求助完整留痕）
+            try:
+                from data.db_elderly_care import get_sos_timeline
+                for _t in get_sos_timeline(s["id"]):
+                    st.caption(
+                        f"{(str(_t.get('created_at')) or '')[:16]} · {_t.get('actor') or ''} · "
+                        f"{_t.get('action') or ''}"
+                        + (f" · {(str(_t.get('detail')) or '')[:60]}" if _t.get("detail") else "")
+                    )
+            except Exception:
+                pass
 
     # 导出（用药/联系人/求助事件，电话脱敏）
     st.markdown("---")

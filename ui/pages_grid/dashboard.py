@@ -134,6 +134,35 @@ try:
     from data.db_elderly import get_pending_sos, mark_sos_done, get_elderly_overview
     _sos = get_pending_sos()
     _elders = get_elderly_overview()
+
+    # 新 SOS（emergency_calls，老年端当前触发路径）：最高优先级弹窗 + 声音提醒，点「确认响应」才消失
+    try:
+        from data.db_elderly_care import get_sos_calls as _get_calls, respond_sos as _respond
+        _new_sos = _get_calls(status="求助中", limit=5)
+    except Exception:
+        _new_sos = []
+    if _new_sos:
+        st.markdown("---")
+        section("🚨 紧急求助（最高优先级）")
+        st.audio("https://actions.google.com/sounds/v1/alarms/medium_glass_ping_short.ogg",
+                 autoplay=True, format="audio/ogg", loop=False)
+        for _s in _new_sos:
+            _nm = _s.get("target_name") or f"老人#{_s.get('user_id')}"
+            with st.container(border=True):
+                st.markdown(
+                    f'<div style="background:#dc2626;color:#ffffff;padding:14px 16px;border-radius:12px;'
+                    f'font-size:1.05em;font-weight:800;">🚨 SOS 紧急求助：{_nm}'
+                    f'（{(_s.get("created_at") or "")[:16]}）</div>',
+                    unsafe_allow_html=True,
+                )
+                _detail = f"求助内容：{_s.get('content') or _s.get('description') or '—'}"
+                st.caption(_detail)
+                # 关闭弹窗 ≠ 响应：必须点「确认响应」才算处理
+                if st.button(f"✅ 确认响应 #{_s['id']}（已安排处理）", key=f"nsos_respond_{_s['id']}",
+                             type="primary", width="stretch"):
+                    _respond(_s["id"], actor=_actor)
+                    st.rerun()
+
     if _sos or _elders:
         st.markdown("---")
         section("👴 老年关怀")

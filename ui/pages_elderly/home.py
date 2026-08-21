@@ -511,13 +511,23 @@ if st.session_state.get("_show_policy"):
         _spoken = voice_input(key="elderly_policy_voice")
         if _spoken:
             st.session_state["_policy_confirm_text"] = _spoken
+            st.session_state["_policy_confirm_at"] = time.time()
             st.session_state.pop("_policy_result", None)
     except Exception:
         pass
 
-    # 转写确认（spec：先显示转写文本，老人点「对，提交」或「重新说」）
+    # 转写确认（spec：先显示转写文本，老人点「对，提交」或「重新说」；确认超时 10 秒自动取消保留草稿）
     _confirm_text = st.session_state.get("_policy_confirm_text")
     if _confirm_text:
+        # 10 秒超时自动取消（草稿保留在 session，可重新进入继续提交）
+        _confirm_at = st.session_state.get("_policy_confirm_at") or time.time()
+        if time.time() - _confirm_at > 10:
+            st.session_state.pop("_policy_confirm_text", None)
+            st.session_state.pop("_policy_confirm_at", None)
+            st.session_state["_policy_draft_hint"] = "确认超时已自动取消，草稿已保留，可重新进入继续提交。"
+            st.rerun()
+        if st.session_state.get("_policy_draft_hint"):
+            st.info(st.session_state.pop("_policy_draft_hint"))
         big_card(f"您说的是：<strong>{_confirm_text}</strong>", bg="#eef2ff", border="#4f46e5")
         c1, c2 = st.columns(2)
         with c1:
@@ -535,6 +545,7 @@ if st.session_state.get("_show_policy"):
         with c2:
             if st.button("🔁 重新说", key="policy_confirm_no", width="stretch"):
                 st.session_state.pop("_policy_confirm_text", None)
+                st.session_state.pop("_policy_confirm_at", None)
                 st.rerun()
 
     q = st.text_input("或输入您想问的问题", key="elderly_policy_q",

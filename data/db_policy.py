@@ -1296,7 +1296,7 @@ def get_frequency_stats(days: int | None = None) -> dict:
             fsql = " AND created_at >= datetime('now', ? || ' days', 'localtime')"
             fargs.append(f"-{days}")
         fails = conn.execute(
-            "SELECT actor, detail, created_at FROM activity_log "
+            "SELECT id, actor, detail, created_at FROM activity_log "
             "WHERE module=? AND action='自动回答失败'" + fsql +
             " ORDER BY created_at DESC LIMIT 50", fargs
         ).fetchall()

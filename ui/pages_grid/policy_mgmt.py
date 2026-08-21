@@ -1,4 +1,4 @@
-﻿# ui/pages_grid/policy_mgmt.py
+# ui/pages_grid/policy_mgmt.py
 """📖 政策问答管理（负责人端）— 知识库审核/版本/时效 + 人工待回复（24小时倒计时）+ 提问记录 + 高频统计。
 
 未注册到 app.py 路由，由项目负责人统一注册（建议标题「政策问答管理」）。
@@ -105,6 +105,9 @@ with tab_kb:
         else:
             st.markdown(f"### 📝 创建新版本（基于 #{kid}，版本号自动递增）")
         defaults = base or {}
+        # R36：从「自动回答失败」一键跳转新建时预填（标题=失败问题摘要）
+        if mode == "new" and st.session_state.get("_pm_prefill") and not defaults:
+            defaults = st.session_state.pop("_pm_prefill") or {}
         with st.form(key=f"kb_form_{mode}"):
             f_title = st.text_input("标题（必填，≤50字）", value=defaults.get("title", ""))
             cat_idx = POLICY_CATEGORIES.index(defaults.get("category")) \
@@ -541,6 +544,15 @@ with tab_stats:
         if s["match_failed_list"]:
             for f in s["match_failed_list"]:
                 st.caption(f'{f["created_at"][:16]} · {f["actor"]} · {f["detail"]}')
+                # R36：一键跳转「新建知识库条目」补充（预填失败问题为标题）
+                if st.button("➕ 补充为知识库条目", key=f"pm_fill_{f['id']}", width="stretch"):
+                    st.session_state["_pm_prefill"] = {
+                        "title": (f.get("detail") or "")[:40].replace("自动回答失败", "").strip()[:40],
+                        "keywords": "待补充",
+                    }
+                    st.session_state["_kb_form_mode"] = "new"
+                    st.session_state["_kb_form_id"] = None
+                    st.rerun()
         else:
             st.caption("暂无匹配失败记录")
     with f2:

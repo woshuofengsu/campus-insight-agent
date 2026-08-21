@@ -59,7 +59,7 @@ class TestReportIssue(unittest.TestCase):
         result = report_issue.invoke({
             "title": "3号楼灯坏了",
             "category": "设施维修",
-            "location": "3号楼",
+            "location": "幸福小区3号楼",
             "description": "楼道灯不亮",
             "urgency": "普通",
             "reporter_name": "王阿姨",
@@ -74,7 +74,7 @@ class TestReportIssue(unittest.TestCase):
         result = report_issue.invoke({
             "title": "楼道堆放杂物",
             "category": "物业服务",
-            "location": "3号楼2单元",
+            "location": "幸福小区3号楼2单元",
             "description": "楼道堆了很多杂物影响通行",
             "urgency": "紧急",
             "reporter_name": "王阿姨",
@@ -113,7 +113,7 @@ class TestReportIssue(unittest.TestCase):
 
     def test_validate_location_dorm_with_location(self):
         from tools.action_report_issue import validate_location
-        err = validate_location("楼道灯坏了", "3号楼2单元")
+        err = validate_location("楼道灯坏了", "幸福小区3号楼2单元")
         self.assertIsNone(err)
 
     def test_validate_location_exempt(self):
