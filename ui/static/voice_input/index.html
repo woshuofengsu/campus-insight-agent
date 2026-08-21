@@ -9,12 +9,18 @@
       border: 2px solid #dc2626; background: #fef2f2; cursor: pointer; font-weight: 700;
     }
     #status { margin: 8px 0; color: #64748b; font-size: 1.1em; min-height: 1.5em; }
+    .recording { background: #fee2e2 !important; border-color: #b91c1c !important; }
   </style>
 </head>
 <body>
   <button id="btn">🎤 按住说话</button>
   <p id="status">点击按钮，说出您的问题</p>
   <script>
+    var MAX_SECONDS = 60; // spec R22：单次语音最长 60 秒，到时自动结束转写
+    var timer = null;
+    var remain = MAX_SECONDS;
+    var partial = ""; // 失败时保留已识别内容（interimResults 部分文本）
+
     function sendValue(v) {
       // Streamlit 组件双向通信：把识别文本回传给 Python
       window.parent.postMessage(
@@ -25,23 +31,73 @@
     document.getElementById("btn").addEventListener("click", function () {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       const status = document.getElementById("status");
+      const btn = document.getElementById("btn");
       if (!SR) {
         status.innerText = "当前浏览器不支持语音，请直接在下框打字";
         return;
       }
       const rec = new SR();
       rec.lang = "zh-CN";
-      rec.interimResults = false;
+      rec.interimResults = true; // 开启中间结果：失败时也能保留已识别内容
       rec.maxAlternatives = 1;
+      rec.continuous = false;
+
+      // 录音中：显示「正在聆听…」+ 剩余秒数（R22）
+      remain = MAX_SECONDS;
+      partial = "";
+      status.innerText = "正在聆听…（剩余 " + remain + " 秒）";
+      btn.classList.add("recording");
+      timer = setInterval(function () {
+        remain -= 1;
+        if (remain <= 0) {
+          clearInterval(timer);
+          timer = null;
+          try { rec.stop(); } catch (e) {}
+          if (partial) {
+            status.innerText = "已识别：" + partial;
+            sendValue(partial); // 到时自动结束，保留已识别的部分内容
+          } else {
+            status.innerText = "已到 60 秒，未识别到内容，请再说一次或手动输入";
+          }
+        } else {
+          status.innerText = "正在聆听…（剩余 " + remain + " 秒）";
+        }
+      }, 1000);
+
       rec.onresult = function (e) {
-        const text = e.results[0][0].transcript;
-        status.innerText = "已识别：" + text;
-        sendValue(text);
+        // 持续更新已识别内容（中间结果），失败时可回退使用
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            partial = e.results[i][0].transcript;
+            if (timer) { clearInterval(timer); timer = null; }
+            btn.classList.remove("recording");
+            status.innerText = "已识别：" + partial;
+            sendValue(partial);
+          } else {
+            partial = e.results[i][0].transcript;
+            status.innerText = "正在聆听…（剩余 " + remain + " 秒）：" + partial;
+          }
+        }
       };
       rec.onerror = function () {
-        status.innerText = "没听清，请再说一次或手动输入";
+        if (timer) { clearInterval(timer); timer = null; }
+        btn.classList.remove("recording");
+        if (partial) {
+          // 失败但已有部分内容：保留已识别内容可重试（R22）
+          status.innerText = "识别中断，已保留内容：" + partial;
+          sendValue(partial);
+        } else {
+          status.innerText = "没听清，请再说一次或手动输入";
+        }
       };
-      rec.start();
+      rec.onend = function () {
+        if (timer) { clearInterval(timer); timer = null; }
+        btn.classList.remove("recording");
+      };
+      try { rec.start(); } catch (e) {
+        if (timer) { clearInterval(timer); timer = null; }
+        status.innerText = "录音启动失败，请手动输入";
+      }
     });
   </script>
 </body>

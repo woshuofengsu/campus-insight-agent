@@ -26,6 +26,9 @@ memory = st.session_state.get("memory")
 profile = memory.get_user_profile() if memory is not None else {}
 uid = st.session_state.get("_elderly_uid") or (profile or {}).get("id")
 name = st.session_state.get("_elderly_name") or (profile or {}).get("name", "") or "大爷/阿姨"
+# 家属代操作模式（spec 06：家属不能代替老人触发紧急求助）
+_is_family_mode = bool(st.session_state.get("_elderly_uid")) and \
+    st.session_state.get("_elderly_uid") != (profile or {}).get("id")
 
 if uid:
     touch_active(uid)          # 进入即平安打卡
@@ -655,7 +658,11 @@ def _sos_status_area():
             big_card(f"ℹ️ 最近一次求助已取消：{latest_sos.get('result') or '已取消'}",
                      bg="#f8fafc", border="#cbd5e1")
 
-        if st.session_state.get("_sos_confirm"):
+        if _is_family_mode:
+            # 家属代操作：不能代替老人触发紧急求助（spec 06），可代为拨打联系人电话
+            big_card("⚠️ 紧急求助需<strong>老人本人</strong>操作。\n家属可代为拨打上方联系人电话。",
+                     bg="#fffbeb", border="#d97706")
+        elif st.session_state.get("_sos_confirm"):
             _render_sos_confirm(_uid, name)
         else:
             st.components.v1.html(_LONG_PRESS_JS, height=130)
