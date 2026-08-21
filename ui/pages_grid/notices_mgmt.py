@@ -359,7 +359,8 @@ def _render_edit_form(n: dict):
                 "body": body.strip(), "elderly_summary": (elderly_summary or "").strip(),
                 "is_pinned": is_pinned, "is_urgent": 1 if is_urgent else 0,
             }
-            ok, msg = update_notice(n["id"], _actor, **upd)
+            ok, msg = update_notice(n["id"], _actor,
+                                    expected_updated_at=(n.get("updated_at") or ""), **upd)
             if ok and is_urgent and new_expire is not None:
                 # 有效期变化才更新，避免保存普通修改时误动有效期（_ts 视为当天 23:59:59）
                 if new_expire.strftime("%Y-%m-%d") != (n.get("expire_at") or "")[:10]:

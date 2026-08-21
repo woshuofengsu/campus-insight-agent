@@ -14,6 +14,10 @@ import streamlit.components.v1 as components
 _VOICE_COMPONENT_DIR = os.path.join(os.path.dirname(__file__), "static", "voice_input")
 _voice_input_component = components.declare_component("voice_input", path=_VOICE_COMPONENT_DIR)
 
+# TTS 朗读自定义组件（v2：支持音量、5 分钟重试、失败回传通知负责人）
+_TTS_COMPONENT_DIR = os.path.join(os.path.dirname(__file__), "static", "elderly_tts")
+_tts_component = components.declare_component("elderly_tts", path=_TTS_COMPONENT_DIR)
+
 
 def inject_elderly_css():
     """注入老年关怀版全局大字 + 高对比样式。"""
@@ -53,41 +57,60 @@ def big_button(label: str, key: str, primary: bool = True, on_click=None, args=N
     )
 
 
-def tts_speak(text: str, label: str = "🔊 朗读"):
-    """朗读文本（浏览器 SpeechSynthesis，渐进增强；失败自动重试 3 次并提示）。"""
-    text_js = json.dumps(text, ensure_ascii=False)
-    st.components.v1.html(f"""
-    <button onclick="speak()" style="font-size:1.2em;padding:14px 22px;border-radius:14px;
-        border:2px solid #4f46e5;background:#eef2ff;cursor:pointer;font-weight:700;">{label}</button>
-    <div id="tts_msg" style="font-size:1em;color:#b91c1c;margin-top:6px;"></div>
-    <script>
-    function speak() {{
-        if (!('speechSynthesis' in window)) {{
-            document.getElementById('tts_msg').textContent = '当前浏览器不支持语音朗读，请查看文字';
-            return;
-        }}
-        var tries = 0;
-        function attempt() {{
-            tries++;
+def tts_speak(text: str, label: str = "🔊 朗读", volume: float | None = None):
+    """朗读文本（浏览器 SpeechSynthesis，渐进增强）。
+
+    - volume：音量（0~2，按老人设置传入；默认从 session `_tts_volume` 读，缺省 1.0）
+    - 失败自动重试 3 次、每次间隔 5 分钟（spec）；最终失败回传 "__TTS_FAIL__"，
+      由调用方留痕并通知负责人「提醒发送失败」。
+    """
+    if volume is None:
+        try:
+            volume = float(st.session_state.get("_tts_volume", 1.0))
+        except (TypeError, ValueError):
+            volume = 1.0
+    try:
+        with open(os.path.join(_TTS_COMPONENT_DIR, "index.html"), "r", encoding="utf-8") as f:
+            html = f.read()
+        html = html.replace("{{{TEXT_JSON}}}", json.dumps(text, ensure_ascii=False))
+        html = html.replace("{{{VOLUME_JSON}}}", str(float(volume)))
+        result = _tts_component(html=html, key=f"tts_{abs(hash(text)) % 10**9}", default="")
+        if result == "__TTS_FAIL__":
+            try:
+                from data.db_notifications import log_activity, log_exception
+                log_activity("系统", "老年端语音播报失败", "tts", module="老年端",
+                             detail=f"播报内容：{text[:60]}（重试 3 次失败，已通知负责人）")
+                log_exception("老年端", f"语音播报失败（3 次重试后）：{text[:60]}")
+                from data.db_user import list_users
+                for u in list_users(role="grid"):
+                    from data.db_notifications import create_notification
+                    create_notification(u["id"], "tts", "⚠️ 老年端语音播报失败",
+                                        "语音朗读重试 3 次仍失败，请提醒老人查看文字内容。")
+            except Exception:
+                pass
+    except Exception:
+        # 组件不可用时降级为普通朗读按钮（HTML 内联，兼容旧行为）
+        text_js = json.dumps(text, ensure_ascii=False)
+        st.components.v1.html(f"""
+        <button onclick="speak()" style="font-size:1.2em;padding:14px 22px;border-radius:14px;
+            border:2px solid #4f46e5;background:#eef2ff;cursor:pointer;font-weight:700;">{label}</button>
+        <div id="tts_msg" style="font-size:1em;color:#b91c1c;margin-top:6px;"></div>
+        <script>
+        function speak() {{
+            if (!('speechSynthesis' in window)) {{
+                document.getElementById('tts_msg').textContent = '当前浏览器不支持语音朗读，请查看文字';
+                return;
+            }}
             var u = new SpeechSynthesisUtterance({text_js});
-            u.lang = 'zh-CN'; u.rate = 0.9;
+            u.lang = 'zh-CN'; u.rate = 0.9; u.volume = {float(volume)};
             u.onerror = function() {{
-                if (tries < 3) {{
-                    setTimeout(attempt, 5000);  // 失败重试，间隔 5 秒
-                }} else {{
-                    document.getElementById('tts_msg').textContent = '语音播放失败，请查看文字';
-                }}
-            }};
-            u.onend = function() {{
-                document.getElementById('tts_msg').textContent = '';
+                document.getElementById('tts_msg').textContent = '语音播放失败，请查看文字';
             }};
             speechSynthesis.cancel();
             speechSynthesis.speak(u);
         }}
-        attempt();
-    }}
-    </script>
-    """, height=96)
+        </script>
+        """, height=96)
 
 
 def voice_input(key: str | None = None) -> str | None:

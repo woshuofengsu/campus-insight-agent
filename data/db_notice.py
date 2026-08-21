@@ -245,10 +245,13 @@ def create_notice(title: str, notice_type: str, publish_scope: str, body: str,
     return notice_id
 
 
-def update_notice(notice_id: int, actor: str, **fields) -> tuple[bool, str]:
+def update_notice(notice_id: int, actor: str, expected_updated_at: str = "",
+                  **fields) -> tuple[bool, str]:
     """编辑通知（仅草稿 / 待发布可编辑）。fields 为可更新字段。
 
     已发布不能直接修改，只能下架重新发布。
+    expected_updated_at：乐观锁（spec 十.13 并发冲突防护）——传入打开编辑时的
+    更新时间，若已被他人修改则拒绝并提示刷新，避免覆盖。
     """
     _ensure_columns()
     allowed = {"title", "notice_type", "publish_scope", "scope_target_json", "body",
@@ -261,6 +264,9 @@ def update_notice(notice_id: int, actor: str, **fields) -> tuple[bool, str]:
         n = dict(row)
         if n["status"] not in (STATUS_DRAFT, STATUS_PENDING):
             return False, f"当前状态「{n['status']}」不能编辑，请下架后重新发布"
+        # 乐观锁：传入的 expected_updated_at 与当前不一致 → 并发冲突，拒绝覆盖
+        if expected_updated_at and str(n.get("updated_at") or "") != str(expected_updated_at):
+            return False, "该通知已被修改/操作，请刷新后重试"
         upd: dict = {k: v for k, v in fields.items() if k in allowed}
         if not upd:
             return False, "没有可更新的字段"
@@ -476,6 +482,40 @@ def _auto_publish(n: dict) -> tuple[bool, str]:
                     n["expire_at"] or "")
     if err:
         return False, err
+    # 发布范围失效校验（spec 十.10：定时到达时目标小区/楼栋已失效 → 阻止发布标记「范围失效」通知负责人）
+    try:
+        import json as _json
+        targets = _json.loads(n.get("scope_target_json") or "[]")
+        if n["publish_scope"] in ("指定小区", "指定楼栋") and targets:
+            from data.db_core import get_db as _gdb
+            with _gdb() as conn:
+                _tbl = "communities" if n["publish_scope"] == "指定小区" else "buildings"
+                _tbl_exists = conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (_tbl,)
+                ).fetchone()
+                _exist = None
+                if _tbl_exists:
+                    _rows = conn.execute(f"SELECT name AS n FROM {_tbl}").fetchall()
+                    _exist = {r["n"] for r in _rows}
+            # 表不存在（未启用范围管理）→ 跳过校验；表存在才判失效
+            if _exist is not None:
+                _invalid = [t for t in targets if t not in _exist]
+                if _invalid:
+                    log_activity("系统", "定时发布范围失效", "notice", n["id"], n["title"],
+                                 module=MODULE, before_value=STATUS_PENDING, after_value=STATUS_FAILED,
+                                 detail=f"发布范围失效：{'、'.join(str(x) for x in _invalid[:5])}")
+                    try:
+                        from data.db_user import list_users
+                        for u in list_users(role="grid"):
+                            from data.db_notifications import create_notification
+                            create_notification(u["id"], "notice",
+                                                "⚠️ 定时通知发布范围失效",
+                                                f"通知「{n['title'][:20]}」定时发布失败：发布范围（{'、'.join(str(x) for x in _invalid[:5])}）已失效。")
+                    except Exception:
+                        pass
+                    return False, "发布范围失效"
+    except Exception:
+        pass
     is_pinned = 1 if n["is_urgent"] else n["is_pinned"]
     expire_at = n["expire_at"] or ""
     if n["is_urgent"] and not expire_at:
@@ -697,31 +737,43 @@ def get_notice_read_stats(notice_id: int) -> dict:
     返回 {"resident_total", "resident_read", "resident_unread",
           "elderly_total", "elderly_read", "elderly_unread"}。
     范围外用户不计入；下架后本函数不再被 UI 调用即保持固化。
+    统计异常时记录异常日志并返回全零（保留最近一次正确统计由调用方缓存）。
     """
-    _ensure_columns()
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM notices WHERE id=?", (notice_id,)).fetchone()
-        if row is None:
-            return {}
-        n = dict(row)
-        residents, elderly = _scope_user_ids(conn, n)
-        r_read = conn.execute(
-            "SELECT COUNT(DISTINCT user_id) AS c FROM notice_reads "
-            "WHERE notice_id=? AND client_type='resident'", (notice_id,),
-        ).fetchone()["c"]
-        e_read = conn.execute(
-            "SELECT COUNT(DISTINCT user_id) AS c FROM notice_reads "
-            "WHERE notice_id=? AND client_type='elderly'", (notice_id,),
-        ).fetchone()["c"]
-    r_total, e_total = len(residents), len(elderly)
-    return {
-        "resident_total": r_total,
-        "resident_read": min(r_read, r_total),
-        "resident_unread": max(r_total - r_read, 0),
-        "elderly_total": e_total,
-        "elderly_read": min(e_read, e_total),
-        "elderly_unread": max(e_total - e_read, 0),
-    }
+    try:
+        _ensure_columns()
+        with get_db() as conn:
+            row = conn.execute("SELECT * FROM notices WHERE id=?", (notice_id,)).fetchone()
+            if row is None:
+                return {}
+            n = dict(row)
+            residents, elderly = _scope_user_ids(conn, n)
+            r_read = conn.execute(
+                "SELECT COUNT(DISTINCT user_id) AS c FROM notice_reads "
+                "WHERE notice_id=? AND client_type='resident'", (notice_id,),
+            ).fetchone()["c"]
+            e_read = conn.execute(
+                "SELECT COUNT(DISTINCT user_id) AS c FROM notice_reads "
+                "WHERE notice_id=? AND client_type='elderly'", (notice_id,),
+            ).fetchone()["c"]
+        r_total, e_total = len(residents), len(elderly)
+        return {
+            "resident_total": r_total,
+            "resident_read": min(r_read, r_total),
+            "resident_unread": max(r_total - r_read, 0),
+            "elderly_total": e_total,
+            "elderly_read": min(e_read, e_total),
+            "elderly_unread": max(e_total - e_read, 0),
+        }
+    except Exception as e:  # noqa: BLE001
+        # spec 十.9：统计异常时记录异常日志，返回零值（不阻塞页面）
+        _log.warning("已读统计异常 notice#%s：%s", notice_id, e)
+        try:
+            from data.db_notifications import log_exception
+            log_exception(MODULE, f"已读统计异常 notice#{notice_id}: {e}")
+        except Exception:
+            pass
+        return {"resident_total": 0, "resident_read": 0, "resident_unread": 0,
+                "elderly_total": 0, "elderly_read": 0, "elderly_unread": 0}
 
 
 def get_notice_unread_count(client_type: str, user_id: int) -> int:

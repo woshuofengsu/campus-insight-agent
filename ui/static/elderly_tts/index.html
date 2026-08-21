@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { margin: 0; padding: 0; }
+    #btn {
+      font-size: 1.2em; padding: 14px 22px; border-radius: 14px;
+      border: 2px solid #4f46e5; background: #eef2ff; cursor: pointer; font-weight: 700;
+    }
+    #msg { font-size: 1em; color: #b91c1c; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <button id="btn">🔊 朗读</button>
+  <div id="msg"></div>
+  <script>
+    const MAX_TRIES = 3;
+    const RETRY_MS = 5 * 60 * 1000; // spec：失败重试 3 次，每次间隔 5 分钟
+
+    function notify(v) {
+      window.parent.postMessage(
+        { isStreamlitMessage: true, type: "streamlit:setComponentValue", value: v },
+        "*"
+      );
+    }
+
+    document.getElementById("btn").addEventListener("click", function () {
+      const btn = document.getElementById("btn");
+      const msg = document.getElementById("msg");
+      if (!('speechSynthesis' in window)) {
+        msg.textContent = "当前浏览器不支持语音朗读，请查看文字";
+        return;
+      }
+      let tries = 0;
+      let timedOut = false;
+      const text = "{{{TEXT_JSON}}}";
+      const volume = {{{VOLUME_JSON}}};
+      function attempt() {
+        tries++;
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "zh-CN"; u.rate = 0.9; u.volume = volume;
+        u.onerror = function () {
+          if (tries < MAX_TRIES && !timedOut) {
+            msg.textContent = "语音播放失败，5 分钟后自动重试（第 " + tries + " 次）";
+            setTimeout(attempt, RETRY_MS);
+          } else if (!timedOut) {
+            msg.textContent = "语音播放失败，请查看文字（已通知负责人）";
+            notify("__TTS_FAIL__");
+          }
+        };
+        u.onend = function () { msg.textContent = ""; };
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      }
+      attempt();
+    });
+  </script>
+</body>
+</html>

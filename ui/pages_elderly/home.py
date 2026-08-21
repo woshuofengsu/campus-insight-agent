@@ -243,6 +243,23 @@ with _top_r:
 st.markdown(f'<div class="elderly-title">👴 {name}，您好！</div>', unsafe_allow_html=True)
 st.caption("点下面的大按钮就行，有事随时按红色按钮。")
 
+# 音量设置（spec：语音按老人设置音量）
+_vol_map = {"低": 0.5, "中": 1.0, "高": 1.5}
+_vc1, _vc2 = st.columns([3, 1])
+with _vc1:
+    _vol_choice = st.selectbox("🔊 音量", ["中", "低", "高"],
+                               index=["中", "低", "高"].index(
+                                   next((k for k, v in _vol_map.items()
+                                         if abs(v - float(st.session_state.get("_tts_volume", 1.0))) < 0.01),
+                                        "中")),
+                               key="elderly_volume")
+with _vc2:
+    st.markdown("<div style='margin-top:26px;'></div>", unsafe_allow_html=True)
+    if st.button("保存音量", key="elderly_volume_save", width="stretch"):
+        st.session_state["_tts_volume"] = _vol_map.get(_vol_choice, 1.0)
+        tts_speak("音量已设置")
+        st.rerun()
+
 # 疾病预防联动语音提醒（#33：每天最多一次，最多连续 7 天；打开页面即播报）
 try:
     from data.db_health_content import get_elderly_linkage_reminders, log_elderly_linkage_reminder
@@ -278,7 +295,12 @@ if due:
                 pass
 
 # 未读通知 + 最近联系记录
-unread = get_unread_count(uid) if uid else 0
+# 广播通知未读数（spec：老年端「通知」按钮显示广播通知未读数量）
+try:
+    from data.db_notice import get_notice_unread_count as _notice_unread
+    unread = _notice_unread("elderly", uid) if uid else 0
+except Exception:
+    unread = get_unread_count(uid) if uid else 0
 recent_call = get_latest_contact_call(uid) if uid else None
 info_parts = []
 if unread:
