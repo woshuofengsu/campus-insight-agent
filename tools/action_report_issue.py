@@ -24,19 +24,26 @@ _URGENCY_LEVELS = ("紧急", "中等", "一般", "普通")
 # 旧三档（极急/紧急/普通）→ 新四档的映射，兼容 LLM 偶尔吐旧档位
 _LEGACY_URGENCY_MAP = {"极急": "紧急", "紧急": "中等", "普通": "一般"}
 
-# 室内/室外分类关键词：描述里出现这些词默认「室内」，否则「室外」
+# 室内/室外分类关键词：描述里出现这些词默认「室内」，否则按公共区域关键词判「室外」（spec：默认「室内」，公共区域改判「室外」）
 _INDOOR_KEYWORDS = [
     "家里", "室内", "我家", "卧室", "厨房", "卫生间", "客厅", "阳台",
     "书房", "厕所", "浴室", "洗澡", "餐厅", "玄关",
 ]
+_OUTDOOR_KEYWORDS = [
+    "楼道", "单元门", "外墙", "电梯", "大厅", "门厅", "走廊", "过道",
+    "楼下", "小区", "广场", "花园", "路面", "车位", "路灯", "绿化",
+    "垃圾桶", "门口", "屋顶", "天台", "地下室", "车库",
+]
 
 
 def _detect_issue_type(title: str, description: str) -> str:
-    """根据标题+描述判断报修分类（室内/室外）。默认室外。"""
+    """根据标题+描述判断报修分类（室内/室外）。默认「室内」，出现公共区域关键词改判「室外」。"""
     text = f"{title or ''} {description or ''}"
     if any(kw in text for kw in _INDOOR_KEYWORDS):
         return "室内"
-    return "室外"
+    if any(kw in text for kw in _OUTDOOR_KEYWORDS):
+        return "室外"
+    return "室内"
 
 
 def _normalize_urgency(urgency: str) -> str:
@@ -155,22 +162,30 @@ _ROOM_NUMBER_PATTERN = re.compile(
     r"\d+号(?:楼|单元)?)"
 )
 
+# 小区/院落类关键词（spec 27：报修地址必须包含小区/院落名称 + 楼栋单元房号）
+_NEIGHBORHOOD_PATTERN = re.compile(
+    r"(小区|社区|院|村|巷|胡同|公寓|家园|花园|湾|里|街|路|大道|弄|坊)"
+)
+
 
 def validate_location(title: str, location: str) -> str | None:
-    """楼栋/单元类诉求至少要填到楼栋级别的位置。
+    """楼栋/单元类诉求要填到楼栋级别的位置（spec 27：小区/院落名称 + 楼栋单元房号）。
 
-    只有楼栋/单元类问题且位置完全为空时才报错。
-    只要填了任何位置（楼名、楼层、单元）都算过——
-    有点位置信息总比把上报卡死强。
+    楼栋/单元类问题：位置必须同时含小区/院落名称与楼栋/单元/房号，
+    缺任一项都提示补全；非楼栋类问题（小区内公共区域）放宽为非空即可。
     """
     text = f"{title} {location}"
     needs_room = any(kw in text for kw in _ROOM_REQUIRED_KEYWORDS)
     is_exempt = any(kw in text for kw in _ROOM_EXEMPT_KEYWORDS)
 
     if needs_room and not is_exempt:
-        if not location.strip():
+        loc = (location or "").strip()
+        if not loc:
             return "⚠️ 楼栋/单元类诉求请填写位置（如：3号楼2单元、7号楼前空地、中心花园）"
-        # 只要非空就接受 — 有半截信息也比没上报强
+        has_nb = bool(_NEIGHBORHOOD_PATTERN.search(loc))
+        has_room = bool(_ROOM_NUMBER_PATTERN.search(loc))
+        if not (has_nb and has_room):
+            return "⚠️ 报修地址请填写：小区/院落名称 + 楼栋单元房号（如：幸福小区3号楼2单元302）"
     return None
 
 # 自动分类用的关键词表
@@ -204,9 +219,10 @@ def _keyword_classify(title: str, description: str) -> str:
 def _keyword_urgency(title: str, description: str) -> str:
     """关键词兜底紧急度判断 — LLM 不可用时用（四档：紧急/中等/一般/普通）。"""
     urgent_keywords = ["火灾", "漏电", "触电", "塌", "爆炸", "大面积停电", "电梯困人",
-                       "受伤", "流血", "煤气", "中毒", "严重漏水", "起火", "冒烟"]
+                       "受伤", "流血", "煤气", "中毒", "漏水", "爆了", "起火", "冒烟",
+                       "火光", "巨响", "断裂", "悬空"]
     medium_keywords = ["停电", "停水", "电梯故障", "玻璃碎裂", "线路裸露", "消防",
-                       "通道堵塞", "大面积", "严重", "渗水", "管道破裂", "堵塞"]
+                       "通道堵塞", "大面积", "严重", "渗水", "管道破裂", "堵塞", "反味"]
     low_keywords = ["小问题", "不影响", "轻微", "小事", "咨询", "建议", "美观", "顺手", "磕碰", "划痕", "掉漆"]
 
     text = f"{title} {description}"
@@ -356,6 +372,9 @@ def report_issue(title: str, category: str = "", location: str = "",
         f"  {ue} 紧急程度：{urgency}",
         f"  📍 地点：{location or '未指定'}",
         f"  ⏳ 当前状态：待审核",
+        "",
+        # R67：AI 自动判定的分类/紧急程度必须告知用户，用户可纠正（不能代替用户选择）
+        f"（分类与紧急程度由系统按您描述自动判定，如需修改请告诉我，例如：改成「紧急」或换分类）",
         "",
         "社区负责人会尽快电话核实，请保持电话畅通。",
     ]

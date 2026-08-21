@@ -164,7 +164,7 @@ def audit_issue(issue_id: int, approve: bool, opinion: str = "", actor: str = "�
         if row is None:
             return False, "工单不存在"
         if row["status"] not in ("待审核", "退回补充信息"):
-            return False, f"当前状态「{row['status']}」不支持审核"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试审核"
         if not approve and not opinion:
             return False, "退回必须填写审核意见"
         new_status = "已审核待派单" if approve else "退回补充信息"
@@ -191,7 +191,7 @@ def dispatch_issue(issue_id: int, assignee_name: str, assignee_phone: str,
         if row is None:
             return False, "工单不存在"
         if row["status"] not in ("已审核待派单", "已派单", "处理中"):
-            return False, f"当前状态「{row['status']}」不支持分派"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试分派"
         old = row["status"]
         old_name = row["assignee_name"] or ""
         conn.execute(
@@ -287,7 +287,7 @@ def start_process(issue_id: int, actor: str = "负责人") -> tuple[bool, str]:
         if row is None:
             return False, "工单不存在"
         if row["status"] not in ("已派单", "待协商"):
-            return False, f"当前状态「{row['status']}」不支持开始处理"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试开始处理"
         old = row["status"]
         conn.execute("UPDATE community_issues SET status='处理中' WHERE id=?", (issue_id,))
         conn.commit()
@@ -308,7 +308,7 @@ def resolve_issue(issue_id: int, resolve_note: str, photo_after: str = "[]",
         if row is None:
             return False, "工单不存在"
         if row["status"] not in ("处理中",):
-            return False, f"当前状态「{row['status']}」不支持填写结果"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试填写结果"
         old = row["status"]
         conn.execute(
             "UPDATE community_issues SET status='待居民反馈', resolve_note=?, "
@@ -331,7 +331,7 @@ def feedback_issue(issue_id: int, satisfied: bool, reason: str = "",
         if row is None:
             return False, "工单不存在"
         if row["status"] != "待居民反馈":
-            return False, f"当前状态「{row['status']}」不支持反馈"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试反馈"
         if not satisfied and not reason:
             return False, "不满意必须填写原因"
         old = row["status"]
@@ -361,7 +361,7 @@ def withdraw_issue(issue_id: int, actor: str = "居民") -> tuple[bool, str]:
         if row is None:
             return False, "工单不存在"
         if row["status"] != "待审核":
-            return False, f"当前状态「{row['status']}」不支持撤回"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试撤回"
         conn.execute("UPDATE community_issues SET status='已撤回' WHERE id=?", (issue_id,))
         conn.commit()
     log_activity(actor, "撤回工单", "issue", issue_id, module=MODULE,
@@ -376,7 +376,7 @@ def reopen_issue(issue_id: int, actor: str = "居民") -> tuple[bool, str]:
         if row is None:
             return False, "工单不存在"
         if row["status"] != "已撤回":
-            return False, f"当前状态「{row['status']}」不支持重新打开"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试重新打开"
         conn.execute("UPDATE community_issues SET status='待审核' WHERE id=?", (issue_id,))
         conn.commit()
     log_activity(actor, "重新打开工单", "issue", issue_id, module=MODULE,
@@ -544,7 +544,7 @@ def resubmit_issue(issue_id: int, actor: str = "居民") -> tuple[bool, str]:
         if row is None:
             return False, "工单不存在"
         if row["status"] != "退回补充信息":
-            return False, f"当前状态「{row['status']}」不支持重新提交"
+            return False, f"状态已变更（当前「{row['status']}」），请刷新后重试重新提交"
         conn.execute("UPDATE community_issues SET status='待审核' WHERE id=?", (issue_id,))
         conn.commit()
     log_activity(actor, "重新提交工单", "issue", issue_id, module=MODULE,

@@ -349,6 +349,20 @@ def _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency_val, issue_type_va
             invalidate_issues()
         except Exception:
             pass
+    else:
+        # R57：提交失败（校验不过/异常）自动保存草稿，可恢复继续填写
+        st.error(hint or "提交失败，请检查后重试。")
+        try:
+            from data.db_repair import create_draft
+            if uid and title_t:
+                create_draft(
+                    uid, title=title_t, category="", issue_type=issue_type_val,
+                    location=loc_t, description=title_t, urgency=urgency_val,
+                    reporter_name=name_t, reporter_phone=phone_t,
+                )
+                st.info("已自动保存为草稿，可在上方草稿区继续填写后重新提交。")
+        except Exception:
+            pass
 
 
 def _render_detail(issue: dict):
