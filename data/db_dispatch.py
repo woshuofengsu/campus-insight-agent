@@ -125,6 +125,19 @@ def discover_and_dispatch(limit: int = 20) -> list[dict]:
         dept = CATEGORY_DEPT_MAP.get(r["category"], "网格办")
         worker = _grid_worker_for(dept) or _grid_worker_for("网格办") or _any_grid_worker()
         if not worker:
+            # 分派失败：保持「已审核待派单」，通知负责人手动分派（spec：分派失败通知负责人手动分派，计时不暂停）
+            try:
+                from data.db_user import list_users
+                from data.db_notifications import create_notification
+                for u in list_users(role="grid"):
+                    create_notification(
+                        u["id"], "dispatch_fail",
+                        f"工单 #{r['id']} 自动分派失败",
+                        f"{r['title'][:20]}：未找到可用的维修/网格人员，请手动分派。",
+                        related_id=r["id"],
+                    )
+            except Exception:
+                _log.warning("分派失败通知负责人失败（工单 #%d）", r["id"], exc_info=True)
             continue
         name = _worker_display_name(worker)
         phone = worker.get("phone") or "13900139000"

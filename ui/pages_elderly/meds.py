@@ -89,7 +89,7 @@ def _render_med_form(uid, existing: dict | None, rid: int | None = None):
         start_d = st.date_input("开始日期", value=start_val)
         end_d = st.date_input("结束日期（选填，晚于开始日期）", value=end_val)
         note = st.text_input("备注（选填，如：饭后服用）", value=existing["note"] if existing else "")
-        photo = st.file_uploader("药品照片（选填 jpg/png ≤5MB，仅记录文件名）",
+        photo = st.file_uploader("药品照片（选填 jpg/png ≤5MB）",
                                  type=["jpg", "jpeg", "png"])
         submitted = st.form_submit_button("提交审核", type="primary", width="stretch")
 
@@ -100,7 +100,12 @@ def _render_med_form(uid, existing: dict | None, rid: int | None = None):
             if photo.size > 5 * 1024 * 1024:
                 st.error("药品照片不能超过 5MB。")
                 return
-            photo_name = photo.name
+            try:
+                from utils.uploads import save_uploaded_files
+                _saved = save_uploaded_files([photo], folder="meds", max_count=1)
+                photo_name = _saved[0] if _saved else ""
+            except Exception:
+                photo_name = ""
         elif existing:
             photo_name = existing.get("photo") or ""
         if rid:
@@ -193,9 +198,16 @@ elif view.startswith("detail:"):
     ]
     if m.get("note"):
         fields.append(f"备注：{m['note']}")
+    _show_photo = None
     if m.get("photo"):
-        fields.append(f"药品照片：{m['photo']}（仅记录文件名）")
+        try:
+            from utils.uploads import resolve_path
+            _show_photo = resolve_path(m["photo"])
+        except Exception:
+            _show_photo = None
     big_card("<br>".join(fields), bg="#ffffff", border="#e2e8f0")
+    if _show_photo:
+        st.image(_show_photo, width=180, caption="药品照片")
 
     if m.get("audit_opinion"):
         big_card(f"📝 审核意见：{m['audit_opinion']}", bg="#fef2f2", border="#dc2626")
