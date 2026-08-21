@@ -10,6 +10,7 @@ const alerts = ref([])
 const tasks = ref([])
 const history = ref([])
 const overview = ref([])
+const exLogs = ref([])
 const tab = ref('now')
 const confirmTask = ref(null)
 
@@ -19,6 +20,7 @@ onMounted(async () => {
   try { tasks.value = (await weather.tasks()) || [] } catch { /* 忽略 */ }
   try { history.value = (await weather.history({ limit: 200 })) || [] } catch { /* 忽略 */ }
   try { overview.value = (await weather.overview({ limit: 50 })) || [] } catch { /* 忽略 */ }
+  try { exLogs.value = (await weather.exceptionLogs({ limit: 100 })) || [] } catch { /* 忽略 */ }
 })
 
 async function confirm(t) {
@@ -127,6 +129,20 @@ function remainingText(t) {
             <span class="muted" style="font-size:0.8rem;">更新 {{ (o.updated_at || '').slice(0, 16) }}</span>
           </div>
           <n-empty v-if="overview.length === 0" description="暂无天气数据" />
+        </div>
+      </n-tab-pane>
+
+      <n-tab-pane name="logs" tab="异常日志">
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:8px;">⚠️ 系统异常日志（保留 7 天，单独记录不混入业务留痕）</div>
+          <div v-for="e in exLogs" :key="e.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <b style="color:#b91c1c;">{{ e.module }}：{{ e.error }}</b>
+              <span class="muted" style="font-size:0.8rem;">{{ (e.created_at || '').slice(0, 16) }}</span>
+            </div>
+            <div v-if="e.detail" class="muted" style="font-size:0.8rem;margin-top:2px;">{{ e.detail }}</div>
+          </div>
+          <n-empty v-if="exLogs.length === 0" description="暂无异常日志" />
         </div>
       </n-tab-pane>
     </n-tabs>

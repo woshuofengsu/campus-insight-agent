@@ -82,6 +82,7 @@ export const weather = {
   confirmTask: (id, data) => api.post(`/weather/check-task/${id}/confirm`, data),
   history: (params) => api.get('/weather/history', { params }),
   overview: (params) => api.get('/weather/overview', { params }),
+  exceptionLogs: (params) => api.get('/weather/exception-logs', { params }),
 }
 
 // 政策

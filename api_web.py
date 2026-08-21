@@ -1520,6 +1520,20 @@ def web_weather_overview(request: Request, limit: int = 50):
     return ok(get_community_weather_overview(limit=limit))
 
 
+@app.get("/api/web/weather/exception-logs")
+def web_weather_exception_logs(request: Request, limit: int = 100):
+    """负责人端异常日志（天气等系统异常单独记录 7 天）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_core import get_db
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, created_at, module, error, detail FROM exception_log "
+            "ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return ok([dict(r) for r in rows])
+
+
 # ---------------- 政策统计 / 匹配阈值 ----------------
 
 @app.get("/api/web/qa/stats")
@@ -1879,6 +1893,20 @@ def web_elderly_home(request: Request):
     })
 
 
+def _correct_report_text(text: str) -> str:
+    """简单纠错（演示级规则）：压缩空格、合并重复标点、常见错别字替换。"""
+    import re
+    t = text.strip()
+    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"([。！？!?，,\.])\1+", r"\1", t)
+    t = re.sub(r"([。！？!?，,\.])(?=[^。！？!?，,\.]+[。！？!?，,\.])", r"\1", t)  # noqa: E501
+    fixes = {"的的": "的", "在在": "在", "了了": "了", "楼楼": "楼", "电梯梯": "电梯",
+             "报修修": "报修", "没没有": "没有", "一一起": "一起", "门门": "门", "灯灯": "灯"}
+    for k, v in fixes.items():
+        t = t.replace(k, v)
+    return t
+
+
 class VoiceReport(BaseModel):
     text: str = Field(..., min_length=2)
     urgency: str = Field(default="一般")
@@ -1901,6 +1929,7 @@ def web_elderly_voice_report(req: VoiceReport, request: Request):
         pass
     category, urgency = _llm_classify(req.text, "")
     loc = extract_location(req.text) or profile.get("community") or "社区"
+    corrected = _correct_report_text(req.text)
     iid, hint = submit_issue(
         title=req.text[:80], category=category, issue_type=req.issue_type,
         location=loc, description=req.text, urgency=req.urgency or urgency or "一般",
@@ -1910,7 +1939,8 @@ def web_elderly_voice_report(req: VoiceReport, request: Request):
     )
     if iid <= 0:
         return fail(2001, hint or "上报失败")
-    return ok({"issue_id": iid, "category": category}, "上报成功")
+    return ok({"issue_id": iid, "category": category, "corrected": corrected,
+               "original": req.text}, "上报成功")
 
 
 class MedicationCreate(BaseModel):
