@@ -96,6 +96,39 @@ async function kAct(k, data, okMsg) {
     message.error(e.message)
   }
 }
+
+// 版本管理
+const verModal = ref(null) // { mode: 'new'|'list', k, versions, form }
+const kForm2 = ref({})
+
+async function newVersionOf(k) {
+  kForm2.value = { ...kForm.value, title: k.title, plain_interpretation: k.plain_interpretation, category: k.category }
+  verModal.value = { mode: 'new', k }
+}
+
+async function submitNewVersion() {
+  const k = verModal.value.k
+  const f = kForm2.value
+  if (!f.title || !f.plain_interpretation) return message.warning('请填写标题和通俗解读')
+  if (!f.keywords) return message.warning('请填写关键词（必填，1-5 个）')
+  try {
+    await knowledge.newVersion(k.id, f)
+    message.success('新版本已创建并提交审核，审核通过自动替换旧版')
+    verModal.value = null
+    kb.value = (await knowledge.list()) || []
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+async function showVersions(k) {
+  try {
+    const versions = (await knowledge.versions(k.id)) || []
+    verModal.value = { mode: 'list', k, versions }
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 </script>
 
 <template>
@@ -289,5 +322,50 @@ async function kAct(k, data, okMsg) {
         <n-empty v-if="!stats" description="暂无统计数据" />
       </n-tab-pane>
     </n-tabs>
+
+    <!-- 版本管理弹窗 -->
+    <n-modal :show="!!verModal" @update:show="(v) => { if (!v) verModal = null }" preset="card" style="width:600px;"
+             :title="verModal ? (verModal.mode === 'new' ? '🆕 创建新版本' : '📜 版本历史') : ''">
+      <template v-if="verModal">
+        <template v-if="verModal.mode === 'new'">
+          <n-form label-placement="top">
+            <n-form-item label="标题">
+              <n-input v-model:value="kForm2.title" />
+            </n-form-item>
+            <n-form-item label="分类">
+              <n-select v-model:value="kForm2.category" :options="KB_CATS.map(v=>({label:v,value:v}))" />
+            </n-form-item>
+            <n-form-item label="通俗解读">
+              <n-input v-model:value="kForm2.plain_interpretation" type="textarea" :rows="2" />
+            </n-form-item>
+            <n-form-item label="关键词（必填，逗号分隔）">
+              <n-input v-model:value="kForm2.keywords" placeholder="如：医保,报销" />
+            </n-form-item>
+            <n-form-item label="正文">
+              <n-input v-model:value="kForm2.content" type="textarea" :rows="3" />
+            </n-form-item>
+            <n-grid :cols="2" :x-gap="12">
+              <n-form-item-gi label="生效日期">
+                <n-input v-model:value="kForm2.effective_date" placeholder="如 2026-01-01" />
+              </n-form-item-gi>
+              <n-form-item-gi label="失效日期">
+                <n-input v-model:value="kForm2.expire_date" placeholder="如 2027-12-31" />
+              </n-form-item-gi>
+            </n-grid>
+            <n-button type="primary" @click="submitNewVersion">📤 创建并提交审核</n-button>
+          </n-form>
+        </template>
+        <template v-else>
+          <div v-for="v in verModal.versions" :key="v.id" style="padding:8px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <b>V{{ v.version || 1 }} {{ v.title }}</b>
+              <n-tag size="small" :type="v.audit_status === '已发布' ? 'success' : 'default'">{{ v.audit_status }}</n-tag>
+            </div>
+            <div class="muted" style="font-size:0.8rem;margin-top:2px;">{{ (v.updated_at || v.created_at || '').slice(0, 16) }} · 发布人 {{ v.publisher || '' }}</div>
+          </div>
+          <n-empty v-if="!verModal.versions || !verModal.versions.length" description="暂无版本记录" style="font-size:0.85rem;padding:8px;" />
+        </template>
+      </template>
+    </n-modal>
   </div>
 </template>
