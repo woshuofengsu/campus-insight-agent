@@ -950,7 +950,8 @@ def _last_escalation_log(task_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM activity_log WHERE module=? AND target_type='weather_check_task' "
-            "AND target_id=? AND action LIKE '超时升级%' ORDER BY id DESC LIMIT 1",
+            "AND target_id=? AND (action LIKE '超时升级%' OR action LIKE '升级通知失败%') "
+            "ORDER BY id DESC LIMIT 1",
             (MODULE, task_id),
         ).fetchone()
         return dict(row) if row else None

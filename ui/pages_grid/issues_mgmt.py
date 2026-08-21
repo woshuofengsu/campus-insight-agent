@@ -380,11 +380,17 @@ if issues:
             i.get("status", ""), (i.get("approved_at") or "")[:16] or "",
             i.get("assignee_name", ""), i.get("resolve_note", ""),
         ])
+    def _log_issue_export():
+        """导出动作留痕（spec 十）。"""
+        from data.db_notifications import log_activity
+        log_activity("负责人", "导出工单数据", "issue", module="报修", detail="导出工单 CSV（电话脱敏，不含照片）")
+
     st.download_button(
         "📥 导出工单数据（CSV）",
         buf.getvalue(),
         file_name=f"工单导出_{datetime.now().strftime('%Y%m%d')}.csv",
         mime="text/csv",
+        on_click=_log_issue_export,
     )
 
 st.markdown("---")

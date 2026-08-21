@@ -356,12 +356,15 @@ def negotiate_issue(issue_id: int, reason: str, actor: str = "负责人") -> tup
 
 
 def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tuple[bool, str]:
-    """居民补充信息（24 小时内最多 2 次）。"""
+    """居民补充信息（24 小时内最多 2 次）。
+
+    补充后自动通知负责人，提示确认是否影响紧急程度/分类（若影响，计时重算或重新分派）。
+    """
     if not content:
         return False, "补充内容不能为空"
     with get_db() as conn:
         row = conn.execute(
-            "SELECT supplement_count, supplemented_at, status FROM community_issues WHERE id=?",
+            "SELECT supplement_count, supplemented_at, status, title FROM community_issues WHERE id=?",
             (issue_id,),
         ).fetchone()
         if row is None:
@@ -377,7 +380,21 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
             "INSERT INTO issue_supplements (issue_id, content) VALUES (?, ?)", (issue_id, content)
         )
         conn.commit()
-    log_activity(actor, "补充信息", "issue", issue_id, module=MODULE, detail=content)
+    log_activity(actor, "补充信息", "issue", issue_id, module=MODULE, detail=content,
+                 after_value=f"第 {row['supplement_count'] + 1} 次补充")
+    # 自动通知负责人重评估（spec 16：补充后自动通知负责人，标记"有补充信息"，负责人需确认）
+    try:
+        from data.db_user import list_users
+        for u in list_users(role="grid"):
+            from data.db_notifications import create_notification
+            create_notification(
+                u["id"], "supplement",
+                f"工单 #{issue_id} 有补充信息",
+                f"{row['title'][:20]}：居民补充了信息，请确认是否影响紧急程度/分类（影响则重新计时或重新分派）。",
+                related_id=issue_id,
+            )
+    except Exception:
+        pass  # 通知不是硬依赖
     return True, ""
 
 
