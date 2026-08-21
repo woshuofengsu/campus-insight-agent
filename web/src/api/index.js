@@ -47,6 +47,8 @@ export const issues = {
   detail: (id) => api.get(`/issues/${id}`),
   create: (data) => api.post('/issues', data),
   action: (id, data) => api.post(`/issues/${id}/action`, data),
+  drafts: () => api.get('/issues/drafts'),
+  saveDraft: (data) => api.post('/issues/drafts', data),
 }
 
 // 提案
@@ -111,6 +113,8 @@ export const elderly = {
   createMedication: (data) => api.post('/elderly/medications', data),
   emergency: () => api.post('/elderly/emergency'),
   emergencyStatus: () => api.get('/elderly/emergency/status'),
+  contacts: () => api.get('/elderly/emergency-contacts'),
+  addContact: (data) => api.post('/elderly/emergency-contacts', data),
   // 老年关怀管理（负责人）
   manageMeds: (params) => api.get('/elderly/manage/medications', { params }),
   auditMedication: (id, data) => api.post(`/elderly/manage/medications/${id}/audit`, data),

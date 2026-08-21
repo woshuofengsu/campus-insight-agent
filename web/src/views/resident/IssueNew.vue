@@ -1,6 +1,6 @@
 <script setup>
-// 提交报修（含现场照片上传，jpg/png ≤5MB 最多3张）
-import { ref } from 'vue'
+// 提交报修（含现场照片上传 + 代报 + 草稿恢复）
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { issues, upload } from '../../api'
@@ -19,8 +19,21 @@ const form = ref({
   reporter_name: '',
   reporter_phone: '',
   photo_before: '[]',
+  is_agent_report: false, agent_name: '', agent_phone: '', agent_relation: '',
 })
 const files = ref([]) // 上传的文件列表（n-upload）
+const drafts = ref([])
+
+onMounted(async () => {
+  try { drafts.value = (await issues.drafts()) || [] } catch { /* 忽略 */ }
+})
+
+function restoreDraft(d) {
+  form.value.title = d.title || ''
+  form.value.location = d.location || ''
+  form.value.description = d.description || ''
+  message.success('已恢复草稿，可继续填写')
+}
 
 const submit = async () => {
   if (!form.value.title || !form.value.location) {
@@ -34,7 +47,10 @@ const submit = async () => {
       const up = await upload(fileObjs, 'issues')
       form.value.photo_before = JSON.stringify(up.paths || [])
     }
-    const data = await issues.create(form.value)
+    const data = await issues.create({
+      ...form.value,
+      is_agent_report: form.value.is_agent_report ? 1 : 0,
+    })
     message.success(`工单 #${data.issue_id} 已提交，状态：待审核`)
     router.push('/resident/work-orders')
   } catch (e) {
@@ -49,6 +65,16 @@ const submit = async () => {
   <div class="page">
     <h2 class="page-title">📝 提交报修</h2>
     <p class="page-sub">填一下问题描述，负责人会尽快电话核实</p>
+
+    <!-- 草稿恢复 -->
+    <div v-if="drafts.length" class="card urgent-bg" style="margin-bottom:12px;">
+      <b>📝 您有 {{ drafts.length }} 份未完成的报修草稿</b>
+      <div v-for="d in drafts" :key="d.id" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+        <span>{{ d.title }} <span class="muted">（{{ (d.created_at || '').slice(0, 10) }}）</span></span>
+        <n-button size="small" @click="restoreDraft(d)">继续填写</n-button>
+      </div>
+    </div>
+
     <div class="card">
       <n-form label-placement="top">
         <n-form-item label="问题描述（必填）">
@@ -75,6 +101,20 @@ const submit = async () => {
         <n-form-item label="联系电话">
           <n-input v-model:value="form.reporter_phone" placeholder="11 位手机号" />
         </n-form-item>
+        <n-checkbox v-model:checked="form.is_agent_report" style="margin-bottom:8px;">我是代报（帮家人/邻居报修）</n-checkbox>
+        <template v-if="form.is_agent_report">
+          <n-grid :cols="2" :x-gap="16">
+            <n-form-item-gi label="代报人姓名">
+              <n-input v-model:value="form.agent_name" placeholder="代报人姓名" />
+            </n-form-item-gi>
+            <n-form-item-gi label="代报人电话">
+              <n-input v-model:value="form.agent_phone" placeholder="代报人电话" />
+            </n-form-item-gi>
+          </n-grid>
+          <n-form-item label="与报修人关系">
+            <n-input v-model:value="form.agent_relation" placeholder="如：家人 / 邻居" />
+          </n-form-item>
+        </template>
         <n-button type="primary" block size="large" :loading="loading" @click="submit">📨 提交报修</n-button>
       </n-form>
     </div>

@@ -301,6 +301,10 @@ class IssueCreate(BaseModel):
     reporter_name: str = Field(default="")
     reporter_phone: str = Field(default="")
     photo_before: str = Field(default="[]")
+    is_agent_report: int = Field(default=0)
+    agent_name: str = Field(default="")
+    agent_phone: str = Field(default="")
+    agent_relation: str = Field(default="")
 
 
 @app.post("/api/web/issues")
@@ -312,6 +316,8 @@ def web_issue_create(req: IssueCreate, request: Request):
         urgency=req.urgency, reporter_name=req.reporter_name or u.get("name") or "居民",
         reporter_phone=req.reporter_phone, reporter_id=u.get("uid"),
         photo_before=req.photo_before,
+        is_agent_report=req.is_agent_report, agent_name=req.agent_name,
+        agent_phone=req.agent_phone, agent_relation=req.agent_relation,
     )
     if iid <= 0:
         return fail(2001, hint or "提交失败")
@@ -1209,6 +1215,98 @@ def web_manage_sos(request: Request, status: str = ""):
     from data.db_elderly_care import get_sos_calls
     rows = get_sos_calls(status=status or None, limit=50)
     return ok([dict(r) for r in rows])
+
+
+# ---------------- 报修草稿（居民端崩溃恢复） ----------------
+
+@app.get("/api/web/issues/drafts")
+def web_issue_drafts(request: Request):
+    """当前居民未完成的报修草稿。"""
+    from data.db_repair import get_drafts
+    u = _user(request)
+    return ok([dict(r) for r in get_drafts(u.get("uid"))])
+
+
+class IssueDraft(BaseModel):
+    title: str = Field(default="")
+    location: str = Field(default="")
+    description: str = Field(default="")
+    urgency: str = Field(default="一般")
+    issue_type: str = Field(default="室内")
+
+
+@app.post("/api/web/issues/drafts")
+def web_issue_draft_save(req: IssueDraft, request: Request):
+    """保存报修草稿（崩溃/超时自动生成，7 天内可恢复）。"""
+    from data.db_repair import create_draft
+    u = _user(request)
+    if not req.title:
+        return fail(1001, "请至少填写问题描述")
+    create_draft(
+        u.get("uid"), title=req.title, category="", issue_type=req.issue_type,
+        location=req.location, description=req.description or req.title,
+        urgency=req.urgency, reporter_name="", reporter_phone="",
+    )
+    return ok({"saved": True}, "草稿已保存")
+
+
+@app.delete("/api/web/issues/drafts/{did}")
+def web_issue_draft_delete(did: int, request: Request):
+    from data.db_repair import delete_draft
+    delete_draft(did)
+    return ok({"deleted": did}, "已删除")
+
+
+# ---------------- 天气历史 / 社区概况 ----------------
+
+@app.get("/api/web/weather/history")
+def web_weather_history(request: Request, status: str = "", limit: int = 200):
+    """负责人端天气检查任务历史。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_weather import get_check_task_history
+    rows = get_check_task_history(status=status or None, limit=limit)
+    return ok([dict(r) for r in rows])
+
+
+@app.get("/api/web/weather/overview")
+def web_weather_overview(request: Request, limit: int = 50):
+    """负责人端所有社区天气概况。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_weather import get_community_weather_overview
+    return ok(get_community_weather_overview(limit=limit))
+
+
+# ---------------- 政策统计 / 匹配阈值 ----------------
+
+@app.get("/api/web/qa/stats")
+def web_qa_stats(request: Request):
+    """负责人端高频统计（匹配失败/无帮助分类）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_policy import get_frequency_stats
+    return ok(get_frequency_stats())
+
+
+class ThresholdSet(BaseModel):
+    threshold: float = Field(..., ge=0.1, le=5.0)
+
+
+@app.get("/api/web/qa/threshold")
+def web_qa_threshold_get(request: Request):
+    from data.db_policy import get_match_threshold
+    return ok({"threshold": get_match_threshold()})
+
+
+@app.post("/api/web/qa/threshold")
+def web_qa_threshold_set(req: ThresholdSet, request: Request):
+    """匹配阈值配置（仅负责人，留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_policy import set_match_threshold
+    set_match_threshold(req.threshold, actor=_user(request).get("name") or "负责人")
+    return ok({"threshold": req.threshold}, "阈值已更新")
 
 
 # ---- 老年端补充：联系人 / SOS 响应结束 / 用药暂停恢复 / 联系拨打 ----
