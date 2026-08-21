@@ -248,6 +248,13 @@ if due:
     if not st.session_state.get("_due_announced"):
         st.session_state["_due_announced"] = True
         tts_speak(f"该吃药了：{med_text}")
+        # 播报记录（spec 06.4：记录每次播报时间，负责人后台可查看）
+        try:
+            from data.db_notifications import log_activity
+            log_activity(name or "老人", "用药提醒播报", "medication_reminder", uid,
+                         med_text, module="老年端", detail=f"播报用药：{med_text}")
+        except Exception:
+            pass
 
 # 未读通知 + 最近联系记录
 unread = get_unread_count(uid) if uid else 0

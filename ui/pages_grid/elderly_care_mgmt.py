@@ -61,6 +61,21 @@ with tab1:
         if r.get("audit_opinion"):
             st.caption(f"审核意见：{r['audit_opinion']}")
 
+    section("📢 用药播报记录（最近 20 条）")
+    try:
+        from data.db_core import get_db
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT actor, detail, created_at FROM activity_log "
+                "WHERE module='老年端' AND action='用药提醒播报' ORDER BY id DESC LIMIT 20"
+            ).fetchall()
+        if not rows:
+            st.caption("暂无播报记录（老人打开老年端首页且到点用药时触发）。")
+        for r in rows:
+            st.caption(f"🕐 {(r['created_at'] or '')[:16]} · {r['actor']} · {r['detail'] or ''}")
+    except Exception:
+        st.caption("暂无播报记录。")
+
 # ---------- Tab2：紧急联系人审核 ----------
 with tab2:
     section("待审核紧急联系人")
