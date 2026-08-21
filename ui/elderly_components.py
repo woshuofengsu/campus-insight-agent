@@ -54,23 +54,40 @@ def big_button(label: str, key: str, primary: bool = True, on_click=None, args=N
 
 
 def tts_speak(text: str, label: str = "🔊 朗读"):
-    """朗读文本（浏览器 SpeechSynthesis，渐进增强）。"""
+    """朗读文本（浏览器 SpeechSynthesis，渐进增强；失败自动重试 3 次并提示）。"""
     text_js = json.dumps(text, ensure_ascii=False)
     st.components.v1.html(f"""
     <button onclick="speak()" style="font-size:1.2em;padding:14px 22px;border-radius:14px;
         border:2px solid #4f46e5;background:#eef2ff;cursor:pointer;font-weight:700;">{label}</button>
+    <div id="tts_msg" style="font-size:1em;color:#b91c1c;margin-top:6px;"></div>
     <script>
     function speak() {{
-        if ('speechSynthesis' in window) {{
+        if (!('speechSynthesis' in window)) {{
+            document.getElementById('tts_msg').textContent = '当前浏览器不支持语音朗读，请查看文字';
+            return;
+        }}
+        var tries = 0;
+        function attempt() {{
+            tries++;
             var u = new SpeechSynthesisUtterance({text_js});
             u.lang = 'zh-CN'; u.rate = 0.9;
-            speechSynthesis.cancel(); speechSynthesis.speak(u);
-        }} else {{
-            alert('当前浏览器不支持语音朗读');
+            u.onerror = function() {{
+                if (tries < 3) {{
+                    setTimeout(attempt, 5000);  // 失败重试，间隔 5 秒
+                }} else {{
+                    document.getElementById('tts_msg').textContent = '语音播放失败，请查看文字';
+                }}
+            }};
+            u.onend = function() {{
+                document.getElementById('tts_msg').textContent = '';
+            }};
+            speechSynthesis.cancel();
+            speechSynthesis.speak(u);
         }}
+        attempt();
     }}
     </script>
-    """, height=64)
+    """, height=96)
 
 
 def voice_input(key: str | None = None) -> str | None:

@@ -196,58 +196,35 @@ with st.container(border=True):
             elif not _PHONE_RE.match(phone_t):
                 st.error("请输入正确的手机号（11 位，1 开头）。")
             else:
-                # 诉求类别交给 AI 分类（紧急程度由居民自选）
-                category, _ = _llm_classify(title_t, "")
-                photo_before = "[]"
-                try:
-                    from utils.uploads import save_uploaded_files
-                    _saved = save_uploaded_files(photos, folder="issues")
-                    if _saved:
-                        import json
-                        photo_before = json.dumps(_saved, ensure_ascii=False)
-                except Exception:
-                    pass
-                draft_id = st.session_state.get("_active_draft_id")
-                issue_id, hint = submit_issue(
-                    title=title_t,
-                    category=category,
-                    issue_type=issue_type,
-                    location=loc_t,
-                    description=title_t,
-                    urgency=urgency,
-                    reporter_name=name_t,
-                    reporter_phone=phone_t,
-                    reporter_id=uid,
-                    photo_before=photo_before,
-                    draft_id=draft_id,
-                )
-                if hint == "safety":
-                    st.error(
-                        "⚠️ **已记录安全提醒，不生成维修工单**\n\n"
-                        "请先拨打紧急电话：🚒 消防 **119** · 🔥 燃气 **96777**\n"
-                        "系统已记录您的安全提醒，社区负责人会同步跟进。"
-                    )
-                elif hint == "third_party":
+                # 错别字纠错确认（spec：纠正后交居民确认，确认后才生成工单）
+                _corr = st.session_state.get("_rep_corr")
+                if _corr is None:
+                    try:
+                        from tools.action_report_issue import correct_typos
+                        _c = correct_typos(title_t)
+                        _corr = {"orig": title_t, "new": _c} if _c and _c != title_t else ""
+                    except Exception:
+                        _corr = ""
+                    st.session_state["_rep_corr"] = _corr
+                if _corr:
                     st.warning(
-                        f"⚠️ 该问题可能属第三方施工责任，已生成工单 **#{issue_id}** 并标记「非社区责任」，"
-                        "负责人将核实处理。"
+                        f"检测到描述可能有错别字/病句：\n\n"
+                        f"**原描述**：{_corr['orig']}\n\n"
+                        f"**纠正建议**：{_corr['new']}"
                     )
-                elif hint == "violation":
-                    st.warning(
-                        f"⚠️ 工单 **#{issue_id}** 已生成并标记「违规搭建」，负责人审核通过后将按流程转出处理。"
-                    )
-                elif issue_id > 0:
-                    st.success(
-                        f"✅ 工单 **#{issue_id}** 已提交！分类：{category}（{issue_type}）· "
-                        f"{_URGENCY_EMOJI.get(urgency, '🔵')} {urgency} · 状态：待审核\n\n"
-                        "社区负责人会尽快电话核实，请保持电话畅通。"
-                    )
-                    # 清空表单（含已恢复的草稿）
-                    for k in ("rep_form_title", "rep_form_location", "rep_form_name",
-                              "rep_form_phone", "_active_draft_id"):
-                        st.session_state.pop(k, None)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("✅ 用纠正后的描述提交", key="rep_corr_yes", width="stretch"):
+                            st.session_state.pop("_rep_corr", None)
+                            _do_submit_issue(_corr["new"], loc_t, name_t, phone_t,
+                                             urgency, issue_type, photos)
+                    with c2:
+                        if st.button("↩️ 用原文提交", key="rep_corr_no", width="stretch"):
+                            st.session_state.pop("_rep_corr", None)
+                            _do_submit_issue(title_t, loc_t, name_t, phone_t,
+                                             urgency, issue_type, photos)
                 else:
-                    st.error(f"提交失败：{hint}")
+                    _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency, issue_type, photos)
 
 def _load_photos(raw: str | None) -> list[str]:
     """解析照片路径 JSON，返回可显示的绝对路径列表（仅负责人和本人可见）。"""
@@ -258,6 +235,56 @@ def _load_photos(raw: str | None) -> list[str]:
         paths = []
     from utils.uploads import resolve_path
     return [p for p in (resolve_path(x) for x in paths) if p]
+
+
+def _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency_val, issue_type_val, photos_list):
+    """真正提交工单（校验已通过；AI 分类 + 照片保存 + 结果提示）。"""
+    category, _ = _llm_classify(title_t, "")
+    photo_before = "[]"
+    try:
+        from utils.uploads import save_uploaded_files
+        _saved = save_uploaded_files(photos_list, folder="issues")
+        if _saved:
+            import json
+            photo_before = json.dumps(_saved, ensure_ascii=False)
+    except Exception:
+        pass
+    draft_id = st.session_state.get("_active_draft_id")
+    issue_id, hint = submit_issue(
+        title=title_t, category=category, issue_type=issue_type_val,
+        location=loc_t, description=title_t, urgency=urgency_val,
+        reporter_name=name_t, reporter_phone=phone_t, reporter_id=uid,
+        photo_before=photo_before, draft_id=draft_id,
+    )
+    if hint == "safety":
+        st.error(
+            "⚠️ **已记录安全提醒，不生成维修工单**\n\n"
+            "请先拨打紧急电话：🚒 消防 **119** · 🔥 燃气 **96777**\n"
+            "系统已记录您的安全提醒，社区负责人会同步跟进。"
+        )
+    elif hint == "third_party":
+        st.warning(
+            f"⚠️ 该问题可能属第三方施工责任，已生成工单 **#{issue_id}** 并标记「非社区责任」，"
+            "负责人将核实处理。"
+        )
+    elif hint == "violation":
+        st.warning(
+            f"⚠️ 工单 **#{issue_id}** 已生成并标记「违规搭建」，负责人审核通过后将按流程转出处理。"
+        )
+    elif issue_id > 0:
+        st.success(
+            f"✅ 工单 **#{issue_id}** 已提交！分类：{category}（{issue_type_val}）· "
+            f"{_URGENCY_EMOJI.get(urgency_val, '🔵')} {urgency_val} · 状态：待审核\n\n"
+            "社区负责人会尽快电话核实，请保持电话畅通。"
+        )
+        for k in ("rep_form_title", "rep_form_location", "rep_form_name",
+                  "rep_form_phone", "rep_form_urgency"):
+            st.session_state.pop(k, None)
+        st.session_state.pop("_active_draft_id", None)
+        try:
+            invalidate_issues()
+        except Exception:
+            pass
 
 
 def _render_detail(issue: dict):
@@ -313,11 +340,11 @@ def _render_detail(issue: dict):
         # 修改工单（撤回/退回后回到待审核时可用，全流程仅一次）
         with st.expander("✏️ 修改工单内容（仅一次机会）", expanded=False):
             with st.form(key=f"edit_{iid}"):
-                e_title = st.text_input("问题标题", value=i.get("title", ""))
-                e_loc = st.text_input("报修地址", value=i.get("location", ""))
-                e_desc = st.text_area("问题描述", value=i.get("description", ""))
+                e_title = st.text_input("问题标题", value=issue.get("title", ""))
+                e_loc = st.text_input("报修地址", value=issue.get("location", ""))
+                e_desc = st.text_area("问题描述", value=issue.get("description", ""))
                 e_urg = st.selectbox("紧急程度", ["紧急", "中等", "一般", "普通"],
-                                     index=["紧急", "中等", "一般", "普通"].index(i.get("urgency", "一般")))
+                                     index=["紧急", "中等", "一般", "普通"].index(issue.get("urgency", "一般")))
                 e_sub = st.form_submit_button("保存修改", width="stretch")
             if e_sub:
                 ok, msg = edit_issue(iid, actor=reporter_actor, title=e_title,

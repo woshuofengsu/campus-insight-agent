@@ -236,6 +236,34 @@ def _auto_urgency(title: str, description: str = "") -> str:
 _URGENCY_EMOJI = {"紧急": "🔴", "中等": "🟠", "一般": "🟡", "普通": "🔵"}
 
 
+def correct_typos(text: str) -> str:
+    """LLM 纠正错别字/病句，失败或无明显差异时返回原文本（spec：纠正后交居民确认）。
+
+    供报修/提案提交前的「纠错建议」用；不改变原文存储，只做提示。
+    """
+    if not text or len(text.strip()) < 3:
+        return text
+    try:
+        from langchain_openai import ChatOpenAI
+        from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+        if not DEEPSEEK_API_KEY:
+            return text
+        llm = ChatOpenAI(
+            api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
+            model=DEEPSEEK_MODEL, temperature=0, max_tokens=120, timeout=5, max_retries=0,
+        )
+        prompt = (
+            "你是中文校对助手。纠正下面这段话的错别字和病句，"
+            "只输出纠正后的文本，不要任何解释。如果无需纠正，原样输出：\n"
+            f"{text}"
+        )
+        resp = llm.invoke(prompt)
+        out = (resp.content if hasattr(resp, "content") else str(resp)).strip().strip('"')
+        return out if out and len(out) >= 3 else text
+    except Exception:
+        return text
+
+
 @tool
 def report_issue(title: str, category: str = "", location: str = "",
                  description: str = "", urgency: str = "",
