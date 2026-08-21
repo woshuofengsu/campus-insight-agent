@@ -376,29 +376,87 @@ if st.session_state.get("_show_weather"):
     except Exception:
         pass
 
-# ---------------------------------------------------------------- 政策问答（内联，查知识库）
+# ---------------------------------------------------------------- 政策问答（老年端：语音输入+转写确认+自动回答+转人工）
 if st.session_state.get("_show_policy"):
     st.markdown("### 🧾 政策问答")
-    q = st.text_input("您想问什么？（如：高龄补贴怎么领）", key="elderly_policy_q",
-                      placeholder="输入您想了解的政策问题")
+    st.caption("点「🎤 按住说话」问政策，或直接打字")
+
+    # 语音输入（Web Speech，渐进增强）
+    try:
+        from ui.elderly_components import voice_input
+        _spoken = voice_input(key="elderly_policy_voice")
+        if _spoken:
+            st.session_state["_policy_confirm_text"] = _spoken
+            st.session_state.pop("_policy_result", None)
+    except Exception:
+        pass
+
+    # 转写确认（spec：先显示转写文本，老人点「对，提交」或「重新说」）
+    _confirm_text = st.session_state.get("_policy_confirm_text")
+    if _confirm_text:
+        big_card(f"您说的是：<strong>{_confirm_text}</strong>", bg="#eef2ff", border="#4f46e5")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ 对，就这样问", key="policy_confirm_yes", width="stretch"):
+                st.session_state["_policy_q"] = _confirm_text
+                st.session_state.pop("_policy_confirm_text", None)
+                st.rerun()
+        with c2:
+            if st.button("🔁 重新说", key="policy_confirm_no", width="stretch"):
+                st.session_state.pop("_policy_confirm_text", None)
+                st.rerun()
+
+    q = st.text_input("或输入您想问的问题", key="elderly_policy_q",
+                      value=st.session_state.get("_policy_q", ""))
     if st.button("🔍 查询", key="policy_search", width="stretch"):
         if q.strip():
             try:
-                from data.db_knowledge import search_knowledge
-                hits = search_knowledge(q.strip())
-                st.session_state["_policy_answer"] = hits[0] if hits else None
+                from data.db_policy import ask_question
+                r = ask_question(uid or 0, q.strip(), source="老年端")
+                st.session_state["_policy_result"] = r
+                st.session_state["_policy_qid"] = r.get("question_id")
             except Exception:
-                st.session_state["_policy_answer"] = None
+                st.session_state["_policy_result"] = {"matched": False, "reason": "error"}
             st.rerun()
-    ans = st.session_state.get("_policy_answer")
-    if ans is not None:
-        if ans:
-            big_card(f"<strong>{ans.get('title', '')}</strong><br>{ans.get('content', '')}",
+
+    res = st.session_state.get("_policy_result")
+    if res is not None:
+        if res.get("matched"):
+            ans = res.get("auto_answer") or ""
+            short = ans[:200]
+            _kb = res.get("knowledge") or {}
+            big_card(f"<strong>{_kb.get('title') or '回答'}</strong><br>{short}",
                      bg="#f0fdf4", border="#16a34a")
-            tts_speak(f"{ans.get('title', '')}。{ans.get('content', '')}")
+            tts_speak(f"{_kb.get('title') or ''}。{short}")
+            # 转人工（二次确认）
+            if st.button("🙋 转人工", key="policy_to_human", width="stretch"):
+                st.session_state["_policy_human_confirm"] = True
+            if st.session_state.get("_policy_human_confirm"):
+                if st.button("✅ 确认转人工（负责人24小时内回复）", key="policy_human_yes", width="stretch"):
+                    qid = st.session_state.get("_policy_qid")
+                    try:
+                        from data.db_policy import transfer_to_human
+                        if qid:
+                            transfer_to_human(qid)
+                        else:
+                            transfer_to_human(user_id=uid or 0, question=q.strip(), source="老年端")
+                    except Exception:
+                        pass
+                    st.success("已转人工，负责人将在24小时内回复您")
+                    st.session_state.pop("_policy_result", None)
+                    st.session_state.pop("_policy_human_confirm", None)
+                    st.rerun()
         else:
-            st.info("没找到相关回答，可联系社区负责人咨询。")
-            tts_speak("没有找到相关回答，可联系社区负责人咨询。")
+            st.info("没有找到答案，可以点下方转人工。")
+            tts_speak("没有找到答案，可以点下方转人工。")
+            if st.button("🙋 转人工", key="policy_to_human2", width="stretch"):
+                try:
+                    from data.db_policy import transfer_to_human
+                    transfer_to_human(user_id=uid or 0, question=q.strip(), source="老年端")
+                except Exception:
+                    pass
+                st.success("已转人工，负责人将在24小时内回复您")
+                st.rerun()
 
 st.markdown("---")
 
