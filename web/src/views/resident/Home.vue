@@ -1,5 +1,5 @@
 <script setup>
-// 居民首页：天气摘要 + 未读通知 + 快捷入口
+// 居民首页：天气摘要 + 未读通知 + 紧急通知强制弹窗 + 快捷入口
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
@@ -10,13 +10,27 @@ const store = useUserStore()
 
 const w = ref(null)
 const noticeList = ref([])
+const urgentModal = ref(null) // 紧急通知弹窗
 
 onMounted(async () => {
   try { w.value = await weather.current() } catch { /* 天气失败不阻塞 */ }
   try { noticeList.value = (await notices.list()) || [] } catch { /* 忽略 */ }
+  const urgent = noticeList.value.find((n) => n.is_urgent && !n.is_read)
+  if (urgent) urgentModal.value = urgent
 })
 
 const unread = () => noticeList.value.filter((n) => !n.is_read).length
+
+async function closeUrgent() {
+  const n = urgentModal.value
+  urgentModal.value = null
+  if (n && !n.is_read) {
+    try {
+      await notices.action(n.id, { action: 'mark_read' })
+      noticeList.value = (await notices.list()) || []
+    } catch { /* 忽略 */ }
+  }
+}
 
 const entries = [
   { to: '/resident/work-orders', icon: '🔧', label: '报修' },
@@ -59,5 +73,11 @@ const entries = [
         <span style="font-size:1.8rem;">{{ e.icon }}</span>{{ e.label }}
       </n-button>
     </div>
+
+    <!-- 紧急通知强制弹窗 -->
+    <n-modal :show="!!urgentModal" @update:show="(v) => { if (!v) urgentModal = null }" preset="dialog" type="error"
+             :title="urgentModal ? ('🚨 ' + urgentModal.title) : ''"
+             :content="urgentModal ? urgentModal.body : ''"
+             positive-text="我知道了" @positive-click="closeUrgent" />
   </div>
 </template>

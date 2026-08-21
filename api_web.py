@@ -1677,11 +1677,16 @@ def _resolve_elder_uid(request: Request) -> int | None:
 
 @app.get("/api/web/weather/current")
 def web_weather_current(request: Request):
-    from data.db_weather import get_weather_for_display
+    from data.db_weather import get_weather_for_display, get_daily_advice
     from config import COMMUNITY_CITY, COMMUNITY_DISTRICT
     w = get_weather_for_display("")
     days = w.get("days") or []
     today = days[0] if days else {}
+    advice = {}
+    try:
+        advice = get_daily_advice(city="") or {}
+    except Exception:
+        pass
     return ok({
         "location": COMMUNITY_CITY + COMMUNITY_DISTRICT,
         "temp_high": today.get("temp_high"), "temp_low": today.get("temp_low"),
@@ -1689,6 +1694,8 @@ def web_weather_current(request: Request):
         "wind": today.get("wind"), "rain_prob": today.get("rain_prob"),
         "humidity": today.get("humidity"), "aqi": today.get("aqi"), "uv": today.get("uv"),
         "advice": today.get("advice"),
+        "dress": advice.get("dress", ""), "travel": advice.get("travel", ""),
+        "updated_at": w.get("data_updated_at") or "",
         "forecast": days[1:4],
         "is_degraded": w.get("is_degraded"), "note": w.get("note", ""),
     })

@@ -69,6 +69,7 @@ export const proposals = {
 export const notices = {
   list: (params) => api.get('/notices', { params }),
   manage: (params) => api.get('/notices/manage', { params }),
+  detail: (id) => api.get(`/notices/${id}`),
   create: (data) => api.post('/notices', data),
   action: (id, data) => api.post(`/notices/${id}/action`, data),
 }

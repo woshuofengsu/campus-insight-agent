@@ -1,5 +1,5 @@
 <script setup>
-// 通知管理：创建发布 + 列表 + 下架/撤回/置顶
+// 通知管理：创建发布（含紧急/定时）+ 列表（已读统计含老年端）+ 下架(原因)/撤回/置顶 + 详情
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { notices } from '../../api'
@@ -7,11 +7,16 @@ import { notices } from '../../api'
 const message = useMessage()
 const list = ref([])
 const loading = ref(true)
+const detail = ref(null)
 
-const form = ref({ title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '' })
+const form = ref({
+  title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '',
+  is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]',
+})
+const publishMode = ref('now') // now | schedule
 const creating = ref(false)
 
-const TYPES = ['社区公告', '活动通知', '停水停电通知', '政策通知', '温馨提示', '其他']
+const TYPES = ['社区公告', '活动通知', '停水停电通知', '紧急通知', '政策通知', '其他']
 
 async function load() {
   loading.value = true
@@ -23,11 +28,13 @@ onMounted(load)
 async function create() {
   if (!form.value.title || !form.value.body) return message.warning('请填写标题和正文')
   if (form.value.is_urgent && !form.value.elderly_summary) return message.warning('紧急通知必填老年端播报摘要')
+  if (publishMode.value === 'schedule' && !form.value.scheduled_at) return message.warning('定时发布请选择时间')
   creating.value = true
   try {
-    await notices.create(form.value)
-    message.success('通知已创建并发布')
-    form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '' }
+    await notices.create({ ...form.value, scheduled_at: publishMode.value === 'schedule' ? form.value.scheduled_at : '' })
+    message.success(publishMode.value === 'schedule' ? '通知已创建并定时发布' : '通知已创建并发布')
+    form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]' }
+    publishMode.value = 'now'
     load()
   } catch (e) {
     message.error(e.message)
@@ -45,12 +52,20 @@ async function act(n, data, okMsg) {
     message.error(e.message)
   }
 }
+
+async function showDetail(n) {
+  try { detail.value = await notices.detail(n.id) } catch (e) { message.error(e.message) }
+}
+
+function atts(n) {
+  try { return JSON.parse(n.attachment_json || '[]') } catch { return [] }
+}
 </script>
 
 <template>
   <div class="page">
     <h2 class="page-title">📢 通知管理</h2>
-    <p class="page-sub">发布公告、活动、停水停电与紧急通知</p>
+    <p class="page-sub">发布公告、活动、停水停电与紧急通知（含定时发布）</p>
 
     <div class="card">
       <div style="font-weight:700;margin-bottom:10px;">➕ 新建通知</div>
@@ -72,14 +87,21 @@ async function act(n, data, okMsg) {
       <n-form-item v-if="form.is_urgent" label="老年端播报摘要（紧急必填，≤30字）">
         <n-input v-model:value="form.elderly_summary" maxlength="30" placeholder="口语化一句话" />
       </n-form-item>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
+        <n-radio-group v-model:value="publishMode">
+          <n-radio value="now">立即发布</n-radio>
+          <n-radio value="schedule">定时发布</n-radio>
+        </n-radio-group>
+        <n-input v-if="publishMode === 'schedule'" v-model:value="form.scheduled_at" placeholder="定时时间，如 2026-08-22 09:00" style="max-width:240px;" />
+      </div>
       <div style="margin-top:10px;">
         <n-popconfirm v-if="form.is_urgent" @positive-click="create" :positive-button-props="{ type: 'error' }">
           <template #trigger>
-            <n-button type="error" :loading="creating">📨 发布紧急通知</n-button>
+            <n-button type="error" :loading="creating">📨 {{ publishMode === 'schedule' ? '定时发布紧急通知' : '发布紧急通知' }}</n-button>
           </template>
           紧急通知将自动置顶并在居民端/老年端强制弹窗，确认内容无误？
         </n-popconfirm>
-        <n-button v-else type="primary" :loading="creating" @click="create">📨 创建并发布</n-button>
+        <n-button v-else type="primary" :loading="creating" @click="create">📨 {{ publishMode === 'schedule' ? '创建并定时发布' : '创建并发布' }}</n-button>
       </div>
     </div>
 
@@ -87,20 +109,22 @@ async function act(n, data, okMsg) {
       <div v-for="n in list" :key="n.id" class="card" :style="n.is_urgent ? 'border-left:4px solid #dc2626;' : ''">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>
-            <b>{{ n.title }}</b>
+            <b style="cursor:pointer;" @click="showDetail(n)">{{ n.title }} ›</b>
             <n-tag v-if="n.is_urgent" type="error" size="small" style="margin-left:8px;">🚨 紧急</n-tag>
             <n-tag size="small" style="margin-left:4px;">{{ n.status }}</n-tag>
           </div>
           <span class="muted" style="font-size:0.8rem;">
-            已读 {{ (n.stats && n.stats.resident_read) || 0 }} / 未读 {{ (n.stats && n.stats.resident_unread) || 0 }}
+            居民已读 {{ (n.stats && n.stats.resident_read) || 0 }}/{{ (n.stats && n.stats.resident_total) || 0 }} ·
+            老年已读 {{ (n.stats && n.stats.elderly_read) || 0 }}/{{ (n.stats && n.stats.elderly_total) || 0 }}
           </span>
         </div>
         <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ n.notice_type }} · {{ (n.published_at || n.created_at || '').slice(0, 16) }}</div>
         <div style="margin-top:8px;">{{ n.body }}</div>
-        <div style="margin-top:10px;display:flex;gap:8px;">
-          <n-popconfirm v-if="n.status === '已发布'" @positive-click="act(n, { action: 'take_down', reason: '已处理完成' }, '已下架')">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <n-input v-if="n.status === '已发布'" :value="n.downReason || ''" placeholder="下架原因（必填）" size="small" style="max-width:200px;" @update:value="(v) => (n.downReason = v)" />
+          <n-popconfirm v-if="n.status === '已发布'" @positive-click="act(n, { action: 'take_down', reason: n.downReason || '内容更新' }, '已下架')">
             <template #trigger><n-button size="small" type="warning">⏬ 下架</n-button></template>
-            下架后居民端不再显示，确认？
+            下架后居民端不再显示，将记录原因，确认？
           </n-popconfirm>
           <n-button v-if="n.status === '已发布' && !n.is_pinned" size="small" @click="act(n, { action: 'pin' }, '已置顶')">📌 置顶</n-button>
           <n-button v-if="n.is_pinned" size="small" quaternary @click="act(n, { action: 'unpin' }, '已取消置顶')">📌 取消置顶</n-button>
@@ -117,5 +141,27 @@ async function act(n, data, okMsg) {
       </div>
       <n-empty v-if="!loading && list.length === 0" description="暂无通知" />
     </n-spin>
+
+    <!-- 详情弹窗（含附件/老年摘要） -->
+    <n-modal :show="!!detail" @update:show="(v) => { if (!v) detail = null }" preset="card" style="width:600px;" :title="detail ? detail.title : ''">
+      <template v-if="detail">
+        <div style="margin-bottom:8px;">
+          <n-tag size="small" :type="detail.is_urgent ? 'error' : 'default'">{{ detail.notice_type }}</n-tag>
+          <n-tag size="small" style="margin-left:6px;">{{ detail.status }}</n-tag>
+          <span class="muted" style="margin-left:8px;font-size:0.8rem;">{{ (detail.published_at || detail.created_at || '').slice(0, 16) }}</span>
+        </div>
+        <div style="font-size:0.95rem;line-height:1.8;white-space:pre-wrap;">{{ detail.body }}</div>
+        <div v-if="detail.elderly_summary" style="margin-top:10px;font-size:0.9rem;color:#b45309;">🔊 老年端播报：{{ detail.elderly_summary }}</div>
+        <div v-if="atts(detail).length" style="margin-top:10px;">
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📎 附件</div>
+          <div v-for="(a, i) in atts(detail)" :key="i" style="display:inline-block;margin-right:8px;">
+            <img :src="a" style="max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--border);" :alt="'附件' + (i + 1)" />
+          </div>
+        </div>
+        <div v-if="detail.read_stats" style="margin-top:10px;font-size:0.85rem;" class="muted">
+          居民已读 {{ detail.read_stats.resident_read }}/{{ detail.read_stats.resident_total }} · 老年已读 {{ detail.read_stats.elderly_read }}/{{ detail.read_stats.elderly_total }}
+        </div>
+      </template>
+    </n-modal>
   </div>
 </template>

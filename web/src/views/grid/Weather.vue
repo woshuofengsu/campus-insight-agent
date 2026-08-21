@@ -11,6 +11,7 @@ const tasks = ref([])
 const history = ref([])
 const overview = ref([])
 const tab = ref('now')
+const confirmTask = ref(null)
 
 onMounted(async () => {
   try { w.value = await weather.current() } catch { /* 忽略 */ }
@@ -21,17 +22,40 @@ onMounted(async () => {
 })
 
 async function confirm(t) {
+  // 弹窗逐项确认（清单由后端按天气类型给出）
+  const items = (t.checklist && t.checklist.length ? t.checklist : ['公共设施巡查']).map((item) => ({
+    item, status: '已检查',
+  }))
+  confirmTask.value = { ...t, items, note: '' }
+}
+
+async function submitConfirm() {
+  const t = confirmTask.value
+  if (!t) return
   try {
     await weather.confirmTask(t.id, {
       checker: '网格员（演示）',
-      items: [{ item: '排水沟/雨水口是否畅通', status: '已检查' }],
-      note: '演示确认',
+      items: t.items,
+      note: t.note || '',
     })
     message.success(`任务 #${t.id} 已确认`)
+    confirmTask.value = null
     tasks.value = (await weather.tasks()) || []
     history.value = (await weather.history({ limit: 200 })) || []
   } catch (e) {
     message.error(e.message)
+  }
+}
+
+function remainingText(t) {
+  try {
+    const created = new Date((t.created_at || '').replace(' ', 'T'))
+    const remain = 3 - (Date.now() - created.getTime()) / 3600000
+    if (remain < 0) return { text: '已超时', cls: 'background:#fef2f2;color:#dc2626;' }
+    if (remain < 1) return { text: `⏰ ${remain.toFixed(1)}h 内需确认`, cls: 'background:#fef2f2;color:#dc2626;' }
+    return { text: `⏳ 剩余 ${remain.toFixed(1)}h`, cls: 'background:#f0fdf4;color:#16a34a;' }
+  } catch {
+    return { text: '', cls: '' }
   }
 }
 </script>
@@ -57,13 +81,15 @@ async function confirm(t) {
         </div>
 
         <div class="card">
-          <div style="font-weight:700;margin-bottom:8px;">🧾 检查任务</div>
+          <div style="font-weight:700;margin-bottom:8px;">🧾 检查任务（3 小时倒计时）</div>
           <div v-for="t in tasks" :key="t.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">
             <div>
               <b>#{{ t.id }} {{ t.alert_type }}{{ t.level }}</b>
               <n-tag size="small" style="margin-left:8px;" :type="t.status === '待检查' ? 'warning' : 'success'">{{ t.status }}</n-tag>
+              <span v-if="t.status === '待检查'" class="status-pill" :style="remainingText(t).cls">{{ remainingText(t).text }}</span>
             </div>
             <n-button v-if="t.status === '待检查'" size="small" type="primary" @click="confirm(t)">✅ 确认检查</n-button>
+            <n-button v-else-if="t.status === '超时未确认'" size="small" type="warning" @click="confirm(t)">📝 补填检查结果</n-button>
           </div>
           <n-empty v-if="tasks.length === 0" description="暂无检查任务" />
         </div>
@@ -104,5 +130,25 @@ async function confirm(t) {
         </div>
       </n-tab-pane>
     </n-tabs>
+
+    <!-- 检查确认弹窗（清单逐项勾选 + 备注） -->
+    <n-modal :show="!!confirmTask" @update:show="(v) => { if (!v) confirmTask = null }" preset="card"
+             style="width:520px;" :title="confirmTask ? `检查任务 #${confirmTask.id}（${confirmTask.alert_type}${confirmTask.level}）` : ''">
+      <template v-if="confirmTask">
+        <div v-for="(it, idx) in confirmTask.items" :key="idx" style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span style="font-size:0.9rem;">{{ it.item }}</span>
+          <n-radio-group v-model:value="it.status" size="small">
+            <n-radio value="已检查">已检查</n-radio>
+            <n-radio value="正常">正常</n-radio>
+            <n-radio value="异常">异常</n-radio>
+          </n-radio-group>
+        </div>
+        <n-input v-model:value="confirmTask.note" placeholder="备注（选填）" style="margin-top:10px;" />
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+          <n-button @click="confirmTask = null">取消</n-button>
+          <n-button type="primary" @click="submitConfirm">✅ 提交确认</n-button>
+        </div>
+      </template>
+    </n-modal>
   </div>
 </template>

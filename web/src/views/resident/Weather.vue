@@ -28,6 +28,14 @@ const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
           <div class="muted">{{ w.wind }} · 💧{{ w.rain_prob }}% · 湿度 {{ w.humidity }}%</div>
         </div>
       </div>
+      <!-- AQI / UV / 穿衣 / 出行建议 -->
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+        <div v-if="w.aqi != null"><b>空气质量：</b>{{ w.aqi_level || w.aqi }}</div>
+        <div v-if="w.uv != null"><b>紫外线：</b>{{ w.uv }}</div>
+        <div v-if="w.dress"><b>👕 穿衣：</b>{{ w.dress }}</div>
+        <div v-if="w.travel"><b>🚶 出行：</b>{{ w.travel }}</div>
+        <div v-if="w.updated_at" class="muted" style="font-size:0.8rem;">数据更新于 {{ (w.updated_at || '').slice(0, 16) }}</div>
+      </div>
       <div v-if="w.note" style="margin-top:10px;color:#b91c1c;font-weight:600;">⚠️ {{ w.note }}</div>
     </div>
 
