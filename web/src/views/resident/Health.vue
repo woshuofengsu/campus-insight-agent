@@ -205,7 +205,12 @@ function atts(c) {
             <n-tag size="small" :type="c.status === '待回复' ? 'warning' : c.status === '已回复' ? 'success' : 'default'">{{ c.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:6px;">{{ c.content }}</div>
-          <div v-if="atts(c).length" class="muted" style="font-size:0.75rem;margin-top:4px;">📎 附件 {{ atts(c).length }} 张（仅您和负责人可见）</div>
+          <div v-if="atts(c).length" style="margin-top:6px;">
+            <div class="muted" style="font-size:0.75rem;">📎 附件 {{ atts(c).length }} 张（仅您和负责人可见）</div>
+            <div v-for="(a, i) in atts(c)" :key="i" style="display:inline-block;margin-right:6px;">
+              <img :src="a" style="max-width:100px;max-height:100px;border-radius:6px;border:1px solid var(--border);" />
+            </div>
+          </div>
           <div v-if="c.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
             💬 负责人：{{ c.reply }}
             <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:#b45309;">🏥 就医指引：{{ c.doctor_guide }}</div>

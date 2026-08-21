@@ -163,6 +163,10 @@ function downloadBlob(blob, name) {
   URL.revokeObjectURL(url)
 }
 
+function attsOf(c) {
+  try { return JSON.parse(c.attachment_json || '[]') } catch { return [] }
+}
+
 async function exportConsults() {
   try { downloadBlob(await exportApi.healthConsults(), 'health-consults.csv') }
   catch (e) { message.error(e.message) }
@@ -195,7 +199,8 @@ async function exportContents() {
             <n-tag size="small" :type="c.status === '待回复' ? 'warning' : c.status === '已回复' ? 'success' : c.status === '超时未回复' ? 'error' : 'default'">{{ c.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ c.name }} · {{ c.phone }} · {{ c.consult_type }} · {{ (c.created_at || '').slice(0, 16) }}</div>
-          <div style="margin-top:8px;">{{ c.content }}</div>
+          <!-- 列表不直接展示全文（spec：列表不展示内容和附件） -->
+          <div style="margin-top:8px;" class="muted">{{ (c.content || '').slice(0, 50) }}{{ (c.content || '').length > 50 ? '…' : '' }} <n-button size="tiny" text @click="showDetail(c)">查看详情</n-button></div>
           <div v-if="c.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
             💬 已回复：{{ c.reply }}
             <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:#b45309;">🏥 就医指引：{{ c.doctor_guide }}</div>
@@ -339,6 +344,13 @@ async function exportContents() {
           <span class="muted" style="margin-left:8px;font-size:0.85rem;">{{ cDetail.name }} · {{ cDetail.phone }} · {{ cDetail.consult_type }}</span>
         </div>
         <div style="font-size:0.95rem;line-height:1.8;white-space:pre-wrap;">{{ cDetail.content }}</div>
+        <!-- 附件（仅处理人可见） -->
+        <div v-if="attsOf(cDetail).length" style="margin-top:10px;">
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📎 附件</div>
+          <div v-for="(a, i) in attsOf(cDetail)" :key="i" style="display:inline-block;margin-right:8px;">
+            <img :src="a" style="max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--border);" />
+          </div>
+        </div>
         <div v-if="cDetail.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:10px;">
           💬 回复：{{ cDetail.reply }}
           <div v-if="cDetail.doctor_guide" style="margin-top:4px;color:#b45309;">🏥 就医指引：{{ cDetail.doctor_guide }}</div>

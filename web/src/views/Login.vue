@@ -63,7 +63,7 @@ async function demo(role) {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
         <n-button secondary type="success" @click="demo('resident')">居民</n-button>
         <n-button secondary type="warning" @click="demo('grid')">网格员</n-button>
-        <n-button secondary type="error" @click="demo('elderly')">👴 老年版</n-button>
+        <n-button secondary type="error" @click="demo('elderly')">👴 老年入口（免登录）</n-button>
       </div>
       <div style="text-align:center;color:#9ca3af;font-size:0.75rem;margin-top:16px;">
         居民/老人演示免密 · 网格员 demo123

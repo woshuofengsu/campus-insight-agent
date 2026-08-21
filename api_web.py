@@ -935,13 +935,30 @@ def web_qa_question_delete(qid: int, request: Request):
 
 @app.get("/api/web/qa/questions")
 def web_qa_questions(request: Request, status: str = "", limit: int = 50):
-    from data.db_policy import get_questions
+    from data.db_policy import get_questions, get_question_deadline_info
     u = _user(request)
     if u.get("role") == "grid":
         rows = get_questions(status=status or None, limit=limit)
     else:
         rows = get_questions(user_id=u.get("uid"), limit=limit)
-    return ok([dict(r) for r in rows])
+    out = []
+    for r in rows:
+        v = dict(r)
+        # 脱敏昵称（居民+后4位 / 老人+后4位）
+        if u.get("role") == "grid":
+            try:
+                from data.db_policy import masked_nickname
+                v["nickname_masked"] = masked_nickname(v.get("user_id") or 0, "老人" if v.get("source") == "老年端" else "居民")
+            except Exception:
+                v["nickname_masked"] = v.get("nickname") or ""
+        if u.get("role") == "grid" and v.get("status") in ("待人工回复", "处理中", "已转人工", "超时未回复"):
+            try:
+                deadline = get_question_deadline_info(r["id"])
+                v.update(deadline or {})
+            except Exception:
+                pass
+        out.append(v)
+    return ok(out)
 
 
 @app.get("/api/web/knowledge")
@@ -1036,6 +1053,11 @@ def web_notice_detail(nid: int, request: Request):
     out = dict(n)
     if u.get("role") == "grid":
         out["read_stats"] = get_notice_read_stats(nid)
+        try:
+            from data.db_notice import get_notice_timeline
+            out["timeline"] = get_notice_timeline(nid)
+        except Exception:
+            out["timeline"] = []
     return ok(out)
 
 
@@ -1498,6 +1520,30 @@ def web_export_health_consults(request: Request):
                     headers={"Content-Disposition": f"attachment; filename={fname}"})
 
 
+@app.get("/api/web/export/weather-tasks")
+def web_export_weather_tasks(request: Request):
+    """导出天气检查任务记录 CSV（负责人，留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_weather import list_check_tasks
+    from data.db_notifications import log_activity
+    import csv
+    from io import StringIO
+    rows = list_check_tasks(limit=1000)
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["编号", "预警类型", "等级", "状态", "确认人", "备注", "检查时间", "创建时间"])
+    for r in rows:
+        w.writerow([r.get("id"), r.get("alert_type"), r.get("level"), r.get("status"),
+                    r.get("checker") or "", r.get("note") or "",
+                    (r.get("checked_at") or "")[:16], (r.get("created_at") or "")[:16]])
+    log_activity(_user(request).get("name") or "负责人", "导出天气检查任务",
+                 module="天气", detail=f"导出 {len(rows)} 条检查任务记录")
+    from fastapi.responses import Response
+    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=weather-tasks.csv"})
+
+
 # ---------------- 老年关怀管理（负责人端：用药审核 / 联系人审核 / SOS 响应） ----------------
 
 @app.get("/api/web/elderly/manage/medications")
@@ -1647,12 +1693,12 @@ def web_weather_exception_logs(request: Request, limit: int = 100):
 # ---------------- 政策统计 / 匹配阈值 ----------------
 
 @app.get("/api/web/qa/stats")
-def web_qa_stats(request: Request):
-    """负责人端高频统计（匹配失败/无帮助分类）。"""
+def web_qa_stats(request: Request, days: int = 0):
+    """负责人端高频统计（匹配失败/无帮助分类）；days=0 全部，7 近 7 天，30 近 30 天。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_policy import get_frequency_stats
-    return ok(get_frequency_stats())
+    return ok(get_frequency_stats(days=days or None))
 
 
 class ThresholdSet(BaseModel):
@@ -2087,6 +2133,22 @@ def web_medication_create(req: MedicationCreate, request: Request):
     if mid <= 0:
         return fail(2001, msg)
     return ok({"reminder_id": mid}, "已提交，待审核")
+
+
+@app.post("/api/web/elderly/medications/{rid}/modify")
+def web_medication_modify(rid: int, req: MedicationCreate, request: Request):
+    """修改用药提醒 → 重新审核（审核期间原规则继续播报）。"""
+    from data.db_elderly_care import modify_medication
+    u = _user(request)
+    times = [t.strip() for t in req.times.replace("，", ",").split(",") if t.strip()]
+    ok_, msg = modify_medication(
+        rid, u.get("name") or "老人", req.drug_name, req.dosage, times,
+        repeat_rule=req.repeat_rule, start_date=req.start_date, end_date=req.end_date,
+        note=req.note, actor=u.get("name") or "老人",
+    )
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"reminder_id": rid}, "已提交修改，待重新审核")
 
 
 @app.get("/api/web/elderly/medications")

@@ -11,6 +11,7 @@ const stats = ref(null)
 const threshold = ref(0.6)
 const tab = ref('kb')
 const replyMap = ref({}) // qid -> reply
+const statsDays = ref(0)
 const kForm = ref({
   title: '', category: '社保医保', plain_interpretation: '', content: '',
   summary: '', source: '社区整理', keywords: '', effective_date: '', expire_date: '',
@@ -24,7 +25,7 @@ onMounted(async () => {
   try { kb.value = (await knowledge.list()) || [] } catch { /* 忽略 */ }
   try { questions.value = (await qa.questions()) || [] } catch { /* 忽略 */ }
   try {
-    stats.value = (await qa.stats()) || null
+    stats.value = await loadStats()
   } catch { /* 忽略 */ }
   try {
     const t = await qa.getThreshold()
@@ -52,6 +53,10 @@ async function reply(q) {
   } catch (e) {
     message.error(e.message)
   }
+}
+
+async function loadStats() {
+  return (await qa.stats({ days: statsDays.value })) || null
 }
 
 async function saveThreshold() {
@@ -171,7 +176,12 @@ async function kAct(k, data, okMsg) {
             <b>{{ q.summary }}</b>
             <n-tag size="small" :type="q.status === '已转人工' || q.status === '超时未回复' ? 'warning' : q.status === '已回复' ? 'success' : 'default'">{{ q.status }}</n-tag>
           </div>
-          <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ q.q_type }} · {{ (q.created_at || '').slice(0, 16) }}</div>
+          <div class="muted" style="font-size:0.85rem;margin-top:4px;">
+            {{ q.nickname_masked || q.nickname || '居民' }} · {{ q.q_type }} · {{ (q.created_at || '').slice(0, 16) }}
+            <span v-if="q.remaining_hours != null" :style="q.overdue ? 'color:#dc2626;font-weight:700;' : ''">
+              · {{ q.overdue ? `⏰ 超时 ${Math.abs(q.remaining_hours).toFixed(1)}h` : `⏳ 剩 ${q.remaining_hours.toFixed(1)}h` }}
+            </span>
+          </div>
           <div v-if="q.auto_answer" style="margin-top:6px;font-size:0.9rem;">🤖 自动回答：{{ q.auto_answer }}</div>
           <div v-if="q.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
             💬 已回复：{{ q.reply }}
@@ -187,6 +197,13 @@ async function kAct(k, data, okMsg) {
       </n-tab-pane>
 
       <n-tab-pane name="stats" tab="统计与阈值">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <n-radio-group v-model:value="statsDays" @update:value="async () => { stats.value = await loadStats() }">
+            <n-radio :value="0">全部</n-radio>
+            <n-radio :value="7">近 7 天</n-radio>
+            <n-radio :value="30">近 30 天</n-radio>
+          </n-radio-group>
+        </div>
         <div v-if="stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
           <div class="card" style="text-align:center;">
             <div style="font-size:1.6rem;font-weight:800;">{{ stats.total_questions }}</div>

@@ -3,7 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
-import { weather } from '../../api'
+import { weather, exportApi } from '../../api'
 
 const message = useMessage()
 const store = useUserStore()
@@ -15,6 +15,30 @@ const overview = ref([])
 const exLogs = ref([])
 const tab = ref('now')
 const confirmTask = ref(null)
+const hType = ref('全部')
+const hStatus = ref('全部')
+
+const H_TYPES = ['全部', '暴雨', '台风', '高温', '寒潮', '大风', '雷电', '冰雹', '大雾']
+const H_STATUS = ['全部', '待检查', '已确认', '超时未确认']
+
+const fHistory = () => {
+  let arr = history.value
+  if (hType.value !== '全部') arr = arr.filter((h) => h.alert_type === hType.value)
+  if (hStatus.value !== '全部') arr = arr.filter((h) => h.status === hStatus.value)
+  return arr
+}
+
+async function exportTasks() {
+  try {
+    const blob = await exportApi.weatherTasks()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'weather-tasks.csv'; a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 
 onMounted(async () => {
   try { w.value = await weather.current() } catch { /* 忽略 */ }
@@ -100,9 +124,14 @@ function remainingText(t) {
       </n-tab-pane>
 
       <n-tab-pane name="history" tab="任务历史">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+          <n-select v-model:value="hType" :options="H_TYPES.map(v=>({label:v,value:v}))" style="width:110px;" />
+          <n-select v-model:value="hStatus" :options="H_STATUS.map(v=>({label:v,value:v}))" style="width:110px;" />
+          <n-button size="small" @click="exportTasks">⬇️ 导出</n-button>
+        </div>
         <div class="card">
           <div style="font-weight:700;margin-bottom:8px;">📜 历史检查任务（含已确认，留痕可追溯）</div>
-          <div v-for="h in history" :key="h.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">
+          <div v-for="h in fHistory()" :key="h.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">
             <div>
               <b>#{{ h.id }} {{ h.alert_type }}{{ h.level }}</b>
               <span class="muted" style="margin-left:8px;font-size:0.85rem;">{{ (h.created_at || '').slice(0, 16) }}</span>
@@ -113,7 +142,7 @@ function remainingText(t) {
             </div>
             <n-tag size="small" :type="h.status === '已确认' ? 'success' : h.status === '已超时' ? 'error' : 'warning'">{{ h.status }}</n-tag>
           </div>
-          <n-empty v-if="history.length === 0" description="暂无历史任务" />
+          <n-empty v-if="fHistory().length === 0" description="暂无历史任务" />
         </div>
       </n-tab-pane>
 

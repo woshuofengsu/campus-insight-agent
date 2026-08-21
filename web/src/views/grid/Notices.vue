@@ -12,7 +12,8 @@ const files = ref([])
 
 const form = ref({
   title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '',
-  is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]',
+  is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]',
+  scope_target_json: '[]', scope_targets: '',
 })
 const publishMode = ref('now') // now | schedule
 const creating = ref(false)
@@ -55,9 +56,13 @@ async function create() {
       const up = await upload(files.value.map((f) => f.file), 'notices')
       form.value.attachment_json = JSON.stringify(up.paths || [])
     }
+    // 范围目标多选
+    form.value.scope_target_json = JSON.stringify(
+      (form.value.scope_targets || '').split(/[,，]/).map((s) => s.trim()).filter(Boolean),
+    )
     await notices.create({ ...form.value, scheduled_at: publishMode.value === 'schedule' ? form.value.scheduled_at : '' })
     message.success(publishMode.value === 'schedule' ? '通知已创建并定时发布' : '通知已创建并发布')
-    form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]' }
+    form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]', scope_targets: '' }
     files.value = []
     publishMode.value = 'now'
     load()
@@ -123,6 +128,9 @@ async function exportNotices() {
       </n-form-item>
       <n-form-item label="发布范围">
         <n-select v-model:value="form.publish_scope" :options="['全体居民','指定小区','指定楼栋','仅老年端'].map(v=>({label:v,value:v}))" />
+      </n-form-item>
+      <n-form-item v-if="['指定小区', '指定楼栋'].includes(form.publish_scope)" label="目标（逗号分隔，多选）">
+        <n-input v-model:value="form.scope_targets" :placeholder="form.publish_scope === '指定小区' ? '如：幸福小区,阳光小区' : '如：3号楼2单元,5号楼1单元'" />
       </n-form-item>
       <n-checkbox v-model:checked="form.is_urgent">🚨 紧急通知（自动置顶 + 弹窗，需二次确认）</n-checkbox>
       <n-form-item v-if="form.is_urgent" label="老年端播报摘要（紧急必填，≤30字）">
@@ -213,6 +221,12 @@ async function exportNotices() {
         </div>
         <div v-if="detail.read_stats" style="margin-top:10px;font-size:0.85rem;" class="muted">
           居民已读 {{ detail.read_stats.resident_read }}/{{ detail.read_stats.resident_total }} · 老年已读 {{ detail.read_stats.elderly_read }}/{{ detail.read_stats.elderly_total }}
+        </div>
+        <div v-if="detail.timeline && detail.timeline.length" style="margin-top:10px;">
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📜 操作留痕</div>
+          <div v-for="t in detail.timeline" :key="t.id" style="padding:3px 0;border-bottom:1px solid var(--border);font-size:0.8rem;" class="muted">
+            {{ (t.created_at || '').slice(0, 16) }} · {{ t.actor || '' }} · {{ t.action || '' }}
+          </div>
         </div>
       </template>
     </n-modal>

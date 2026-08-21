@@ -91,7 +91,7 @@ export const qa = {
   transfer: (qid, question) => api.post(`/qa/${qid}/transfer`, { question }),
   questions: (params) => api.get('/qa/questions', { params }),
   highFreq: () => api.get('/qa/high-freq'),
-  stats: () => api.get('/qa/stats'),
+  stats: (params) => api.get('/qa/stats', { params }),
   getThreshold: () => api.get('/qa/threshold'),
   setThreshold: (threshold) => api.post('/qa/threshold', { threshold }),
   reply: (qid, data) => api.post(`/qa/questions/${qid}/reply`, data),
@@ -138,6 +138,7 @@ export const elderly = {
   medications: () => api.get('/elderly/medications'),
   createMedication: (data) => api.post('/elderly/medications', data),
   toggleMedication: (id, action) => api.post(`/elderly/medications/${id}/toggle`, { action }),
+  modifyMedication: (id, data) => api.post(`/elderly/medications/${id}/modify`, data),
   emergency: () => api.post('/elderly/emergency'),
   emergencyStatus: () => api.get('/elderly/emergency/status'),
   contactCall: (data) => api.post('/elderly/contact', data),
@@ -161,6 +162,7 @@ export const exportApi = {
   knowledge: () => api.get('/export/knowledge', { responseType: 'blob' }),
   healthContents: () => api.get('/export/health-contents', { responseType: 'blob' }),
   healthConsults: () => api.get('/export/health-consults', { responseType: 'blob' }),
+  weatherTasks: () => api.get('/export/weather-tasks', { responseType: 'blob' }),
 }
 
 // 上传
