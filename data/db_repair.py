@@ -362,6 +362,7 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
     """
     if not content:
         return False, "补充内容不能为空"
+    new_count = 0
     with get_db() as conn:
         row = conn.execute(
             "SELECT supplement_count, supplemented_at, status, title FROM community_issues WHERE id=?",
@@ -369,8 +370,23 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
         ).fetchone()
         if row is None:
             return False, "工单不存在"
-        if row["supplement_count"] >= 2:
+        # 24 小时窗口（spec 15）：距上次补充超过 24 小时重置计数
+        if row["supplemented_at"]:
+            try:
+                from datetime import datetime
+                last = datetime.strptime(str(row["supplemented_at"])[:19], "%Y-%m-%d %H:%M:%S")
+                if (datetime.utcnow() - last).total_seconds() > 86400:
+                    conn.execute(
+                        "UPDATE community_issues SET supplement_count=0 WHERE id=?", (issue_id,)
+                    )
+            except Exception:
+                pass
+        fresh = conn.execute(
+            "SELECT supplement_count FROM community_issues WHERE id=?", (issue_id,)
+        ).fetchone()
+        if fresh["supplement_count"] >= 2:
             return False, "操作过于频繁，请稍后再试"
+        new_count = fresh["supplement_count"] + 1
         conn.execute(
             "UPDATE community_issues SET supplement_count=supplement_count+1, "
             "supplemented_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -381,7 +397,7 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
         )
         conn.commit()
     log_activity(actor, "补充信息", "issue", issue_id, module=MODULE, detail=content,
-                 after_value=f"第 {row['supplement_count'] + 1} 次补充")
+                 after_value=f"第 {new_count} 次补充（24小时窗口）")
     # 自动通知负责人重评估（spec 16：补充后自动通知负责人，标记"有补充信息"，负责人需确认）
     try:
         from data.db_user import list_users
