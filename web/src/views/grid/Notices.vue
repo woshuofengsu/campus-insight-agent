@@ -1,13 +1,14 @@
 <script setup>
-// 通知管理：创建发布（含紧急/定时）+ 列表（已读统计含老年端）+ 下架(原因)/撤回/置顶 + 详情
-import { ref, onMounted } from 'vue'
+// 通知管理：创建发布（含紧急/定时/附件）+ 列表（筛选/已读统计/导出）+ 下架/撤回/置顶 + 详情
+import { ref, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { notices } from '../../api'
+import { notices, upload, exportApi } from '../../api'
 
 const message = useMessage()
 const list = ref([])
 const loading = ref(true)
 const detail = ref(null)
+const files = ref([])
 
 const form = ref({
   title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '',
@@ -15,15 +16,33 @@ const form = ref({
 })
 const publishMode = ref('now') // now | schedule
 const creating = ref(false)
+// 筛选
+const typeFilter = ref('全部')
+const statusFilter = ref('全部')
 
 const TYPES = ['社区公告', '活动通知', '停水停电通知', '紧急通知', '政策通知', '其他']
+const STATUS_OPTIONS = ['全部', '草稿', '待发布', '已发布', '已下架']
+
+const filtered = computed(() => {
+  let arr = list.value
+  if (typeFilter.value !== '全部') arr = arr.filter((n) => n.notice_type === typeFilter.value)
+  if (statusFilter.value !== '全部') arr = arr.filter((n) => n.status === statusFilter.value)
+  return arr
+})
 
 async function load() {
   loading.value = true
   try { list.value = (await notices.manage()) || [] } catch (e) { message.error(e.message) }
   finally { loading.value = false }
 }
-onMounted(load)
+onMounted(() => {
+  load()
+  // 已发布 30 秒 / 紧急 10 秒自动刷新
+  setInterval(load, 30000)
+  setInterval(() => {
+    if (list.value.some((n) => n.is_urgent)) load()
+  }, 10000)
+})
 
 async function create() {
   if (!form.value.title || !form.value.body) return message.warning('请填写标题和正文')
@@ -31,9 +50,15 @@ async function create() {
   if (publishMode.value === 'schedule' && !form.value.scheduled_at) return message.warning('定时发布请选择时间')
   creating.value = true
   try {
+    // 附件上传
+    if (files.value.length) {
+      const up = await upload(files.value.map((f) => f.file), 'notices')
+      form.value.attachment_json = JSON.stringify(up.paths || [])
+    }
     await notices.create({ ...form.value, scheduled_at: publishMode.value === 'schedule' ? form.value.scheduled_at : '' })
     message.success(publishMode.value === 'schedule' ? '通知已创建并定时发布' : '通知已创建并发布')
     form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]' }
+    files.value = []
     publishMode.value = 'now'
     load()
   } catch (e) {
@@ -60,6 +85,18 @@ async function showDetail(n) {
 function atts(n) {
   try { return JSON.parse(n.attachment_json || '[]') } catch { return [] }
 }
+
+async function exportNotices() {
+  try {
+    const blob = await exportApi.notices()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'notices.csv'; a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 </script>
 
 <template>
@@ -79,6 +116,10 @@ function atts(n) {
       </n-grid>
       <n-form-item label="正文">
         <n-input v-model:value="form.body" type="textarea" :rows="3" />
+      </n-form-item>
+      <n-form-item label="附件（选填，jpg/png，≤5MB，最多3张）">
+        <n-upload v-model:file-list="files" accept="image/jpeg,image/png" :max="3"
+                  list-type="image-card" :default-upload="false" />
       </n-form-item>
       <n-form-item label="发布范围">
         <n-select v-model:value="form.publish_scope" :options="['全体居民','指定小区','指定楼栋','仅老年端'].map(v=>({label:v,value:v}))" />
@@ -105,8 +146,15 @@ function atts(n) {
       </div>
     </div>
 
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+      <n-select v-model:value="typeFilter" :options="TYPES.map(v=>({label:v,value:v}))" style="width:150px;" />
+      <n-select v-model:value="statusFilter" :options="STATUS_OPTIONS.map(v=>({label:v,value:v}))" style="width:120px;" />
+      <n-button size="small" @click="exportNotices">⬇️ 导出</n-button>
+      <span class="muted" style="font-size:0.8rem;">已发布 30 秒 / 紧急 10 秒自动刷新</span>
+    </div>
+
     <n-spin :show="loading">
-      <div v-for="n in list" :key="n.id" class="card" :style="n.is_urgent ? 'border-left:4px solid #dc2626;' : ''">
+      <div v-for="n in filtered" :key="n.id" class="card" :style="n.is_urgent ? 'border-left:4px solid #dc2626;' : ''">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>
             <b style="cursor:pointer;" @click="showDetail(n)">{{ n.title }} ›</b>
@@ -133,13 +181,18 @@ function atts(n) {
             撤回为草稿？
           </n-popconfirm>
           <n-button v-if="n.status === '待发布'" size="small" type="primary" @click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')">🚀 立即发布</n-button>
+          <!-- 草稿：可立即发布（含紧急通知，二次确认） -->
+          <n-popconfirm v-if="n.status === '草稿'" @positive-click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')">
+            <template #trigger><n-button size="small" type="primary">🚀 发布</n-button></template>
+            {{ n.is_urgent ? '紧急通知将自动置顶并强制弹窗，确认发布？' : '确认发布该通知？' }}
+          </n-popconfirm>
           <n-popconfirm v-if="n.status === '草稿'" @positive-click="act(n, { action: 'delete' }, '已删除')">
             <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除</n-button></template>
             删除该草稿？
           </n-popconfirm>
         </div>
       </div>
-      <n-empty v-if="!loading && list.length === 0" description="暂无通知" />
+      <n-empty v-if="!loading && filtered.length === 0" description="暂无通知" />
     </n-spin>
 
     <!-- 详情弹窗（含附件/老年摘要） -->

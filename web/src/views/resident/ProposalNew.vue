@@ -21,6 +21,7 @@ const form = ref({
   community_building: '',
   attachment_public: 0,
   attachment: '[]',
+  is_agent_report: false, agent_name: '', agent_phone: '', agent_relation: '',
 })
 
 const CATS = ['公共设施', '环境卫生', '文化活动', '安全治理', '其他']
@@ -60,7 +61,10 @@ const submit = async () => {
       const up = await upload(files.value.map((f) => f.file), 'proposals')
       form.value.attachment = JSON.stringify(up.paths || [])
     }
-    const data = await proposals.create(form.value)
+    const data = await proposals.create({
+      ...form.value,
+      is_agent_report: form.value.is_agent_report ? 1 : 0,
+    })
     message.success(`提案已提交，编号 #${data.proposal_id}，状态：待审核`)
     router.push('/resident/proposals')
   } catch (e) {
@@ -114,6 +118,20 @@ const submit = async () => {
         <n-form-item label="联系电话">
           <n-input v-model:value="form.reporter_phone" placeholder="11 位手机号" />
         </n-form-item>
+        <n-checkbox v-model:checked="form.is_agent_report" style="margin-bottom:8px;">我是代报（帮家人/邻居提交）</n-checkbox>
+        <template v-if="form.is_agent_report">
+          <n-grid :cols="2" :x-gap="16">
+            <n-form-item-gi label="代报人姓名">
+              <n-input v-model:value="form.agent_name" />
+            </n-form-item-gi>
+            <n-form-item-gi label="代报人电话">
+              <n-input v-model:value="form.agent_phone" />
+            </n-form-item-gi>
+          </n-grid>
+          <n-form-item label="与提案人关系">
+            <n-input v-model:value="form.agent_relation" placeholder="如：家人 / 邻居" />
+          </n-form-item>
+        </template>
         <n-form-item label="附件（选填，jpg/png，单张≤5MB，最多3张）">
           <n-upload v-model:file-list="files" accept="image/jpeg,image/png" :max="3"
                     list-type="image-card" :default-upload="false" />

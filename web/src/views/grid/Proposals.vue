@@ -1,13 +1,14 @@
 <script setup>
-// 提案管理：审核/决定执行/转执行/执行结果/下架/关闭/改类别/看手机号/提醒确认/延票/负责人投票
+// 提案管理：审核/决定执行/转执行/执行结果/下架/关闭/改类别/看手机号/提醒确认/延票/负责人投票 + 详情/导出
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { proposals } from '../../api'
+import { proposals, exportApi } from '../../api'
 
 const message = useMessage()
 const list = ref([])
 const loading = ref(true)
-const op = ref({}) // { [id]: { opinion, reason, dept, result, cat, phone, closeReason, downReason, score } }
+const op = ref({}) // { [id]: { opinion, reason, dept, result, cat, phone, closeReason, downReason, score, attachOk } }
+const detail = ref(null)
 
 const CATS = ['公共设施', '环境卫生', '文化活动', '安全治理', '其他']
 const DEPTS = ['物业维修班', '环境卫生组', '安全治理组', '文化活动组', '社区服务中心', '综合办公室']
@@ -52,17 +53,40 @@ async function vote(p, score) {
     message.error(e.message)
   }
 }
+
+async function showDetail(p) {
+  try { detail.value = await proposals.detail(p.id) } catch (e) { message.error(e.message) }
+}
+
+async function exportProposals() {
+  try {
+    const blob = await exportApi.proposals()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'proposals.csv'; a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+function atts(p) {
+  try { return JSON.parse(p.attachment || '[]') } catch { return [] }
+}
 </script>
 
 <template>
   <div class="page">
-    <h2 class="page-title">💡 提案管理</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h2 class="page-title">💡 提案管理</h2>
+      <n-button size="small" @click="exportProposals">⬇️ 导出</n-button>
+    </div>
     <p class="page-sub">共 {{ list.length }} 条提案 · 公开方式由提案人本人确认，负责人不能代替</p>
 
     <n-spin :show="loading">
       <div v-for="p in list" :key="p.id" class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <b>{{ p.title }}</b>
+          <b style="cursor:pointer;" @click="showDetail(p)">{{ p.title }} ›</b>
           <n-tag size="small">{{ p.status }}</n-tag>
         </div>
         <div class="muted" style="font-size:0.85rem;margin-top:6px;">
@@ -71,10 +95,11 @@ async function vote(p, score) {
         </div>
 
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <!-- 审核（意见必填，退回必须写） -->
+          <!-- 审核（意见必填，退回必须写；附件公开审核） -->
           <template v-if="['待审核', '退回修改'].includes(p.status)">
             <n-input v-model:value="opOf(p).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:240px;" />
-            <n-button size="small" type="success" @click="act(p, { action: 'audit', approve: true, opinion: opOf(p).opinion || '同意' }, '审核通过')">✅ 通过</n-button>
+            <n-checkbox v-if="p.attachment_public" v-model:checked="opOf(p).attachOk" :checked-value="1" :unchecked-value="0" size="small">附件含隐私→不公开</n-checkbox>
+            <n-button size="small" type="success" @click="act(p, { action: 'audit', approve: true, opinion: opOf(p).opinion || '同意', attachment_public_ok: opOf(p).attachOk ? false : true }, '审核通过')">✅ 通过</n-button>
             <n-button size="small" type="warning" @click="act(p, { action: 'audit', approve: false, opinion: opOf(p).opinion || '请补充' }, '已退回')">↩️ 退回</n-button>
           </template>
           <!-- 待确认公示/私有：提醒提案人确认（负责人不能代替确认） -->
@@ -152,5 +177,38 @@ async function vote(p, score) {
       </div>
       <n-empty v-if="!loading && list.length === 0" description="暂无提案" />
     </n-spin>
+
+    <!-- 提案详情弹窗（完整字段 + 留痕） -->
+    <n-modal :show="!!detail" @update:show="(v) => { if (!v) detail = null }" preset="card" style="width:640px;" :title="detail ? detail.title : ''">
+      <template v-if="detail">
+        <div style="margin-bottom:8px;">
+          <n-tag size="small">{{ detail.status }}</n-tag>
+          <n-tag size="small" style="margin-left:6px;">{{ detail.category }}</n-tag>
+          <span class="muted" style="margin-left:8px;font-size:0.8rem;">{{ detail.is_public ? '公开' : '私有' }} · 提案人 {{ detail.reporter_name || '—' }} · {{ detail.reporter_phone || '' }}</span>
+        </div>
+        <div v-if="detail.community_building" class="muted" style="font-size:0.85rem;">🏠 楼栋：{{ detail.community_building }}</div>
+        <div v-if="detail.is_agent_report && detail.agent_name" class="muted" style="font-size:0.85rem;">🙋 代报：{{ detail.agent_name }}（{{ detail.agent_relation }}）</div>
+        <div style="font-size:0.95rem;line-height:1.8;margin-top:8px;white-space:pre-wrap;">{{ detail.description }}</div>
+        <div v-if="atts(detail).length" style="margin-top:8px;">
+          <div style="font-weight:700;font-size:0.9rem;">📎 附件（{{ detail.attachment_public ? '公开' : '不公开' }}）</div>
+          <div v-for="(a, i) in atts(detail)" :key="i" style="display:inline-block;margin-right:8px;">
+            <img :src="a" style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid var(--border);" />
+          </div>
+        </div>
+        <div v-if="detail.vote_stats" style="margin-top:8px;font-size:0.9rem;" class="muted">
+          🗳️ 投票 {{ detail.vote_stats.vote_count || 0 }} 人 · 平均 {{ detail.vote_stats.avg_score || '—' }} 分 · 排名 {{ detail.vote_stats.rank || '—' }}
+        </div>
+        <div v-if="detail.audit_opinion" style="margin-top:8px;font-size:0.9rem;">审核意见：{{ detail.audit_opinion }}</div>
+        <div v-if="detail.execution_result" style="margin-top:8px;font-size:0.9rem;">执行结果：{{ detail.execution_result }}</div>
+        <div style="margin-top:12px;">
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📜 处理留痕</div>
+          <div v-for="t in detail.timeline || []" :key="t.id" style="padding:4px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+            {{ (t.created_at || '').slice(0, 16) }} · {{ t.actor || '' }} · {{ t.action || '' }}
+            <span v-if="t.detail" class="muted">（{{ t.detail }}）</span>
+          </div>
+          <n-empty v-if="!(detail.timeline || []).length" description="暂无留痕" style="font-size:0.8rem;padding:4px;" />
+        </div>
+      </template>
+    </n-modal>
   </div>
 </template>

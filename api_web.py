@@ -564,7 +564,7 @@ def web_proposal_draft_delete(did: int, request: Request):
 
 @app.get("/api/web/proposals")
 def web_proposal_list(request: Request, status: str = "", limit: int = 300):
-    from data.db_proposal import get_proposals
+    from data.db_proposal import get_proposals, get_proposal_vote_stats, has_voted
     u = _user(request)
     rows = get_proposals(status=status or None, limit=limit)
     out = []
@@ -577,6 +577,19 @@ def web_proposal_list(request: Request, status: str = "", limit: int = 300):
                     continue
                 if not p.get("is_public"):
                     continue
+        stats = {}
+        remaining = None
+        try:
+            stats = get_proposal_vote_stats(p.get("id")) or {}
+        except Exception:
+            stats = {}
+        if p.get("status") == "公示中" and p.get("voting_ended_at"):
+            try:
+                from datetime import datetime
+                end = datetime.strptime(str(p["voting_ended_at"])[:19], "%Y-%m-%d %H:%M:%S")
+                remaining = max(0, (end - datetime.utcnow()).days + 1)
+            except (ValueError, TypeError):
+                remaining = None
         out.append({
             "id": p.get("id"), "title": p.get("title"), "category": p.get("category"),
             "status": p.get("status"), "is_public": p.get("is_public"),
@@ -585,6 +598,15 @@ def web_proposal_list(request: Request, status: str = "", limit: int = 300):
             "created_at": p.get("created_at"),
             "reopen_count": p.get("reopen_count") or 0,
             "mine": u.get("role") != "grid" and p.get("reporter_id") == u.get("uid"),
+            "proposal_no": p.get("id"),
+            "vote_count": stats.get("vote_count") or 0,
+            "avg_score": stats.get("avg_score"),
+            "rank": stats.get("rank"),
+            "remaining_days": remaining,
+            "executor_dept": p.get("executor_dept") or "",
+            "execution_result": p.get("execution_result") or "",
+            "attachment_public": p.get("attachment_public") or 0,
+            "has_voted": bool(has_voted(p.get("id"), u.get("uid"))),
         })
     return ok(out)
 
@@ -648,6 +670,7 @@ class ProposalAction(BaseModel):
     close: bool = Field(default=False)
     category: str = Field(default="")
     minutes: int = Field(default=1440)
+    attachment_public_ok: bool | None = Field(default=None)
 
 
 @app.post("/api/web/proposals/{pid}/action")
@@ -669,7 +692,8 @@ def web_proposal_action(pid: int, req: ProposalAction, request: Request):
     a = req.action
     try:
         if a == "audit":
-            ok_, msg = audit_proposal(pid, req.approve, opinion=req.opinion, actor=actor)
+            ok_, msg = audit_proposal(pid, req.approve, opinion=req.opinion,
+                                      attachment_public_ok=req.attachment_public_ok, actor=actor)
         elif a == "confirm":
             ok_, msg = confirm_visibility(pid, req.is_public, actor=actor)
         elif a == "decide":
@@ -734,6 +758,8 @@ class NoticeCreate(BaseModel):
 @app.post("/api/web/notices")
 def web_notice_create(req: NoticeCreate, request: Request):
     from data.db_notice import create_notice, can_publish_urgent
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
     actor = _user(request).get("name") or "负责人"
     # 紧急通知权限白名单（方案权限矩阵：仅紧急通知发布人）
     if req.is_urgent and not can_publish_urgent(_user(request).get("uid")):
@@ -804,6 +830,9 @@ def web_notice_action(nid: int, req: NoticeAction, request: Request):
     )
     from ui.cache import invalidate_notices
     u = _user(request)
+    # 管理动作仅负责人；mark_read 允许居民/老年
+    if req.action != "mark_read" and u.get("role") != "grid":
+        return fail(1003, "无权限执行该操作（仅负责人可管理通知）")
     actor = u.get("name") or "负责人"
     a = req.action
     try:
@@ -870,14 +899,36 @@ class TransferHuman(BaseModel):
 
 @app.post("/api/web/qa/{qid}/transfer")
 def web_qa_transfer(qid: int, req: TransferHuman, request: Request):
-    from data.db_policy import transfer_to_human
+    from data.db_policy import transfer_to_human, get_question
     u = _user(request)
+    if qid > 0:
+        q = get_question(qid)
+        if not q:
+            return fail(1004, "提问不存在")
+        if u.get("role") != "grid" and q.get("user_id") != u.get("uid"):
+            return fail(1003, "无权限操作该提问")
     try:
         ok_ = transfer_to_human(qid) if qid > 0 else transfer_to_human(
             user_id=u.get("uid"), question=req.question, source="居民端")
         return ok({"question_id": qid}, "已转人工")
     except Exception as e:  # noqa: BLE001
         return fail(2001, f"转人工失败：{e}")
+
+
+@app.delete("/api/web/qa/questions/{qid}")
+def web_qa_question_delete(qid: int, request: Request):
+    """居民删除自己的提问记录（处理中拦截由数据层校验）。"""
+    from data.db_policy import delete_question, get_question
+    u = _user(request)
+    q = get_question(qid)
+    if not q:
+        return fail(1004, "提问不存在")
+    if u.get("role") != "grid" and q.get("user_id") != u.get("uid"):
+        return fail(1003, "无权限删除该提问")
+    ok_, msg = delete_question(qid, u.get("uid"))
+    if not ok_:
+        return fail(2001, msg or "删除失败")
+    return ok({"question_id": qid}, "已删除")
 
 
 @app.get("/api/web/qa/questions")
@@ -934,13 +985,25 @@ def web_proposal_detail(pid: int, request: Request):
                 return fail(1003, "无权限查看该提案")
     stats = get_proposal_vote_stats(pid) or {}
     out = dict(p)
+    # 当前用户是否已投票（居民/负责人匿名一票制）
+    try:
+        from data.db_proposal import has_voted
+        out["has_voted"] = bool(has_voted(pid, u.get("uid")))
+    except Exception:
+        out["has_voted"] = False
     if u.get("role") != "grid":
         mine = p.get("reporter_id") == u.get("uid")
         out["mine"] = bool(mine)
         if not mine:
             out.pop("reporter_phone", None)
             out["reporter_name"] = ((p.get("reporter_name") or "")[:1] + "**") if p.get("reporter_name") else "—"
-            out.pop("attachment", None)
+            # 附件公开且审核通过（公示链）→ 其他居民公示期可见
+            if p.get("attachment_public") and p.get("status") in (
+                "公示中", "待执行", "执行中", "待提案人反馈", "重新执行", "已完成"
+            ):
+                pass
+            else:
+                out.pop("attachment", None)
     out["vote_stats"] = stats
     try:
         out["timeline"] = get_proposal_timeline(pid, limit=20)
@@ -952,11 +1015,24 @@ def web_proposal_detail(pid: int, request: Request):
 @app.get("/api/web/notices/{nid}")
 def web_notice_detail(nid: int, request: Request):
     from data.db_notice import get_notice, get_notice_read_stats
+    u = _user(request)
     n = get_notice(nid)
     if not n:
         return fail(1004, "通知不存在")
+    # 范围过滤：居民/老年只能看本端可见通知
+    if u.get("role") != "grid":
+        try:
+            from data.db_notice import get_visible_notices
+            visible = get_visible_notices("elderly" if u.get("role") == "elderly" else "resident",
+                                          u.get("uid"), limit=500)
+            if not any(v.get("id") == nid for v in visible):
+                return fail(1003, "无权限查看该通知")
+        except Exception:
+            pass
+        n.pop("publisher", None)
+        n.pop("scope_target_json", None)
     out = dict(n)
-    if _user(request).get("role") == "grid":
+    if u.get("role") == "grid":
         out["read_stats"] = get_notice_read_stats(nid)
     return ok(out)
 
@@ -1084,8 +1160,13 @@ def web_health_linkage_thresholds_set(req: LinkageThresholdsSet, request: Reques
     return ok(r, "阈值已更新")
 
 
+class LinkageAction(BaseModel):
+    action: str = Field(..., pattern="^(close|reopen)$")
+    reason: str = Field(default="")
+
+
 @app.post("/api/web/health/linkage/{link_key}/action")
-def web_health_linkage_action(link_key: str, req: HealthArticleAction, request: Request):
+def web_health_linkage_action(link_key: str, req: LinkageAction, request: Request):
     """联动关闭/重新开启（二次确认留痕）。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
@@ -1208,6 +1289,8 @@ class KnowledgeCreate(BaseModel):
 
 @app.post("/api/web/knowledge")
 def web_knowledge_create(req: KnowledgeCreate, request: Request):
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
     from data.db_policy import create_knowledge, submit_review
     from ui.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
@@ -1234,6 +1317,8 @@ class KnowledgeAction(BaseModel):
 
 @app.post("/api/web/knowledge/{kid}/action")
 def web_knowledge_action(kid: int, req: KnowledgeAction, request: Request):
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
     from data.db_policy import audit_knowledge, take_down_knowledge
     from ui.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
@@ -1256,6 +1341,8 @@ class QaReply(BaseModel):
 
 @app.post("/api/web/qa/questions/{qid}/reply")
 def web_qa_reply(qid: int, req: QaReply, request: Request):
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
     from data.db_policy import reply_question
     actor = _user(request).get("name") or "负责人"
     ok_, msg, _ = reply_question(qid, req.reply, actor=actor)
@@ -1271,8 +1358,13 @@ class QaFeedback(BaseModel):
 
 @app.post("/api/web/qa/questions/{qid}/feedback")
 def web_qa_feedback(qid: int, req: QaFeedback, request: Request):
-    from data.db_policy import feedback_question
+    from data.db_policy import feedback_question, get_question
     u = _user(request)
+    q = get_question(qid)
+    if not q:
+        return fail(1004, "提问不存在")
+    if u.get("role") != "grid" and q.get("user_id") != u.get("uid"):
+        return fail(1003, "无权限反馈该提问")
     ok_, msg, _ = feedback_question(qid, req.satisfied, reason=req.reason, actor=u.get("name") or "居民")
     if not ok_:
         return fail(2001, msg)
@@ -1732,6 +1824,8 @@ def web_check_task_confirm(task_id: int, req: CheckTaskConfirm, request: Request
     from data.db_weather import confirm_check_task, fill_overdue_task
     from data.db_weather import list_check_tasks
     from ui.cache import invalidate_weather
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
     actor = _user(request).get("name") or "负责人"
     rows = list_check_tasks(limit=1000)
     row = next((t for t in rows if t["id"] == task_id), None)
@@ -1752,6 +1846,8 @@ def web_check_task_confirm(task_id: int, req: CheckTaskConfirm, request: Request
 @app.get("/api/web/weather/tasks")
 def web_weather_tasks(request: Request, status: str = ""):
     from data.db_weather import list_check_tasks
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
     rows = list_check_tasks(status=status or None, limit=200)
     return ok([dict(r) for r in rows])
 

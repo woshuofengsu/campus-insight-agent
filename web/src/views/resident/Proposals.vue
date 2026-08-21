@@ -9,10 +9,14 @@ const list = ref([])
 const loading = ref(true)
 const commentInput = ref({}) // pid -> 输入内容
 const commentList = ref({}) // pid -> 议论列表
+const votedIds = ref([])
 
 async function load() {
   loading.value = true
-  try { list.value = (await proposals.list()) || [] } catch (e) { message.error(e.message) }
+  try {
+    list.value = (await proposals.list()) || []
+    votedIds.value = list.value.filter((p) => p.has_voted).map((p) => p.id)
+  } catch (e) { message.error(e.message) }
   finally { loading.value = false }
 }
 onMounted(load)
@@ -80,6 +84,10 @@ async function addComment(p) {
         <div class="muted" style="font-size:0.85rem;margin-top:6px;">
           {{ p.category }} · {{ p.is_public ? '公开' : '私有' }} · 提案人 {{ p.reporter_name || '—' }}
           <n-tag v-if="p.mine" size="tiny" type="info" style="margin-left:6px;">我的提案</n-tag>
+          <span v-if="p.status === '公示中'" style="margin-left:8px;">
+            <n-tag size="tiny" type="warning" v-if="p.remaining_days != null">剩 {{ p.remaining_days }} 天</n-tag>
+            <n-tag size="tiny" v-if="p.vote_count">🗳️ {{ p.vote_count }} 人 · {{ p.avg_score }} 分</n-tag>
+          </span>
         </div>
 
         <!-- 我的提案：待审核撤回 / 已撤回重开 / 退回修改重提 / 待确认公示私有 -->
@@ -95,9 +103,15 @@ async function addComment(p) {
         </div>
 
         <div v-if="p.status === '公示中'" style="margin-top:10px;display:flex;gap:6px;align-items:center;">
-          <span class="muted" style="font-size:0.85rem;">评分（1-5）：</span>
-          <n-button v-for="s in 5" :key="'v' + s" size="small" :type="s === 5 ? 'primary' : 'default'"
-                    @click="vote(p, s)">{{ s }}★</n-button>
+          <template v-if="p.mine">
+            <span class="muted" style="font-size:0.85rem;">这是您自己的提案，不能给自己投票</span>
+          </template>
+          <template v-else>
+            <span class="muted" style="font-size:0.85rem;">评分（1-5，匿名一票制）：</span>
+            <n-button v-for="s in 5" :key="'v' + s" size="small" :type="s === 5 ? 'primary' : 'default'"
+                      :disabled="votedIds.includes(p.id)" @click="vote(p, s)">{{ s }}★</n-button>
+            <span v-if="votedIds.includes(p.id)" class="muted" style="font-size:0.85rem;">您已评分，不可修改</span>
+          </template>
         </div>
 
         <!-- 公示期匿名议论 -->

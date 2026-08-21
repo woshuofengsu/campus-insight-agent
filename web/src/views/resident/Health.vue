@@ -13,7 +13,7 @@ const typeFilter = ref('全部')
 const detail = ref(null) // 内容详情弹窗
 
 const TYPES = ['全部', '季节性疾病预防', '疫苗接种提醒', '传染病预警', '健康小贴士', '就医指引']
-const CONSULT_TYPES = ['健康知识', '疫苗接种', '慢性病管理', '传染病防控', '就医指引']
+const CONSULT_TYPES = ['健康知识', '疫苗接种', '疾病症状', '就医指引', '其他']
 
 const cform = ref({
   name: '', phone: '', consult_type: '健康知识', content: '',

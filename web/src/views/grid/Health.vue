@@ -16,7 +16,7 @@ const offlineMap = ref({}) // cid -> doctor_guide
 const offlineCheck = ref({}) // cid -> confirmed
 const cDetail = ref(null) // 咨询详情弹窗
 const CONSULT_STATUS = ['全部', '待回复', '已回复', '超时未回复', '已结束', '已撤回', '已关闭']
-const CONSULT_TYPES = ['全部', '健康知识', '疫苗接种', '慢性病管理', '传染病防控', '就医指引']
+const CONSULT_TYPES = ['全部', '健康知识', '疫苗接种', '疾病症状', '就医指引', '其他']
 // 内容
 const contents = ref([])
 const cStatus = ref('全部')

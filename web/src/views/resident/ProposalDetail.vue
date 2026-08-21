@@ -88,10 +88,18 @@ async function changeVis(isPublic) {
 
       <!-- 投票 -->
       <div v-if="p.status === '公示中'" class="card">
-        <div style="font-weight:700;margin-bottom:8px;">🗳️ 匿名评分（1-5 星）</div>
-        <div style="display:flex;gap:6px;">
-          <n-button v-for="s in 5" :key="s" size="small" :type="s === 5 ? 'primary' : 'default'" @click="vote(s)">{{ s }}★</n-button>
-        </div>
+        <div style="font-weight:700;margin-bottom:8px;">🗳️ 匿名评分（1-5 星，一票制）</div>
+        <template v-if="p.mine">
+          <div class="muted">这是您自己的提案，不能给自己投票</div>
+        </template>
+        <template v-else-if="p.has_voted">
+          <div class="muted">✅ 您已评分，不可修改</div>
+        </template>
+        <template v-else>
+          <div style="display:flex;gap:6px;">
+            <n-button v-for="s in 5" :key="s" size="small" :type="s === 5 ? 'primary' : 'default'" @click="vote(s)">{{ s }}★</n-button>
+          </div>
+        </template>
       </div>
 
       <!-- 提案人反馈 -->
