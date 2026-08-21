@@ -1,27 +1,33 @@
 <script setup>
-import { useUserStore } from './stores/user'
-// 登录后按角色跳对应端首页
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { watch } from 'vue'
+import { useUserStore } from './stores/user'
+import { useThemeStore } from './stores/theme'
+import { darkTheme } from 'naive-ui'
 
 const store = useUserStore()
+const theme = useThemeStore()
 const router = useRouter()
 
-watch(
-  () => store.role,
-  (role) => {
-    if (!role) return
+// 登录后按角色跳对应端首页
+onMounted(() => {
+  theme.apply()
+  const role = store.role
+  if (role && !router.currentRoute.value.path.startsWith(`/${role}`)) {
     const home = { resident: '/resident/home', grid: '/grid/dashboard', elderly: '/elderly/home' }
-    if (!router.currentRoute.value.path.startsWith(`/${role}`)) {
+    if (router.currentRoute.value.path !== '/screen') {
       router.replace(home[role] || '/login')
     }
-  },
-  { immediate: true },
-)
+  }
+})
+
+const themeOverrides = computed(() => theme.isDark
+  ? { common: { primaryColor: '#4caf50', primaryColorHover: '#66bb6a', primaryColorPressed: '#388e3c', bodyColor: '#0f1a15', cardColor: '#16251e', textColorBase: '#e5efe8' } }
+  : { common: { primaryColor: '#2E7D32', primaryColorHover: '#3B8F44', primaryColorPressed: '#256B28' } })
 </script>
 
 <template>
-  <n-config-provider :theme-overrides="{ common: { primaryColor: '#2E7D32', primaryColorHover: '#3B8F44', primaryColorPressed: '#256B28' } }">
+  <n-config-provider :theme="theme.isDark ? darkTheme : null" :theme-overrides="themeOverrides">
     <n-message-provider>
       <router-view />
     </n-message-provider>

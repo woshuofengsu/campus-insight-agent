@@ -3,10 +3,12 @@
 import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { useThemeStore } from '../stores/theme'
 
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
+const theme = useThemeStore()
 
 const menus = computed(() => {
   if (store.isGrid) {
@@ -41,21 +43,22 @@ function logout() {
 
 <template>
   <n-layout style="min-height:100vh" has-sider>
-    <n-layout-sider bordered width="210" content-style="background:#fff">
-      <div style="padding:18px 16px;border-bottom:1px solid #f0f0f0;">
+    <n-layout-sider bordered width="210">
+      <div style="padding:18px 16px;border-bottom:1px solid var(--border);">
         <div style="font-weight:800;color:#2E7D32;font-size:1.05rem;">🏘️ 社区先知</div>
-        <div style="color:#9ca3af;font-size:0.75rem;">{{ store.isGrid ? '网格员工作台' : '社区治理平台' }}</div>
+        <div style="color:var(--muted);font-size:0.75rem;">{{ store.isGrid ? '网格员工作台' : '社区治理平台' }}</div>
       </div>
       <n-menu :options="menus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
               :value="active" @update:value="(k) => router.push(k)" />
     </n-layout-sider>
 
     <n-layout>
-      <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;">
+      <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
         <div style="font-weight:700;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
+          <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
           <n-tag :bordered="false" type="success" size="small">● {{ store.isGrid ? 'AI 治理' : '居民端' }}</n-tag>
-          <span style="color:#6b7280;">{{ store.user?.name }}</span>
+          <span style="color:var(--muted);">{{ store.user?.name }}</span>
           <n-button size="small" quaternary @click="logout">退出</n-button>
         </div>
       </n-layout-header>
