@@ -865,8 +865,8 @@ def feedback_proposal(pid: int, satisfied: bool, reason: str = "",
             reason = (reason or "").strip()
             if not reason:
                 return False, "不满意必须填写原因。"
-            if reopen_count < MAX_REOPEN:
-                reopen_count += 1
+            reopen_count += 1  # 每次不满意统一 +1（1、2、3...），处理时不再动
+            if reopen_count <= MAX_REOPEN:
                 conn.execute(
                     "UPDATE proposals SET status='重新执行', reopen_count=?, satisfaction='不满意', "
                     "feedback_reason=?, feedback_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -877,9 +877,9 @@ def feedback_proposal(pid: int, satisfied: bool, reason: str = "",
                 action = f"反馈不满意，进入第 {reopen_count} 次重新执行"
             else:
                 conn.execute(
-                    "UPDATE proposals SET status='重新执行', satisfaction='不满意', "
+                    "UPDATE proposals SET status='重新执行', reopen_count=?, satisfaction='不满意', "
                     "feedback_reason=?, feedback_at=CURRENT_TIMESTAMP WHERE id=?",
-                    (reason, pid),
+                    (reopen_count, reason, pid),
                 )
                 conn.commit()
                 new_status = "重新执行"
@@ -925,10 +925,7 @@ def handle_reopen(pid: int, close: bool = False, reason: str = "",
                 pass
             return True, ""
 
-        # 继续重新执行
-        if reopen_count >= MAX_REOPEN:
-            reopen_count += 1  # 超过 2 次仍继续：次数继续累加并留痕
-            conn.execute("UPDATE proposals SET reopen_count=? WHERE id=?", (reopen_count, pid))
+        # 继续重新执行（次数在反馈时已统一累加，这里不再动）
         if row["is_public"]:
             # 投票数据清零 + 防重复表清空（重新投票）
             conn.execute("DELETE FROM proposal_votes WHERE proposal_id=?", (pid,))
