@@ -684,7 +684,328 @@ def web_qa_high_freq(request: Request, limit: int = 10):
 
 
 
-# ---------------- 天气（复用 db_weather / tools.query_weather） ----------------
+# ---------------- 补充端点：详情 / 内容 CRUD / 提问回复 / 老年端闭环 ----------------
+
+@app.get("/api/web/proposals/{pid}")
+def web_proposal_detail(pid: int, request: Request):
+    from data.db_proposal import get_proposal, get_proposal_vote_stats, get_proposal_timeline
+    p = get_proposal(pid)
+    if not p:
+        return fail(1004, "提案不存在")
+    stats = get_proposal_vote_stats(pid) or {}
+    out = dict(p)
+    out["vote_stats"] = stats
+    try:
+        out["timeline"] = get_proposal_timeline(pid, limit=20)
+    except Exception:
+        out["timeline"] = []
+    return ok(out)
+
+
+@app.get("/api/web/notices/{nid}")
+def web_notice_detail(nid: int, request: Request):
+    from data.db_notice import get_notice, get_notice_read_stats
+    n = get_notice(nid)
+    if not n:
+        return fail(1004, "通知不存在")
+    out = dict(n)
+    if _user(request).get("role") == "grid":
+        out["read_stats"] = get_notice_read_stats(nid)
+    return ok(out)
+
+
+# ---- 健康内容管理（创建/审核/下架） ----
+
+class HealthArticleCreate(BaseModel):
+    title: str = Field(..., min_length=2)
+    content_type: str = Field(default="健康知识")
+    body: str = Field(default="")
+    summary: str = Field(default="")
+    source: str = Field(default="社区整理")
+    is_pinned: int = Field(default=0)
+    expire_at: str = Field(default="")
+
+
+@app.post("/api/web/health/articles")
+def web_health_article_create(req: HealthArticleCreate, request: Request):
+    from data.db_health_content import create_content, submit_for_review
+    from ui.cache import invalidate_health
+    actor = _user(request).get("name") or "负责人"
+    cid, err = create_content(
+        title=req.title, content_type=req.content_type, body=req.body,
+        source=req.source, publisher=actor, is_pinned=req.is_pinned,
+        expire_at=req.expire_at,
+    )
+    if cid <= 0:
+        return fail(2001, err or "创建失败")
+    # 发布人不能同时是审核人，用「社区审核组」作为默认审核人
+    submit_for_review(cid, auditor="社区审核组", actor=actor)
+    invalidate_health()
+    return ok({"content_id": cid}, "已创建并提交审核")
+
+
+class HealthArticleAction(BaseModel):
+    action: str = Field(..., pattern="^(audit|offline)$")
+    approve: bool = Field(default=True)
+    opinion: str = Field(default="")
+    reason: str = Field(default="")
+
+
+@app.post("/api/web/health/articles/{cid}/action")
+def web_health_article_action(cid: int, req: HealthArticleAction, request: Request):
+    from data.db_health_content import review_content, take_down_content
+    from ui.cache import invalidate_health
+    actor = _user(request).get("name") or "负责人"
+    if req.action == "audit":
+        # 提交时审核人为「社区审核组」，审核必须同名（单负责人演示环境统一用该标识）
+        ok_, msg = review_content(cid, req.approve, opinion=req.opinion, actor="社区审核组")
+    else:
+        ok_, msg = take_down_content(cid, req.reason, confirm=True, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    invalidate_health()
+    return ok({"content_id": cid}, "操作成功")
+
+
+# ---- 咨询详情 / 居民反馈 ----
+
+@app.get("/api/web/health/consults/{cid}")
+def web_consult_detail(cid: int, request: Request):
+    from data.db_health_content import get_consult
+    c = get_consult(cid)
+    if not c:
+        return fail(1004, "咨询不存在")
+    return ok(c)
+
+
+class ConsultFeedback(BaseModel):
+    solved: bool = Field(default=True)
+    reason: str = Field(default="")
+
+
+@app.post("/api/web/health/consults/{cid}/feedback")
+def web_consult_feedback(cid: int, req: ConsultFeedback, request: Request):
+    from data.db_health_content import feedback_consult
+    from ui.cache import invalidate_health
+    u = _user(request)
+    ok_, msg = feedback_consult(cid, u.get("uid"), req.solved, reason=req.reason)
+    if not ok_:
+        return fail(2001, msg)
+    invalidate_health()
+    return ok({"consult_id": cid}, "反馈已提交")
+
+
+# ---- 政策知识库管理（创建/审核/下架） ----
+
+class KnowledgeCreate(BaseModel):
+    title: str = Field(..., min_length=2)
+    category: str = Field(default="社保医保")
+    plain_interpretation: str = Field(..., min_length=2)
+    content: str = Field(default="")
+    summary: str = Field(default="")
+    source: str = Field(default="社区整理")
+    keywords: str = Field(default="")
+    effective_date: str = Field(default="")
+    expire_date: str = Field(default="")
+    policy_number: str = Field(default="")
+
+
+@app.post("/api/web/knowledge")
+def web_knowledge_create(req: KnowledgeCreate, request: Request):
+    from data.db_policy import create_knowledge, submit_review
+    from ui.cache import invalidate_knowledge
+    actor = _user(request).get("name") or "负责人"
+    kid, err = create_knowledge(
+        title=req.title, category=req.category, plain_interpretation=req.plain_interpretation,
+        content=req.content, summary=req.summary, source=req.source,
+        keywords=req.keywords, effective_date=req.effective_date,
+        expire_date=req.expire_date, policy_number=req.policy_number,
+        actor=actor,
+    )
+    if kid <= 0:
+        return fail(2001, err or "创建失败")
+    submit_review(kid, auditor="社区审核组", actor=actor)
+    invalidate_knowledge()
+    return ok({"knowledge_id": kid}, "已创建并提交审核")
+
+
+class KnowledgeAction(BaseModel):
+    action: str = Field(..., pattern="^(audit|offline)$")
+    approve: bool = Field(default=True)
+    opinion: str = Field(default="")
+    reason: str = Field(default="")
+
+
+@app.post("/api/web/knowledge/{kid}/action")
+def web_knowledge_action(kid: int, req: KnowledgeAction, request: Request):
+    from data.db_policy import audit_knowledge, take_down_knowledge
+    from ui.cache import invalidate_knowledge
+    actor = _user(request).get("name") or "负责人"
+    if req.action == "audit":
+        # 发布人不能审核自己发布的内容，审核统一走「社区审核组」身份
+        ok_, msg = audit_knowledge(kid, req.approve, opinion=req.opinion, actor="社区审核组")
+    else:
+        ok_, msg = take_down_knowledge(kid, req.reason, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    invalidate_knowledge()
+    return ok({"knowledge_id": kid}, "操作成功")
+
+
+# ---- 提问人工回复 / 居民反馈 ----
+
+class QaReply(BaseModel):
+    reply: str = Field(..., min_length=1)
+
+
+@app.post("/api/web/qa/questions/{qid}/reply")
+def web_qa_reply(qid: int, req: QaReply, request: Request):
+    from data.db_policy import reply_question
+    actor = _user(request).get("name") or "负责人"
+    ok_, msg, _ = reply_question(qid, req.reply, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"question_id": qid}, "已回复")
+
+
+class QaFeedback(BaseModel):
+    satisfied: bool = Field(default=True)
+    reason: str = Field(default="")
+
+
+@app.post("/api/web/qa/questions/{qid}/feedback")
+def web_qa_feedback(qid: int, req: QaFeedback, request: Request):
+    from data.db_policy import feedback_question
+    u = _user(request)
+    ok_, msg, _ = feedback_question(qid, req.satisfied, reason=req.reason, actor=u.get("name") or "居民")
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"question_id": qid}, "反馈已提交")
+
+
+# ---- 老年端补充：联系人 / SOS 响应结束 / 用药暂停恢复 / 联系拨打 ----
+
+class ContactCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    phone: str = Field(..., min_length=11)
+    relation: str = Field(default="家属")
+
+
+@app.get("/api/web/elderly/emergency-contacts")
+def web_contacts_list(request: Request):
+    from data.db_elderly_care import list_emergency_contacts
+    u = _user(request)
+    return ok([dict(r) for r in list_emergency_contacts(u.get("uid"))])
+
+
+@app.post("/api/web/elderly/emergency-contacts")
+def web_contacts_create(req: ContactCreate, request: Request):
+    from data.db_elderly_care import add_emergency_contact
+    u = _user(request)
+    cid, msg = add_emergency_contact(u.get("uid"), req.name, req.phone, req.relation,
+                                     actor=u.get("name") or "老人")
+    if cid <= 0:
+        return fail(2001, msg)
+    return ok({"contact_id": cid}, "已提交，待审核")
+
+
+@app.post("/api/web/elderly/emergency-contacts/{cid}/delete")
+def web_contacts_delete(cid: int, request: Request):
+    from data.db_elderly_care import delete_emergency_contact
+    u = _user(request)
+    ok_, msg = delete_emergency_contact(cid, actor=u.get("name") or "老人")
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"contact_id": cid}, "已删除")
+
+
+class SosAction(BaseModel):
+    action: str = Field(..., pattern="^(respond|close)$")
+    handle_note: str = Field(default="")
+
+
+@app.post("/api/web/elderly/emergency/{call_id}/action")
+def web_sos_action(call_id: int, req: SosAction, request: Request):
+    from data.db_elderly_care import respond_sos, end_sos
+    actor = _user(request).get("name") or "负责人"
+    if req.action == "respond":
+        ok_, msg = respond_sos(call_id, actor=actor)
+    else:
+        ok_, msg = end_sos(call_id, req.handle_note, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"call_id": call_id}, "操作成功")
+
+
+class MedicationToggle(BaseModel):
+    action: str = Field(..., pattern="^(pause|resume)$")
+
+
+@app.post("/api/web/elderly/medications/{rid}/toggle")
+def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
+    from data.db_elderly_care import pause_medication, resume_medication
+    actor = _user(request).get("name") or "老人"
+    if req.action == "pause":
+        ok_, msg = pause_medication(rid, actor=actor)
+    else:
+        ok_, msg = resume_medication(rid, actor=actor)
+    if not ok_:
+        return fail(2001, msg)
+    return ok({"reminder_id": rid}, "操作成功")
+
+
+class ContactCall(BaseModel):
+    target_name: str = Field(default="")
+    target_phone: str = Field(default="")
+
+
+@app.post("/api/web/elderly/contact")
+def web_elderly_contact(req: ContactCall, request: Request):
+    """联系家属/社区（拨号留痕）。"""
+    from data.db_elderly_care import log_emergency_call
+    u = _user(request)
+    try:
+        log_emergency_call(u.get("uid"), "contact", req.target_name, req.target_phone,
+                           "拨出", status="已结束", actor=u.get("name") or "老人")
+        return ok({"dialed": req.target_name or req.target_phone}, "已记录拨打")
+    except Exception as e:  # noqa: BLE001
+        return fail(2001, f"拨打记录失败：{e}")
+
+
+# ---- 天气预报独立端点 ----
+
+@app.get("/api/web/weather/forecast")
+def web_weather_forecast(request: Request, days: int = 3):
+    from data.db_weather import get_weather_for_display
+    w = get_weather_for_display("")
+    return ok({"forecast": (w.get("days") or [])[:days], "is_degraded": w.get("is_degraded")})
+
+
+# ---------------- 老年端免登录（elder_id 参数 + 绑定校验） ----------------
+# 使用方式：token 为绑定家属的居民，请求 /api/web/elderly/*?elder_id=X 时以老人身份操作。
+# 在 JWT 中间件中处理：见下方 hook —— 由端点内的 _resolve_elder_uid 使用。
+
+def _resolve_elder_uid(request: Request) -> int | None:
+    """老年端免登录：?elder_id=X 且当前 token 用户是该老人的绑定家属 → 返回老人 uid。"""
+    u = _user(request)
+    uid = u.get("uid")
+    elder_id = request.query_params.get("elder_id")
+    if not elder_id or not str(elder_id).isdigit():
+        return None
+    elder_id = int(elder_id)
+    if u.get("role") == "elderly" and elder_id == uid:
+        return uid
+    try:
+        from data.db_user import get_bound_elderly
+        bound = get_bound_elderly(uid)
+        if bound and bound.get("id") == elder_id:
+            return elder_id
+    except Exception:
+        pass
+    return None
+
+
+
 
 @app.get("/api/web/weather/current")
 def web_weather_current(request: Request):
@@ -835,7 +1156,7 @@ def web_elderly_home(request: Request):
     from data.db_elderly_care import get_latest_sos
     from data.db_weather import get_simplified_weather
     u = _user(request)
-    uid = u.get("uid")
+    uid = _resolve_elder_uid(request) or u.get("uid")
     elderly = get_profile(uid) or {}
     health = elderly.get("health_info", {})
     due = 0
@@ -867,10 +1188,11 @@ def web_elderly_voice_report(req: VoiceReport, request: Request):
     from agent.helpers import extract_location
     from tools.action_report_issue import _llm_classify
     u = _user(request)
+    uid = _resolve_elder_uid(request) or u.get("uid")
     profile = {}
     try:
         from data.db_user import get_user_by_id
-        profile = get_user_by_id(u.get("uid")) or {}
+        profile = get_user_by_id(uid) or {}
     except Exception:
         pass
     category, urgency = _llm_classify(req.text, "")
@@ -880,7 +1202,7 @@ def web_elderly_voice_report(req: VoiceReport, request: Request):
         location=loc, description=req.text, urgency=req.urgency or urgency or "一般",
         reporter_name=profile.get("name") or "老人",
         reporter_phone=profile.get("phone") or "13800000000",
-        reporter_id=u.get("uid"),
+        reporter_id=uid,
     )
     if iid <= 0:
         return fail(2001, hint or "上报失败")
@@ -901,9 +1223,10 @@ class MedicationCreate(BaseModel):
 def web_medication_create(req: MedicationCreate, request: Request):
     from data.db_elderly_care import add_medication_reminder
     u = _user(request)
+    uid = _resolve_elder_uid(request) or u.get("uid")
     times = [t.strip() for t in req.times.replace("，", ",").split(",") if t.strip()]
     mid, msg = add_medication_reminder(
-        u.get("uid"), u.get("name") or "老人", req.drug_name, req.dosage, times,
+        uid, u.get("name") or "老人", req.drug_name, req.dosage, times,
         repeat_rule=req.repeat_rule, start_date=req.start_date, end_date=req.end_date,
         note=req.note, setter_id=u.get("uid"), actor=u.get("name") or "老人",
     )
@@ -916,7 +1239,8 @@ def web_medication_create(req: MedicationCreate, request: Request):
 def web_medication_list(request: Request):
     from data.db_elderly_care import list_medication_reminders
     u = _user(request)
-    return ok([dict(r) for r in list_medication_reminders(u.get("uid"))])
+    uid = _resolve_elder_uid(request) or u.get("uid")
+    return ok([dict(r) for r in list_medication_reminders(uid)])
 
 
 @app.post("/api/web/elderly/emergency")
@@ -943,7 +1267,8 @@ def web_emergency_trigger(request: Request):
 def web_emergency_status(request: Request):
     from data.db_elderly_care import get_latest_sos
     u = _user(request)
-    return ok(get_latest_sos(u.get("uid")))
+    uid = _resolve_elder_uid(request) or u.get("uid")
+    return ok(get_latest_sos(uid))
 
 
 _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "dist")

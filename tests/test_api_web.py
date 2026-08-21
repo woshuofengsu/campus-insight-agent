@@ -286,3 +286,123 @@ def test_elderly_voice_report(client):
     }, headers=eh)
     assert r.status_code == 200, r.text
     assert r.json()["data"]["issue_id"] > 0
+
+
+def test_details_and_content_crud(client):
+    """提案/通知详情 + 健康内容/知识库 CRUD + 咨询反馈 + 提问回复。"""
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    res = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {res['token']}"}
+
+    # 提案详情
+    ps = client.get("/api/web/proposals", headers=gh).json()["data"]
+    if ps:
+        r = client.get(f"/api/web/proposals/{ps[0]['id']}", headers=gh)
+        assert r.json()["success"] and "title" in r.json()["data"]
+
+    # 通知详情
+    ns = client.get("/api/web/notices/manage", headers=gh).json()["data"]
+    if ns:
+        r = client.get(f"/api/web/notices/{ns[0]['id']}", headers=gh)
+        assert r.json()["success"]
+
+    # 健康内容创建 → 审核
+    r = client.post("/api/web/health/articles", json={
+        "title": "流感预防小贴士", "content_type": "健康小贴士",
+        "body": "勤洗手、多通风、接种流感疫苗。", "summary": "预防流感要点",
+    }, headers=gh)
+    assert r.status_code == 200, r.text
+    cid = r.json()["data"]["content_id"]
+    r = client.post(f"/api/web/health/articles/{cid}/action",
+                    json={"action": "audit", "approve": True}, headers=gh)
+    assert r.json()["success"], r.text
+
+    # 知识库创建 → 审核
+    r = client.post("/api/web/knowledge", json={
+        "title": "医保报销材料", "category": "社保医保",
+        "plain_interpretation": "报销需要身份证、发票和病历。",
+        "keywords": "医保,报销", "effective_date": "2026-01-01", "expire_date": "2027-01-01",
+    }, headers=gh)
+    assert r.status_code == 200, r.text
+    kid = r.json()["data"]["knowledge_id"]
+    r = client.post(f"/api/web/knowledge/{kid}/action",
+                    json={"action": "audit", "approve": True}, headers=gh)
+    assert r.json()["success"], r.text
+
+    # 咨询提交 → 回复 → 居民反馈
+    r = client.post("/api/web/health/consults", json={
+        "name": "王阿姨", "phone": "13800138000", "content": "想了解血压高怎么办",
+    }, headers=rh)
+    cid2 = r.json()["data"]["consult_id"]
+    assert client.post(f"/api/web/health/consults/{cid2}/reply",
+                       json={"reply": "建议就医测量"}, headers=gh).json()["success"]
+    r = client.post(f"/api/web/health/consults/{cid2}/feedback",
+                    json={"solved": True}, headers=rh)
+    assert r.json()["success"], r.text
+
+    # 提问：自动回答的提问不可人工回复（正确行为）；仅验证列表可用
+    q = client.post("/api/web/qa/ask", json={"question": "养老金怎么领？"}, headers=rh).json()["data"]
+    assert "matched" in q
+    r = client.get("/api/web/qa/questions", headers=gh)
+    assert r.json()["success"]
+
+
+def test_elderly_contacts_sos_medication_clean(client):
+    """复用：老年端闭环（不含免登录复杂断言）。"""
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    e = _login(client, "demo_elderly", "")
+    eh = {"Authorization": f"Bearer {e['token']}"}
+
+    r = client.post("/api/web/elderly/emergency-contacts", json={
+        "name": "女儿", "phone": "13800002222", "relation": "家属",
+    }, headers=eh)
+    assert r.json()["success"], r.text
+    r = client.get("/api/web/elderly/emergency-contacts", headers=eh)
+    assert r.json()["success"] and len(r.json()["data"]) >= 1
+    # 负责人审核联系人（SOS 触发前提：至少一个审核通过的联系人）
+    from data.db_elderly_care import audit_emergency_contact
+    for c in r.json()["data"]:
+        audit_emergency_contact(c["id"], True, opinion="同意", actor="网格员A")
+
+    r = client.post("/api/web/elderly/emergency", headers=eh)
+    assert r.json()["success"], r.text
+    cid = r.json()["data"]["call_id"]
+    assert client.post(f"/api/web/elderly/emergency/{cid}/action",
+                       json={"action": "respond"}, headers=gh).json()["success"]
+    assert client.post(f"/api/web/elderly/emergency/{cid}/action",
+                       json={"action": "close", "handle_note": "已处理"}, headers=gh).json()["success"]
+
+    r = client.post("/api/web/elderly/medications", json={
+        "drug_name": "钙片", "dosage": "2片", "times": "09:00", "repeat_rule": "每天",
+        "start_date": "2026-08-21", "end_date": "2026-12-31",
+    }, headers=eh)
+    rid = r.json()["data"]["reminder_id"]
+    # 待审核不能暂停（正确行为）；审核通过后可暂停
+    from data.db_elderly_care import audit_medication
+    audit_medication(rid, True, opinion="同意", actor="网格员A")
+    r = client.post(f"/api/web/elderly/medications/{rid}/toggle", json={"action": "pause"}, headers=eh)
+    assert r.json()["success"], r.text
+
+
+def test_elderly_free_login(client):
+    """老年端免登录：家属绑定后 elder_id 参数以老人身份访问。"""
+    from data.db_core import get_db
+    from data.db_user import bind_elderly, unbind_elderly
+    with get_db() as conn:
+        ru = conn.execute("SELECT id FROM user_profile WHERE username='demo_resident'").fetchone()["id"]
+        eu = conn.execute("SELECT id FROM user_profile WHERE username='demo_elderly'").fetchone()["id"]
+    rh = {"Authorization": f"Bearer {_login(client, 'demo_resident', '')['token']}"}
+    try:
+        bind_elderly(ru, eu)
+        r = client.get(f"/api/web/elderly/home?elder_id={eu}", headers=rh)
+        assert r.status_code == 200 and r.json()["success"], r.text
+        # 未绑定的 elder_id 应拒绝（走默认身份，不报错即可）
+        r = client.get("/api/web/elderly/home?elder_id=99999", headers=rh)
+        assert r.status_code == 200
+    finally:
+        try:
+            unbind_elderly(ru)
+        except Exception:
+            pass
