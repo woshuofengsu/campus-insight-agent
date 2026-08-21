@@ -23,6 +23,8 @@ const form = ref({
 })
 const files = ref([]) // 上传的文件列表（n-upload）
 const drafts = ref([])
+// 特殊情况提示（安全隐患/第三方施工/违规）
+const special = ref(null) // { type: 'safety'|'third_party'|'violation' }
 
 onMounted(async () => {
   try { drafts.value = (await issues.drafts()) || [] } catch { /* 忽略 */ }
@@ -40,6 +42,7 @@ const submit = async () => {
     return message.warning('请填写问题描述和地址')
   }
   loading.value = true
+  special.value = null
   try {
     // 先传照片（最多3张，≤5MB），再提交工单
     if (files.value.length) {
@@ -51,9 +54,31 @@ const submit = async () => {
       ...form.value,
       is_agent_report: form.value.is_agent_report ? 1 : 0,
     })
+    // 特殊情况处理（spec 四）
+    if (data.hint === 'safety') {
+      special.value = { type: 'safety' }
+      return message.warning('⚠️ 检测到安全隐患，已记录安全提醒（未生成工单）')
+    }
+    if (data.hint === 'third_party') {
+      special.value = { type: 'third_party' }
+      message.warning('该问题涉及第三方施工，请直接联系施工方；社区已标记为非社区责任')
+      router.push('/resident/work-orders')
+      return
+    }
+    if (data.hint === 'violation') {
+      special.value = { type: 'violation' }
+      message.warning('该描述涉及违规搭建，工单已标记')
+      router.push('/resident/work-orders')
+      return
+    }
     message.success(`工单 #${data.issue_id} 已提交，状态：待审核`)
     router.push('/resident/work-orders')
   } catch (e) {
+    // 后端对 safety 用 fail(2001, "safety") 透传
+    if (e.message === 'safety') {
+      special.value = { type: 'safety' }
+      return message.warning('⚠️ 检测到安全隐患，已记录安全提醒（未生成工单）')
+    }
     message.error(e.message || '提交失败')
   } finally {
     loading.value = false
@@ -75,6 +100,28 @@ const submit = async () => {
       </div>
     </div>
 
+    <!-- 特殊情况提示（spec 四） -->
+    <div v-if="special" class="card urgent-bg" style="margin-bottom:12px;">
+      <template v-if="special.type === 'safety'">
+        <b>🚨 安全隐患提醒（已生成「安全提醒记录」）</b>
+        <p style="margin:6px 0;font-size:0.9rem;">您描述的问题属于安全隐患（如漏电、燃气泄漏、危墙等），社区已记录并转告负责人处理，未生成报修工单。请远离危险区域，必要时立即联系紧急电话：</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <n-button type="error" tag="a" href="tel:120" size="small">🚑 急救 120</n-button>
+          <n-button type="warning" tag="a" href="tel:119" size="small">🧯 火警 119</n-button>
+          <n-button type="info" tag="a" href="tel:110" size="small">👮 报警 110</n-button>
+          <n-button type="primary" tag="a" href="tel:12345" size="small">🏛️ 市民热线 12345</n-button>
+        </div>
+      </template>
+      <template v-else-if="special.type === 'third_party'">
+        <b>🏗️ 第三方施工提醒</b>
+        <p style="margin:6px 0;font-size:0.9rem;">您的问题涉及第三方施工方责任，工单已标记为「非社区责任」。请直接联系施工方处理，社区会协助跟进。</p>
+      </template>
+      <template v-else-if="special.type === 'violation'">
+        <b>🚫 违规标记提醒</b>
+        <p style="margin:6px 0;font-size:0.9rem;">您描述的内容涉及违规搭建，工单已标记，将由负责人核实后按流程处理（可能转出至城管等部门）。</p>
+      </template>
+    </div>
+
     <div class="card">
       <n-form label-placement="top">
         <n-form-item label="问题描述（必填）">
@@ -89,6 +136,7 @@ const submit = async () => {
           </n-form-item-gi>
           <n-form-item-gi label="紧急程度">
             <n-select v-model:value="form.urgency" :options="['紧急','中等','一般','普通'].map(v=>({label:v,value:v}))" />
+            <div class="muted" style="font-size:0.75rem;margin-top:4px;">紧急：漏水停电/存在风险 · 中等：影响生活 · 一般：日常小修 · 普通：可预约上门</div>
           </n-form-item-gi>
         </n-grid>
         <n-form-item label="现场照片（选填，jpg/png，≤5MB，最多3张）">

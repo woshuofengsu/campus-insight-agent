@@ -598,6 +598,7 @@ def get_issue(issue_id: int) -> dict | None:
 
 def get_issues(status: str | None = None, issue_type: str | None = None,
                category: str | None = None, reporter_id: int | None = None,
+               urgency: str | None = None, keyword: str | None = None,
                limit: int = 50) -> list[dict]:
     q = "SELECT * FROM community_issues WHERE 1=1"
     args: list = []
@@ -610,6 +611,13 @@ def get_issues(status: str | None = None, issue_type: str | None = None,
     if category:
         q += " AND category=?"
         args.append(category)
+    if urgency:
+        q += " AND urgency=?"
+        args.append(urgency)
+    if keyword:
+        q += " AND (title LIKE ? OR location LIKE ? OR description LIKE ?)"
+        kw = f"%{keyword}%"
+        args += [kw, kw, kw]
     if reporter_id is not None:
         q += " AND reporter_id=?"
         args.append(reporter_id)
@@ -617,6 +625,15 @@ def get_issues(status: str | None = None, issue_type: str | None = None,
     args.append(limit)
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_safety_reminders(limit: int = 100) -> list[dict]:
+    """安全提醒记录（负责人端查看，spec 四：安全隐患强制提示+生成记录）。"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM safety_reminders ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
         return [dict(r) for r in rows]
 
 

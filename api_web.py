@@ -330,13 +330,17 @@ def _db_submit_issue(**kw):
 
 
 @app.get("/api/web/issues")
-def web_issue_list(request: Request, status: str = "", limit: int = 200):
+def web_issue_list(request: Request, status: str = "", category: str = "",
+                   urgency: str = "", issue_type: str = "", keyword: str = "",
+                   limit: int = 200):
     from data.db_repair import get_issues
     u = _user(request)
     if u.get("role") == "grid":
-        rows = get_issues(status=status or None, limit=limit)
+        rows = get_issues(status=status or None, category=category or None,
+                          urgency=urgency or None, issue_type=issue_type or None,
+                          keyword=keyword or None, limit=limit)
     else:
-        rows = get_issues(reporter_id=u.get("uid"), limit=limit)
+        rows = get_issues(reporter_id=u.get("uid"), status=status or None, limit=limit)
     # 非负责人：手机号脱敏
     out = []
     for r in rows:
@@ -345,6 +349,15 @@ def web_issue_list(request: Request, status: str = "", limit: int = 200):
             v["reporter_phone"] = v["reporter_phone"][:3] + "****" + v["reporter_phone"][-4:]
         out.append(v)
     return ok(out)
+
+
+@app.get("/api/web/issues/safety-reminders")
+def web_issue_safety_reminders(request: Request, limit: int = 100):
+    """负责人查看安全隐患提醒记录。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_repair import get_safety_reminders
+    return ok(get_safety_reminders(limit=limit))
 
 
 @app.get("/api/web/issues/{issue_id}")
@@ -365,8 +378,24 @@ def web_issue_detail(issue_id: int, request: Request):
     return ok(detail)
 
 
+def _issue_deadline(r: dict) -> dict:
+    """按紧急程度计算时限（审核通过后计时：紧急1h/中等4h/一般24h/普通48h）。"""
+    hours = {"紧急": 1, "中等": 4, "一般": 24, "普通": 48}.get(r.get("urgency"), 24)
+    approved = r.get("approved_at")
+    remaining, overdue = None, False
+    if approved:
+        try:
+            from datetime import datetime
+            t0 = datetime.strptime(str(approved)[:19], "%Y-%m-%d %H:%M:%S")
+            remaining = round(hours - (datetime.utcnow() - t0).total_seconds() / 3600.0, 2)
+            overdue = remaining < 0
+        except (ValueError, TypeError):
+            pass
+    return {"deadline_hours": hours, "remaining_hours": remaining, "overdue": overdue}
+
+
 def _issue_view(r: dict) -> dict:
-    return {
+    v = {
         "id": r.get("id"), "title": r.get("title"), "category": r.get("category"),
         "issue_type": r.get("issue_type"), "location": r.get("location"),
         "description": r.get("description"), "urgency": r.get("urgency"),
@@ -374,11 +403,19 @@ def _issue_view(r: dict) -> dict:
         "reporter_phone": r.get("reporter_phone"), "assignee_name": r.get("assignee_name"),
         "created_at": r.get("reported_at"), "approved_at": r.get("approved_at"),
         "resolve_note": r.get("resolve_note"), "supplement_pending": r.get("supplement_pending"),
+        "is_violation": r.get("is_violation") or 0,
+        "non_community_responsibility": r.get("non_community_responsibility") or 0,
+        "photo_before": r.get("photo_before") or "[]",
+        "is_agent_report": r.get("is_agent_report") or 0,
+        "agent_name": r.get("agent_name") or "",
+        "agent_relation": r.get("agent_relation") or "",
     }
+    v.update(_issue_deadline(r))
+    return v
 
 
 class IssueAction(BaseModel):
-    action: str = Field(..., pattern="^(audit|dispatch|start|resolve|feedback|withdraw|close|transfer|negotiate|supplement|confirm_supplement|update_category)$")
+    action: str = Field(..., pattern="^(audit|dispatch|start|resolve|feedback|withdraw|close|transfer|negotiate|supplement|confirm_supplement|update_category|reopen|resubmit)$")
     opinion: str = Field(default="")
     approve: bool = Field(default=True)
     assignee_name: str = Field(default="")
@@ -396,11 +433,12 @@ def web_issue_action(issue_id: int, req: IssueAction, request: Request):
         audit_issue, dispatch_issue, start_process, resolve_issue, feedback_issue,
         withdraw_issue, close_issue, transfer_issue, negotiate_issue,
         supplement_issue, confirm_supplement, update_issue_category,
+        reopen_issue, resubmit_issue,
     )
     u = _user(request)
     role = u.get("role")
-    # 权限（spec 六）：状态管理类操作仅负责人；居民可 反馈/撤回/补充
-    resident_actions = {"feedback", "withdraw", "supplement"}
+    # 权限（spec 六）：状态管理类操作仅负责人；居民可 反馈/撤回/补充/重新打开/重新提交
+    resident_actions = {"feedback", "withdraw", "supplement", "reopen", "resubmit"}
     if role != "grid" and req.action not in resident_actions:
         return fail(1003, "无权限执行该操作（仅负责人可管理工单状态）")
     actor = u.get("name") or "负责人"
@@ -431,6 +469,10 @@ def web_issue_action(issue_id: int, req: IssueAction, request: Request):
             ok_, msg = confirm_supplement(issue_id, affects_timing=req.affects_timing, actor=actor)
         elif a == "update_category":
             ok_, msg = update_issue_category(issue_id, req.category, actor=actor)
+        elif a == "reopen":
+            ok_, msg = reopen_issue(issue_id, actor=actor)
+        elif a == "resubmit":
+            ok_, msg = resubmit_issue(issue_id, actor=actor)
         else:
             return fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001

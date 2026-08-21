@@ -63,6 +63,10 @@ async function act(id, data) {
           </template>
           <!-- 待审核 → 撤回 -->
           <n-button v-if="i.status === '待审核'" size="small" quaternary @click="act(i.id, { action: 'withdraw' })">↩️ 撤回</n-button>
+          <!-- 已撤回 → 重新打开（回待审核，可修改一次） -->
+          <n-button v-if="i.status === '已撤回'" size="small" type="info" @click="act(i.id, { action: 'reopen' })">🔓 重新打开</n-button>
+          <!-- 退回补充信息 → 重新提交 -->
+          <n-button v-if="i.status === '退回补充信息'" size="small" type="warning" @click="act(i.id, { action: 'resubmit' })">📤 重新提交</n-button>
           <!-- 补充信息 -->
           <template v-if="['已审核待派单', '已派单', '处理中'].includes(i.status)">
             <n-input v-model:value="opOf(i).content" placeholder="补充内容（必填）" size="small" style="max-width:240px;" />

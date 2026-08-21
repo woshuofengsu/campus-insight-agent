@@ -76,6 +76,8 @@ export const weather = {
   alerts: () => api.get('/weather/alerts'),
   tasks: (params) => api.get('/weather/tasks', { params }),
   confirmTask: (id, data) => api.post(`/weather/check-task/${id}/confirm`, data),
+  history: (params) => api.get('/weather/history', { params }),
+  overview: (params) => api.get('/weather/overview', { params }),
 }
 
 // 政策
@@ -84,6 +86,9 @@ export const qa = {
   transfer: (qid, question) => api.post(`/qa/${qid}/transfer`, { question }),
   questions: (params) => api.get('/qa/questions', { params }),
   highFreq: () => api.get('/qa/high-freq'),
+  stats: () => api.get('/qa/stats'),
+  getThreshold: () => api.get('/qa/threshold'),
+  setThreshold: (threshold) => api.post('/qa/threshold', { threshold }),
 }
 
 export const knowledge = {
