@@ -163,8 +163,25 @@ if detail_id:
         if st.button(f"查看附件（{len(files)} 个）", key="elderly_view_files", width="stretch"):
             st.session_state["_elderly_show_files"] = True
         if st.session_state.get("_elderly_show_files"):
+            from utils.uploads import resolve_path
             for f in files:
-                big_card(f"📄 {f.get('name', '附件')}", bg="#f8fafc", border="#94a3b8")
+                path = resolve_path(f.get("path"))
+                ext = (f.get("ext") or "").lower()
+                if path and ext in ("jpg", "jpeg", "png"):
+                    st.image(path, width=200, caption=f.get("name", ""))
+                elif path:
+                    try:
+                        with open(path, "rb") as fh:
+                            data = fh.read()
+                        st.download_button(
+                            f"⬇️ {f.get('name', '附件')}", data=data, file_name=f.get("name", "附件"),
+                            mime="application/pdf" if ext == "pdf" else "application/octet-stream",
+                            width="stretch",
+                        )
+                    except Exception:
+                        big_card(f"📄 {f.get('name', '附件')}", bg="#f8fafc", border="#94a3b8")
+                else:
+                    big_card(f"📄 {f.get('name', '附件')}", bg="#f8fafc", border="#94a3b8")
 
     # 语音播报：摘要优先，为空播报兜底文案
     speak_text = (n.get("elderly_summary") or "").strip() or "您有一条新通知，请查看详情"

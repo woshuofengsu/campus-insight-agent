@@ -63,7 +63,7 @@ def _pinned_badge() -> str:
 
 
 def _render_attachments(n: dict):
-    """渲染附件列表（附件元数据存 attachment_json；真实文件存储见交付说明）。"""
+    """渲染附件：图片直接展示，pdf/其他提供下载。"""
     try:
         files = json.loads(n.get("attachment_json") or "[]")
     except Exception:
@@ -71,10 +71,26 @@ def _render_attachments(n: dict):
     if not files:
         return
     st.markdown("**📎 附件**")
+    from utils.uploads import resolve_path
     for f in files:
         name = f.get("name", "附件")
         size_kb = (f.get("size") or 0) / 1024
-        st.caption(f"📄 {name}（{size_kb:.0f} KB）")
+        path = resolve_path(f.get("path"))
+        ext = (f.get("ext") or "").lower()
+        if path and ext in ("jpg", "jpeg", "png"):
+            st.image(path, width=180, caption=name)
+        elif path:
+            try:
+                with open(path, "rb") as fh:
+                    data = fh.read()
+                st.download_button(
+                    f"⬇️ {name}（{size_kb:.0f} KB）", data=data, file_name=name,
+                    mime="application/pdf" if ext == "pdf" else "application/octet-stream",
+                )
+            except Exception:
+                st.caption(f"📄 {name}（{size_kb:.0f} KB）")
+        else:
+            st.caption(f"📄 {name}（{size_kb:.0f} KB）")
 
 
 unread_total = get_notice_unread_count("resident", user_id)

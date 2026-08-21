@@ -77,7 +77,10 @@ def _status_badge(status: str) -> str:
 
 
 def _parse_files(files) -> str:
-    """校验附件（格式/大小/数量）并返回 attachment_json。"""
+    """校验附件（格式/大小/数量）并真实保存到 uploads/notices/，返回 attachment_json。
+
+    每条含 {name, size, type, ext, path}，path 为真实文件相对路径（供两端下载/预览）。
+    """
     if not files:
         return "[]"
     if len(files) > ATTACHMENT_MAX_COUNT:
@@ -92,7 +95,13 @@ def _parse_files(files) -> str:
         if f.size > ATTACHMENT_MAX_SIZE:
             st.error(f"附件「{f.name}」超过 5MB")
             return ""
-        meta.append({"name": f.name, "size": f.size, "type": f.type or ext, "ext": ext})
+        try:
+            from utils.uploads import save_uploaded_files
+            saved = save_uploaded_files([f], folder="notices", max_count=1)
+            path = saved[0] if saved else ""
+        except Exception:
+            path = ""
+        meta.append({"name": f.name, "size": f.size, "type": f.type or ext, "ext": ext, "path": path})
     return json.dumps(meta, ensure_ascii=False)
 
 
