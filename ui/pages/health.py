@@ -16,6 +16,7 @@ import streamlit as st
 
 from ui.session_state import SS
 from ui.components import TOKEN, page_header, section, info_card
+from ui.cache import cached_my_consults, invalidate_health
 
 _log = logging.getLogger(__name__)
 
@@ -346,6 +347,7 @@ with tab_ask:
             agent_name=c_agent_name, agent_phone=c_agent_phone, agent_relation=c_agent_rel,
         )
         if cid:
+            invalidate_health()
             st.success(
                 f"✅ 提交成功！咨询编号：**{code}**（可复制）\n\n"
                 f"- 当前状态：待回复\n"
@@ -360,7 +362,7 @@ with tab_ask:
 
 # ---------- 我的咨询 ----------
 with tab_mine:
-    my_consults = get_my_consults(uid, limit=50)
+    my_consults = cached_my_consults(uid, limit=50)
     if not my_consults:
         st.info("还没有提交过健康咨询。")
     else:
@@ -418,6 +420,7 @@ with tab_mine:
                     with a1:
                         if st.button("↩️ 撤回咨询", key=f"hc_withdraw_{cid}", width="stretch"):
                             ok, msg = withdraw_consult(cid, uid)
+                            invalidate_health()
                             if ok:
                                 st.toast("已撤回，可重新打开（可修改一次）", icon="↩️")
                                 st.rerun()
@@ -426,6 +429,7 @@ with tab_mine:
                     with a2:
                         if st.button("✕ 关闭咨询", key=f"hc_close_{cid}", width="stretch"):
                             ok, msg = close_consult(cid, uid)
+                            invalidate_health()
                             if ok:
                                 st.toast("咨询已关闭", icon="✕")
                                 st.rerun()
@@ -440,6 +444,7 @@ with tab_mine:
                     if reopened:
                         content_arg = new_content if new_content != c.get("content", "") else ""
                         ok, msg = reopen_consult(cid, uid, content=content_arg)
+                        invalidate_health()
                         if ok:
                             st.toast("咨询已重新打开（待回复，重新计时 24 小时）", icon="🔓")
                             st.rerun()
@@ -450,6 +455,7 @@ with tab_mine:
                     with b1:
                         if st.button("✅ 已解决", key=f"hc_solved_{cid}", width="stretch"):
                             ok, msg = feedback_consult(cid, uid, solved=True)
+                            invalidate_health()
                             if ok:
                                 st.toast("感谢反馈，咨询已结束", icon="✅")
                                 st.rerun()
@@ -458,6 +464,7 @@ with tab_mine:
                     with b2:
                         if st.button("✕ 关闭咨询", key=f"hc_close2_{cid}", width="stretch"):
                             ok, msg = close_consult(cid, uid)
+                            invalidate_health()
                             if ok:
                                 st.toast("咨询已关闭", icon="✕")
                                 st.rerun()
@@ -468,6 +475,7 @@ with tab_mine:
                         unsolved = st.form_submit_button("🔄 未解决（重新计时）", width="stretch")
                     if unsolved:
                         ok, msg = feedback_consult(cid, uid, solved=False, reason=reason or "")
+                        invalidate_health()
                         if ok:
                             st.toast("已反馈未解决，负责人将重新开始 24 小时回复计时", icon="🔄")
                             st.rerun()
@@ -476,6 +484,7 @@ with tab_mine:
                 elif status == "继续回复":
                     if st.button("✕ 关闭咨询", key=f"hc_close3_{cid}", width="stretch"):
                         ok, msg = close_consult(cid, uid)
+                        invalidate_health()
                         if ok:
                             st.toast("咨询已关闭", icon="✕")
                             st.rerun()
@@ -485,6 +494,7 @@ with tab_mine:
                     st.caption("⚠️ 负责人超过 24 小时未回复，系统已标记「超时未回复」并再次提醒负责人。")
                     if st.button("✕ 关闭咨询", key=f"hc_close4_{cid}", width="stretch"):
                         ok, msg = close_consult(cid, uid)
+                        invalidate_health()
                         if ok:
                             st.toast("咨询已关闭", icon="✕")
                             st.rerun()

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 from ui.guard import require_role
+from ui.cache import cached_notices_with_stats, invalidate_notices
 
 require_role("grid")
 
@@ -185,6 +186,7 @@ def _render_new_form():
                     st.session_state.pop("_nm_pending_mode", None)
                     st.session_state.pop("_nm_pending_scheduled", None)
                     if ok:
+                        invalidate_notices()
                         st.session_state["_nm_feedback"] = f"✅ 紧急通知「{n['title']}」已发布"
                         st.rerun(scope="app")
                     else:
@@ -289,6 +291,7 @@ def _render_new_form():
                 else:
                     ok, msg = schedule_notice(notice_id, scheduled_at, _user_id, _actor)
                 if ok:
+                    invalidate_notices()
                     st.session_state["_nm_feedback"] = (
                         f"✅ 已发布「{title.strip()}」" if publish_mode == "立即发布"
                         else f"✅ 已定时「{title.strip()}」→ 待发布"
@@ -368,6 +371,7 @@ def _render_edit_form(n: dict):
                     if not ok2:
                         ok, msg = False, f"有效期更新失败：{msg2}"
             if ok:
+                invalidate_notices()
                 st.session_state["_nm_feedback"] = f"✅ 已保存 #{n['id']}"
                 st.session_state.pop("_nm_edit_id", None)
                 st.rerun(scope="app")
@@ -402,7 +406,7 @@ def _render_list_fragment():
     with c6:
         st.caption("按发布时间过滤")
 
-    notices = get_notices_with_stats(
+    notices = cached_notices_with_stats(
         notice_type=None if type_f == "全部" else type_f,
         status=None if status_f == "全部" else status_f,
         publish_scope=None if scope_f == "全部" else scope_f,
@@ -463,6 +467,7 @@ def _render_list_fragment():
                         ok, msg = take_down_notice(int(down_id), reason, _actor)
                         st.session_state.pop("_nm_down_confirm_id", None)
                         if ok:
+                            invalidate_notices()
                             st.session_state["_nm_feedback"] = f"✅ 已下架 #{down_id}"
                         else:
                             st.session_state["_nm_feedback"] = f"❌ {msg}"
@@ -561,6 +566,7 @@ def _render_list_fragment():
             if status == STATUS_PENDING:
                 if st.button("⏪ 撤回", key=f"nml_withdraw_{nid}", width="stretch"):
                     ok, msg = withdraw_notice(nid, _actor)
+                    invalidate_notices()
                     st.session_state["_nm_feedback"] = f"✅ 已撤回 #{nid} → 草稿" if ok else f"❌ {msg}"
                     st.rerun(scope="app")
                 if st.button("🚀 立即发布", key=f"nml_publish_now_{nid}", width="stretch"):

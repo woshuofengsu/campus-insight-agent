@@ -19,7 +19,7 @@ from data.db_repair import (
     update_issue_category as db_update_category,
 )
 from data.db_notifications import log_activity
-from ui.cache import invalidate_issues
+from ui.cache import invalidate_issues, cached_repair_issues
 from ui.components import TOKEN, page_header
 
 _log = logging.getLogger(__name__)
@@ -446,7 +446,7 @@ with f5:
     st.caption("按提交时间过滤")
 search = st.text_input("🔍 搜索标题 / 描述 / 地址", key="mgmt_search", placeholder="输入关键词…")
 
-issues = get_issues(
+issues = cached_repair_issues(
     status=None if status_choice == "全部" else status_choice,
     issue_type=None if type_choice == "全部" else type_choice,
     limit=300,

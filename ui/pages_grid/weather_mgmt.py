@@ -34,6 +34,10 @@ from data.db_weather import (  # noqa: E402  数据层，只调用不写 SQL
     MODULE,
 )
 from data.db_notifications import log_activity  # noqa: E402
+from ui.cache import (  # noqa: E402
+    cached_weather_overview, cached_check_tasks, cached_check_task_history,
+    invalidate_weather,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -163,7 +167,7 @@ def _escalation_html(esc: dict) -> str:
 # ============================================================
 section("🌍 所有社区天气概况")
 
-overview = get_community_weather_overview(limit=50)
+overview = cached_weather_overview(limit=50)
 if not overview:
     st.info("暂无社区天气数据（请先在天气数据源接入后刷新）。")
 else:
@@ -208,7 +212,7 @@ st.markdown("---")
 # ============================================================
 section("🧾 极端天气检查任务")
 
-all_tasks = list_check_tasks(limit=100)
+all_tasks = cached_check_tasks(limit=100)
 pending = [t for t in all_tasks if t.get("status") in ("待检查", "超时未确认")]
 confirmed = [t for t in all_tasks if t.get("status") == "已确认"]
 
@@ -274,6 +278,7 @@ else:
                     else fill_overdue_task(tid, (checker or "").strip() or _actor, items, note or "", actor=_actor)
                 )
                 if ok:
+                    invalidate_weather()
                     st.toast(f"任务 #{tid} 已确认" if status == "待检查" else f"任务 #{tid} 已补填（保留超时标记）", icon="✅")
                     st.rerun()
                 else:
@@ -295,7 +300,7 @@ with hf2:
 with hf3:
     h_period = st.selectbox("时间范围", ["全部", "近7天", "近30天"], key="weather_history_period")
 
-history = get_check_task_history(
+history = cached_check_task_history(
     alert_type=None if h_type == "全部" else h_type,
     status=None if h_status == "全部" else h_status,
     limit=200,

@@ -37,7 +37,7 @@ from data.db_proposal import (
     STATUS_COLORS,
 )
 from ui.components import TOKEN, tag, page_header
-from ui.cache import invalidate_proposals
+from ui.cache import invalidate_proposals, cached_proposals_full
 
 page_header("💡 提案管理", "审核提案、确认公开/私有、查看公示投票、决定执行并闭环。")
 
@@ -124,7 +124,11 @@ with c_export:
         )
 
 status_filter = status_choice if status_choice != "全部" else None
-all_props = db_get_proposals(status=status_filter, keyword=keyword, limit=300)
+all_props = cached_proposals_full(status=status_filter, limit=300)
+if keyword.strip():
+    _kw = keyword.strip().lower()
+    all_props = [p for p in all_props if _kw in (p.get("title") or "").lower()
+                 or _kw in (p.get("description") or "").lower()]
 
 st.caption(f"共 {len(all_props)} 条 · 导出字段已脱敏，不含个体投票明细与附件")
 

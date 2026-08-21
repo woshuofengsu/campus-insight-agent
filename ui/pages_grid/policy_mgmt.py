@@ -15,6 +15,7 @@ require_role("grid")
 
 from ui.components import TOKEN, page_header, stat, configure_altair, section
 from data.db_notifications import log_activity
+from ui.cache import cached_knowledge_list, invalidate_knowledge
 from data.db_user import get_current_user
 from data.db_policy import (
     POLICY_CATEGORIES, KNOWLEDGE_STATUS, STATUS_COLORS,
@@ -185,6 +186,7 @@ with tab_kb:
             if err:
                 st.error(err)
             else:
+                invalidate_knowledge()
                 if submit_btn:
                     ok2, err2 = submit_review(kid2, auditor=auditor_name, actor=_actor)
                     if not ok2:
@@ -209,7 +211,7 @@ with tab_kb:
     with c3:
         search = st.text_input("搜索标题/关键词", key="kb_search")
 
-    rows = get_knowledge_list(
+    rows = cached_knowledge_list(
         status=None if stf == "全部" else stf,
         category=None if catf == "全部" else catf,
         search=search,
@@ -288,6 +290,7 @@ with tab_kb:
                 with c1:
                     if st.button("✅ 确认删除草稿", key=f"kbdel_yes_{kid}", width="stretch"):
                         ok, msg = delete_knowledge(kid, actor=_actor)
+                        invalidate_knowledge()
                         st.session_state.pop(f"_kbdel_{kid}", None)
                         st.toast(msg, icon="🗑️" if ok else "⚠️")
                         st.rerun()
@@ -306,6 +309,7 @@ with tab_kb:
                     if st.form_submit_button("✅ 确认审核", width="stretch"):
                         ok, msg = audit_knowledge(kid, a_decision == "通过",
                                                   opinion=a_opinion, actor=_actor)
+                        invalidate_knowledge()
                         st.session_state.pop(f"_kbaudit_{kid}", None)
                         st.toast(msg, icon="✅" if ok else "⚠️")
                         st.rerun()
@@ -321,6 +325,7 @@ with tab_kb:
                 with c1:
                     if st.button("✅ 确认下架", key=f"kbdown_yes_{kid}", width="stretch"):
                         ok, msg = take_down_knowledge(kid, d_reason, actor=_actor)
+                        invalidate_knowledge()
                         st.session_state.pop(f"_kbdown_{kid}", None)
                         st.toast(msg, icon="⏬" if ok else "⚠️")
                         st.rerun()
