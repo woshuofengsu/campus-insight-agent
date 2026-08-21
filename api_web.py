@@ -145,6 +145,14 @@ def _require_role(request: Request, role: str):
     return None
 
 
+# ---------------- 系统 ----------------
+
+@app.get("/api/web/health")
+def web_health():
+    """健康检查（Docker HEALTHCHECK 用）。"""
+    return ok({"service": "CommunityInsight Web", "status": "ok"})
+
+
 # ---------------- 认证 ----------------
 
 class LoginRequest(BaseModel):
@@ -347,7 +355,8 @@ def web_issue_action(issue_id: int, req: IssueAction, request: Request):
         elif a == "start":
             ok_, msg = start_process(issue_id, actor=actor)
         elif a == "resolve":
-            ok_, msg = resolve_issue(issue_id, req.note, no_photo_reason=req.reason, actor=actor)
+            ok_, msg = resolve_issue(issue_id, req.note,
+                                     no_photo_reason=req.reason or "现场未拍照", actor=actor)
         elif a == "feedback":
             ok_, msg = feedback_issue(issue_id, req.satisfied, reason=req.reason, actor=actor)
         elif a == "withdraw":
