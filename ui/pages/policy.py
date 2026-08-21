@@ -253,16 +253,23 @@ with tab_mine:
 # ================================================================ 常见问题
 
 with tab_hot:
-    hot = get_common_questions(10)
+    # R44：按分类展示常见问题（最多 10 条，每条带分类标签）
+    _qtypes = ["全部", "社保医保", "养老服务", "住房保障", "办事指引", "社区规定", "其他"]
+    _qt = st.selectbox("分类", _qtypes, key="hot_qtype")
+    hot = get_common_questions(10, q_type=None if _qt == "全部" else _qt)
     if not hot:
         st.info("暂无常见问题，快去提问吧。")
     else:
         for i, h in enumerate(hot, 1):
+            _qt_label = (h.get("q_type") or "其他")
+            _qt_color = "#4f46e5" if _qt_label == "社保医保" else "#059669" if _qt_label == "养老服务" else "#d97706"
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;'
                 f'border-bottom:1px solid {TOKEN["border"]};font-size:0.9em;">'
                 f'<span style="color:{TOKEN["text_muted"]};font-weight:700;">{i}</span>'
                 f'<span style="flex:1;color:{TOKEN["text"]};">{h["summary"]}</span>'
+                f'<span style="background:{_qt_color}1f;color:{_qt_color};border:1px solid {_qt_color};'
+                f'border-radius:99px;padding:1px 10px;font-size:0.75em;font-weight:700;">{_qt_label}</span>'
                 f'<span style="color:{TOKEN["text_muted"]};font-size:0.78em;">{h["c"]} 次</span>'
                 f'</div>',
                 unsafe_allow_html=True,

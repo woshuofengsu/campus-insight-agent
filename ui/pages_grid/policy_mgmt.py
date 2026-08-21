@@ -1,4 +1,4 @@
-# ui/pages_grid/policy_mgmt.py
+﻿# ui/pages_grid/policy_mgmt.py
 """📖 政策问答管理（负责人端）— 知识库审核/版本/时效 + 人工待回复（24小时倒计时）+ 提问记录 + 高频统计。
 
 未注册到 app.py 路由，由项目负责人统一注册（建议标题「政策问答管理」）。
@@ -13,7 +13,8 @@ from ui.guard import require_role
 
 require_role("grid")
 
-from ui.components import TOKEN, page_header, stat, configure_altair
+from ui.components import TOKEN, page_header, stat, configure_altair, section
+from data.db_notifications import log_activity
 from data.db_user import get_current_user
 from data.db_policy import (
     POLICY_CATEGORIES, KNOWLEDGE_STATUS, STATUS_COLORS,
@@ -557,3 +558,49 @@ with tab_stats:
         st.markdown("**⏰ 7 天内即将到期的政策**")
         for e in s["expiring"]:
             st.caption(f'#{e["id"]} {e["title"]} · 失效日期 {e["expire_date"]}')
+
+    # 导出（R35：知识库 + 提问记录，不含完整手机号/正文全文/详细提问内容，导出留痕）
+    st.markdown("---")
+    section("📤 导出")
+    try:
+        import csv as _csv
+        from io import StringIO as _SIO
+        from data.db_core import get_db as _gdb
+
+        _kb = get_knowledge_list(limit=1000)
+        _b1 = _SIO()
+        _w1 = _csv.DictWriter(_b1, fieldnames=["ID", "标题", "分类", "状态", "版本",
+                                               "有效期", "引用次数", "更新时间"])
+        _w1.writeheader()
+        for k in _kb:
+            _w1.writerow({"ID": k["id"], "标题": (k.get("title") or "")[:40], "分类": k.get("category", ""),
+                          "状态": k.get("audit_status", ""), "版本": k.get("version") or 1,
+                          "有效期": f"{k.get('effective_date') or ''}~{k.get('expire_date') or ''}",
+                          "引用次数": k.get("cite_count") or 0,
+                          "更新时间": (k.get("updated_at") or k.get("created_at") or "")[:16]})
+        st.download_button("⬇️ 知识库导出（CSV）", data=_b1.getvalue().encode("utf-8-sig"),
+                           file_name="政策知识库.csv", mime="text/csv", key="pm_kb_export",
+                           on_click=lambda: log_activity(_actor, "导出知识库", module="政策问答",
+                                                          detail="不含正文全文与审核意见"))
+
+        with _gdb() as _conn:
+            _qs = _conn.execute(
+                "SELECT id, summary, q_type, status, source, created_at, answered_at "
+                "FROM policy_questions ORDER BY id DESC LIMIT 1000"
+            ).fetchall()
+        _b2 = _SIO()
+        _w2 = _csv.DictWriter(_b2, fieldnames=["ID", "摘要", "类型", "状态", "来源",
+                                               "提问时间", "回复时间"])
+        _w2.writeheader()
+        for q in _qs:
+            _w2.writerow({"ID": q["id"], "摘要": (q["summary"] or "")[:30], "类型": q["q_type"] or "",
+                          "状态": q["status"] or "", "来源": q["source"] or "",
+                          "提问时间": (q["created_at"] or "")[:16],
+                          "回复时间": (q["answered_at"] or "")[:16]})
+        st.download_button("⬇️ 提问记录导出（CSV）", data=_b2.getvalue().encode("utf-8-sig"),
+                           file_name="政策提问记录.csv", mime="text/csv", key="pm_q_export",
+                           on_click=lambda: log_activity(_actor, "导出提问记录", module="政策问答",
+                                                          detail="不含完整提问内容与手机号"))
+    except Exception as e:  # noqa: BLE001
+        st.caption(f"导出不可用：{e}")
+

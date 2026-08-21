@@ -430,6 +430,26 @@ if st.session_state.get("_show_policy"):
     st.markdown("### 🧾 政策问答")
     st.caption("点「🎤 按住说话」问政策，或直接打字")
 
+    # 历史记录（R25：最近 5 条大字版，点详情语音播报，不提供删除）
+    try:
+        from data.db_core import get_db as _pgdb
+        with _pgdb() as _pconn:
+            _myqs = _pconn.execute(
+                "SELECT summary, status, auto_answer, created_at FROM policy_questions "
+                "WHERE user_id=? ORDER BY id DESC LIMIT 5", (uid or 0,)
+            ).fetchall()
+        if _myqs:
+            with st.expander("📋 我的提问（最近 5 条）"):
+                for _mq in _myqs:
+                    _st = _mq["status"] or ""
+                    _mark = "🔴" if _st in ("已转人工", "超时未回复") else "🟢" if _st == "已自动回答" else "🟡"
+                    _txt = f"{_mark} {(_mq['summary'] or '')[:24]}（{_st}，{str(_mq['created_at'])[:10]}）"
+                    if st.button(_txt, key=f"mq_{_mq['created_at']}", width="stretch"):
+                        _ans = (_mq.get("auto_answer") or _st or "")
+                        tts_speak(f"您的问题是：{_mq['summary']}。{_ans[:80]}")
+    except Exception:
+        pass
+
     # 语音输入（Web Speech，渐进增强）
     try:
         from ui.elderly_components import voice_input
@@ -447,9 +467,16 @@ if st.session_state.get("_show_policy"):
         c1, c2 = st.columns(2)
         with c1:
             if st.button("✅ 对，就这样问", key="policy_confirm_yes", width="stretch"):
-                st.session_state["_policy_q"] = _confirm_text
-                st.session_state.pop("_policy_confirm_text", None)
-                st.rerun()
+                # R27：说「转人工」→ 先确认再转人工（生成工单），不当问题内容提交
+                if "转人工" in (_confirm_text or ""):
+                    st.session_state["_policy_human_confirm"] = True
+                    st.session_state.pop("_policy_confirm_text", None)
+                    st.session_state["_policy_human_q"] = (_confirm_text or "").replace("转人工", "").strip()
+                    st.rerun()
+                else:
+                    st.session_state["_policy_q"] = _confirm_text
+                    st.session_state.pop("_policy_confirm_text", None)
+                    st.rerun()
         with c2:
             if st.button("🔁 重新说", key="policy_confirm_no", width="stretch"):
                 st.session_state.pop("_policy_confirm_text", None)
@@ -477,16 +504,20 @@ if st.session_state.get("_show_policy"):
             big_card(f"<strong>{_kb.get('title') or '回答'}</strong><br>{short}",
                      bg="#f0fdf4", border="#16a34a")
             tts_speak(f"{_kb.get('title') or ''}。{short}")
-            # 转人工（二次确认）
+            # 转人工（二次确认；语音说「转人工」也走这里）
             if st.button("🙋 转人工", key="policy_to_human", width="stretch"):
                 st.session_state["_policy_human_confirm"] = True
             if st.session_state.get("_policy_human_confirm"):
+                st.warning("确认转人工？负责人将在 24 小时内回复。")
                 if st.button("✅ 确认转人工（负责人24小时内回复）", key="policy_human_yes", width="stretch"):
                     qid = st.session_state.get("_policy_qid")
+                    hq = st.session_state.pop("_policy_human_q", "")
                     try:
                         from data.db_policy import transfer_to_human
                         if qid:
                             transfer_to_human(qid)
+                        elif hq:
+                            transfer_to_human(user_id=uid or 0, question=hq, source="老年端")
                         else:
                             transfer_to_human(user_id=uid or 0, question=q.strip(), source="老年端")
                     except Exception:

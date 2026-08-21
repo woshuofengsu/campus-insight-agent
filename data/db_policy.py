@@ -299,7 +299,8 @@ def get_knowledge_list(status: str | None = None, category: str | None = None,
         q += " AND (title LIKE ? OR keywords LIKE ? OR content LIKE ?)"
         s = f"%{search}%"
         args += [s, s, s]
-    q += " ORDER BY id DESC LIMIT ?"
+    # 默认按更新时间倒序（spec 七.1：列表按更新时间排序），更新时间缺失用创建时间
+    q += " ORDER BY COALESCE(updated_at, created_at, '') DESC, id DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
@@ -583,8 +584,9 @@ def create_new_version(knowledge_id: int, title: str, category: str,
         cur = conn.execute(
             "INSERT INTO knowledge_base (category, title, content, keywords, audit_status, "
             "source, effective_date, expire_date, version, plain_interpretation, summary, "
-            "publisher, auditor, policy_number, applicable_area, attachment) "
-            "VALUES (?,?,?,?,'草稿',?,?,?,?,?,?,?,?,?,?,?)",
+            "publisher, auditor, policy_number, applicable_area, attachment, "
+            "created_at, updated_at) "
+            "VALUES (?,?,?,?,'草稿',?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
             (category, title.strip(), content, keywords.strip(), source.strip(),
              effective_date, expire_date, new_version, plain_interpretation.strip(),
              summary.strip(), actor, auditor, policy_number.strip(),
@@ -704,6 +706,72 @@ def get_version_history(knowledge_id: int) -> list[dict]:
     return versions
 
 
+def remind_knowledge_updates() -> list[dict]:
+    """知识库更新提醒（R17/R18，scheduler 调用）：
+      1. 已发布条目 3 天内到期 → 提醒负责人更新或下架（每天一次幂等）；
+      2. 审核不通过超 7 天未修改 → 提醒一次。
+    """
+    reminded: list[dict] = []
+    today = _now_str()[:10]
+    with get_db() as conn:
+        expiring = conn.execute(
+            "SELECT id, title, expire_date FROM knowledge_base "
+            "WHERE audit_status='已发布' AND expire_date!='' "
+            "AND date(expire_date) >= date('now','localtime') "
+            "AND date(expire_date) <= date('now','localtime','+3 days')"
+        ).fetchall()
+        rejected = conn.execute(
+            "SELECT id, title, created_at FROM knowledge_base "
+            "WHERE audit_status='审核不通过' AND created_at < datetime('now','-7 days')"
+        ).fetchall()
+    # 用独立查询判重（避免 conn 已关闭）
+    with get_db() as conn:
+        for r in expiring:
+            dup = conn.execute(
+                "SELECT id FROM activity_log WHERE module=? AND action='知识库到期提醒' "
+                "AND target_type='knowledge' AND target_id=? AND substr(created_at,1,10)=? LIMIT 1",
+                (MODULE, r["id"], today),
+            ).fetchone()
+            if dup:
+                continue
+            reminded.append({"id": r["id"], "title": r["title"], "kind": "expiring",
+                             "expire_date": r["expire_date"]})
+        for r in rejected:
+            dup = conn.execute(
+                "SELECT id FROM activity_log WHERE module=? AND action='知识库退回修改提醒' "
+                "AND target_type='knowledge' AND target_id=? AND substr(created_at,1,10)=? LIMIT 1",
+                (MODULE, r["id"], today),
+            ).fetchone()
+            if dup:
+                continue
+            reminded.append({"id": r["id"], "title": r["title"], "kind": "rejected"})
+    for item in reminded:
+        if item["kind"] == "expiring":
+            log_activity("系统", "知识库到期提醒", "knowledge", item["id"], item["title"],
+                         module=MODULE, detail=f"条目 {item['expire_date']} 到期，请更新或下架")
+            _notify_managers_txt(f"📅 政策条目即将到期：{item['title'][:20]}",
+                                 f"「{item['title'][:30]}」将于 {item['expire_date']} 到期，请提前更新或下架。",
+                                 item["id"])
+        else:
+            log_activity("系统", "知识库退回修改提醒", "knowledge", item["id"], item["title"],
+                         module=MODULE, detail="审核不通过超过 7 天未修改，请提醒处理")
+            _notify_managers_txt(f"📝 政策条目审核不通过超 7 天：{item['title'][:20]}",
+                                 "审核不通过已超过 7 天未修改，请提醒负责人补充后重新提交。",
+                                 item["id"])
+    return reminded
+
+
+def _notify_managers_txt(title: str, body: str, related_id: int) -> None:
+    """通知全部负责人（提醒类）。失败静默（不阻断调度器）。"""
+    try:
+        from data.db_user import list_users
+        for u in list_users(role="grid"):
+            from data.db_notifications import create_notification
+            create_notification(u["id"], "policy", title, body, related_id=related_id)
+    except Exception:
+        pass
+
+
 def get_knowledge_activity(knowledge_id: int, limit: int = 10) -> list[dict]:
     """知识库操作留痕时间线（最近在前）。"""
     with get_db() as conn:
@@ -739,15 +807,54 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
     q_type = classify_question(q)
     actor = actor or masked_nickname(user_id)
 
+    # R37：敏感词 / 医疗诊断 / 法律纠纷 → 不自动回答，直接转人工审核
+    _human_keywords = [
+        "诊断", "症状", "吃什么药", "病情", "治疗", "手术", "挂号", "医生",
+        "起诉", "告他", "赔偿", "律师", "纠纷", "欠款", "合同违约",
+    ]
+    try:
+        from utils.text import check_sensitive
+        _hit, _word = check_sensitive(q)
+        if _hit:
+            log_activity(actor, "提问含敏感词转人工", "policy_question", None, summary,
+                         module=MODULE, after_value="需人工审核",
+                         detail=f"命中敏感词「{_word}」 · {q[:50]}")
+            return {"matched": False, "reason": "manual", "question": q,
+                    "summary": summary, "q_type": q_type,
+                    "manual_text": "您的问题涉及敏感内容，已转人工审核处理。"}
+        if any(k in q for k in _human_keywords):
+            log_activity(actor, "医疗/法律类提问转人工", "policy_question", None, summary,
+                         module=MODULE, after_value="需人工审核",
+                         detail=f"{q_type} · 疑似医疗/法律咨询 · {q[:50]}")
+            return {"matched": False, "reason": "manual", "question": q,
+                    "summary": summary, "q_type": q_type,
+                    "manual_text": "该问题可能涉及医疗诊断或法律事务，系统不自动回答，已转人工审核。"}
+    except Exception:
+        pass
+
     results = search_published_knowledge(q, top_k=5, category=category)
     if not results and category:
         results = search_published_knowledge(q, top_k=5)  # 指定分类没命中，放宽全库
     if not results:
+        # R39：存在同题过期条目时给「可能已更新」提示
+        expired_hint = ""
+        try:
+            with get_db() as conn:
+                _erows = conn.execute(
+                    "SELECT title FROM knowledge_base WHERE audit_status='已发布' "
+                    "AND (title LIKE ? OR keywords LIKE ?) "
+                    "AND expire_date != '' AND expire_date < date('now','localtime')",
+                    (f"%{q[:10]}%", f"%{q[:10]}%"),
+                ).fetchall()
+        except Exception:
+            _erows = []
+        if _erows:
+            expired_hint = "该政策可能已更新，建议咨询相关部门或转人工。"
         log_activity(actor, "自动回答失败", "policy_question", None, summary,
                      module=MODULE, after_value="匹配失败",
                      detail=f"{q_type} · 无匹配条目 · {q[:50]}")
         return {"matched": False, "reason": "no_knowledge", "question": q,
-                "summary": summary, "q_type": q_type}
+                "summary": summary, "q_type": q_type, "expired_hint": expired_hint}
     best = results[0]
     if best["score"] < _match_threshold:
         log_activity(actor, "自动回答失败", "policy_question", None, summary,
@@ -925,6 +1032,19 @@ def feedback_question(question_id: int, satisfied: bool, reason: str = "",
             log_activity(actor, "超过3次循环转线下沟通", "policy_question", question_id,
                          row["summary"], module=MODULE, before_value="已回复",
                          after_value="需线下沟通", detail=reason)
+            # R13：超过 3 次循环通知双方（居民 + 负责人）
+            try:
+                from data.db_user import list_users
+                for u in list_users(role="grid"):
+                    from data.db_notifications import create_notification
+                    create_notification(u["id"], "policy",
+                                        "🧭 政策提问需线下沟通",
+                                        f"提问「{row['summary'][:20]}」已超过 3 次循环未解决，标记需线下沟通，请与居民联系。")
+                _notify_managers("🧭 政策提问需线下沟通",
+                                 f"提问「{row['summary'][:20]}」超过 3 次循环未解决，已标记需线下沟通。",
+                                 related_id=question_id)
+            except Exception:
+                pass
             return True, "offline", question_id
         new_loop = row["loop_count"] + 1
         with get_db() as conn:
@@ -1051,6 +1171,16 @@ def mark_overdue_questions(actor: str = "系统") -> list[dict]:
         log_activity(actor, "超时未回复", "policy_question", q["id"], q["summary"],
                      module=MODULE, before_value="已转人工", after_value="超时未回复",
                      detail=f"超时 {info['remaining_hours']:.1f} 小时")
+        # 再次提醒负责人（R12：超时后再次提醒，不止标记）
+        try:
+            from data.db_user import list_users
+            for u in list_users(role="grid"):
+                from data.db_notifications import create_notification
+                create_notification(u["id"], "policy",
+                                    "⏰ 政策提问超时未回复",
+                                    f"提问「{q['summary'][:20]}」已超过 24 小时未回复，请尽快处理。")
+        except Exception:
+            pass
     return marked
 
 
@@ -1188,14 +1318,21 @@ def get_frequency_stats(days: int | None = None) -> dict:
     }
 
 
-def get_common_questions(limit: int = 10) -> list[dict]:
-    """常见问题（按提问次数倒序），居民端/负责人端展示。"""
+def get_common_questions(limit: int = 10, q_type: str | None = None) -> list[dict]:
+    """常见问题（按提问次数倒序），居民端/负责人端展示。可按类型过滤。"""
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT summary, COUNT(*) c FROM policy_questions GROUP BY summary "
-            "ORDER BY c DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if q_type:
+            rows = conn.execute(
+                "SELECT summary, q_type, COUNT(*) c FROM policy_questions "
+                "WHERE q_type=? GROUP BY summary ORDER BY c DESC LIMIT ?",
+                (q_type, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT summary, q_type, COUNT(*) c FROM policy_questions "
+                "GROUP BY summary ORDER BY c DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
         return [dict(r) for r in rows]
 
 

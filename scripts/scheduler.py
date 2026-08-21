@@ -113,6 +113,7 @@ def run_all() -> dict:
     results["resubmit_remind"] = _safe("退回修改提醒", db_health_content.resubmit_reminder)
     results["health_linkage"] = _safe("健康天气联动", lambda: _health_linkage_tasks(db_weather, db_health_content))
     results["policy_expire"] = _safe("政策到期", _pol.auto_expire_knowledge)
+    results["policy_remind"] = _safe("政策更新提醒", lambda: len(_pol.remind_knowledge_updates()))
     results["policy_overdue"] = _safe("政策超时", _pol.mark_overdue_questions)
     results["policy_close"] = _safe("政策关闭", _pol.auto_close_stale_questions)
     results["sos_escalated"] = _safe("SOS升级", lambda: sum(
