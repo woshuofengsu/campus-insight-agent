@@ -507,8 +507,11 @@ class NoticeCreate(BaseModel):
 
 @app.post("/api/web/notices")
 def web_notice_create(req: NoticeCreate, request: Request):
-    from data.db_notice import create_notice
+    from data.db_notice import create_notice, can_publish_urgent
     actor = _user(request).get("name") or "负责人"
+    # 紧急通知权限白名单（方案权限矩阵：仅紧急通知发布人）
+    if req.is_urgent and not can_publish_urgent(_user(request).get("uid")):
+        return fail(1003, "您无权发布紧急通知（仅指定负责人）")
     nid = create_notice(
         title=req.title, notice_type=req.notice_type, publish_scope=req.publish_scope,
         body=req.body, elderly_summary=req.elderly_summary, publisher=actor,
@@ -753,8 +756,11 @@ class HealthArticleAction(BaseModel):
 
 @app.post("/api/web/health/articles/{cid}/action")
 def web_health_article_action(cid: int, req: HealthArticleAction, request: Request):
-    from data.db_health_content import review_content, take_down_content
+    from data.db_health_content import review_content, take_down_content, is_disease_prevention_manager
     from ui.cache import invalidate_health
+    # 权限：内容审核仅疾病预防负责人（方案权限矩阵）
+    if not is_disease_prevention_manager(_user(request)):
+        return fail(1003, "无权限：仅疾病预防负责人可审核健康内容")
     actor = _user(request).get("name") or "负责人"
     if req.action == "audit":
         # 提交时审核人为「社区审核组」，审核必须同名（单负责人演示环境统一用该标识）
@@ -1135,8 +1141,11 @@ class ConsultReply(BaseModel):
 
 @app.post("/api/web/health/consults/{cid}/reply")
 def web_consult_reply(cid: int, req: ConsultReply, request: Request):
-    from data.db_health_content import reply_consult
+    from data.db_health_content import reply_consult, is_disease_prevention_manager
     from ui.cache import invalidate_health
+    # 权限：咨询处理人（疾病预防负责人自动成为处理人）
+    if not is_disease_prevention_manager(_user(request)):
+        return fail(1003, "无权限：仅咨询处理人可回复")
     actor = _user(request).get("name") or "负责人"
     ok_, msg = reply_consult(cid, req.reply, actor=actor, doctor_guide=req.doctor_guide,
                              need_offline=req.need_offline, offline_confirmed=req.offline_confirmed)
