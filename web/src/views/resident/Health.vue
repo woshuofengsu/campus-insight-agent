@@ -31,6 +31,16 @@ async function submit() {
     submitting.value = false
   }
 }
+
+async function toggle(c, action) {
+  try {
+    await health.toggleConsult(c.id, { action })
+    message.success('操作成功')
+    myConsults.value = (await health.consults()) || []
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 </script>
 
 <template>
@@ -67,11 +77,18 @@ async function submit() {
 
       <n-tab-pane name="mine" tab="我的咨询">
         <div v-for="c in myConsults" :key="c.id" class="card">
-          <b>{{ c.code || ('#' + c.id) }}</b>
-          <n-tag size="small" style="margin-left:8px;">{{ c.status }}</n-tag>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b>{{ c.code || ('#' + c.id) }}</b>
+            <n-tag size="small" :type="c.status === '待回复' ? 'warning' : c.status === '已回复' ? 'success' : 'default'">{{ c.status }}</n-tag>
+          </div>
           <div class="muted" style="font-size:0.85rem;margin-top:6px;">{{ c.content }}</div>
-          <div v-if="c.reply" style="background:#f0fdf4;border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
+          <div v-if="c.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
             💬 负责人：{{ c.reply }}
+          </div>
+          <div v-if="['待回复','已回复','超时未回复','已撤回'].includes(c.status)" style="margin-top:8px;display:flex;gap:8px;">
+            <n-button v-if="c.status === '待回复'" size="small" quaternary @click="toggle(c, 'withdraw')">↩️ 撤回</n-button>
+            <n-button v-if="c.status === '已撤回'" size="small" @click="toggle(c, 'reopen')">🔄 重新打开</n-button>
+            <n-button v-if="['已回复','超时未回复'].includes(c.status)" size="small" @click="toggle(c, 'close')">✕ 关闭</n-button>
           </div>
         </div>
         <n-empty v-if="myConsults.length === 0" description="还没有咨询记录" />

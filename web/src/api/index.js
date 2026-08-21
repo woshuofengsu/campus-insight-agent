@@ -94,6 +94,13 @@ export const health = {
   consults: (params) => api.get('/health/consults', { params }),
   createConsult: (data) => api.post('/health/consults', data),
   replyConsult: (id, data) => api.post(`/health/consults/${id}/reply`, data),
+  toggleConsult: (id, data) => api.post(`/health/consults/${id}/toggle`, data),
+}
+
+// 消息中心
+export const messages = {
+  list: (params) => api.get('/messages', { params }),
+  read: (id) => api.post(`/messages/${id}/read`),
 }
 
 // 老年端

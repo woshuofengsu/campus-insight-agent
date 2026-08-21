@@ -914,6 +914,59 @@ def web_consult_feedback(cid: int, req: ConsultFeedback, request: Request):
     return ok({"consult_id": cid}, "反馈已提交")
 
 
+class ConsultToggle(BaseModel):
+    action: str = Field(..., pattern="^(withdraw|reopen|close)$")
+    content: str = Field(default="")
+
+
+@app.post("/api/web/health/consults/{cid}/toggle")
+def web_consult_toggle(cid: int, req: ConsultToggle, request: Request):
+    """咨询撤回/重新打开/关闭（居民本人）。"""
+    from data.db_health_content import withdraw_consult, reopen_consult, close_consult
+    from ui.cache import invalidate_health
+    u = _user(request)
+    uid = u.get("uid")
+    if req.action == "withdraw":
+        ok_, msg = withdraw_consult(cid, uid)
+    elif req.action == "reopen":
+        ok_, msg = reopen_consult(cid, uid, content=req.content)
+    else:
+        ok_, msg = close_consult(cid, uid)
+    if not ok_:
+        return fail(2001, msg)
+    invalidate_health()
+    return ok({"consult_id": cid}, "操作成功")
+
+
+# ---- 站内消息中心（通知/工单/提案等系统消息） ----
+
+@app.get("/api/web/messages")
+def web_messages(request: Request, limit: int = 50):
+    """当前用户站内消息（type=notification/issue/sos/policy 等）。"""
+    from data.db_core import get_db
+    u = _user(request)
+    uid = u.get("uid")
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, ntype, title, content, is_read, related_id, created_at "
+            "FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT ?",
+            (uid, limit),
+        ).fetchall()
+    return ok([dict(r) for r in rows])
+
+
+@app.post("/api/web/messages/{mid}/read")
+def web_message_read(mid: int, request: Request):
+    """标记消息已读。"""
+    from data.db_core import get_db
+    u = _user(request)
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?", (mid, u.get("uid")))
+        conn.commit()
+    return ok({"message_id": mid}, "已读")
+
+
 # ---- 政策知识库管理（创建/审核/下架） ----
 
 class KnowledgeCreate(BaseModel):

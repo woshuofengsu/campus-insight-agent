@@ -4,6 +4,7 @@ import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useThemeStore } from '../stores/theme'
+import WeatherBanner from '../components/WeatherBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,6 +55,7 @@ function logout() {
     </n-layout-sider>
 
     <n-layout>
+      <WeatherBanner />
       <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
         <div style="font-weight:700;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
