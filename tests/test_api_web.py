@@ -32,10 +32,10 @@ def _login(client, username="demo_grid", password="demo123"):
 
 
 def test_health_no_dist(client):
-    """dist 未构建时根路径返回服务说明。"""
+    """dist 已构建：根路径返回 Vue 前端 HTML（含 #app 挂载点）。"""
     r = client.get("/")
     assert r.status_code == 200
-    assert "CommunityInsight" in r.text
+    assert 'id="app"' in r.text or 'id="app"' in r.text
 
 
 def test_jwt_login_and_me(client):
