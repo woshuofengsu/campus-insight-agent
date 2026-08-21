@@ -10,6 +10,9 @@ const loading = ref(true)
 const commentInput = ref({}) // pid -> 输入内容
 const commentList = ref({}) // pid -> 议论列表
 const votedIds = ref([])
+const editModal = ref(null) // 退回/撤回后编辑重提
+
+const CATS_EDIT = ['公共设施', '环境卫生', '文化活动', '安全治理', '其他']
 
 async function load() {
   loading.value = true
@@ -38,6 +41,35 @@ async function act(p, data, okMsg) {
     load()
   } catch (e) {
     message.error(e.message)
+  }
+}
+
+// 退回修改 / 已撤回：编辑后重新提交（可修改一次）
+function openEdit(p) {
+  editModal.value = { id: p.id, title: p.title, description: '', category: p.category }
+  try {
+    const full = JSON.parse(localStorage.getItem('ci_prop_' + p.id) || '{}')
+    editModal.value.description = full.description || ''
+  } catch { /* 忽略 */ }
+}
+
+async function submitEdit() {
+  const e = editModal.value
+  if (!e.title || !e.description || e.description.length < 10) {
+    return message.warning('请填写标题和至少 10 字内容')
+  }
+  try {
+    await proposals.action(e.id, {
+      action: 'resubmit',
+      opinion: e.title,
+      result: e.description,
+      category: e.category,
+    })
+    message.success('已修改并重新提交，等待审核')
+    editModal.value = null
+    load()
+  } catch (err) {
+    message.error(err.message)
   }
 }
 
@@ -94,7 +126,7 @@ async function addComment(p) {
         <div v-if="p.mine" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <n-button v-if="p.status === '待审核'" size="small" quaternary @click="act(p, { action: 'withdraw' }, '已撤回')">↩️ 撤回</n-button>
           <n-button v-if="p.status === '已撤回'" size="small" type="info" @click="act(p, { action: 'reopen_mine' }, '已重新打开，待审核')">🔓 重新打开</n-button>
-          <n-button v-if="p.status === '退回修改'" size="small" type="warning" @click="act(p, { action: 'resubmit' }, '已重新提交，待审核')">📤 修改后重新提交</n-button>
+          <n-button v-if="p.status === '退回修改'" size="small" type="warning" @click="openEdit(p)">📝 修改后重新提交</n-button>
           <template v-if="p.status === '待确认公示/私有'">
             <span class="muted" style="font-size:0.85rem;">请确认公开方式：</span>
             <n-button size="small" type="success" @click="act(p, { action: 'confirm', is_public: 1 }, '已确认公开，进入公示')">🌐 确认公开</n-button>
@@ -134,5 +166,25 @@ async function addComment(p) {
       </div>
       <n-empty v-if="!loading && list.length === 0" description="还没有提案" />
     </n-spin>
+
+    <!-- 编辑重提弹窗 -->
+    <n-modal :show="!!editModal" @update:show="(v) => { if (!v) editModal = null }" preset="card" style="width:560px;" title="✏️ 修改后重新提交（可修改一次）">
+      <template v-if="editModal">
+        <n-form label-placement="top">
+          <n-form-item label="标题">
+            <n-input v-model:value="editModal.title" maxlength="50" />
+          </n-form-item>
+          <n-form-item label="内容（10-1000字）">
+            <n-input v-model:value="editModal.description" type="textarea" :rows="4" />
+          </n-form-item>
+          <n-form-item label="分类">
+            <n-select v-model:value="editModal.category" :options="CATS_EDIT.map(v=>({label:v,value:v}))" />
+          </n-form-item>
+          <div style="text-align:right;">
+            <n-button type="primary" @click="submitEdit">📤 重新提交（待审核）</n-button>
+          </div>
+        </n-form>
+      </template>
+    </n-modal>
   </div>
 </template>
