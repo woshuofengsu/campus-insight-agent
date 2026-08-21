@@ -82,7 +82,21 @@ with tab_ask:
                 if kb.get("policy_number"):
                     st.caption(f"政策文号：{kb['policy_number']}")
                 if kb.get("attachment"):
-                    st.info(f"附件：{kb['attachment']}")
+                    from utils.uploads import resolve_path
+                    _path = resolve_path(kb["attachment"])
+                    if _path:
+                        try:
+                            with open(_path, "rb") as fh:
+                                _data = fh.read()
+                            st.download_button(
+                                "⬇️ 查看政策原文（PDF）", data=_data,
+                                file_name=str(kb["attachment"]).split("/")[-1] or "政策原文.pdf",
+                                mime="application/pdf",
+                            )
+                        except Exception:
+                            st.info(f"附件：{kb['attachment']}")
+                    else:
+                        st.info(f"附件：{kb['attachment']}")
 
             fb_done = st.session_state.get(f"_fb_{qid}") == "done"
             unhelp_qid = st.session_state.get("_pol_unhelp")

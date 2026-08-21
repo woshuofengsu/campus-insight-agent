@@ -127,7 +127,8 @@ with tab_kb:
                 f_pnum = st.text_input("政策文号（选填）", value=defaults.get("policy_number", ""))
             with c4:
                 f_area = st.text_input("适用地区", value=defaults.get("applicable_area", "") or "全社区通用")
-            f_attach = st.text_input("附件（选填，PDF 文件名）", value=defaults.get("attachment", ""))
+            f_attach_file = st.file_uploader("附件（选填，PDF，≤5MB）", type=["pdf"], key="kb_attach_file",
+                                             help="政策原文 PDF，居民端可查看")
             auditor_opts = _grid_users(exclude=_actor)
             if not auditor_opts:
                 st.warning("⚠️ 没有其他负责人可作为审核人（审核人不能与发布人相同），提交审核前请先添加负责人账号。")
@@ -152,10 +153,19 @@ with tab_kb:
             auditor_name = ""
             if auditor_labels:
                 auditor_name = auditor_opts[pre_idx if pre_idx < len(auditor_opts) else 0]["name"]
+            _attach_val = defaults.get("attachment", "") or ""
+            try:
+                if f_attach_file:
+                    from utils.uploads import save_uploaded_files
+                    _saved = save_uploaded_files([f_attach_file], folder="knowledge", max_count=1)
+                    if _saved:
+                        _attach_val = _saved[0]
+            except Exception:
+                pass
             kw = dict(title=f_title, category=f_cat, plain_interpretation=f_interp,
                       source=f_source, keywords=f_keywords, effective_date=f_eff,
                       content=f_content, summary=f_summary, expire_date=f_exp,
-                      policy_number=f_pnum, applicable_area=f_area, attachment=f_attach)
+                      policy_number=f_pnum, applicable_area=f_area, attachment=_attach_val)
             kid2, err = 0, ""
             if mode == "new":
                 kid2, err = create_knowledge(actor=_actor, **kw)
