@@ -96,6 +96,7 @@ export const qa = {
   setThreshold: (threshold) => api.post('/qa/threshold', { threshold }),
   reply: (qid, data) => api.post(`/qa/questions/${qid}/reply`, data),
   feedback: (qid, data) => api.post(`/qa/questions/${qid}/feedback`, data),
+  deleteQuestion: (qid) => api.delete(`/qa/questions/${qid}`),
 }
 
 export const knowledge = {
@@ -118,6 +119,7 @@ export const health = {
   feedbackConsult: (id, data) => api.post(`/health/consults/${id}/feedback`, data),
   unread: () => api.get('/health/unread-reply-count'),
   linkageRecords: (params) => api.get('/health/linkage/records', { params }),
+  linkageActive: (params) => api.get('/health/linkage/active', { params }),
   linkageThresholds: () => api.get('/health/linkage/thresholds'),
   setLinkageThresholds: (data) => api.post('/health/linkage/thresholds', data),
   linkageAction: (key, data) => api.post(`/health/linkage/${key}/action`, data),

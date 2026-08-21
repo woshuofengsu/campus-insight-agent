@@ -26,6 +26,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from data.db_elderly_care import COMMUNITY_PHONE as _COMMUNITY_PHONE
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 _log = logging.getLogger(__name__)
@@ -1134,6 +1136,22 @@ def web_health_linkage_records(request: Request, limit: int = 50):
     return ok(get_linkage_records(limit=limit))
 
 
+@app.get("/api/web/health/linkage/active")
+def web_health_linkage_active(request: Request, limit: int = 3):
+    """居民端当前生效的天气联动提醒（当天触发，最多 3 条，其余折叠）。"""
+    from data.db_core import get_db
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM activity_log WHERE module='疾病预防' AND target_type='weather_linkage' "
+            "AND action='联动提醒触发' AND date(created_at, 'localtime')=date('now','localtime') "
+            "ORDER BY id DESC LIMIT ?", (limit,),
+        ).fetchall()
+        return ok([{
+            "content_id": r["target_id"], "title": r["target_title"] or "",
+            "detail": r["detail"] or "", "created_at": r["created_at"],
+        } for r in rows])
+
+
 @app.get("/api/web/health/linkage/thresholds")
 def web_health_linkage_thresholds_get(request: Request):
     if _require_role(request, "grid"):
@@ -1902,9 +1920,14 @@ class ConsultCreate(BaseModel):
 
 @app.post("/api/web/health/consults")
 def web_consult_create(req: ConsultCreate, request: Request):
-    from data.db_health_content import submit_consult
+    from data.db_health_content import submit_consult, log_emergency_hint_shown
     from ui.cache import invalidate_health
     u = _user(request)
+    # 提交前紧急提示已展示（120 急救提示，留痕）
+    try:
+        log_emergency_hint_shown(u.get("uid"))
+    except Exception:
+        pass
     cid, msg, code = submit_consult(
         u.get("uid"), req.name or u.get("name") or "居民", req.phone,
         req.consult_type, req.content, building=req.building,
@@ -1986,6 +2009,7 @@ def web_elderly_home(request: Request):
         "latest_sos": get_latest_sos(uid) if uid else None,
         "bp": (health.get("blood_pressure") or [{}])[-1] if health.get("blood_pressure") else {},
         "weather": get_simplified_weather(""),
+        "community_phone": _COMMUNITY_PHONE,
     })
 
 

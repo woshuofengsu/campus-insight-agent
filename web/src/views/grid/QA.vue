@@ -18,7 +18,7 @@ const kForm = ref({
 })
 const kOp = ref({}) // kid -> {opinion, reason}
 
-const KB_CATS = ['社保医保', '养老服务', '住房保障', '民政救助', '户籍居住证', '就业创业', '其他']
+const KB_CATS = ['社保医保', '养老服务', '住房保障', '办事指引', '社区规定']
 
 onMounted(async () => {
   try { kb.value = (await knowledge.list()) || [] } catch { /* 忽略 */ }
@@ -121,8 +121,8 @@ async function kAct(k, data, okMsg) {
               <n-form-item-gi label="来源">
                 <n-input v-model:value="kForm.source" placeholder="社区整理" />
               </n-form-item-gi>
-              <n-form-item-gi label="政策文号">
-                <n-input v-model:value="kForm.policy_number" placeholder="如 京人社发〔2026〕1号" />
+              <n-form-item-gi label="关键词（必填，逗号分隔 1-5 个）">
+                <n-input v-model:value="kForm.keywords" placeholder="如：医保,报销,材料" />
               </n-form-item-gi>
             </n-grid>
             <n-grid :cols="2" :x-gap="12">
@@ -133,6 +133,9 @@ async function kAct(k, data, okMsg) {
                 <n-input v-model:value="kForm.expire_date" placeholder="如 2027-12-31（到期自动下架）" />
               </n-form-item-gi>
             </n-grid>
+            <n-form-item label="政策文号（选填）">
+              <n-input v-model:value="kForm.policy_number" placeholder="如 京人社发〔2026〕1号" />
+            </n-form-item>
             <n-button type="primary" @click="createKb">📤 创建并提交审核</n-button>
           </n-form>
         </div>

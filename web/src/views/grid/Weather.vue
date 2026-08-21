@@ -1,10 +1,12 @@
 <script setup>
-// 天气管理：当前天气 + 预警 + 检查任务 + 任务历史 + 社区天气概况
+// 天气管理：当前天气 + 预警 + 检查任务 + 任务历史 + 社区天气概况 + 异常日志
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
+import { useUserStore } from '../../stores/user'
 import { weather } from '../../api'
 
 const message = useMessage()
+const store = useUserStore()
 const w = ref(null)
 const alerts = ref([])
 const tasks = ref([])
@@ -36,7 +38,7 @@ async function submitConfirm() {
   if (!t) return
   try {
     await weather.confirmTask(t.id, {
-      checker: '网格员（演示）',
+      checker: store.user?.name || '网格员',
       items: t.items,
       note: t.note || '',
     })

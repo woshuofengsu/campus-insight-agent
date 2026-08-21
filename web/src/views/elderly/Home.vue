@@ -44,7 +44,7 @@ onBeforeUnmount(() => {
 
 const rows = [
   [{ icon: '🌤️', label: '天气', action: 'weather' }, { to: '/elderly/notices', icon: '🔊', label: '通知' }, { to: '/elderly/report', icon: '🗣️', label: '报修' }],
-  [{ to: '/elderly/qa', icon: '📖', label: '政策问答' }, { to: '/elderly/contacts', icon: '👨‍👩‍👧', label: '联系人' }, { icon: '❓', label: '语音帮助', action: 'help' }],
+  [{ icon: '🏛️', label: '联系社区', action: 'community' }, { to: '/elderly/medication', icon: '💊', label: '用药提醒' }, { icon: '❓', label: '语音帮助', action: 'help' }],
 ]
 
 function playWeather() {
@@ -56,7 +56,16 @@ function playWeather() {
 }
 
 function voiceHelp() {
-  speak('您好，我是社区智能助手。您可以点击报修、通知、用药、政策问答按钮，也可以长按红色紧急求助按钮联系社区。', vol.value)
+  speak('您好，我是社区智能助手。您可以点击天气、通知、报修、联系社区、联系人、用药提醒按钮，也可以长按红色紧急求助按钮联系社区。', vol.value)
+}
+
+function callCommunity() {
+  const phone = home.value?.community_phone || '62319876'
+  speak(`正在呼叫社区服务中心，电话 ${phone}`, vol.value)
+  message.info(`正在呼叫社区服务中心：${phone}`)
+  try {
+    elderly.contactCall({ target_name: '社区服务中心', target_phone: phone })
+  } catch { /* 留痕失败不阻塞 */ }
 }
 
 // ---- 紧急求助：长按 3 秒进入确认，10 秒超时自动取消 ----
@@ -91,7 +100,7 @@ async function confirmSos() {
   sosTimer = null
   sosConfirm.value = false
   try {
-    const names = contacts.value.filter((c) => c.status === '已通过').slice(0, 3).map((c) => c.name).join('、')
+    const names = contacts.value.filter((c) => c.status === '审核通过').slice(0, 3).map((c) => c.name).join('、')
     await elderly.emergency()
     speak(`紧急求助已发出${names ? `，将依次呼叫 ${names}` : ''}`, vol.value)
     message.success(`紧急求助已发出${names ? `，将依次呼叫：${names}` : ''}`)
@@ -170,10 +179,13 @@ function cancelCall() {
 
     <!-- 两行三列大按钮 -->
     <div v-for="(row, ri) in rows" :key="ri" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;">
-      <n-button v-for="b in row" :key="b.label" size="large" type="primary" ghost class="elderly-btn"
-                @click="b.action === 'help' ? voiceHelp() : b.action === 'weather' ? playWeather() : router.push(b.to)">
-        <span style="font-size:2rem;">{{ b.icon }}</span>{{ b.label }}
-      </n-button>
+      <n-badge v-for="b in row" :key="b.label" :value="b.label === '用药提醒' ? home?.due_medications || 0 : 0"
+               :show="b.label === '用药提醒' && home?.due_medications > 0" :offset="[-8, 8]">
+        <n-button size="large" type="primary" ghost class="elderly-btn"
+                  @click="b.action === 'help' ? voiceHelp() : b.action === 'weather' ? playWeather() : b.action === 'community' ? callCommunity() : router.push(b.to)">
+          <span style="font-size:2rem;">{{ b.icon }}</span>{{ b.label }}
+        </n-button>
+      </n-badge>
     </div>
 
     <!-- 最近联系（留痕记录） -->
@@ -198,7 +210,7 @@ function cancelCall() {
 
     <!-- 紧急求助确认弹窗 -->
     <n-modal v-model:show="sosConfirm" preset="dialog" type="error" title="确认紧急求助？"
-             :content="`将依次呼叫：${contacts.filter(c => c.status === '已通过').slice(0, 3).map(c => c.name).join('、') || '暂无紧急联系人'}`"
+             :content="`将依次呼叫：${contacts.filter(c => c.status === '审核通过').slice(0, 3).map(c => c.name).join('、') || '暂无紧急联系人'}`"
              positive-text="确认求助" negative-text="取消"
              @positive-click="confirmSos" @negative-click="sosConfirm = false">
       <template #default>

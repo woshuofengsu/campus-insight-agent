@@ -70,6 +70,16 @@ async function transferQuestion(q) {
     message.error(e.message)
   }
 }
+
+async function delQuestion(q) {
+  try {
+    await qa.deleteQuestion(q.id)
+    message.success('提问记录已删除')
+    myQuestions.value = (await qa.questions()) || []
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 </script>
 
 <template>
@@ -130,6 +140,13 @@ async function transferQuestion(q) {
           <!-- 待回复/处理中可转人工 -->
           <div v-if="q.status === '待人工回复' || q.status === '处理中'" style="margin-top:8px;">
             <n-button size="small" @click="transferQuestion(q)">🙋 转人工</n-button>
+          </div>
+          <!-- 删除记录（二次确认；处理中拦截由后端） -->
+          <div style="margin-top:8px;">
+            <n-popconfirm @positive-click="delQuestion(q)">
+              <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除记录</n-button></template>
+              删除后不可恢复，确认删除该提问记录？
+            </n-popconfirm>
           </div>
         </div>
         <n-empty v-if="myQuestions.length === 0" description="还没有提问记录" />

@@ -11,6 +11,9 @@ const unread = ref(0)
 const tab = ref('articles')
 const typeFilter = ref('全部')
 const detail = ref(null) // 内容详情弹窗
+const linkage = ref([]) // 天气联动提醒卡片
+const linkageCollapsed = ref(false)
+const linkageHidden = ref(false)
 
 const TYPES = ['全部', '季节性疾病预防', '疫苗接种提醒', '传染病预警', '健康小贴士', '就医指引']
 const CONSULT_TYPES = ['健康知识', '疫苗接种', '疾病症状', '就医指引', '其他']
@@ -34,6 +37,7 @@ onMounted(async () => {
   try { articles.value = (await health.articles()) || [] } catch { /* 忽略 */ }
   try { myConsults.value = (await health.consults()) || [] } catch { /* 忽略 */ }
   try { unread.value = (await health.unread()).count || 0 } catch { /* 忽略 */ }
+  try { linkage.value = (await health.linkageActive()) || [] } catch { /* 忽略 */ }
 })
 
 async function loadArticles() {
@@ -99,6 +103,21 @@ function atts(c) {
   <div class="page">
     <h2 class="page-title">🏥 健康防护</h2>
     <p class="page-sub">疾病预防内容 + 健康咨询（负责人 24 小时内回复）</p>
+
+    <!-- 天气联动提醒卡片（最多 3 张，其余折叠，可临时关闭） -->
+    <div v-if="linkage.length && !linkageHidden" class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;">🌦️ 天气提醒</div>
+        <div style="display:flex;gap:8px;">
+          <n-button v-if="linkage.length > 3" size="tiny" @click="linkageCollapsed = !linkageCollapsed">{{ linkageCollapsed ? '展开' : '折叠' }}</n-button>
+          <n-button size="tiny" quaternary @click="linkageHidden = true">✕ 关闭</n-button>
+        </div>
+      </div>
+      <div v-for="(l, i) in (linkageCollapsed ? linkage.slice(0, 3) : linkage)" :key="l.content_id + '-' + i" style="padding:6px 0;font-size:0.9rem;">
+        <b>{{ l.title }}</b> <span class="muted">（{{ (l.detail || '').split('|')[0] || '' }}联动）</span>
+      </div>
+      <div class="muted" style="font-size:0.75rem;margin-top:4px;">重新登录或 6 小时后提醒再现</div>
+    </div>
 
     <n-tabs v-model:value="tab" type="line">
       <n-tab-pane name="articles" tab="健康知识">
