@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 23
+_SCHEMA_CURRENT_VERSION = 24
 
 
 def _create_schema_version_table(conn):
@@ -492,6 +492,11 @@ def _m23_guardian_binding(conn):
     _add_column_if_missing(conn, "user_profile", "bound_elderly_id", "INTEGER DEFAULT 0")
 
 
+def _m24_proposal_attachment(conn):
+    """v24：proposals 加 attachment 列（提案附件图片路径 JSON，spec 02）。"""
+    _add_column_if_missing(conn, "proposals", "attachment", "TEXT DEFAULT '[]'")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -680,6 +685,7 @@ def init_db(db_path: str):
         (21, "user_phone", _m21_user_phone),
         (22, "exception_log", _m22_exception_log),
         (23, "guardian_binding", _m23_guardian_binding),
+        (24, "proposal_attachment", _m24_proposal_attachment),
     ]
     for version, name, fn in post:
         if version <= current:

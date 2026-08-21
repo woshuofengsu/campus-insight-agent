@@ -223,6 +223,7 @@ def submit_proposal(title: str, description: str, category: str,
                     reporter_name: str, reporter_phone: str, is_public: int,
                     reporter_id: int | None = None,
                     community_building: str = "", attachment_public: int = 0,
+                    attachment: str = "[]",
                     is_agent_report: int = 0, agent_name: str = "",
                     agent_phone: str = "", agent_relation: str = "",
                     draft_id: int | None = None, author: str = "") -> tuple[int, str]:
@@ -264,10 +265,11 @@ def submit_proposal(title: str, description: str, category: str,
             "INSERT INTO proposals (title, description, category, author, supporter_count, "
             "status, is_public, audit_status, attachment_public, reporter_id, reporter_name, "
             "reporter_phone, is_agent_report, agent_name, agent_phone, agent_relation, "
-            "community_building) VALUES (?,?,?,?,0,'待审核',?,'待审核',?,?,?,?,?,?,?,?,?)",
+            "community_building, attachment) VALUES (?,?,?,?,0,'待审核',?,'待审核',?,?,?,?,?,?,?,?,?,?)",
             (title, description, category, author or reporter_name, is_public,
              attachment_public, reporter_id, reporter_name, reporter_phone,
-             is_agent_report, agent_name, agent_phone, agent_relation, community_building),
+             is_agent_report, agent_name, agent_phone, agent_relation, community_building,
+             attachment),
         )
         pid = cur.lastrowid
         if draft_id:

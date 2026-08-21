@@ -319,6 +319,10 @@ with st.container(border=True):
         "公开附件（选填，默认不公开；公开需负责人审核确认不含个人隐私，公示期间其他居民可见）",
         key="create_proposal_attach",
     )
+    prop_files = st.file_uploader("附件图片（选填，jpg/png，≤5MB，最多3张）",
+                                  type=["jpg", "jpeg", "png"], accept_multiple_files=True,
+                                  key="create_proposal_files",
+                                  help="附件仅负责人可见；选择公开且审核通过后，公示期间其他居民可见")
     with st.expander("👴 代报信息（选填，老人可由家属/负责人代报）"):
         prop_agent = st.checkbox("这是代报", key="create_proposal_agent")
         c_a1, c_a2, c_a3 = st.columns(3)
@@ -359,12 +363,22 @@ with st.container(border=True):
             st.session_state._create_proposal_error = "请填写提案标题和内容。"
             st.session_state._create_proposal_feedback = ""
         else:
+            _attach = "[]"
+            try:
+                from utils.uploads import save_uploaded_files
+                _saved = save_uploaded_files(prop_files, folder="proposals")
+                if _saved:
+                    import json
+                    _attach = json.dumps(_saved, ensure_ascii=False)
+            except Exception:
+                pass
             pid, msg = db_submit_proposal(
                 title=title, description=desc, category=prop_category,
                 reporter_name=prop_name.strip(), reporter_phone=prop_phone.strip(),
                 is_public=1 if prop_public == "公开" else 0,
                 community_building=prop_building.strip(),
                 attachment_public=1 if prop_attach else 0,
+                attachment=_attach,
                 reporter_id=_user_id or None,
                 is_agent_report=1 if prop_agent else 0,
                 agent_name=agent_name, agent_phone=agent_phone, agent_relation=agent_rel,

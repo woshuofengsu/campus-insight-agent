@@ -202,6 +202,17 @@ else:
                     )
                 if p.get("attachment_public"):
                     st.markdown("**附件：** 提案人已选择公开附件（公示中居民可见；审核时需确认不含隐私）")
+                # 附件图片展示（仅负责人端可见）
+                try:
+                    import json
+                    _paths = json.loads(p.get("attachment") or "[]")
+                    from utils.uploads import resolve_path
+                    _imgs = [x for x in (resolve_path(x) for x in _paths) if x]
+                    if _imgs:
+                        st.markdown("**📎 附件图片**")
+                        st.image(_imgs, width=140)
+                except Exception:
+                    pass
 
                 # ---- 状态操作 ----
                 acted = False
