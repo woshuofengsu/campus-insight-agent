@@ -1,11 +1,56 @@
 <script setup>
-// 占位页：社区天气（P3-P5 填充真实实现）
+// 社区天气：实时 + 3 天预报 + 预警标签
+import { ref, onMounted } from 'vue'
+import { weather } from '../../api'
+
+const w = ref(null)
+const alerts = ref([])
+
+onMounted(async () => {
+  try { w.value = await weather.current() } catch { /* 忽略 */ }
+  try { alerts.value = (await weather.alerts()) || [] } catch { /* 忽略 */ }
+})
+
+const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
 </script>
 
 <template>
   <div class="page">
     <h2 class="page-title">🌤️ 社区天气</h2>
-    <p class="page-sub">实时天气与预警</p>
-    <div class="card muted">此页面正在建设中（P3-P5 阶段实现），当前为骨架占位。</div>
+    <p class="page-sub">实时天气 · 未来 3 天预报 · 极端天气预警</p>
+
+    <div v-if="w" class="card">
+      <div style="display:flex;align-items:center;gap:20px;">
+        <div style="font-size:4rem;">{{ w.emoji }}</div>
+        <div>
+          <div style="font-size:2.4rem;font-weight:800;">{{ w.temp_high }}°C</div>
+          <div class="muted">{{ w.condition }} · {{ w.temp_low }}°C ~ {{ w.temp_high }}°C</div>
+          <div class="muted">{{ w.wind }} · 💧{{ w.rain_prob }}% · 湿度 {{ w.humidity }}%</div>
+        </div>
+      </div>
+      <div v-if="w.note" style="margin-top:10px;color:#b91c1c;font-weight:600;">⚠️ {{ w.note }}</div>
+    </div>
+
+    <div v-if="alerts.length" class="card" style="background:#fef2f2;border:1px solid #fca5a5;">
+      <div style="font-weight:700;color:#b91c1c;">🚨 极端天气预警</div>
+      <div v-for="a in alerts" :key="a.id" style="margin-top:8px;">
+        <span class="status-pill" :style="{ background: (LEVEL_COLOR[a.level] || '#eab308') + '22', color: LEVEL_COLOR[a.level] || '#eab308', border: '1px solid ' + (LEVEL_COLOR[a.level] || '#eab308') }">
+          {{ a.alert_type }}{{ a.level }}预警
+        </span>
+        <span class="muted" style="margin-left:8px;font-size:0.85rem;">生效 {{ (a.effective_time || '').slice(0, 16) }}</span>
+      </div>
+    </div>
+
+    <div v-if="w?.forecast?.length" class="card">
+      <div style="font-weight:700;margin-bottom:10px;">📅 未来预报</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div v-for="(d, i) in w.forecast" :key="i" style="text-align:center;background:#f5f7f5;border-radius:10px;padding:12px;">
+          <div class="muted">{{ (d.date || '').slice(5) }}</div>
+          <div style="font-size:1.6rem;">{{ d.emoji }}</div>
+          <div>{{ d.condition }}</div>
+          <div class="muted">{{ d.temp_low }}° ~ {{ d.temp_high }}°</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
