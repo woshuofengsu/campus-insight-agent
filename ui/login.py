@@ -3,6 +3,7 @@
 import streamlit as st
 from ui.components import TOKEN
 from data.db_user import authenticate, create_user, get_user_by_username
+from config import DEMO_MODE
 
 
 def render_login():
@@ -31,23 +32,25 @@ def render_login():
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown(
-            f'<div style="text-align:center;margin:8px 0 6px;font-size:0.75em;'
-            f'color:{TOKEN["text_muted"]};">快速体验</div>',
-            unsafe_allow_html=True,
-        )
-        c_demo1, c_demo2, c_demo3 = st.columns(3)
-        with c_demo1:
-            if st.button("居民", key="demo_resident", use_container_width=True):
-                _login_demo("resident")
-        with c_demo2:
-            if st.button("网格员", key="demo_grid", use_container_width=True):
-                _login_demo("grid")
-        with c_demo3:
-            if st.button("👴 老年关怀版", key="demo_elderly", use_container_width=True):
-                _login_demo("elderly")
+        # 快速体验按钮受 DEMO_MODE 门控：正式部署设 DEMO_MODE=false 后消失，走正式鉴权
+        if DEMO_MODE:
+            st.markdown(
+                f'<div style="text-align:center;margin:8px 0 6px;font-size:0.75em;'
+                f'color:{TOKEN["text_muted"]};">快速体验</div>',
+                unsafe_allow_html=True,
+            )
+            c_demo1, c_demo2, c_demo3 = st.columns(3)
+            with c_demo1:
+                if st.button("居民", key="demo_resident", use_container_width=True):
+                    _login_demo("resident")
+            with c_demo2:
+                if st.button("网格员", key="demo_grid", use_container_width=True):
+                    _login_demo("grid")
+            with c_demo3:
+                if st.button("👴 老年关怀版", key="demo_elderly", use_container_width=True):
+                    _login_demo("elderly")
 
-        st.markdown("---")
+            st.markdown("---")
 
         tab_login, tab_register = st.tabs(["登录", "注册"])
 

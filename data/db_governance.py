@@ -5,6 +5,9 @@ from data.db_core import get_db
 
 _log = logging.getLogger(__name__)
 
+# 留痕模块来源（跨模块联动 #10：所有留痕必须带模块字段）
+MODULE = "治理"
+
 # 匿名上报的伪名盐值——与密码盐无关，仅用于生成稳定的匿名标识
 _ANON_SALT = "community-insight-anon-2026"
 
@@ -117,7 +120,8 @@ def report_issue(title: str, category: str, location: str = "",
     try:
         from data.db_notifications import log_activity
         log_activity(author, "上报问题", "issue", iid, title,
-                     f"{category} · {location}" if location else category)
+                     f"{category} · {location}" if location else category,
+                     module=MODULE)
     except Exception:  # 记个日志跳过
         _log.debug("report_issue #%d 记活动日志失败（不影响）", iid)
     # 记到跨会话事件记忆（个性化用）
@@ -306,6 +310,7 @@ def update_issue_status(issue_id: int, status: str, actor: str = "",
                 actor or "网格员", action_map.get(status, "更新工单"),
                 "issue", issue_id, issue_title,
                 f"{issue['category']} · {issue['location']}" if issue["location"] else issue["category"],
+                module=MODULE,
             )
         except Exception:  # 记个日志跳过
             _log.debug("工单 #%d 状态变更时通知/记日志失败（不影响）", issue_id)
@@ -384,7 +389,7 @@ def review_dissatisfaction(issue_id: int, reopen: bool) -> str:
         from data.db_notifications import notify_issue_status_change, log_activity
         notify_issue_status_change(issue_id, new_status)
         log_activity("网格员", "复核满意度" if reopen else "驳回不满意",
-                     "issue", issue_id, "", new_status)
+                     "issue", issue_id, "", new_status, module=MODULE)
     except Exception:
         _log.debug("review_dissatisfaction 工单 #%d 通知/记日志失败", issue_id)
     return new_status
@@ -453,7 +458,7 @@ def create_proposal(title: str, description: str, category: str = "其他",
         pid = cur.lastrowid
     try:
         from data.db_notifications import log_activity
-        log_activity(author, "提交提案", "proposal", pid, title, category)
+        log_activity(author, "提交提案", "proposal", pid, title, category, module=MODULE)
     except Exception:  # 记个日志跳过
         _log.debug("create_proposal #%d 记活动日志失败（不影响）", pid)
     return pid
@@ -493,7 +498,7 @@ def support_proposal(proposal_id: int, actor: str = "") -> int:
     try:
         from data.db_notifications import log_activity
         log_activity(actor or "居民", "附议提案", "proposal", proposal_id,
-                     row["title"] if row else "", f"共 {new_count} 人附议")
+                     row["title"] if row else "", f"共 {new_count} 人附议", module=MODULE)
     except Exception:  # 记个日志跳过
         _log.debug("support_proposal #%d 记活动日志失败（不影响）", proposal_id)
     return new_count
@@ -530,6 +535,7 @@ def update_proposal_status(proposal_id: int, status: str,
             log_activity(
                 actor or "网格员", action_map.get(status, "更新提案"),
                 "proposal", proposal_id, prop["title"], prop["category"],
+                module=MODULE,
             )
         except Exception:  # 记个日志跳过
             _log.debug("提案 #%d 状态变更时通知/记日志失败（不影响）", proposal_id)

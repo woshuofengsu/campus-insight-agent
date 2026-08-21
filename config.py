@@ -22,8 +22,9 @@ def _secret(key: str, default: str = "") -> str:
 # 离线演示模式：.env 里设 OFFLINE_MODE=true，或 URL 带 ?offline=1
 OFFLINE_MODE = _secret("OFFLINE_MODE", "").lower() in ("1", "true", "yes")
 
-# 演示模式：默认关。开启后显示「切换账号」等演示功能；正式用务必关闭，隔离双角色。
-DEMO_MODE = _secret("DEMO_MODE", "").lower() in ("1", "true", "yes")
+# 演示模式：默认开（比赛演示一键登录方便）。正式用 .env 设 DEMO_MODE=false 关闭，
+# 快速体验按钮消失、走正式鉴权，隔离双角色。
+DEMO_MODE = _secret("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 
 # 演示假数据，默认关：比赛/生产环境不每天自动伪造工单/解决/附议/反馈。
 # 想演示"持续活跃"就 .env 设 DEMO_LIVE_DATA=true。
