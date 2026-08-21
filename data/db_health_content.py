@@ -968,7 +968,20 @@ def get_unread_reply_count(user_id: int) -> int:
 # ============================================================
 
 def get_linkage_thresholds() -> dict:
-    """联动阈值（当前生效值）：高温/低温/24小时降温。"""
+    """联动阈值（settings 表持久化，重启不丢）。"""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key='linkage_thresholds'"
+            ).fetchone()
+            if row and row["value"]:
+                import json
+                stored = json.loads(row["value"])
+                merged = dict(_LINKAGE_THRESHOLDS)
+                merged.update(stored)
+                return merged
+    except Exception:
+        pass
     return dict(_LINKAGE_THRESHOLDS)
 
 
@@ -976,7 +989,7 @@ def set_linkage_thresholds(high_temp: int | None = None, low_temp: int | None = 
                            temp_drop: int | None = None, actor: str = "") -> dict:
     """调整联动阈值：仅疾病预防负责人可操作，调整后立即生效并留痕（不需二次确认）。
 
-    说明：本轮阈值为进程内配置 + 留痕；跨重启持久化需配置表，由 UI/后续版本承接。
+    持久化到 settings 表，重启不丢。
     """
     changes: list[str] = []
     if high_temp is not None and high_temp != _LINKAGE_THRESHOLDS["high_temp"]:
@@ -991,6 +1004,17 @@ def set_linkage_thresholds(high_temp: int | None = None, low_temp: int | None = 
     if changes:
         log_activity(actor or "疾病预防负责人", "调整天气联动阈值", "weather_linkage",
                      module=MODULE, detail="；".join(changes))
+        try:
+            import json
+            with get_db() as conn:
+                conn.execute(
+                    "INSERT INTO settings (key, value) VALUES ('linkage_thresholds', ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (json.dumps(_LINKAGE_THRESHOLDS, ensure_ascii=False),),
+                )
+                conn.commit()
+        except Exception:
+            pass  # 持久化失败不影响进程内生效
     return get_linkage_thresholds()
 
 

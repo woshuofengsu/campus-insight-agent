@@ -1184,11 +1184,21 @@ def get_common_questions(limit: int = 10) -> list[dict]:
 # ---------------------------------------------------------------- 匹配阈值
 
 def get_match_threshold() -> float:
+    """自动回答匹配阈值（存 settings 表持久化，重启不丢）。"""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key='match_threshold'"
+            ).fetchone()
+            if row and row["value"]:
+                return float(row["value"])
+    except Exception:
+        pass
     return _match_threshold
 
 
 def set_match_threshold(value: float, actor: str = "负责人") -> tuple[bool, str]:
-    """负责人调整自动回答匹配阈值（立即生效，留痕；进程内生效）。"""
+    """负责人调整自动回答匹配阈值（立即生效，留痕；持久化到 settings）。"""
     global _match_threshold
     try:
         v = float(value)
@@ -1198,6 +1208,15 @@ def set_match_threshold(value: float, actor: str = "负责人") -> tuple[bool, s
         return False, "阈值范围 0.1 ~ 10"
     old = _match_threshold
     _match_threshold = v
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('match_threshold', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(v),),
+            )
+            conn.commit()
+    except Exception:
+        pass  # 持久化失败不影响进程内生效
     log_activity(actor, "调整自动回答阈值", "knowledge", None, "",
                  module=MODULE, before_value=str(old), after_value=str(v))
     return True, ""

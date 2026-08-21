@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 24
+_SCHEMA_CURRENT_VERSION = 25
 
 
 def _create_schema_version_table(conn):
@@ -497,6 +497,14 @@ def _m24_proposal_attachment(conn):
     _add_column_if_missing(conn, "proposals", "attachment", "TEXT DEFAULT '[]'")
 
 
+def _m25_settings(conn):
+    """v25：建 settings 表（key-value 配置，供匹配阈值/联动阈值等持久化）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS settings ("
+        "key TEXT PRIMARY KEY, value TEXT DEFAULT '')"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -686,6 +694,7 @@ def init_db(db_path: str):
         (22, "exception_log", _m22_exception_log),
         (23, "guardian_binding", _m23_guardian_binding),
         (24, "proposal_attachment", _m24_proposal_attachment),
+        (25, "settings", _m25_settings),
     ]
     for version, name, fn in post:
         if version <= current:
