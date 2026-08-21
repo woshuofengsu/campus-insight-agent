@@ -342,27 +342,65 @@ if st.session_state.get("_help_tts"):
 
 # ---------------------------------------------------------------- 天气（大字版，内联）
 if st.session_state.get("_show_weather"):
-    st.markdown("### 🌤️ 大字版天气")
+    st.markdown(f"### 🌤️ {COMMUNITY_NAME}天气")
     days, loc, is_real = _cached_weather()
+
+    # 极端天气主动提醒（每天一次，红色播报两遍；点「我知道了」关闭当次）
+    try:
+        from data.db_weather import get_elderly_reminder_plan, log_elderly_reminder
+        _plan = get_elderly_reminder_plan()
+        _pending = [p for p in _plan if p.get("should_send")]
+        if _pending and not st.session_state.get("_weather_alert_done", False):
+            for p in _pending:
+                big_card(
+                    f"<div style='text-align:center;font-size:1.35em;font-weight:800;'>"
+                    f"⚠️ {p.get('alert_type','')}{p.get('level','')}预警</div>"
+                    f"<div style='text-align:center;margin-top:8px;'>{p.get('text','')}</div>",
+                    bg="#fef2f2", border="#dc2626",
+                )
+                tts_speak(p.get("text", ""))
+                if p.get("broadcast_times", 1) >= 2:
+                    tts_speak(p.get("text", ""))  # 红色预警播报两遍
+                log_elderly_reminder(p.get("alert_id"), p.get("alert_type", ""), p.get("level", ""))
+            if st.button("我知道了", key="weather_alert_ok", width="stretch"):
+                st.session_state["_weather_alert_done"] = True
+                st.rerun()
+    except Exception:
+        pass
+
     if days and days[0]:
         t = days[0]
         is_bad = t.get("rain_prob", 0) >= 60 or t.get("condition", "") in (
             "暴雨", "雷阵雨", "大雪", "沙尘暴", "大风",
         )
+        # 温度颜色：高温红 / 低温蓝 / 一般黑
+        def _temp_color(v):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return "#111827"
+            if v >= 33:
+                return "#dc2626"
+            if v <= 0:
+                return "#2563eb"
+            return "#111827"
+
         alert_html = (
             f'<br><span style="color:#dc2626;font-weight:800;">⚠️ 极端天气预警：'
             f'{t.get("condition", "")}，请注意出行安全！</span>' if is_bad else ""
         )
         big_card(
             f"{t.get('emoji', '')} <strong>{t.get('condition', '')}</strong>　"
-            f"{t.get('temp_low', '')}°C ~ {t.get('temp_high', '')}°C<br>"
+            f"<span style='color:{_temp_color(t.get('temp_high'))};font-weight:800;'>"
+            f"{t.get('temp_low', '')}°C ~ {t.get('temp_high', '')}°C</span><br>"
             f"降水概率：{t.get('rain_prob', 0)}% ｜ {t.get('wind', '')}<br>"
             f"建议：{t.get('advice', '')}{alert_html}",
             bg="#fef2f2" if is_bad else "#f0f9ff",
             border="#dc2626" if is_bad else "#2563eb",
         )
-        tts_speak(f"今天{t.get('condition', '')}，{t.get('temp_low', '')}到{t.get('temp_high', '')}度，"
-                  f"{t.get('advice', '')}。")
+        if st.button("🔊 播放天气", key="weather_speak", width="stretch"):
+            tts_speak(f"今天{t.get('condition', '')}，{t.get('temp_low', '')}到{t.get('temp_high', '')}度，"
+                      f"{t.get('advice', '')}。")
     else:
         st.info("天气数据暂时不可用，请稍后再试。")
 
@@ -380,6 +418,10 @@ if st.session_state.get("_show_weather"):
             big_card(f"<div style='text-align:center;'>{tags}</div>", bg="#fef2f2", border="#dc2626")
         if sim and sim.get("updated_at"):
             st.caption(f"天气数据更新于{str(sim.get('updated_at'))[11:16]}")
+        # 缓存降级/延迟提示（跨模块联动 #11：老年端同步显示，超 30 分钟降级并语音播报）
+        if sim and sim.get("is_degraded"):
+            st.warning(f"⚠️ {sim.get('note') or '天气数据可能延迟，当前为缓存数据'}")
+            tts_speak("天气数据更新延迟，当前显示的是之前的天气信息。")
     except Exception:
         pass
 

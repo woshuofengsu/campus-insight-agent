@@ -227,14 +227,7 @@ def refresh_weather(city: str = "") -> dict:
             "data_updated_at": _fmt(_now()),
             "note": "",
         }
-    if days is not None:
-        # 真实 API 失败，退回模拟数据（不写缓存；缓存只存"上次成功"的真实数据）
-        return {
-            "days": days, "location": location, "is_real": False,
-            "is_degraded": False, "is_mock": True,
-            "data_updated_at": "",
-            "note": "天气API请求失败，已切换为模拟数据",
-        }
+    # 真实 API 失败：优先用上次成功的缓存数据降级（spec：保留上次成功数据）
     cache = get_cached_weather(city)
     if cache and cache.get("days"):
         log_activity("系统", "缓存降级", "weather_cache", module=MODULE,
@@ -244,6 +237,14 @@ def refresh_weather(city: str = "") -> dict:
             "is_real": False, "is_degraded": True, "is_mock": False,
             "data_updated_at": cache.get("updated_at") or "",
             "note": f"数据更新于{cache.get('updated_at') or ''}，当前不可用",
+        }
+    if days is not None:
+        # 无缓存兜底：模拟数据（明确标注，不冒充真实）
+        return {
+            "days": days, "location": location, "is_real": False,
+            "is_degraded": False, "is_mock": True,
+            "data_updated_at": "",
+            "note": "天气API请求失败，已切换为模拟数据",
         }
     return {
         "days": None, "location": "", "is_real": False,
@@ -717,16 +718,25 @@ def expire_alerts() -> list[int]:
 
 
 def _close_tasks_for_alert(alert_id: int) -> None:
-    """预警解除后关闭未处理的检查任务（记录关闭留痕，不代填检查结果）。"""
+    """预警解除后关闭未处理的检查任务（DB 状态置「已关闭」，不代填检查结果）。"""
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT id, status FROM weather_check_tasks WHERE alert_id=? AND status='待检查'",
+            "SELECT id, status, alert_type, level FROM weather_check_tasks "
+            "WHERE alert_id=? AND status IN ('待检查','超时未确认')",
             (str(alert_id),),
         ).fetchall()
         task_ids = [r["id"] for r in rows]
-    for tid in task_ids:
-        log_activity("系统", "检查任务随预警解除关闭", "weather_check_task", tid,
-                     module=MODULE, before_value="待检查", after_value="已关闭")
+        if task_ids:
+            ph = ",".join("?" * len(task_ids))
+            conn.execute(
+                f"UPDATE weather_check_tasks SET status='已关闭' WHERE id IN ({ph})",
+                task_ids,
+            )
+            conn.commit()
+    for r in rows:
+        log_activity("系统", "检查任务随预警解除关闭", "weather_check_task", r["id"],
+                     target_title=f"{r['alert_type']}{r['level']}检查",
+                     module=MODULE, before_value=r["status"], after_value="已关闭")
 
 
 # ============================================================
@@ -829,7 +839,9 @@ def get_task_remaining_hours(task_id: int) -> dict:
 _CHECK_ITEM_STATUSES = ("已检查", "正常", "异常")
 
 
-def _validate_check_items(items) -> tuple[bool, str]:
+def _validate_check_items(items, valid_items: set[str] | None = None) -> tuple[bool, str]:
+    """校验检查结果格式；valid_items 给定时（该天气类型专属清单），
+    检查项必须来自清单，不匹配则拦截（跨模块联动 #2）。"""
     if not items:
         return False, "检查清单结果不能为空"
     if not isinstance(items, list):
@@ -839,26 +851,29 @@ def _validate_check_items(items) -> tuple[bool, str]:
             return False, "检查项格式错误"
         if it.get("status") not in _CHECK_ITEM_STATUSES:
             return False, f"检查项「{it.get('item', '')}」状态必须是{'/'.join(_CHECK_ITEM_STATUSES)}之一"
+        if valid_items is not None and it.get("item") not in valid_items:
+            return False, f"检查项「{it.get('item', '')}」不在该天气类型的检查清单内，请按清单逐项勾选"
     return True, ""
 
 
 def confirm_check_task(task_id: int, checker: str, items: list[dict],
                        note: str = "", actor: str = "") -> tuple[bool, str]:
     """负责人确认已检查。→ 已确认。checker 为确认人。"""
-    ok, msg = _validate_check_items(items)
-    if not ok:
-        return False, msg
-    if not checker:
-        return False, "请填写检查人"
     with get_db() as conn:
         row = conn.execute(
             "SELECT status, alert_type, level FROM weather_check_tasks WHERE id=?", (task_id,)
         ).fetchone()
-        if row is None:
-            return False, "检查任务不存在"
-        if row["status"] != "待检查":
-            return False, f"当前状态「{row['status']}」不支持确认"
-        old = row["status"]
+    if row is None:
+        return False, "检查任务不存在"
+    ok, msg = _validate_check_items(items, valid_items=set(CHECKLISTS.get(row["alert_type"], [])))
+    if not ok:
+        return False, msg
+    if not checker:
+        return False, "请填写检查人"
+    if row["status"] != "待检查":
+        return False, f"当前状态「{row['status']}」不支持确认"
+    old = row["status"]
+    with get_db() as conn:
         conn.execute(
             "UPDATE weather_check_tasks SET status='已确认', checker=?, result=?, note=?, "
             "checked_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -875,19 +890,20 @@ def confirm_check_task(task_id: int, checker: str, items: list[dict],
 def fill_overdue_task(task_id: int, checker: str, items: list[dict],
                       note: str = "", actor: str = "") -> tuple[bool, str]:
     """超时未确认后补填：允许填写检查结果和备注，但保留"超时未确认"标记。"""
-    ok, msg = _validate_check_items(items)
-    if not ok:
-        return False, msg
-    if not checker:
-        return False, "请填写检查人"
     with get_db() as conn:
         row = conn.execute(
             "SELECT status, alert_type, level FROM weather_check_tasks WHERE id=?", (task_id,)
         ).fetchone()
-        if row is None:
-            return False, "检查任务不存在"
-        if row["status"] != "超时未确认":
-            return False, f"当前状态「{row['status']}」不支持补填"
+    if row is None:
+        return False, "检查任务不存在"
+    ok, msg = _validate_check_items(items, valid_items=set(CHECKLISTS.get(row["alert_type"], [])))
+    if not ok:
+        return False, msg
+    if not checker:
+        return False, "请填写检查人"
+    if row["status"] != "超时未确认":
+        return False, f"当前状态「{row['status']}」不支持补填"
+    with get_db() as conn:
         conn.execute(
             "UPDATE weather_check_tasks SET checker=?, result=?, note=?, "
             "checked_at=CURRENT_TIMESTAMP WHERE id=?",

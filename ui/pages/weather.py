@@ -27,6 +27,7 @@ community = (profile.get("community") or "").strip()
 
 if not uid:
     st.info("请先登录后查看天气。")
+    st.switch_page("app.py")  # 回登录页（spec：未登录访问天气页跳转登录）
     st.stop()
 if not community:
     st.info("请先绑定所属社区，再查看社区天气。")
@@ -106,10 +107,8 @@ def _render_banner(alerts: list) -> bool:
     return True
 
 
-# ---------------- 顶部极端天气滚动提醒 ----------------
+# 极端天气滚动提醒已由 app.py 全局注入（所有页面顶部统一展示），这里不再重复渲染
 alerts = get_active_alerts()          # 按等级从高到低排序
-banners = get_reminder_banner_data()  # 与 get_active_alerts 同源，滚动用
-_render_banner(banners or alerts)
 
 # ---------------- 天气数据（统一展示入口，含缓存降级） ----------------
 try:

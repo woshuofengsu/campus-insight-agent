@@ -31,7 +31,9 @@ from data.db_weather import (  # noqa: E402  数据层，只调用不写 SQL
     get_reminder_banner_data,
     get_checklist,
     ALERT_TEXTS,
+    MODULE,
 )
+from data.db_notifications import log_activity  # noqa: E402
 
 _log = logging.getLogger(__name__)
 
@@ -103,7 +105,7 @@ def _render_banner() -> None:
             st.rerun()
 
 
-_render_banner()
+# 滚动提醒已由 app.py 全局注入，这里不再重复渲染
 
 
 def _level_pill(alert_type: str, level: str) -> str:
@@ -332,3 +334,57 @@ else:
         })
     st.dataframe(rows, width="stretch", hide_index=True)
     st.caption("说明：超时任务补填后仍保留「超时未确认」标记，检查人与结果可查。")
+
+    # 导出检查任务记录（spec：负责人可导出天气检查任务记录）
+    import csv as _csv
+    from io import StringIO as _StringIO
+    _buf = _StringIO()
+    _w = _csv.DictWriter(_buf, fieldnames=list(rows[0].keys()))
+    _w.writeheader()
+    _w.writerows(rows)
+    st.download_button(
+        "⬇️ 导出检查任务记录 CSV",
+        data=_buf.getvalue().encode("utf-8-sig"),
+        file_name="天气检查任务记录.csv",
+        mime="text/csv",
+        key="weather_tasks_export",
+        on_click=lambda: log_activity(_actor, "导出天气检查任务记录", module=MODULE,
+                                      detail="含时间/类型/状态/检查人/结果"),
+    )
+
+st.markdown("---")
+section("🛠️ 天气异常日志（近 7 天）")
+try:
+    from data.db_core import get_db as _get_db
+    with _get_db() as _conn:
+        _errs = _conn.execute(
+            "SELECT id, created_at, module, error, detail FROM exception_log "
+            "WHERE module LIKE '%天气%' OR detail LIKE '%天气%' "
+            "ORDER BY id DESC LIMIT 50"
+        ).fetchall()
+    if not _errs:
+        st.caption("近 7 天无天气相关异常记录。")
+    else:
+        _err_rows = [{
+            "时间": (r["created_at"] or "")[:16],
+            "模块": r["module"] or "",
+            "错误": (r["error"] or "")[:60],
+            "详情": (r["detail"] or "")[:80],
+        } for r in _errs]
+        st.dataframe(_err_rows, width="stretch", hide_index=True)
+        import csv as _csv2
+        from io import StringIO as _StringIO2
+        _buf2 = _StringIO2()
+        _w2 = _csv2.DictWriter(_buf2, fieldnames=list(_err_rows[0].keys()))
+        _w2.writeheader()
+        _w2.writerows(_err_rows)
+        st.download_button(
+            "⬇️ 导出天气异常日志 CSV",
+            data=_buf2.getvalue().encode("utf-8-sig"),
+            file_name="天气异常日志.csv",
+            mime="text/csv",
+            key="weather_err_export",
+            on_click=lambda: log_activity(_actor, "导出天气异常日志", module=MODULE),
+        )
+except Exception:
+    st.caption("异常日志读取失败。")

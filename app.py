@@ -174,6 +174,13 @@ def main():
             from ui.sidebar import render_sidebar
             render_sidebar(profile, role)
 
+    # 全局极端天气滚动提醒（居民端/负责人端所有页面顶部，spec 要求覆盖网页顶部）
+    try:
+        from ui.weather_banner import render_weather_banner
+        render_weather_banner(profile.get("id") or 0)
+    except Exception:
+        pass  # 提醒不阻塞页面
+
     nav.run()
 
 

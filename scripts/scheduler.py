@@ -33,6 +33,36 @@ def _clean_exceptions():
     return clean_exception_log(days=7)
 
 
+# 天气定时刷新节流（实时每 10 分钟刷新一次，预报每天早 8 点/晚 8 点重取）
+_last_weather_refresh = 0.0
+_WEATHER_REFRESH_INTERVAL = 600  # 10 分钟
+
+
+def _weather_tasks(db_weather) -> dict:
+    """天气自动任务：定时刷新（节流）+ 新鲜度监测 + 降级时暂停新预警触发。"""
+    global _last_weather_refresh
+    out: dict = {}
+    now = time.time()
+    if now - _last_weather_refresh >= _WEATHER_REFRESH_INTERVAL:
+        _last_weather_refresh = now
+        try:
+            r = db_weather.refresh_weather()
+            out["refresh"] = ("real" if r.get("is_real") else
+                              "degraded" if r.get("is_degraded") else "mock")
+        except Exception as e:  # noqa: BLE001
+            out["refresh"] = f"error:{e}"
+    # 新鲜度监测：>15 分钟提示延迟，>30 分钟进入降级（状态变化才留痕，不会刷屏）
+    try:
+        fresh = db_weather.check_cache_freshness()
+        out["freshness"] = fresh.get("state")
+    except Exception as e:  # noqa: BLE001
+        out["freshness"] = f"error:{e}"
+    # 预警检测：降级时暂停新预警触发（spec：API 故障时暂停新预警）
+    degraded = out.get("freshness") == "degraded"
+    out["detect"] = db_weather.run_alert_detection(degraded=degraded)
+    return out
+
+
 def run_all() -> dict:
     """跑一遍全部自动任务，返回每类结果摘要。任务本身幂等，失败记录到异常日志。"""
     from data import db_notice, db_proposal, db_health_content, db_weather
@@ -42,7 +72,7 @@ def run_all() -> dict:
     results: dict = {}
     results["notice"] = _safe("通知", db_notice.run_auto_tasks)
     results["auto_dispatch"] = _safe("自动分派", lambda: len(_dispatch.discover_and_dispatch(limit=20)))
-    results["weather_detect"] = _safe("天气预警", db_weather.run_alert_detection)
+    results["weather"] = _safe("天气自动任务", lambda: _weather_tasks(db_weather))
     results["weather_overdue"] = _safe("天气超时", db_weather.mark_overdue_tasks)
     _safe("天气升级", db_weather.escalate_overdue_tasks)
     _safe("天气预警解除", db_weather.expire_alerts)

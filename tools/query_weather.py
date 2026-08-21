@@ -57,6 +57,9 @@ def _mock_weather():
             "temp_low": temp_low,
             "rain_prob": rain_map.get(cond, 10),
             "wind": random.choice(["微风 1-2级","北风 2-3级","南风 3-4级","东北风 2-3级"]),
+            "humidity": random.randint(30, 85),
+            "aqi": random.randint(20, 120),
+            "uv": random.randint(1, 9),
             "advice": advice_map.get(cond, "适合出行"),
         })
     return days
@@ -184,6 +187,9 @@ def fetch_real_weather_days(api_key: str, city_id: str,
             "temp_low": temp_low,
             "rain_prob": int(precip),
             "wind": wind,
+            "humidity": int(d.get("humidity") or 40),
+            "aqi": int(d.get("aqi") or 55),
+            "uv": int(d.get("uvIndex") or 3),
             "advice": _make_advice(cond, precip),
         })
 

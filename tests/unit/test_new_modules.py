@@ -224,10 +224,14 @@ class TestWeatherCheck(unittest.TestCase):
         from data import db_weather as w
         task_id = w.create_check_task(1, "暴雨", "黄色")
         self.assertIsNotNone(task_id)
-        # 用默认清单逐项确认
-        items = [{"item": "检查排水口", "status": "已检查", "note": ""}]
-        ok, _ = w.confirm_check_task(task_id, "刘网格员", items)
-        self.assertTrue(ok)
+        # 非清单项 → 拦截（跨模块联动 #2：不匹配必须拦截）
+        bad_items = [{"item": "检查排水口", "status": "已检查", "note": ""}]
+        ok_bad, _ = w.confirm_check_task(task_id, "刘网格员", bad_items)
+        self.assertFalse(ok_bad, "不在该天气类型清单内的检查项应被拦截")
+        # 用该类型专属清单逐项确认（暴雨清单第一项：排水沟/雨水口是否畅通）
+        good_items = [{"item": "排水沟/雨水口是否畅通", "status": "已检查", "note": ""}]
+        ok_good, _ = w.confirm_check_task(task_id, "刘网格员", good_items)
+        self.assertTrue(ok_good)
 
 
 class TestHealthContent(unittest.TestCase):
