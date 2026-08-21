@@ -326,6 +326,15 @@ def _render_edit_form(n: dict):
     elderly_summary = st.text_input("老年端播报摘要（紧急必填，最多 30 字）",
                                     value=n.get("elderly_summary") or "", max_chars=30, key="nme_summary")
     is_pinned = 1 if st.checkbox("置顶（普通）", value=bool(n.get("is_pinned")), key="nme_pin") else 0
+    new_expire = None
+    if is_urgent:
+        # 紧急通知：可修改有效期（留痕；只影响修改后仍未读的用户）
+        try:
+            cur_exp = datetime.strptime((n.get("expire_at") or "")[:10], "%Y-%m-%d").date()
+        except Exception:
+            cur_exp = datetime.now().date() + timedelta(days=URGENT_DEFAULT_EXPIRE_DAYS)
+        new_expire = st.date_input("紧急通知有效期至（到期自动取消置顶和弹窗）",
+                                   value=cur_exp, key="nme_expire_urgent")
     c1, c2 = st.columns(2)
     with c1:
         if st.button("💾 保存修改", type="primary", width="stretch", key="nme_save"):
@@ -337,6 +346,12 @@ def _render_edit_form(n: dict):
                 "is_pinned": is_pinned, "is_urgent": 1 if is_urgent else 0,
             }
             ok, msg = update_notice(n["id"], _actor, **upd)
+            if ok and is_urgent and new_expire is not None:
+                # 有效期变化才更新，避免保存普通修改时误动有效期（_ts 视为当天 23:59:59）
+                if new_expire.strftime("%Y-%m-%d") != (n.get("expire_at") or "")[:10]:
+                    ok2, msg2 = update_urgent_expire(n["id"], new_expire, _user_id, _actor)
+                    if not ok2:
+                        ok, msg = False, f"有效期更新失败：{msg2}"
             if ok:
                 st.session_state["_nm_feedback"] = f"✅ 已保存 #{n['id']}"
                 st.session_state.pop("_nm_edit_id", None)

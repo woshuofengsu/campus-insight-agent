@@ -50,7 +50,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 # 表结构版本管理
-_SCHEMA_CURRENT_VERSION = 25
+_SCHEMA_CURRENT_VERSION = 26
 
 
 def _create_schema_version_table(conn):
@@ -505,6 +505,15 @@ def _m25_settings(conn):
     )
 
 
+def _m26_knowledge_timestamps(conn):
+    """v26：knowledge_base 加 created_at/updated_at（知识库列表更新时间列，spec 07）。
+
+    SQLite ADD COLUMN 不支持 CURRENT_TIMESTAMP 默认值，用空串，写入时显式填时间。
+    """
+    _add_column_if_missing(conn, "knowledge_base", "created_at", "TEXT DEFAULT ''")
+    _add_column_if_missing(conn, "knowledge_base", "updated_at", "TEXT DEFAULT ''")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -695,6 +704,7 @@ def init_db(db_path: str):
         (23, "guardian_binding", _m23_guardian_binding),
         (24, "proposal_attachment", _m24_proposal_attachment),
         (25, "settings", _m25_settings),
+        (26, "knowledge_timestamps", _m26_knowledge_timestamps),
     ]
     for version, name, fn in post:
         if version <= current:

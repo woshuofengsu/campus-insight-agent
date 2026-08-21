@@ -228,6 +228,7 @@ with tab_kb:
                 f'发布人：{row.get("publisher","") or "—"} · 审核人：{row.get("auditor","") or "—"} · '
                 f'生效 {row.get("effective_date","") or "—"}'
                 + (f' · 失效 {row.get("expire_date","")}' if row.get("expire_date") else "")
+                + f' · 更新 {(row.get("updated_at") or row.get("created_at") or "")[:16]}'
                 + f' · 被引用 {row.get("cite_count") or 0} 次'
             )
             act_cells = []
