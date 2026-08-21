@@ -222,10 +222,23 @@ def create_notice(title: str, notice_type: str, publish_scope: str, body: str,
                   is_pinned: int = 0, is_urgent: int = 0,
                   expire_at: str = "", attachment_json: str = "[]",
                   scope_target_json: str = "[]", actor: str = "负责人") -> int:
-    """新建通知（保存为草稿）。返回通知 ID。"""
+    """新建通知（保存为草稿）。返回通知 ID。非法类型/敏感词创建时即拦截（0 表示拒绝）。"""
     _ensure_columns()
     if not (title or "").strip():
         raise ValueError("通知标题不能为空")
+    # 创建时即校验类型与敏感词（spec：发布前检测，创建草稿早拦避免垃圾数据）
+    if notice_type not in NOTICE_TYPES:
+        return 0
+    if publish_scope not in PUBLISH_SCOPES:
+        return 0
+    try:
+        from utils.text import check_sensitive
+        for _f in (title, body, elderly_summary):
+            _hit, _w = check_sensitive(_f or "")
+            if _hit:
+                return 0
+    except Exception:
+        pass
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO notices (title, notice_type, publish_scope, body, elderly_summary, "

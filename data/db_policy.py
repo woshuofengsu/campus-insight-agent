@@ -745,7 +745,7 @@ def remind_knowledge_updates() -> list[dict]:
       2. 审核不通过超 7 天未修改 → 提醒一次。
     """
     reminded: list[dict] = []
-    today = _now_str()[:10]
+    today = datetime.now().strftime("%Y-%m-%d")
     with get_db() as conn:
         expiring = conn.execute(
             "SELECT id, title, expire_date FROM knowledge_base "
