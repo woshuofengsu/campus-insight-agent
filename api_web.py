@@ -675,6 +675,268 @@ def web_qa_high_freq(request: Request, limit: int = 10):
 
 
 
+# ---------------- 天气（复用 db_weather / tools.query_weather） ----------------
+
+@app.get("/api/web/weather/current")
+def web_weather_current(request: Request):
+    from data.db_weather import get_weather_for_display
+    from config import COMMUNITY_CITY, COMMUNITY_DISTRICT
+    w = get_weather_for_display("")
+    days = w.get("days") or []
+    today = days[0] if days else {}
+    return ok({
+        "location": COMMUNITY_CITY + COMMUNITY_DISTRICT,
+        "temp_high": today.get("temp_high"), "temp_low": today.get("temp_low"),
+        "condition": today.get("condition"), "emoji": today.get("emoji"),
+        "wind": today.get("wind"), "rain_prob": today.get("rain_prob"),
+        "humidity": today.get("humidity"), "aqi": today.get("aqi"), "uv": today.get("uv"),
+        "advice": today.get("advice"),
+        "forecast": days[1:4],
+        "is_degraded": w.get("is_degraded"), "note": w.get("note", ""),
+    })
+
+
+@app.get("/api/web/weather/alerts")
+def web_weather_alerts(request: Request):
+    from ui.cache import cached_active_alerts
+    return ok(cached_active_alerts())
+
+
+class CheckTaskConfirm(BaseModel):
+    checker: str = Field(default="")
+    items: list = Field(default_factory=list)
+    note: str = Field(default="")
+
+
+@app.post("/api/web/weather/check-task/{task_id}/confirm")
+def web_check_task_confirm(task_id: int, req: CheckTaskConfirm, request: Request):
+    from data.db_weather import confirm_check_task, fill_overdue_task
+    from data.db_weather import list_check_tasks
+    from ui.cache import invalidate_weather
+    actor = _user(request).get("name") or "负责人"
+    rows = list_check_tasks(limit=1000)
+    row = next((t for t in rows if t["id"] == task_id), None)
+    if not row:
+        return fail(1004, "检查任务不存在")
+    if row["status"] == "待检查":
+        ok_, msg = confirm_check_task(task_id, req.checker or actor, req.items, req.note, actor=actor)
+    elif row["status"] == "超时未确认":
+        ok_, msg = fill_overdue_task(task_id, req.checker or actor, req.items, req.note, actor=actor)
+    else:
+        return fail(2001, f"当前状态「{row['status']}」不支持确认")
+    if not ok_:
+        return fail(2001, msg)
+    invalidate_weather()
+    return ok({"task_id": task_id}, "已确认")
+
+
+@app.get("/api/web/weather/tasks")
+def web_weather_tasks(request: Request, status: str = ""):
+    from data.db_weather import list_check_tasks
+    rows = list_check_tasks(status=status or None, limit=200)
+    return ok([dict(r) for r in rows])
+
+
+# ---------------- 健康（复用 db_health_content） ----------------
+
+@app.get("/api/web/health/articles")
+def web_health_articles(request: Request, status: str = ""):
+    from data.db_health_content import list_contents
+    u = _user(request)
+    if u.get("role") == "grid":
+        rows = list_contents(status=status or None, limit=100)
+    else:
+        rows = list_contents(status="已发布", limit=50)
+    return ok([{
+        "id": c.get("id"), "title": c.get("title"), "content_type": c.get("content_type"),
+        "summary": c.get("summary"), "status": c.get("status"),
+        "pinned_at": c.get("pinned_at"), "created_at": c.get("created_at"),
+    } for c in rows])
+
+
+class ConsultCreate(BaseModel):
+    name: str = Field(default="")
+    phone: str = Field(default="")
+    consult_type: str = Field(default="健康知识")
+    content: str = Field(..., min_length=5)
+    building: str = Field(default="")
+    attachment_json: str = Field(default="[]")
+    is_agent_report: int = Field(default=0)
+    agent_name: str = Field(default="")
+    agent_phone: str = Field(default="")
+    agent_relation: str = Field(default="")
+
+
+@app.post("/api/web/health/consults")
+def web_consult_create(req: ConsultCreate, request: Request):
+    from data.db_health_content import submit_consult
+    from ui.cache import invalidate_health
+    u = _user(request)
+    cid, msg, code = submit_consult(
+        u.get("uid"), req.name or u.get("name") or "居民", req.phone,
+        req.consult_type, req.content, building=req.building,
+        attachment_json=req.attachment_json,
+        is_agent_report=req.is_agent_report, agent_name=req.agent_name,
+        agent_phone=req.agent_phone, agent_relation=req.agent_relation,
+    )
+    if cid <= 0:
+        return fail(2001, msg or "提交失败")
+    invalidate_health()
+    return ok({"consult_id": cid, "code": code}, "提交成功")
+
+
+@app.get("/api/web/health/consults")
+def web_consult_list(request: Request, status: str = ""):
+    from data.db_health_content import get_my_consults, list_consults
+    u = _user(request)
+    if u.get("role") == "grid":
+        rows = list_consults(status=status or None, limit=100)
+    else:
+        rows = get_my_consults(u.get("uid"), limit=50)
+    return ok([dict(r) for r in rows])
+
+
+class ConsultReply(BaseModel):
+    reply: str = Field(..., min_length=1)
+    doctor_guide: str = Field(default="")
+    need_offline: bool = Field(default=False)
+    offline_confirmed: bool = Field(default=False)
+
+
+@app.post("/api/web/health/consults/{cid}/reply")
+def web_consult_reply(cid: int, req: ConsultReply, request: Request):
+    from data.db_health_content import reply_consult
+    from ui.cache import invalidate_health
+    actor = _user(request).get("name") or "负责人"
+    ok_, msg = reply_consult(cid, req.reply, actor=actor, doctor_guide=req.doctor_guide,
+                             need_offline=req.need_offline, offline_confirmed=req.offline_confirmed)
+    if not ok_:
+        return fail(2001, msg)
+    invalidate_health()
+    return ok({"consult_id": cid}, "已回复")
+
+
+# ---------------- 老年端（复用 db_elderly_care / db_elderly） ----------------
+
+@app.get("/api/web/elderly/home")
+def web_elderly_home(request: Request):
+    """老年端首页聚合：未读通知 / 天气摘要 / 用药状态 / 最近求助。"""
+    from data.db_elderly import get_profile
+    from data.db_notice import get_notice_unread_count
+    from data.db_elderly_care import get_latest_sos
+    from data.db_weather import get_simplified_weather
+    u = _user(request)
+    uid = u.get("uid")
+    elderly = get_profile(uid) or {}
+    health = elderly.get("health_info", {})
+    due = 0
+    try:
+        from data.db_elderly_care import get_due_medications
+        due = len(get_due_medications(uid))
+    except Exception:
+        pass
+    return ok({
+        "name": u.get("name") or "大爷/阿姨",
+        "unread_notices": get_notice_unread_count("elderly", uid),
+        "due_medications": due,
+        "latest_sos": get_latest_sos(uid) if uid else None,
+        "bp": (health.get("blood_pressure") or [{}])[-1] if health.get("blood_pressure") else {},
+        "weather": get_simplified_weather(""),
+    })
+
+
+class VoiceReport(BaseModel):
+    text: str = Field(..., min_length=2)
+    urgency: str = Field(default="一般")
+    issue_type: str = Field(default="室内")
+
+
+@app.post("/api/web/elderly/voice-report")
+def web_elderly_voice_report(req: VoiceReport, request: Request):
+    """老年端语音报修（转写文本已确认，走报修状态机）。"""
+    from data.db_repair import submit_issue
+    from agent.helpers import extract_location
+    from tools.action_report_issue import _llm_classify
+    u = _user(request)
+    profile = {}
+    try:
+        from data.db_user import get_user_by_id
+        profile = get_user_by_id(u.get("uid")) or {}
+    except Exception:
+        pass
+    category, urgency = _llm_classify(req.text, "")
+    loc = extract_location(req.text) or profile.get("community") or "社区"
+    iid, hint = submit_issue(
+        title=req.text[:80], category=category, issue_type=req.issue_type,
+        location=loc, description=req.text, urgency=req.urgency or urgency or "一般",
+        reporter_name=profile.get("name") or "老人",
+        reporter_phone=profile.get("phone") or "13800000000",
+        reporter_id=u.get("uid"),
+    )
+    if iid <= 0:
+        return fail(2001, hint or "上报失败")
+    return ok({"issue_id": iid, "category": category}, "上报成功")
+
+
+class MedicationCreate(BaseModel):
+    drug_name: str = Field(..., min_length=1)
+    dosage: str = Field(default="")
+    times: str = Field(default="08:00")
+    repeat_rule: str = Field(default="每天")
+    start_date: str = Field(default="")
+    end_date: str = Field(default="")
+    note: str = Field(default="")
+
+
+@app.post("/api/web/elderly/medications")
+def web_medication_create(req: MedicationCreate, request: Request):
+    from data.db_elderly_care import add_medication_reminder
+    u = _user(request)
+    times = [t.strip() for t in req.times.replace("，", ",").split(",") if t.strip()]
+    mid, msg = add_medication_reminder(
+        u.get("uid"), u.get("name") or "老人", req.drug_name, req.dosage, times,
+        repeat_rule=req.repeat_rule, start_date=req.start_date, end_date=req.end_date,
+        note=req.note, setter_id=u.get("uid"), actor=u.get("name") or "老人",
+    )
+    if mid <= 0:
+        return fail(2001, msg)
+    return ok({"reminder_id": mid}, "已提交，待审核")
+
+
+@app.get("/api/web/elderly/medications")
+def web_medication_list(request: Request):
+    from data.db_elderly_care import list_medication_reminders
+    u = _user(request)
+    return ok([dict(r) for r in list_medication_reminders(u.get("uid"))])
+
+
+@app.post("/api/web/elderly/emergency")
+def web_emergency_trigger(request: Request):
+    """紧急求助触发（家属代操作模式由前端隐藏按钮，后端校验）。"""
+    from data.db_elderly_care import trigger_sos
+    from data.db_user import get_user_by_id, get_bound_elderly
+    u = _user(request)
+    profile = get_user_by_id(u.get("uid")) or {}
+    # 家属绑定模式：禁止家属代替老人触发
+    try:
+        bound = get_bound_elderly(u.get("uid"))
+        if bound and bound.get("id") != u.get("uid"):
+            return fail(1003, "家属不能代替老人触发紧急求助")
+    except Exception:
+        pass
+    cid, msg = trigger_sos(u.get("uid"), actor=profile.get("name") or "老人")
+    if cid <= 0:
+        return fail(2001, msg or "触发失败")
+    return ok({"call_id": cid}, "已触发紧急求助")
+
+
+@app.get("/api/web/elderly/emergency/status")
+def web_emergency_status(request: Request):
+    from data.db_elderly_care import get_latest_sos
+    u = _user(request)
+    return ok(get_latest_sos(u.get("uid")))
+
+
 _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
 
 

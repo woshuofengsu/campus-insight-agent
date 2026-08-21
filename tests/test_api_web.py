@@ -220,3 +220,69 @@ def test_knowledge_list(client):
     assert r.json()["success"]
     r = client.get("/api/web/qa/high-freq", headers=gh)
     assert r.json()["success"]
+
+
+def test_weather_endpoints(client):
+    """天气当前/预警/检查任务。"""
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    r = client.get("/api/web/weather/current", headers=gh)
+    assert r.status_code == 200, r.text
+    assert r.json()["success"] and "temp_high" in r.json()["data"]
+    r = client.get("/api/web/weather/alerts", headers=gh)
+    assert r.json()["success"]
+    r = client.get("/api/web/weather/tasks", headers=gh)
+    assert r.json()["success"]
+
+
+def test_health_consults(client):
+    """健康咨询提交（居民）→ 回复（负责人）。"""
+    res = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {res['token']}"}
+    r = client.post("/api/web/health/consults", json={
+        "name": "王阿姨", "phone": "13800138000", "consult_type": "健康知识",
+        "content": "最近流感多发，想了解怎么预防？",
+    }, headers=rh)
+    assert r.status_code == 200, r.text
+    cid = r.json()["data"]["consult_id"]
+    assert cid > 0
+
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    r = client.post(f"/api/web/health/consults/{cid}/reply",
+                    json={"reply": "注意通风，接种流感疫苗。"}, headers=gh)
+    assert r.json()["success"], r.text
+    r = client.get("/api/web/health/consults", headers=rh)
+    assert r.json()["success"]
+
+
+def test_elderly_home_and_medication(client):
+    """老年端首页聚合 + 用药提交。"""
+    e = _login(client, "demo_elderly", "")
+    eh = {"Authorization": f"Bearer {e['token']}"}
+    r = client.get("/api/web/elderly/home", headers=eh)
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert "name" in data and "unread_notices" in data
+
+    r = client.post("/api/web/elderly/medications", json={
+        "drug_name": "降压药", "dosage": "1片", "times": "08:00,20:00",
+        "repeat_rule": "每天",
+        "start_date": "2026-08-21", "end_date": "2026-12-31",
+    }, headers=eh)
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["reminder_id"] > 0
+
+    r = client.get("/api/web/elderly/medications", headers=eh)
+    assert r.json()["success"] and len(r.json()["data"]) >= 1
+
+
+def test_elderly_voice_report(client):
+    """老年端语音报修走状态机。"""
+    e = _login(client, "demo_elderly", "")
+    eh = {"Authorization": f"Bearer {e['token']}"}
+    r = client.post("/api/web/elderly/voice-report", json={
+        "text": "3号楼楼道灯不亮了", "issue_type": "室内",
+    }, headers=eh)
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["issue_id"] > 0
