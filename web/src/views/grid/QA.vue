@@ -157,12 +157,22 @@ async function kAct(k, data, okMsg) {
               <n-input v-model:value="kOpOf(k).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:220px;" />
               <n-button size="small" type="success" @click="kAct(k, { action: 'audit', approve: true, opinion: kOpOf(k).opinion || '同意' }, '已通过发布')">✅ 通过</n-button>
               <n-button size="small" type="warning" @click="kAct(k, { action: 'audit', approve: false, opinion: kOpOf(k).opinion || '请补充' }, '已退回')">↩️ 退回</n-button>
+              <n-button size="small" quaternary @click="kAct(k, { action: 'withdraw' }, '已撤回审核，转草稿')">⏪ 撤回审核</n-button>
+              <n-popconfirm @positive-click="kAct(k, { action: 'delete' }, '已删除草稿')">
+                <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除</n-button></template>
+                确认删除该草稿？
+              </n-popconfirm>
             </template>
             <template v-if="k.status === '已发布'">
               <n-input v-model:value="kOpOf(k).reason" placeholder="下架原因（必填）" size="small" style="max-width:200px;" />
               <n-popconfirm @positive-click="kAct(k, { action: 'offline', reason: kOpOf(k).reason || '内容过期' }, '已下架')">
                 <template #trigger><n-button size="small" quaternary type="error">📛 下架</n-button></template>
                 确认下架？将记录原因
+              </n-popconfirm>
+              <n-button size="small" @click="newVersionOf(k)">🆕 建新版本</n-button>
+              <n-popconfirm @positive-click="showVersions(k)">
+                <template #trigger><n-button size="small" quaternary>📜 版本历史</n-button></template>
+                查看版本历史？
               </n-popconfirm>
             </template>
           </div>

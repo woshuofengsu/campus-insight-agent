@@ -37,6 +37,25 @@ function restoreDraft(d) {
   message.success('已恢复草稿，可继续填写')
 }
 
+async function saveDraftNow() {
+  if (!form.value.title && !form.value.location && !form.value.description) {
+    return message.warning('请至少填写问题描述')
+  }
+  try {
+    await issues.saveDraft({
+      title: form.value.title || '未填写标题',
+      location: form.value.location,
+      description: form.value.description,
+      urgency: form.value.urgency,
+      issue_type: form.value.issue_type,
+    })
+    message.success('草稿已保存（7 天内可恢复）')
+    drafts.value = (await issues.drafts()) || []
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
 const submit = async () => {
   if (!form.value.title || !form.value.location) {
     return message.warning('请填写问题描述和地址')
@@ -163,7 +182,10 @@ const submit = async () => {
             <n-input v-model:value="form.agent_relation" placeholder="如：家人 / 邻居" />
           </n-form-item>
         </template>
-        <n-button type="primary" block size="large" :loading="loading" @click="submit">📨 提交报修</n-button>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <n-button type="primary" block size="large" :loading="loading" @click="submit">📨 提交报修</n-button>
+          <n-button size="large" @click="saveDraftNow">💾 存草稿</n-button>
+        </div>
       </n-form>
     </div>
   </div>

@@ -49,6 +49,8 @@ export const issues = {
   action: (id, data) => api.post(`/issues/${id}/action`, data),
   drafts: () => api.get('/issues/drafts'),
   saveDraft: (data) => api.post('/issues/drafts', data),
+  deleteDraft: (id) => api.delete(`/issues/drafts/${id}`),
+  safetyReminders: (params) => api.get('/issues/safety-reminders', { params }),
 }
 
 // 提案
@@ -103,6 +105,8 @@ export const knowledge = {
   list: (params) => api.get('/knowledge', { params }),
   create: (data) => api.post('/knowledge', data),
   action: (id, data) => api.post(`/knowledge/${id}/action`, data),
+  versions: (id) => api.get(`/knowledge/${id}/versions`),
+  newVersion: (id, data) => api.post(`/knowledge/${id}/new-version`, data),
 }
 
 // 健康

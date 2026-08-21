@@ -362,6 +362,53 @@ def web_issue_safety_reminders(request: Request, limit: int = 100):
     return ok(get_safety_reminders(limit=limit))
 
 
+# ---- 报修草稿（必须注册在 /issues/{issue_id} 之前，避免被动态路由遮蔽） ----
+
+class IssueDraft(BaseModel):
+    title: str = Field(default="")
+    location: str = Field(default="")
+    description: str = Field(default="")
+    urgency: str = Field(default="一般")
+    issue_type: str = Field(default="室内")
+
+
+@app.get("/api/web/issues/drafts")
+def web_issue_drafts(request: Request):
+    """当前居民未完成的报修草稿。"""
+    from data.db_repair import get_drafts
+    u = _user(request)
+    return ok([dict(r) for r in get_drafts(u.get("uid"))])
+
+
+@app.post("/api/web/issues/drafts")
+def web_issue_draft_save(req: IssueDraft, request: Request):
+    """保存报修草稿（崩溃/超时自动生成，7 天内可恢复）。"""
+    from data.db_repair import create_draft
+    u = _user(request)
+    if not req.title:
+        return fail(1001, "请至少填写问题描述")
+    create_draft(
+        u.get("uid"), title=req.title, category="", issue_type=req.issue_type,
+        location=req.location, description=req.description or req.title,
+        urgency=req.urgency, reporter_name="", reporter_phone="",
+    )
+    return ok({"saved": True}, "草稿已保存")
+
+
+@app.delete("/api/web/issues/drafts/{did}")
+def web_issue_draft_delete(did: int, request: Request):
+    """删除草稿（校验归属：居民只能删自己的）。"""
+    from data.db_repair import get_draft, delete_draft
+    u = _user(request)
+    d = get_draft(did)
+    if not d:
+        return fail(1004, "草稿不存在")
+    if u.get("role") != "grid" and d.get("user_id") != u.get("uid"):
+        return fail(1003, "无权限删除该草稿")
+    delete_draft(did)
+    return ok({"deleted": did}, "已删除")
+
+
 @app.get("/api/web/issues/{issue_id}")
 def web_issue_detail(issue_id: int, request: Request):
     from data.db_repair import get_issues, get_issue_timeline
@@ -417,7 +464,7 @@ def _issue_view(r: dict) -> dict:
 
 
 class IssueAction(BaseModel):
-    action: str = Field(..., pattern="^(audit|dispatch|start|resolve|feedback|withdraw|close|transfer|negotiate|supplement|confirm_supplement|update_category|reopen|resubmit)$")
+    action: str = Field(..., pattern="^(audit|dispatch|start|resolve|feedback|withdraw|close|transfer|negotiate|supplement|confirm_supplement|update_category|reopen|resubmit|edit)$")
     opinion: str = Field(default="")
     approve: bool = Field(default=True)
     assignee_name: str = Field(default="")
@@ -427,6 +474,10 @@ class IssueAction(BaseModel):
     affects_timing: bool = Field(default=False)
     category: str = Field(default="")
     note: str = Field(default="")
+    title: str = Field(default="")
+    location: str = Field(default="")
+    description: str = Field(default="")
+    urgency: str = Field(default="")
 
 
 @app.post("/api/web/issues/{issue_id}/action")
@@ -435,14 +486,22 @@ def web_issue_action(issue_id: int, req: IssueAction, request: Request):
         audit_issue, dispatch_issue, start_process, resolve_issue, feedback_issue,
         withdraw_issue, close_issue, transfer_issue, negotiate_issue,
         supplement_issue, confirm_supplement, update_issue_category,
-        reopen_issue, resubmit_issue,
+        reopen_issue, resubmit_issue, edit_issue,
     )
     u = _user(request)
     role = u.get("role")
-    # 权限（spec 六）：状态管理类操作仅负责人；居民可 反馈/撤回/补充/重新打开/重新提交
-    resident_actions = {"feedback", "withdraw", "supplement", "reopen", "resubmit"}
+    # 权限（spec 六）：状态管理类操作仅负责人；居民可 反馈/撤回/补充/重新打开/重新提交/修改一次
+    resident_actions = {"feedback", "withdraw", "supplement", "reopen", "resubmit", "edit"}
     if role != "grid" and req.action not in resident_actions:
         return fail(1003, "无权限执行该操作（仅负责人可管理工单状态）")
+    # 归属校验：居民只能操作自己提交的工单
+    if role != "grid":
+        from data.db_repair import get_issue
+        issue = get_issue(issue_id)
+        if not issue:
+            return fail(1004, "工单不存在")
+        if issue.get("reporter_id") != u.get("uid"):
+            return fail(1003, "无权限操作该工单（非本人报修）")
     actor = u.get("name") or "负责人"
     a = req.action
     try:
@@ -475,6 +534,10 @@ def web_issue_action(issue_id: int, req: IssueAction, request: Request):
             ok_, msg = reopen_issue(issue_id, actor=actor)
         elif a == "resubmit":
             ok_, msg = resubmit_issue(issue_id, actor=actor)
+        elif a == "edit":
+            ok_, msg = edit_issue(issue_id, actor=actor, title=req.title,
+                                  location=req.location, description=req.description,
+                                  urgency=req.urgency)
         else:
             return fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001
@@ -974,6 +1037,7 @@ def web_knowledge_list(request: Request, category: str = "", limit: int = 50):
         "attachment": k.get("attachment"),
         "audit_opinion": k.get("audit_opinion") or "",
         "auditor": k.get("auditor") or "",
+        "version": k.get("version") or 1,
     } for k in rows])
 
 
@@ -1349,7 +1413,7 @@ def web_knowledge_create(req: KnowledgeCreate, request: Request):
 
 
 class KnowledgeAction(BaseModel):
-    action: str = Field(..., pattern="^(audit|offline)$")
+    action: str = Field(..., pattern="^(audit|offline|withdraw|delete)$")
     approve: bool = Field(default=True)
     opinion: str = Field(default="")
     reason: str = Field(default="")
@@ -1359,18 +1423,56 @@ class KnowledgeAction(BaseModel):
 def web_knowledge_action(kid: int, req: KnowledgeAction, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
-    from data.db_policy import audit_knowledge, take_down_knowledge
+    from data.db_policy import audit_knowledge, take_down_knowledge, withdraw_review, delete_knowledge
     from ui.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
     if req.action == "audit":
         # 发布人不能审核自己发布的内容，审核统一走「社区审核组」身份
         ok_, msg = audit_knowledge(kid, req.approve, opinion=req.opinion, actor="社区审核组")
-    else:
+    elif req.action == "offline":
         ok_, msg = take_down_knowledge(kid, req.reason, actor=actor)
+    elif req.action == "withdraw":
+        ok_, msg = withdraw_review(kid, actor=actor)
+    elif req.action == "delete":
+        ok_, msg = delete_knowledge(kid, actor=actor)
+    else:
+        return fail(1001, "不支持的操作")
     if not ok_:
         return fail(2001, msg)
     invalidate_knowledge()
     return ok({"knowledge_id": kid}, "操作成功")
+
+
+@app.get("/api/web/knowledge/{kid}/versions")
+def web_knowledge_versions(kid: int, request: Request):
+    """版本历史（负责人）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_policy import get_version_history
+    return ok(get_version_history(kid))
+
+
+@app.post("/api/web/knowledge/{kid}/new-version")
+def web_knowledge_new_version(kid: int, req: KnowledgeCreate, request: Request):
+    """已发布条目创建新版本（提交审核，审核通过自动替换旧版）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_policy import create_new_version, submit_review
+    from ui.cache import invalidate_knowledge
+    actor = _user(request).get("name") or "负责人"
+    nid, err = create_new_version(
+        kid, title=req.title, category=req.category,
+        plain_interpretation=req.plain_interpretation, source=req.source,
+        keywords=req.keywords, effective_date=req.effective_date,
+        content=req.content, summary=req.summary, expire_date=req.expire_date,
+        policy_number=req.policy_number, attachment=req.attachment,
+        actor=actor, auditor="社区审核组",
+    )
+    if nid <= 0:
+        return fail(2001, err or "创建版本失败")
+    submit_review(nid, auditor="社区审核组", actor=actor)
+    invalidate_knowledge()
+    return ok({"knowledge_id": nid}, "新版本已创建并提交审核")
 
 
 # ---- 提问人工回复 / 居民反馈 ----
@@ -1613,46 +1715,6 @@ def web_manage_sos(request: Request, status: str = ""):
     from data.db_elderly_care import get_sos_calls
     rows = get_sos_calls(status=status or None, limit=50)
     return ok([dict(r) for r in rows])
-
-
-# ---------------- 报修草稿（居民端崩溃恢复） ----------------
-
-@app.get("/api/web/issues/drafts")
-def web_issue_drafts(request: Request):
-    """当前居民未完成的报修草稿。"""
-    from data.db_repair import get_drafts
-    u = _user(request)
-    return ok([dict(r) for r in get_drafts(u.get("uid"))])
-
-
-class IssueDraft(BaseModel):
-    title: str = Field(default="")
-    location: str = Field(default="")
-    description: str = Field(default="")
-    urgency: str = Field(default="一般")
-    issue_type: str = Field(default="室内")
-
-
-@app.post("/api/web/issues/drafts")
-def web_issue_draft_save(req: IssueDraft, request: Request):
-    """保存报修草稿（崩溃/超时自动生成，7 天内可恢复）。"""
-    from data.db_repair import create_draft
-    u = _user(request)
-    if not req.title:
-        return fail(1001, "请至少填写问题描述")
-    create_draft(
-        u.get("uid"), title=req.title, category="", issue_type=req.issue_type,
-        location=req.location, description=req.description or req.title,
-        urgency=req.urgency, reporter_name="", reporter_phone="",
-    )
-    return ok({"saved": True}, "草稿已保存")
-
-
-@app.delete("/api/web/issues/drafts/{did}")
-def web_issue_draft_delete(did: int, request: Request):
-    from data.db_repair import delete_draft
-    delete_draft(did)
-    return ok({"deleted": did}, "已删除")
 
 
 # ---------------- 天气历史 / 社区概况 ----------------

@@ -81,6 +81,12 @@ def get_drafts(user_id: int) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def get_draft(draft_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM issue_drafts WHERE id=?", (draft_id,)).fetchone()
+        return dict(row) if row else None
+
+
 def delete_draft(draft_id: int) -> None:
     with get_db() as conn:
         conn.execute("DELETE FROM issue_drafts WHERE id=?", (draft_id,))
