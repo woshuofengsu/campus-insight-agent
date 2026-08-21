@@ -243,21 +243,39 @@ with _top_r:
 st.markdown(f'<div class="elderly-title">👴 {name}，您好！</div>', unsafe_allow_html=True)
 st.caption("点下面的大按钮就行，有事随时按红色按钮。")
 
+# 疾病预防联动语音提醒（#33：每天最多一次，最多连续 7 天；打开页面即播报）
+try:
+    from data.db_health_content import get_elderly_linkage_reminders, log_elderly_linkage_reminder
+    _linkage_reminders = get_elderly_linkage_reminders()
+    if _linkage_reminders and not st.session_state.get("_elderly_linkage_announced"):
+        st.session_state["_elderly_linkage_announced"] = True
+        for _lr in _linkage_reminders[:2]:
+            big_card(f"🩺 <strong>健康提醒：{_lr.get('text', '')}</strong>", bg="#f0f9ff", border="#2563eb")
+            tts_speak(_lr.get("text", ""))
+            log_elderly_linkage_reminder(_lr["content_id"], _lr.get("text", "")[:80])
+except Exception:
+    pass
+
 # 到点用药提醒（置顶，语音播报一次）
 due = get_due_medications(uid) if uid else []
 if due:
-    med_text = "，".join(f"{d['drug_name']} {d['dosage']}" for d in due)
-    big_card(f"💊 <strong>该吃药了：{med_text}</strong>", bg="#fefce8", border="#eab308")
-    if not st.session_state.get("_due_announced"):
-        st.session_state["_due_announced"] = True
-        tts_speak(f"该吃药了：{med_text}")
-        # 播报记录（spec 06.4：记录每次播报时间，负责人后台可查看）
-        try:
-            from data.db_notifications import log_activity
-            log_activity(name or "老人", "用药提醒播报", "medication_reminder", uid,
-                         med_text, module="老年端", detail=f"播报用药：{med_text}")
-        except Exception:
-            pass
+    # 同一时间超 3 条：先提示数量（spec：您有 X 条用药提醒）
+    if len(due) > 3:
+        big_card(f"💊 <strong>您有 {len(due)} 条用药提醒</strong>", bg="#fefce8", border="#eab308")
+        tts_speak(f"您有 {len(due)} 条用药提醒，请查看。")
+    else:
+        med_text = "，".join(f"{d['drug_name']} {d['dosage']}" for d in due)
+        big_card(f"💊 <strong>该吃药了：{med_text}</strong>", bg="#fefce8", border="#eab308")
+        if not st.session_state.get("_due_announced"):
+            st.session_state["_due_announced"] = True
+            tts_speak(f"该吃药了：{med_text}")
+            # 播报记录（spec 06.4：记录每次播报时间，负责人后台可查看）
+            try:
+                from data.db_notifications import log_activity
+                log_activity(name or "老人", "用药提醒播报", "medication_reminder", uid,
+                             med_text, module="老年端", detail=f"播报用药：{med_text}")
+            except Exception:
+                pass
 
 # 未读通知 + 最近联系记录
 unread = get_unread_count(uid) if uid else 0

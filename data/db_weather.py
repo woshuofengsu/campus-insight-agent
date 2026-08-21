@@ -992,6 +992,35 @@ def get_escalation_status(task_id: int) -> dict:
     }
 
 
+def get_senior_manager_ids() -> list[int]:
+    """更高级负责人名单（settings 表 senior_manager_ids，JSON 数组，可配置）。"""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key='senior_manager_ids'"
+            ).fetchone()
+        if not row:
+            return []
+        val = json.loads(row["value"] or "[]")
+        return [int(x) for x in val if str(x).isdigit()]
+    except Exception:
+        return []
+
+
+def set_senior_manager_ids(ids: list[int], actor: str = "负责人") -> None:
+    """配置更高级负责人名单（升级第 2 层；配置即留痕）。"""
+    val = json.dumps([int(x) for x in ids if str(x).isdigit()], ensure_ascii=False)
+    with get_db() as conn:
+        exists = conn.execute("SELECT 1 FROM settings WHERE key='senior_manager_ids'").fetchone()
+        if exists:
+            conn.execute("UPDATE settings SET value=? WHERE key='senior_manager_ids'", (val,))
+        else:
+            conn.execute("INSERT INTO settings (key, value) VALUES ('senior_manager_ids', ?)", (val,))
+        conn.commit()
+    log_activity(actor, "配置更高级负责人", "settings", module=MODULE,
+                 after_value=val, detail="天气检查任务超时升级第 2 层通知对象")
+
+
 def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
                            senior_user_ids: list[int] | None = None) -> dict:
     """超时升级（压测修正）：

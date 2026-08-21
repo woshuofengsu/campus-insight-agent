@@ -311,6 +311,16 @@ with tab_ask:
         c_type = st.selectbox("咨询类型", CONSULT_TYPES, key="hc_type")
         c_content = st.text_area("咨询内容（5-500 字）", height=120, key="hc_content")
         c_building = st.text_input("所属小区/楼栋（选填）", key="hc_building")
+        # 代报（#17：代报人姓名/电话/关系，选填）
+        c_agent = st.checkbox("我是代报（帮家人/邻居咨询，选填）", key="hc_agent")
+        c_agent_name = c_agent_phone = c_agent_rel = ""
+        if c_agent:
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                c_agent_name = st.text_input("代报人姓名", key="hc_agent_name")
+            with ac2:
+                c_agent_phone = st.text_input("代报人电话", key="hc_agent_phone")
+            c_agent_rel = st.text_input("与咨询人关系（如：家人/邻居）", key="hc_agent_rel")
         c_files = st.file_uploader("附件图片（选填，jpg/png，≤5MB，最多3张，仅负责人和您本人可见）",
                                    type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="hc_files")
         submitted = st.form_submit_button("🩺 提交咨询", type="primary", width="stretch")
@@ -332,6 +342,8 @@ with tab_ask:
         cid, msg, code = submit_consult(
             uid, c_name, c_phone, c_type, c_content, building=c_building,
             attachment_json=_attach,
+            is_agent_report=1 if c_agent else 0,
+            agent_name=c_agent_name, agent_phone=c_agent_phone, agent_relation=c_agent_rel,
         )
         if cid:
             st.success(

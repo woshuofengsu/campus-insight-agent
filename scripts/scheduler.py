@@ -64,9 +64,21 @@ def _weather_tasks(db_weather) -> dict:
 
 
 def _health_linkage_tasks(db_weather, db_health) -> list[dict]:
-    """健康天气联动自动触发：对生效窗口内（≤12h）的 active 预警逐条联动（每日去重）。"""
+    """健康天气联动自动触发：对生效窗口内（≤12h）的 active 预警逐条联动（每日去重）。
+
+    天气数据降级（>30 分钟未更新）时暂停新联动触发（spec #39：API 异常暂停新联动）。
+    """
     out: list[dict] = []
     try:
+        # 降级检查：缓存数据超过 30 分钟 → 暂停新联动（已触发保留）
+        try:
+            _fresh = db_weather.check_cache_freshness()
+            if _fresh.get("state") == "degraded":
+                db_health._log_once("联动暂停", "天气数据缓存降级，暂停新的健康天气联动触发",
+                                    "weather_linkage", "系统")
+                return out
+        except Exception:
+            pass
         from datetime import datetime as _dt, timedelta as _td
         cutoff = (_dt.now() + _td(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
         for a in db_weather.get_active_alerts():
@@ -101,7 +113,9 @@ def run_all() -> dict:
     results["auto_dispatch"] = _safe("自动分派", lambda: len(_dispatch.discover_and_dispatch(limit=20)))
     results["weather"] = _safe("天气自动任务", lambda: _weather_tasks(db_weather))
     results["weather_overdue"] = _safe("天气超时", db_weather.mark_overdue_tasks)
-    _safe("天气升级", db_weather.escalate_overdue_tasks)
+    # 天气升级：传入可配置的「更高级负责人」名单（settings senior_manager_ids，未配置则走无法升级分支）
+    _safe("天气升级", lambda: db_weather.escalate_overdue_tasks(
+        senior_user_ids=db_weather.get_senior_manager_ids()))
     _safe("天气预警解除", db_weather.expire_alerts)
     results["proposal_confirm"] = _safe("提案确认", db_proposal.auto_confirm_overdue)
     results["proposal_end"] = _safe("提案反馈", db_proposal.auto_end_unfeedback)
