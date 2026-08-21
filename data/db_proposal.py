@@ -1006,7 +1006,7 @@ def withdraw_proposal(pid: int, actor: str = "居民") -> tuple[bool, str]:
 
 
 def reopen_proposal(pid: int, actor: str = "居民") -> tuple[bool, str]:
-    """重新打开已撤回提案。→ 待审核（可修改一次后重新审核）。"""
+    """重新打开已撤回提案。→ 待审核（仅一次机会，可修改一次后重新审核，spec）。"""
     with get_db() as conn:
         _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
@@ -1014,6 +1014,13 @@ def reopen_proposal(pid: int, actor: str = "居民") -> tuple[bool, str]:
             return False, "提案不存在"
         if row["status"] != "已撤回":
             return False, f"当前状态「{row['status']}」不支持重新打开"
+        # 仅允许重新打开一次（spec：撤回后可重新打开，居民可修改一次）
+        _reopened = conn.execute(
+            "SELECT COUNT(*) c FROM activity_log WHERE target_type='proposal' "
+            "AND target_id=? AND action='重新打开提案'", (pid,),
+        ).fetchone()["c"]
+        if _reopened >= 1:
+            return False, "提案已重新打开过一次，如需修改请重新提交新提案"
         old = row["status"]
         conn.execute(
             "UPDATE proposals SET status='待审核', audit_status='待审核', audit_opinion='' WHERE id=?",
