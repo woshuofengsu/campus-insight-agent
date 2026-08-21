@@ -270,7 +270,7 @@ with alert_cols[2]:
             time_str = f"{hours // 24} 天" if hours >= 24 else f"{hours} 小时"
             urg = "🔴" if o.get("level") == "critical" else "🟡"
             st.markdown(
-                f'{urg} #{o["id"]} {o.get("title", "")[:22]} — '
+                f'{urg} #{o["id"]} {(o.get("title") or "")[:22]} — '
                 f'<span style="color:{TOKEN["danger"]};font-weight:600;">{time_str}</span>',
                 unsafe_allow_html=True,
             )
@@ -405,8 +405,8 @@ with rec_col1:
     recs = data["recurrences"]
     if recs:
         for r in recs[:5]:
-            utitle = r.get("unresolved_title", "")[:25]
-            rtitle = r.get("resolved_title", "")[:20]
+            utitle = (r.get("unresolved_title") or "")[:25]
+            rtitle = (r.get("resolved_title") or "")[:20]
             st.markdown(
                 f'🔄 **{utitle}**...  \n'
                 f'<span style="font-size:0.78em;color:{TOKEN["text_muted"]};">'
@@ -443,11 +443,11 @@ if data["overdues"]:
         oid = o["id"]
         hours = o.get("hours_open", 0)
         time_str = f"{hours // 24} 天" if hours >= 24 else f"{hours} 小时"
-        title = o.get("title", "")[:40]
+        title = (o.get("title") or "")[:40]
         cat = o.get("category", "")
         loc = o.get("location", "")
         urg = o.get("urgency", "")
-        reported = o.get("reported_at", "")[:10]
+        reported = (o.get("reported_at") or "")[:10]
         o_level = o.get("level", "")
 
         level = "🔴" if o_level == "critical" else "🟡"

@@ -170,11 +170,11 @@ if not urgent_issues:
 else:
     for issue in urgent_issues[:10]:
         iid = issue["id"]
-        title = issue.get("title", "")[:40]
+        title = (issue.get("title") or "")[:40]
         cat = issue.get("category", "")
         loc = issue.get("location", "")
         desc = issue.get("description", "")
-        reported = issue.get("reported_at", "")[:10]
+        reported = (issue.get("reported_at") or "")[:10]
         author = issue.get("author", "")
         status = issue.get("status", "")
 
@@ -233,7 +233,7 @@ else:
                     proc_note = issue.get("processing_note", "")
                     st.markdown(
                         f'<span style="font-size:0.78em;color:{TOKEN["success"]};font-weight:600;">'
-                        f'✅ 已于 {issue.get("resolved_at", "")[:10]} 解决</span>',
+                        f'✅ 已于 {(issue.get("resolved_at") or "")[:10]} 解决</span>',
                         unsafe_allow_html=True,
                     )
                     if proc_note:
@@ -252,12 +252,12 @@ if overdue_issues:
 
     for oi in overdue_issues[:5]:
         oi_id = oi["id"]
-        oi_title = oi.get("title", "")[:35]
+        oi_title = (oi.get("title") or "")[:35]
         oi_cat = oi.get("category", "")
         oi_loc = oi.get("location", "")
         oi_hours = oi.get("hours_open", 0)
         oi_urg = oi.get("urgency", "")
-        oi_reported = oi.get("reported_at", "")[:10]
+        oi_reported = (oi.get("reported_at") or "")[:10]
 
         level = "🔴" if oi.get("level") == "critical" else "🟠"
         time_str = f"{oi_hours // 24} 天" if oi_hours >= 24 else f"{oi_hours} 小时"
@@ -426,7 +426,7 @@ else:
     # 已解决卡片紧凑横排
     for ri in recently_resolved[:6]:
         ri_id = ri["id"]
-        ri_title = ri.get("title", "")[:30]
+        ri_title = (ri.get("title") or "")[:30]
         ri_cat = ri.get("category", "")
         ri_resolved = (ri.get("resolved_at") or "")[:10]
         with st.container(border=True):
@@ -543,7 +543,7 @@ else:
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
     for i, prop in enumerate(proposals):
         pid = prop["id"]
-        ptitle = prop.get("title", "")[:35]
+        ptitle = (prop.get("title") or "")[:35]
         supporters = prop.get("supporter_count", 0)
         pstatus = prop.get("status", "讨论中")
         pcat = prop.get("category", "")

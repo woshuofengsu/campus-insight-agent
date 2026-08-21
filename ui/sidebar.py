@@ -106,7 +106,7 @@ def render_sidebar(profile: dict, role: str):
     if kb or gov:
         _section_label("百科")
         for entry in (kb + gov)[:3]:
-            title = entry.get("title", "")[:18]
+            title = (entry.get("title") or "")[:18]
             cat = entry.get("category", "")
             st.markdown(
                 f'<div style="font-size:0.7em;color:{tx2};padding:2px 0;line-height:1.3;">'

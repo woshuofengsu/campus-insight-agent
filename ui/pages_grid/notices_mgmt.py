@@ -638,7 +638,7 @@ def _render_detail(n: dict):
                 f'{item.get("action", "")}'
                 + (f'　[{item.get("before_value", "")} → {item.get("after_value", "")}]'
                    if item.get("before_value") or item.get("after_value") else "")
-                + (f'　{item.get("detail", "")[:40]}' if item.get("detail") else "")
+                + (f'　{(item.get("detail") or "")[:40]}' if item.get("detail") else "")
             )
         if len(timeline) > 3:
             with st.expander(f"查看全部 {len(timeline)} 条留痕"):
@@ -648,7 +648,7 @@ def _render_detail(n: dict):
                         f'{item.get("action", "")}'
                         + (f'　[{item.get("before_value", "")} → {item.get("after_value", "")}]'
                            if item.get("before_value") or item.get("after_value") else "")
-                        + (f'　{item.get("detail", "")[:60]}' if item.get("detail") else "")
+                        + (f'　{(item.get("detail") or "")[:60]}' if item.get("detail") else "")
                     )
 
 

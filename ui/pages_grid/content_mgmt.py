@@ -103,8 +103,8 @@ with col1:
         for entry in notices:
             eid = entry["id"]
             cat = entry.get("category", "")
-            title = entry.get("title", "")[:30]
-            content = entry.get("content", "")[:60]
+            title = (entry.get("title") or "")[:30]
+            content = (entry.get("content") or "")[:60]
 
             # 看这条是不是正等删除确认
             confirming = st.session_state.get(_confirm_delete_key) == eid
@@ -165,7 +165,7 @@ with col2:
     else:
         for topic in all_topics:
             tid = topic["id"]
-            ttitle = topic.get("title", "")[:28]
+            ttitle = (topic.get("title") or "")[:28]
             participants = topic.get("participant_count", 0)
             is_active = topic.get("is_active", 1)
 

@@ -353,8 +353,7 @@ def create_knowledge(title: str, category: str, plain_interpretation: str,
             "INSERT INTO knowledge_base (category, title, content, keywords, audit_status, "
             "source, effective_date, expire_date, version, plain_interpretation, summary, "
             "publisher, policy_number, applicable_area, attachment, created_at, updated_at) "
-            "VALUES (?,?,?,?,'草稿',?,?,?,1,?,?,?,?,?,?,datetime('now','localtime'),"
-            "datetime('now','localtime'))",
+            "VALUES (?,?,?,?,'草稿',?,?,?,1,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
             (category, title.strip(), content, keywords.strip(), source.strip(),
              effective_date, expire_date, plain_interpretation.strip(), summary.strip(),
              actor, policy_number.strip(), applicable_area.strip(), attachment.strip()),
@@ -390,7 +389,8 @@ def update_knowledge(knowledge_id: int, title: str, category: str,
         conn.execute(
             "UPDATE knowledge_base SET category=?, title=?, content=?, keywords=?, "
             "source=?, effective_date=?, expire_date=?, plain_interpretation=?, summary=?, "
-            "policy_number=?, applicable_area=?, attachment=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            "policy_number=?, applicable_area=?, attachment=?, "
+            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (category, title.strip(), content, keywords.strip(), source.strip(),
              effective_date, expire_date, plain_interpretation.strip(), summary.strip(),
              policy_number.strip(), applicable_area.strip(), attachment.strip(), knowledge_id),

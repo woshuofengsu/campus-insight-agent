@@ -350,7 +350,7 @@ def render_tool_progress(events: list[dict] | None) -> None:
             if ev["tool"] in tool_events:
                 tool_events[ev["tool"]].update({
                     "status": "error",
-                    "error": ev.get("error", "")[:60],
+                    "error": (ev.get("error") or "")[:60],
                 })
 
     if not tool_events:

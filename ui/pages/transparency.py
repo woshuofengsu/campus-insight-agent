@@ -481,13 +481,13 @@ for i in issues:
     feed_items.append({
         "icon": icon,
         "text": f'{i.get("title", "")} — <span style="color:{TOKEN["text_muted"]};">{s}</span>',
-        "time": i.get("reported_at", "")[:10],
+        "time": (i.get("reported_at") or "")[:10],
     })
 for p in proposals_list:
     feed_items.append({
         "icon": "💡",
         "text": f'新提案：{p.get("title", "")} — 👍 {p.get("supporter_count", 0)} 人附议',
-        "time": p.get("created_at", "")[:10],
+        "time": (p.get("created_at") or "")[:10],
     })
 feed_items.sort(key=lambda x: x["time"], reverse=True)
 
