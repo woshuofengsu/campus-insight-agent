@@ -159,3 +159,48 @@ with tab3:
             f"{' · ' + s['target_name'] if s.get('target_name') else ''}"
             f"{' · ' + (s.get('handle_note') or '')[:40] if s.get('handle_note') else ''}"
         )
+
+    # 导出（用药/联系人/求助事件，电话脱敏）
+    st.markdown("---")
+    section("📤 导出")
+    try:
+        import csv as _csv
+        from io import StringIO as _SIO
+        from data.db_elderly_care import list_medication_reminders
+
+        def _mask_ph(p: str) -> str:
+            p = (p or "").strip()
+            return p[:3] + "****" + p[-4:] if len(p) == 11 else "****"
+
+        meds = list_medication_reminders()
+        buf = _SIO()
+        w = _csv.DictWriter(buf, fieldnames=["ID", "老人", "药品", "时间", "状态", "设置人"])
+        w.writeheader()
+        for m in meds:
+            w.writerow({"ID": m["id"], "老人": m.get("patient_name", ""), "药品": m.get("drug_name", ""),
+                        "时间": (m.get("created_at") or "")[:16], "状态": m.get("status", ""),
+                        "设置人": (m.get("actor") or "")[:20]})
+        st.download_button("⬇️ 用药提醒导出（CSV）", data=buf.getvalue().encode("utf-8-sig"),
+                           file_name="用药提醒.csv", mime="text/csv", key="ec_med_export")
+
+        contacts = list_emergency_contacts()
+        buf2 = _SIO()
+        w2 = _csv.DictWriter(buf2, fieldnames=["ID", "老人ID", "姓名", "电话(脱敏)", "关系", "状态"])
+        w2.writeheader()
+        for c in contacts:
+            w2.writerow({"ID": c["id"], "老人ID": c.get("user_id", ""), "姓名": c.get("name", ""),
+                         "电话(脱敏)": _mask_ph(c.get("phone")), "关系": c.get("relation", ""),
+                         "状态": c.get("status", "")})
+        st.download_button("⬇️ 紧急联系人导出（CSV，电话脱敏）", data=buf2.getvalue().encode("utf-8-sig"),
+                           file_name="紧急联系人.csv", mime="text/csv", key="ec_contact_export")
+
+        buf3 = _SIO()
+        w3 = _csv.DictWriter(buf3, fieldnames=["ID", "时间", "状态", "老人", "处理结果"])
+        w3.writeheader()
+        for s in sos_all:
+            w3.writerow({"ID": s["id"], "时间": (s.get("created_at") or "")[:16], "状态": s.get("status", ""),
+                         "老人": s.get("target_name", ""), "处理结果": (s.get("handle_note") or "")[:60]})
+        st.download_button("⬇️ 求助事件导出（CSV）", data=buf3.getvalue().encode("utf-8-sig"),
+                           file_name="求助事件.csv", mime="text/csv", key="ec_sos_export")
+    except Exception as e:  # noqa: BLE001
+        st.caption(f"导出不可用：{e}")

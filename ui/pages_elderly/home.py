@@ -582,49 +582,57 @@ st.markdown(
     '<div style="font-size:1.1em;font-weight:800;color:#64748b;text-align:center;">'
     '🆘 紧急求助（长按 3 秒，误触点取消即可）</div>', unsafe_allow_html=True)
 
-latest_sos = get_latest_sos(uid) if uid else None
-_sos_active = bool(latest_sos and latest_sos["status"] in ("求助中", "已响应"))
 
-if _sos_active:
-    # ---- 进行中：拨打状态 / 负责人响应状态 ----
-    if latest_sos["status"] == "求助中":
-        try:
-            escalate_sos(latest_sos["id"])   # 10 分钟未响应自动升级（幂等）
-        except Exception:
-            pass
-        latest_sos = get_latest_sos(uid) or latest_sos
+@st.fragment(run_every=5)
+def _sos_status_area():
+    """紧急求助状态区：每 5 秒自动刷新（跨模块联动 #5，状态变化主动更新）。"""
+    _uid = uid
+    latest_sos = get_latest_sos(_uid) if _uid else None
+    _sos_active = bool(latest_sos and latest_sos["status"] in ("求助中", "已响应"))
 
-    if latest_sos["status"] == "求助中":
-        if "已升级" in (latest_sos.get("result") or ""):
-            big_card(f"🚨 {latest_sos['result']}", bg="#fef2f2", border="#dc2626")
-        _render_sos_dialing(uid, name, latest_sos, approved)
-    else:  # 已响应
-        big_card("✅ <strong>负责人已确认响应，正在赶来处理。</strong><br>请保持电话畅通，不要离开原地。",
-                 bg="#f0fdf4", border="#16a34a")
-        if not st.session_state.get("_sos_responded_announced"):
-            st.session_state["_sos_responded_announced"] = True
-            tts_speak("负责人已响应您的紧急求助，正在赶来。")
-        if st.button("我没事了（收起求助状态）", key="sos_clear", width="stretch"):
-            _clear_sos_session()
-            st.rerun()
-else:
-    # ---- 非进行中：最近一次结果 + 触发入口 ----
-    if latest_sos and latest_sos["status"] == "已结束":
-        big_card(f"✅ <strong>您的紧急求助已处理。</strong><br>处理结果：{latest_sos.get('handle_note') or ''}",
-                 bg="#f0fdf4", border="#16a34a")
-        if not st.session_state.get("_sos_ended_announced"):
-            st.session_state["_sos_ended_announced"] = True
-            tts_speak("您的紧急求助已处理。")
-    elif latest_sos and latest_sos["status"] == "已取消":
-        big_card(f"ℹ️ 最近一次求助已取消：{latest_sos.get('result') or '已取消'}",
-                 bg="#f8fafc", border="#cbd5e1")
+    if _sos_active:
+        # ---- 进行中：拨打状态 / 负责人响应状态 ----
+        if latest_sos["status"] == "求助中":
+            try:
+                escalate_sos(latest_sos["id"])   # 10 分钟未响应自动升级（幂等）
+            except Exception:
+                pass
+            latest_sos = get_latest_sos(_uid) or latest_sos
 
-    if st.session_state.get("_sos_confirm"):
-        _render_sos_confirm(uid, name)
+        if latest_sos["status"] == "求助中":
+            if "已升级" in (latest_sos.get("result") or ""):
+                big_card(f"🚨 {latest_sos['result']}", bg="#fef2f2", border="#dc2626")
+            _render_sos_dialing(_uid, name, latest_sos, approved)
+        else:  # 已响应
+            big_card("✅ <strong>负责人已确认响应，正在赶来处理。</strong><br>请保持电话畅通，不要离开原地。",
+                     bg="#f0fdf4", border="#16a34a")
+            if not st.session_state.get("_sos_responded_announced"):
+                st.session_state["_sos_responded_announced"] = True
+                tts_speak("负责人已响应您的紧急求助，正在赶来。")
+            if st.button("我没事了（收起求助状态）", key="sos_clear", width="stretch"):
+                _clear_sos_session()
+                st.rerun()
     else:
-        st.components.v1.html(_LONG_PRESS_JS, height=130)
-        if st.button("🆘 紧急求助（点此进入确认，防误触）", key="sos_fallback",
-                     type="primary", width="stretch"):
-            st.session_state["_sos_confirm"] = True
-            st.session_state["_sos_confirm_at"] = time.time()
-            st.rerun()
+        # ---- 非进行中：最近一次结果 + 触发入口 ----
+        if latest_sos and latest_sos["status"] == "已结束":
+            big_card(f"✅ <strong>您的紧急求助已处理。</strong><br>处理结果：{latest_sos.get('handle_note') or ''}",
+                     bg="#f0fdf4", border="#16a34a")
+            if not st.session_state.get("_sos_ended_announced"):
+                st.session_state["_sos_ended_announced"] = True
+                tts_speak("您的紧急求助已处理。")
+        elif latest_sos and latest_sos["status"] == "已取消":
+            big_card(f"ℹ️ 最近一次求助已取消：{latest_sos.get('result') or '已取消'}",
+                     bg="#f8fafc", border="#cbd5e1")
+
+        if st.session_state.get("_sos_confirm"):
+            _render_sos_confirm(_uid, name)
+        else:
+            st.components.v1.html(_LONG_PRESS_JS, height=130)
+            if st.button("🆘 紧急求助（点此进入确认，防误触）", key="sos_fallback",
+                         type="primary", width="stretch"):
+                st.session_state["_sos_confirm"] = True
+                st.session_state["_sos_confirm_at"] = time.time()
+                st.rerun()
+
+
+_sos_status_area()

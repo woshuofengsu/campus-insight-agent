@@ -65,6 +65,27 @@ if contacts:
         st.caption(f"{c.get('relation', '')} {c.get('name', '')}　{_label}"
                    + (f"　审核意见：{c.get('audit_opinion', '')}" if c.get("audit_opinion") else ""),
                    unsafe_allow_html=True)
+        # 删除（二次确认；最后一个拦截在数据层）
+        del_key = f"_del_contact_{c['id']}"
+        if st.button(f"🗑️ 删除 {c.get('name', '')}", key=f"del_c_{c['id']}", width="stretch"):
+            st.session_state[del_key] = True
+        if st.session_state.get(del_key):
+            st.warning(f"确认删除联系人「{c.get('name', '')}」？")
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                if st.button("确认删除", key=f"del_c_ok_{c['id']}", width="stretch"):
+                    from data.db_elderly_care import delete_emergency_contact
+                    ok, msg = delete_emergency_contact(c["id"], actor=(profile or {}).get("name") or "老人")
+                    st.session_state.pop(del_key, None)
+                    if ok:
+                        st.success("已删除。")
+                    else:
+                        st.error(msg)
+                    st.rerun()
+            with cc2:
+                if st.button("取消", key=f"del_c_no_{c['id']}", width="stretch"):
+                    st.session_state.pop(del_key, None)
+                    st.rerun()
 else:
     st.info("未设置紧急联系人，可在下方协助录入（需负责人审核通过后生效）。")
 

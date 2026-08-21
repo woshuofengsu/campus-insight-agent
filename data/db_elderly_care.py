@@ -646,6 +646,61 @@ def list_medication_reminders(user_id: int | None = None,
     return result
 
 
+def remind_unreviewed_medications() -> list[dict]:
+    """用药提醒审核超时提醒（scheduler 调用）：
+      1. 待审核超 24 小时 → 通知负责人（每天一次幂等）；
+      2. 审核不通过超 7 天未修改 → 通知设置人。
+    """
+    reminded: list[dict] = []
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, drug_name, patient_name, status, created_at FROM medication_reminders "
+            "WHERE status='待审核' AND created_at < datetime('now', '-1 day')"
+        ).fetchall()
+        for r in rows:
+            done = conn.execute(
+                "SELECT id FROM activity_log WHERE module='老年端' AND action='用药审核超时提醒' "
+                "AND target_type='medication_reminder' AND target_id=? AND substr(created_at,1,10)=? LIMIT 1",
+                (r["id"], today),
+            ).fetchone()
+            if done:
+                continue
+            reminded.append({"id": r["id"], "drug": r["drug_name"], "kind": "unreviewed"})
+        rejected = conn.execute(
+            "SELECT id, drug_name, patient_name, status, created_at FROM medication_reminders "
+            "WHERE status='审核不通过' AND created_at < datetime('now', '-7 day')"
+        ).fetchall()
+        for r in rejected:
+            done = conn.execute(
+                "SELECT id FROM activity_log WHERE module='老年端' AND action='用药修改超期提醒' "
+                "AND target_type='medication_reminder' AND target_id=? AND substr(created_at,1,10)=? LIMIT 1",
+                (r["id"], today),
+            ).fetchone()
+            if done:
+                continue
+            reminded.append({"id": r["id"], "drug": r["drug_name"], "kind": "rejected"})
+    for item in reminded:
+        if item["kind"] == "unreviewed":
+            log_activity("系统", "用药审核超时提醒", "medication_reminder", item["id"],
+                         target_title=item["drug"], module=MODULE,
+                         detail="用药提醒待审核超过 24 小时，请尽快审核")
+            try:
+                from data.db_user import list_users
+                for u in list_users(role="grid"):
+                    from data.db_notifications import create_notification
+                    create_notification(u["id"], "medication",
+                                        "⏰ 用药提醒待审核超时",
+                                        f"「{item['drug']}」用药提醒待审核已超过 24 小时，请尽快处理。")
+            except Exception:
+                pass
+        else:
+            log_activity("系统", "用药修改超期提醒", "medication_reminder", item["id"],
+                         target_title=item["drug"], module=MODULE,
+                         detail="审核不通过已超过 7 天未修改，请提醒设置人补充")
+    return reminded
+
+
 def get_medication_timeline(reminder_id: int) -> list[dict]:
     """用药提醒审核/操作留痕时间线（最近在前）。"""
     with get_db() as conn:

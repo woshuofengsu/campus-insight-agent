@@ -118,6 +118,7 @@ def run_all() -> dict:
     results["sos_escalated"] = _safe("SOS升级", lambda: sum(
         1 for s in _ec.get_sos_calls(status="求助中", limit=50)
         if _ec.escalate_sos(s["id"], actor="系统")[0]))
+    results["med_remind"] = _safe("用药审核提醒", lambda: len(_ec.remind_unreviewed_medications()))
     results["issue_overdue"] = _safe("报修超时", lambda: len(_rep.mark_issue_overdue_notice()))
     results["draft_cleaned"] = _safe("草稿清理", lambda: _rep.clean_issue_drafts(days=7))
     results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
