@@ -53,6 +53,7 @@ def run_all() -> dict:
     results["content_expire"] = _safe("内容到期", db_health_content.expire_contents)
     results["unpin"] = _safe("置顶取消", db_health_content.auto_unpin_expired)
     results["monthly"] = _safe("月度提醒", db_health_content.monthly_update_reminder)
+    results["resubmit_remind"] = _safe("退回修改提醒", db_health_content.resubmit_reminder)
     results["policy_expire"] = _safe("政策到期", _pol.auto_expire_knowledge)
     results["policy_overdue"] = _safe("政策超时", _pol.mark_overdue_questions)
     results["policy_close"] = _safe("政策关闭", _pol.auto_close_stale_questions)
@@ -60,6 +61,7 @@ def run_all() -> dict:
         1 for s in _ec.get_sos_calls(status="求助中", limit=50)
         if _ec.escalate_sos(s["id"], actor="系统")[0]))
     results["issue_overdue"] = _safe("报修超时", lambda: len(_rep.mark_issue_overdue_notice()))
+    results["draft_cleaned"] = _safe("草稿清理", lambda: _rep.clean_issue_drafts(days=7))
     results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
     return results
 

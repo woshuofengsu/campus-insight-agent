@@ -536,3 +536,13 @@ def mark_issue_overdue_notice(actor: str = "系统") -> list[dict]:
         except Exception:
             pass  # 通知不是硬依赖
     return overdue
+
+
+def clean_issue_drafts(days: int = 7) -> int:
+    """清理超过 N 天的报修草稿（spec：草稿保存 7 天，超期删除）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            f"DELETE FROM issue_drafts WHERE created_at < datetime('now', '-{days} days')"
+        )
+        conn.commit()
+        return cur.rowcount
