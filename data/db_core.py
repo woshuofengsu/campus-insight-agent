@@ -519,6 +519,11 @@ def _m27_proposal_auditor(conn):
     _add_column_if_missing(conn, "proposals", "auditor", "TEXT DEFAULT ''")
 
 
+def _m28_issue_supplement_pending(conn):
+    """v28：community_issues 加 supplement_pending（居民补充信息待负责人确认标记）。"""
+    _add_column_if_missing(conn, "community_issues", "supplement_pending", "INTEGER DEFAULT 0")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -711,6 +716,7 @@ def init_db(db_path: str):
         (25, "settings", _m25_settings),
         (26, "knowledge_timestamps", _m26_knowledge_timestamps),
         (27, "proposal_auditor", _m27_proposal_auditor),
+        (28, "issue_supplement_pending", _m28_issue_supplement_pending),
     ]
     for version, name, fn in post:
         if version <= current:

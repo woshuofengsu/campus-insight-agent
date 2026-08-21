@@ -201,7 +201,16 @@ else:
                 # 快捷处理备注
                 quick_note_key = f"_urgent_note_{iid}"
                 st.text_input("备注", key=quick_note_key, placeholder="可选备注…", label_visibility="collapsed")
-                if status == "待处理":
+                # 报修状态机工单：dashboard 不做快捷操作（防破坏状态机，R73），引导去工单管理
+                _REPAIR_STATUSES = {
+                    "待审核", "退回补充信息", "已审核待派单", "已派单", "处理中",
+                    "待居民反馈", "已撤回", "已关闭", "待协商", "已转出",
+                }
+                if status in _REPAIR_STATUSES:
+                    st.caption("报修工单，按报修流程处理（审核→派单→处理→反馈）。")
+                    if st.button("去工单管理处理", key=f"urgent_goto_{iid}", width="stretch"):
+                        st.switch_page("ui/pages_grid/issues_mgmt.py")
+                elif status == "待处理":
                     btn_cols = st.columns(2)
                     with btn_cols[0]:
                         if st.button("🔄 处理中", key=f"urgent_progress_{iid}", width="stretch"):

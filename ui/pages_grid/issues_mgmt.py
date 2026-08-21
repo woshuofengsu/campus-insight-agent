@@ -15,6 +15,8 @@ from data.db_repair import (
     get_issues, get_issue_timeline, get_pending_review_issues,
     audit_issue, dispatch_issue, start_process, resolve_issue,
     close_issue, transfer_issue, negotiate_issue,
+    supplement_issue as db_supplement, confirm_supplement as db_confirm_supplement,
+    update_issue_category as db_update_category,
 )
 from data.db_notifications import log_activity
 from ui.cache import invalidate_issues
@@ -42,6 +44,28 @@ _TERMINAL = {"处理结束", "已关闭", "已转出", "已撤回"}
 _ACTIVE = {"待审核", "退回补充信息", "已审核待派单", "已派单", "处理中", "待协商", "待居民反馈"}
 
 _URGENCY_EMOJI = {"紧急": "🔴", "中等": "🟠", "一般": "🟡", "普通": "🔵"}
+_DEADLINE_HOURS = {"紧急": 1, "中等": 4, "一般": 24, "普通": 48}
+
+
+def _deadline_info(issue: dict) -> tuple[bool, str]:
+    """超时判定（R50/R51）：按审核通过时间计时，未结束状态才判；返回 (是否超时, 标签文案)。"""
+    if issue.get("status") not in ("已审核待派单", "已派单", "处理中", "待居民反馈"):
+        return False, ""
+    approved = issue.get("approved_at")
+    if not approved:
+        return False, ""
+    try:
+        base = datetime.strptime(str(approved)[:19], "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return False, ""
+    hours = _DEADLINE_HOURS.get(issue.get("urgency", ""), 24)
+    used_h = (datetime.now() - base).total_seconds() / 3600.0
+    if used_h > hours:
+        return True, f"⏰ 已超时 {int(used_h - hours)} 小时"
+    remain = hours - used_h
+    if remain < 1:
+        return False, f"⏰ 剩余不足 1 小时"
+    return False, f"⏰ 剩余 {int(remain)} 小时"
 
 page_header("📋 工单管理", "报修工单负责人工作台：审核、派单、处理、特殊情况、完整留痕。")
 
@@ -123,13 +147,24 @@ def _render_issue_card(issue: dict):
     """主列表卡片：字段 + 详情（时间线、操作按钮按状态显示）。"""
     iid = issue["id"]
     status = issue.get("status", "")
+    overdue, deadline_txt = _deadline_info(issue)
+    overdue_html = (f'&nbsp;<span style="color:#ffffff;background:#dc2626;font-size:0.75em;'
+                    f'font-weight:700;border-radius:99px;padding:2px 8px;">{deadline_txt}</span>'
+                    if overdue else
+                    f'&nbsp;<span style="color:#f97316;font-size:0.78em;">{deadline_txt}</span>'
+                    if deadline_txt else "")
+    card_bg = ' style="border:2px solid #dc2626;"' if overdue else ""
     with st.container(border=True):
         st.markdown(
+            f'<div{card_bg}>'
             f'<span style="font-weight:700;color:{TOKEN["text"]};">#{iid} {issue.get("title","")[:40]}</span>'
             f'&nbsp;{_status_badge(status)}'
             + (f'&nbsp;{_URGENCY_EMOJI.get(issue.get("urgency",""), "")} {issue.get("urgency","")}' if issue.get("urgency") else "")
+            + overdue_html
             + (f'&nbsp;<span style="color:#dc2626;font-size:0.78em;font-weight:600;">🚧 违规搭建</span>' if issue.get("is_violation") else "")
-            + (f'&nbsp;<span style="color:#7c3aed;font-size:0.78em;font-weight:600;">非社区责任</span>' if issue.get("non_community_responsibility") else ""),
+            + (f'&nbsp;<span style="color:#7c3aed;font-size:0.78em;font-weight:600;">非社区责任</span>' if issue.get("non_community_responsibility") else "")
+            + (f'&nbsp;<span style="color:#b45309;font-size:0.78em;font-weight:600;">📝 有补充待确认</span>' if issue.get("supplement_pending") else "")
+            + '</div>',
             unsafe_allow_html=True,
         )
         st.caption(
@@ -267,6 +302,42 @@ def _render_detail(issue: dict):
                 st.success("已开始处理。")
                 invalidate_issues()
                 st.rerun()
+
+    # 4) 处理中：继续原维修人员（R40，留痕记录选择，不触发改派）
+    if status == "处理中" and issue.get("assignee_name"):
+        if st.button(f"✅ 继续原维修人员（{issue['assignee_name']}）处理", key=f"m_keep_{iid}", width="stretch"):
+            log_activity(_actor, "确认继续原维修人员", "issue", iid, issue.get("title", ""),
+                         module="报修", detail=f"继续由 {issue['assignee_name']} 处理，不重新分派")
+            st.success("已记录：继续原维修人员处理。")
+            invalidate_issues()
+            st.rerun()
+
+    # 5) 修改分类（R27；已分派/处理中改分类 → 强制重新分派 R28）
+    st.markdown("**🏷️ 修改分类**")
+    cat_opts = ["公共设施", "环境卫生", "房屋维修", "水电燃气", "绿化养护", "其他"]
+    cur_cat = issue.get("category") or ""
+    cat_sel = st.selectbox("选择新分类", cat_opts,
+                           index=cat_opts.index(cur_cat) if cur_cat in cat_opts else 0,
+                           key=f"m_cat_{iid}")
+    if st.button("保存分类修改", key=f"m_cat_save_{iid}", width="stretch"):
+        ok, msg = db_update_category(iid, cat_sel, actor=_actor)
+        if ok:
+            st.success(msg)
+            invalidate_issues()
+            st.rerun()
+        else:
+            st.error(msg)
+
+    # 6) 补充信息确认（R34/R35：居民补充后负责人确认，影响紧急程度则计时重算）
+    if issue.get("supplement_pending"):
+        st.markdown("**📝 待确认补充信息**")
+        affects = st.checkbox("补充信息影响紧急程度/分类（确认后计时重新计算）", key=f"m_supp_affects_{iid}")
+        if st.button("确认补充信息", key=f"m_supp_ok_{iid}", width="stretch"):
+            ok, msg = db_confirm_supplement(iid, affects_timing=affects, actor=_actor)
+            if ok:
+                st.success(msg)
+                invalidate_issues()
+                st.rerun()
             else:
                 st.error(msg)
 
@@ -368,6 +439,11 @@ with f2:
     type_choice = st.selectbox("分类", ["全部", "室外", "室内"], key="mgmt_type")
 with f3:
     urg_choice = st.selectbox("紧急程度", ["全部", "紧急", "中等", "一般", "普通"], key="mgmt_urgency")
+f4, f5 = st.columns(2)
+with f4:
+    period_choice = st.selectbox("时间范围", ["全部", "近7天", "近30天"], key="mgmt_period")
+with f5:
+    st.caption("按提交时间过滤")
 search = st.text_input("🔍 搜索标题 / 描述 / 地址", key="mgmt_search", placeholder="输入关键词…")
 
 issues = get_issues(
@@ -377,6 +453,10 @@ issues = get_issues(
 )
 if urg_choice != "全部":
     issues = [i for i in issues if i.get("urgency") == urg_choice]
+if period_choice != "全部":
+    from datetime import timedelta
+    _cut = (datetime.now() - timedelta(days={"近7天": 7, "近30天": 30}[period_choice])).strftime("%Y-%m-%d %H:%M:%S")
+    issues = [i for i in issues if (i.get("reported_at") or "") >= _cut]
 if search:
     kw = search.lower()
     issues = [

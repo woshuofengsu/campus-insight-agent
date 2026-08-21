@@ -25,12 +25,26 @@ CATEGORY_DEPT_MAP = {
 
 
 def _grid_worker_for(dept: str) -> dict | None:
-    """按部门找一个网格员，返回整行 dict。"""
+    """按部门找一个网格员，返回整行 dict。
+
+    优先挑「当前处理中工单最少」的网格员（R46：自动分派按空闲状态），
+    避免任务全压在第一个网格员身上。
+    """
     try:
         from data.db_user import list_users
-        for u in list_users(role="grid"):
-            if (u.get("building") or "").strip() == dept:
-                return u
+        candidates = [u for u in list_users(role="grid") if (u.get("building") or "").strip() == dept]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        # 统计每个网格员当前「处理中/已派单」工单数，取最少的
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT assignee_name, COUNT(*) c FROM community_issues "
+                "WHERE status IN ('已派单','处理中') GROUP BY assignee_name"
+            ).fetchall()
+        load = {r["assignee_name"]: r["c"] for r in rows}
+        return min(candidates, key=lambda u: load.get(_worker_display_name(u), 0))
     except Exception:
         _log.warning("_grid_worker_for 在 dept=%r 下没找到网格员", dept, exc_info=True)
     return None

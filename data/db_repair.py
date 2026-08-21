@@ -100,6 +100,8 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
     # 校验
     if not title or not description or not location:
         return 0, "报修标题、地址和问题描述都不能为空，请补充完整。"
+    if not (reporter_name or "").strip():
+        return 0, "请填写报修人姓名。"
     if len(description.strip()) < 5:
         return 0, "问题描述太短，请至少写 5 个字。"
     if len(description.strip()) > 200:
@@ -183,22 +185,98 @@ def dispatch_issue(issue_id: int, assignee_name: str, assignee_phone: str,
     """分派/改派维修人员。状态 → 已派单。"""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT status FROM community_issues WHERE id=?", (issue_id,)
+            "SELECT status, assignee_name, assignee_phone, title FROM community_issues WHERE id=?",
+            (issue_id,),
         ).fetchone()
         if row is None:
             return False, "工单不存在"
         if row["status"] not in ("已审核待派单", "已派单", "处理中"):
             return False, f"当前状态「{row['status']}」不支持分派"
         old = row["status"]
+        old_name = row["assignee_name"] or ""
         conn.execute(
             "UPDATE community_issues SET status='已派单', assignee_name=?, assignee_phone=? WHERE id=?",
             (assignee_name, assignee_phone, issue_id),
         )
         conn.commit()
 
+    # 改派（原维修人员存在且不同）：通知原人员取消任务 + 新人员接手（R42，失败自动重试一次 R43）
+    is_reassign = bool(old_name) and old_name != assignee_name
+    detail = f"维修人员：{assignee_name} {assignee_phone}"
+    if is_reassign:
+        _notify_worker(old_name, old_name, "取消任务", f"工单 #{issue_id}（{row['title'][:20]}）已改派他人，您无需再处理。", issue_id)
+        _notify_worker(assignee_name, assignee_phone, "接手任务", f"工单 #{issue_id}（{row['title'][:20]}）已分派给您，请及时处理。", issue_id)
+        detail += f"；原维修人员：{old_name}（已通知取消任务）"
+
     log_activity(actor, "分派维修人员", "issue", issue_id, module=MODULE,
-                 before_value=old, after_value="已派单",
-                 detail=f"维修人员：{assignee_name} {assignee_phone}")
+                 before_value=old, after_value="已派单", detail=detail)
+    return True, ""
+
+
+def _notify_worker(worker_name: str, worker_phone: str, action: str,
+                   text: str, issue_id: int) -> None:
+    """通知维修人员（改派场景：原人员取消 / 新人员接手）。失败自动重试一次，仍失败记异常。"""
+    for attempt in range(2):
+        try:
+            # 维修人员若有系统账号（按姓名/电话匹配）则站内通知，否则留痕即可
+            from data.db_user import list_users
+            notified = False
+            for u in list_users(role="grid"):
+                if (u.get("name") and u["name"] == worker_name) or (
+                    u.get("phone") and u["phone"] == worker_phone
+                ):
+                    from data.db_notifications import create_notification
+                    create_notification(u["id"], "dispatch", f"工单 #{issue_id} {action}", text)
+                    notified = True
+            return
+        except Exception as e:  # noqa: BLE001
+            if attempt == 1:
+                try:
+                    from data.db_notifications import log_exception
+                    log_exception("报修", f"改派通知失败（{worker_name} {action}）：{e}")
+                except Exception:
+                    pass
+                return
+            continue
+
+
+def update_issue_category(issue_id: int, category: str, actor: str = "负责人") -> tuple[bool, str]:
+    """负责人修改工单分类（R27）。
+
+    已分派/处理中的工单改分类后，原维修人员可能不匹配 → 强制重新分派（R28）：
+    清空维修人员、状态回「已审核待派单」，留痕记录原因，由系统重新派单。
+    """
+    category = (category or "").strip()
+    if not category:
+        return False, "请选择分类"
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status, category, assignee_name FROM community_issues WHERE id=?",
+            (issue_id,),
+        ).fetchone()
+        if row is None:
+            return False, "工单不存在"
+        old_cat = row["category"] or ""
+        old_status = row["status"]
+        if category == old_cat:
+            return False, "分类未变化"
+        if old_status in ("已派单", "处理中"):
+            # 强制重新分派：清空维修人员 + 回待派单
+            conn.execute(
+                "UPDATE community_issues SET category=?, assignee_name='', assignee_phone='', "
+                "status='已审核待派单' WHERE id=?",
+                (category, issue_id),
+            )
+            conn.commit()
+            log_activity(actor, "修改工单分类（强制重新分派）", "issue", issue_id,
+                         module=MODULE, before_value=f"{old_status}·{old_cat}",
+                         after_value=f"已审核待派单·{category}",
+                         detail=f"分类由「{old_cat}」改为「{category}」，原维修人员 {row['assignee_name'] or ''} 不匹配，系统将重新派单")
+            return True, "分类已修改，工单已回到待派单（原维修人员不匹配，系统将重新分派）。"
+        conn.execute("UPDATE community_issues SET category=? WHERE id=?", (category, issue_id))
+        conn.commit()
+    log_activity(actor, "修改工单分类", "issue", issue_id, module=MODULE,
+                 before_value=old_cat, after_value=category)
     return True, ""
 
 
@@ -258,10 +336,18 @@ def feedback_issue(issue_id: int, satisfied: bool, reason: str = "",
             return False, "不满意必须填写原因"
         old = row["status"]
         new_status = "处理结束" if satisfied else "处理中"
-        conn.execute(
-            "UPDATE community_issues SET status=?, satisfaction=?, satisfaction_reason=? WHERE id=?",
-            (new_status, "满意" if satisfied else "不满意", reason, issue_id),
-        )
+        if satisfied:
+            conn.execute(
+                "UPDATE community_issues SET status=?, satisfaction=?, satisfaction_reason=? WHERE id=?",
+                (new_status, "满意", reason, issue_id),
+            )
+        else:
+            # 不满意退回处理中：时限从退回时刻重新计算（R39）
+            conn.execute(
+                "UPDATE community_issues SET status=?, satisfaction=?, satisfaction_reason=?, "
+                "approved_at=CURRENT_TIMESTAMP WHERE id=?",
+                (new_status, "不满意", reason, issue_id),
+            )
         conn.commit()
     log_activity(actor, "满意" if satisfied else "不满意", "issue", issue_id, module=MODULE,
                  before_value=old, after_value=new_status, detail=reason)
@@ -389,7 +475,7 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
         new_count = fresh["supplement_count"] + 1
         conn.execute(
             "UPDATE community_issues SET supplement_count=supplement_count+1, "
-            "supplemented_at=CURRENT_TIMESTAMP WHERE id=?",
+            "supplemented_at=CURRENT_TIMESTAMP, supplement_pending=1 WHERE id=?",
             (issue_id,),
         )
         conn.execute(
@@ -411,6 +497,41 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
             )
     except Exception:
         pass  # 通知不是硬依赖
+    return True, ""
+
+
+def confirm_supplement(issue_id: int, affects_timing: bool = False,
+                       actor: str = "负责人") -> tuple[bool, str]:
+    """负责人确认补充信息（R34/R35）。
+
+    affects_timing=True：补充影响紧急程度/分类 → 计时从确认时刻重新计算。
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status, title, supplement_pending FROM community_issues WHERE id=?",
+            (issue_id,),
+        ).fetchone()
+        if row is None:
+            return False, "工单不存在"
+        if not row["supplement_pending"]:
+            return False, "该工单没有待确认的补充信息"
+        if affects_timing:
+            # 计时重算：以确认时间为新的计时起点（spec：补充影响紧急程度 → 重新计算时限）
+            conn.execute(
+                "UPDATE community_issues SET supplement_pending=0, approved_at=CURRENT_TIMESTAMP "
+                "WHERE id=?",
+                (issue_id,),
+            )
+            after = "已确认（计时重算）"
+        else:
+            conn.execute(
+                "UPDATE community_issues SET supplement_pending=0 WHERE id=?", (issue_id,)
+            )
+            after = "已确认"
+        conn.commit()
+    log_activity(actor, "确认补充信息", "issue", issue_id, row["title"] or "",
+                 module=MODULE, before_value="待确认", after_value=after,
+                 detail="补充信息不影响紧急程度/分类" if not affects_timing else "补充信息影响紧急程度/分类，时限已重新计算")
     return True, ""
 
 

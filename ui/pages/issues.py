@@ -149,6 +149,15 @@ with st.container(border=True):
             reporter_name = st.text_input("报修人姓名", value=_my_name, key="rep_form_name")
         with c4:
             reporter_phone = st.text_input("联系电话（手机号）", placeholder="138****1234", key="rep_form_phone")
+        is_agent = st.checkbox("我是代报（帮家人/邻居报修，选填）", key="rep_form_agent")
+        agent_name = agent_phone = agent_rel = ""
+        if is_agent:
+            c5, c6 = st.columns(2)
+            with c5:
+                agent_name = st.text_input("代报人姓名", key="rep_form_agent_name")
+            with c6:
+                agent_phone = st.text_input("代报人电话", key="rep_form_agent_phone")
+            agent_rel = st.text_input("与报修人关系（如：家人/邻居）", key="rep_form_agent_rel")
         photos = st.file_uploader("现场照片（选填，jpg/png，≤5MB，最多3张）",
                                   type=["jpg", "jpeg", "png"], accept_multiple_files=True,
                                   help="照片仅负责人和您本人可见")
@@ -217,14 +226,23 @@ with st.container(border=True):
                         if st.button("✅ 用纠正后的描述提交", key="rep_corr_yes", width="stretch"):
                             st.session_state.pop("_rep_corr", None)
                             _do_submit_issue(_corr["new"], loc_t, name_t, phone_t,
-                                             urgency, issue_type, photos)
+                                             urgency, issue_type, photos,
+                                             orig_text=_corr["orig"], is_agent=1 if is_agent else 0,
+                                             agent_name=agent_name, agent_phone=agent_phone,
+                                             agent_relation=agent_rel)
                     with c2:
                         if st.button("↩️ 用原文提交", key="rep_corr_no", width="stretch"):
                             st.session_state.pop("_rep_corr", None)
                             _do_submit_issue(title_t, loc_t, name_t, phone_t,
-                                             urgency, issue_type, photos)
+                                             urgency, issue_type, photos,
+                                             orig_text="", is_agent=1 if is_agent else 0,
+                                             agent_name=agent_name, agent_phone=agent_phone,
+                                             agent_relation=agent_rel)
                 else:
-                    _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency, issue_type, photos)
+                    _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency, issue_type, photos,
+                                     orig_text="", is_agent=1 if is_agent else 0,
+                                     agent_name=agent_name, agent_phone=agent_phone,
+                                     agent_relation=agent_rel)
 
 def _load_photos(raw: str | None) -> list[str]:
     """解析照片路径 JSON，返回可显示的绝对路径列表（仅负责人和本人可见）。"""
@@ -237,8 +255,14 @@ def _load_photos(raw: str | None) -> list[str]:
     return [p for p in (resolve_path(x) for x in paths) if p]
 
 
-def _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency_val, issue_type_val, photos_list):
-    """真正提交工单（校验已通过；AI 分类 + 照片保存 + 结果提示）。"""
+def _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency_val, issue_type_val, photos_list,
+                     orig_text: str = "", is_agent: int = 0, agent_name: str = "",
+                     agent_phone: str = "", agent_relation: str = ""):
+    """真正提交工单（校验已通过；AI 分类 + 照片保存 + 结果提示）。
+
+    orig_text：错别字纠正前的原文（纠正过时传入，用于留痕双保留 R69）。
+    is_agent/agent_*：代报信息（R11：代报人姓名/电话/关系）。
+    """
     category, _ = _llm_classify(title_t, "")
     photo_before = "[]"
     upload_errs: list[str] = []
@@ -256,12 +280,45 @@ def _do_submit_issue(title_t, loc_t, name_t, phone_t, urgency_val, issue_type_va
         st.error("；".join(upload_errs))
         st.info("照片未保存，问题描述仍保留，请检查照片后重新提交。")
         return
+
+    # 第三方施工两段式（R18）：先提示请直接联系施工方，居民坚持才提交
+    if orig_text == "":  # 只在首提时判定
+        try:
+            from data.db_repair import detect_special_case
+            if detect_special_case(title_t, loc_t) == "third_party" and not st.session_state.get("_rep_third_party_ok"):
+                st.warning(
+                    "⚠️ 该问题可能属**第三方施工责任**，建议直接联系施工方处理，社区可协助协调。\n\n"
+                    "如您坚持提交，社区将生成工单并核实处理（标记「非社区责任」）。"
+                )
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("✅ 仍要提交工单", key="rep_third_ok", width="stretch"):
+                        st.session_state["_rep_third_party_ok"] = True
+                        st.rerun()
+                with c2:
+                    if st.button("↩️ 我再想想", key="rep_third_no", width="stretch"):
+                        st.info("已取消提交。您也可以拨打社区电话沟通处理。")
+                return
+        except Exception:
+            pass
+
+    # 错别字纠正留痕（R69：原始描述与纠正后描述均保留在日志）
+    if orig_text and orig_text != title_t:
+        try:
+            from data.db_notifications import log_activity
+            log_activity(name_t or "居民", "错别字纠正后提交", "issue", module="报修",
+                         detail=f"原始描述：{orig_text[:100]}｜提交描述：{title_t[:100]}")
+        except Exception:
+            pass
+
     draft_id = st.session_state.get("_active_draft_id")
     issue_id, hint = submit_issue(
         title=title_t, category=category, issue_type=issue_type_val,
         location=loc_t, description=title_t, urgency=urgency_val,
         reporter_name=name_t, reporter_phone=phone_t, reporter_id=uid,
         photo_before=photo_before, draft_id=draft_id,
+        is_agent_report=is_agent, agent_name=agent_name,
+        agent_phone=agent_phone, agent_relation=agent_relation,
     )
     if hint == "safety":
         st.error(
