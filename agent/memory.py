@@ -40,14 +40,9 @@ class MemoryManager:
             self.st.last_interaction = None
         if "tool_registry" not in self.st:
             self.st.tool_registry = []
-        # LangChain 记忆：只建一次，多轮复用
+        # LangChain 记忆：懒加载（仅在线模式真正对话时才建；离线模式不建，省初始化耗时）
         if "langchain_memory" not in self.st:
-            self.st.langchain_memory = ConversationBufferMemory(
-                memory_key="chat_history",
-                return_messages=True,
-                input_key="input",
-                output_key="output",
-            )
+            self.st.langchain_memory = None
 
     # 用户身份
 
@@ -148,9 +143,16 @@ class MemoryManager:
     # LangChain 对接
 
     def get_langchain_memory(self) -> ConversationBufferMemory:
-        """返回常驻的 LangChain ConversationBufferMemory（存在 session_state 里）。
+        """返回常驻的 LangChain ConversationBufferMemory（懒创建，存在 session_state 里）。
 
         返回前先裁掉旧消息，LLM 上下文才不会越堆越长。
         """
+        if self.st.langchain_memory is None:
+            self.st.langchain_memory = ConversationBufferMemory(
+                memory_key="chat_history",
+                return_messages=True,
+                input_key="input",
+                output_key="output",
+            )
         self._prune_langchain_memory()
         return self.st.langchain_memory

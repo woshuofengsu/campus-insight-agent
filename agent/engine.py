@@ -6,6 +6,9 @@
 """
 import re
 from datetime import datetime
+from functools import lru_cache
+
+import streamlit as st
 from utils.text import split_thinking
 
 from langchain_openai import ChatOpenAI
@@ -18,6 +21,25 @@ from config import (
 )
 from agent.prompt import get_system_prompt, detect_persona
 from agent.memory import MemoryManager
+
+
+@st.cache_resource(show_spinner=False)
+def _shared_tools():
+    """工具集进程级共享：16 个工具定义不依赖会话，跨会话复用（首会话后加载近 0 耗时）。"""
+    from tools import discover_tools
+    return discover_tools()
+
+
+@st.cache_resource(show_spinner=False)
+def _shared_llm():
+    """LLM 客户端进程级共享（无 key 时由上层走 OfflineAgent，不会到这里）。"""
+    return ChatOpenAI(
+        model=DEEPSEEK_MODEL,
+        openai_api_key=DEEPSEEK_API_KEY,
+        base_url=DEEPSEEK_BASE_URL,
+        temperature=AGENT_TEMPERATURE,
+        max_tokens=2000,
+    )
 from tools import discover_tools
 from utils.logger import get_logger
 
@@ -29,8 +51,9 @@ class CommunityAgent:
 
     def __init__(self, session_state):
         self.memory = MemoryManager(session_state)
-        self.llm = self._create_llm()
-        self.tools = discover_tools()
+        # 工具集与 LLM 客户端进程级共享（cache_resource），仅首次会话有开销
+        self.llm = _shared_llm()
+        self.tools = list(_shared_tools())
         self.memory.register_tools([t.name for t in self.tools])
 
         if not self.tools:

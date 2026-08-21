@@ -75,9 +75,9 @@ def main():
         is_offline = True
         st.session_state._force_offline = True
 
-    # 初始化会话（DB + Agent + 记忆）
+    # 初始化数据库（登录前只跑 DB/种子，<0.1s；agent 延迟到登录后创建，登录页秒开）
     try:
-        agent, memory = init_session()
+        agent, memory = init_session(need_agent=False)
     except Exception as e:
         st.error(f"😅 系统初始化失败：{e}\n请检查 .env 中的 API Key 是否正确。")
         st.stop()
@@ -97,8 +97,28 @@ def main():
 
     # 登录门槛
     if SS.login_user_id not in st.session_state:
+        # 预热 agent 模块（后台线程 import，登录等待期间完成，点登录后秒建实例）
+        try:
+            import threading
+
+            def _prewarm():
+                try:
+                    from agent.engine import CommunityAgent  # noqa: F401
+                except Exception:
+                    from agent.offline_agent import OfflineAgent  # noqa: F401
+            threading.Thread(target=_prewarm, daemon=True).start()
+        except Exception:
+            pass
         render_login()
         return
+
+    # 登录后补建 agent（首次会话含引擎 import + 工具构建，后续会话进程级缓存近 0 耗时）
+    try:
+        from ui.session import ensure_agent
+        agent, memory = ensure_agent()
+    except Exception as e:
+        st.error(f"😅 智能体初始化失败：{e}")
+        st.stop()
 
     # 新人引导（只有新用户会走）
     if not memory.is_onboarding_done():
