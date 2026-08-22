@@ -643,10 +643,12 @@ def get_safety_reminders(limit: int = 100) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def find_duplicate_issue(location: str, description: str, days: int = 7) -> dict | None:
+def find_duplicate_issue(location: str, description: str, days: int = 7,
+                         exclude_id: int | None = None) -> dict | None:
     """重复上报检测（P2-02）：7 天内、同楼栋（地址前 5 字）、关键词重合 ≥2 的同类工单。
 
-    返回原工单 dict（含 reporter 信息），无则 None。降级：地址空或描述过短不检测。
+    返回原工单 dict（含 reporter 信息），无则 None。exclude_id 排除自身（创建后检测用）。
+    降级：地址空或描述过短不检测。
     """
     loc = (location or "").strip()
     desc = (description or "").strip()
@@ -654,12 +656,15 @@ def find_duplicate_issue(location: str, description: str, days: int = 7) -> dict
         return None
     try:
         with get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM community_issues WHERE status NOT IN ('已关闭', '已撤回', '已转出') "
-                "AND reported_at >= datetime('now', ? || ' days') "
-                "AND substr(location, 1, 5) = substr(?, 1, 5) ORDER BY reported_at DESC LIMIT 20",
-                (f"-{days}", loc),
-            ).fetchall()
+            q = ("SELECT * FROM community_issues WHERE status NOT IN ('已关闭', '已撤回', '已转出') "
+                 "AND reported_at >= datetime('now', ? || ' days') "
+                 "AND substr(location, 1, 5) = substr(?, 1, 5)")
+            args: list = [f"-{days}", loc]
+            if exclude_id:
+                q += " AND id != ?"
+                args.append(exclude_id)
+            q += " ORDER BY reported_at DESC LIMIT 20"
+            rows = conn.execute(q, args).fetchall()
     except Exception:
         return None
     def _bigrams(s):

@@ -329,7 +329,7 @@ def web_issue_create(req: IssueCreate, request: Request):
     dup = None
     try:
         from data.db_repair import find_duplicate_issue
-        dup = find_duplicate_issue(req.location, req.description)
+        dup = find_duplicate_issue(req.location, req.description, exclude_id=iid)
     except Exception:
         dup = None
     if dup:
