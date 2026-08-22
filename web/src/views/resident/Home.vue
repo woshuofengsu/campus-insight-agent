@@ -12,6 +12,7 @@ const store = useUserStore()
 const w = ref(null)
 const noticeList = ref([])
 const urgentModal = ref(null) // 紧急通知弹窗
+const agentOpen = ref(true) // 社区小助手默认展开可收起
 
 onMounted(async () => {
   try { w.value = await weather.current() } catch { /* 天气失败不阻塞 */ }
@@ -68,9 +69,13 @@ const entries = [
       <n-button size="small" type="success" ghost style="margin-left:8px;" @click="router.push('/resident/notices')">查看</n-button>
     </div>
 
-    <!-- Agent 智能入口（直接展示，无标题板块） -->
+    <!-- Agent 智能入口（社区小助手，默认展开可收起） -->
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
-      <AgentChat role="resident" />
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--primary,#2D5BFF);color:#fff;">
+        <b>🤖 社区小助手</b>
+        <n-button size="tiny" text style="color:#fff;" @click="agentOpen = !agentOpen">{{ agentOpen ? '收起 ▲' : '展开 ▼' }}</n-button>
+      </div>
+      <AgentChat v-if="agentOpen" role="resident" />
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
