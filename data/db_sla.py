@@ -133,7 +133,10 @@ def escalate_overdue_issues(limit: int = 20) -> list[dict]:
                     f"（{e['urgency']}，已超时 {e['hours_open']} 小时）"
                     for e in escalated
                 )
-                send_email("社区先知 SLA 升级提醒", body)
+                # 按用户要求：SLA 升级提醒不再外发到 SMTP_TO（原 1803801843@qq.com），
+                # 只发给自己留档；站内通知（messages）仍是主渠道。
+                from config import SMTP_USER
+                send_email("社区先知 SLA 升级提醒", body, to=SMTP_USER)
         except Exception:
             _log.warning("SLA 升级邮件发送失败", exc_info=True)
     return escalated

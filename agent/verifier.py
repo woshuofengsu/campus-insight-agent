@@ -98,6 +98,11 @@ class Verifier:
             out.append(_r("PhoneMaskRule", "block", "输出包含完整手机号"))
         if self._enabled("IdCardMaskRule") and _IDCARD_RE.search(text):
             out.append(_r("IdCardMaskRule", "block", "输出包含完整身份证号"))
+        if self._enabled("InjectionOutputRule"):
+            from agent.prompt_guard import detect_output_injection
+            feat = detect_output_injection(text)
+            if feat:
+                out.append(_r("InjectionOutputRule", "block", f"输出含注入特征「{feat}」"))
         if self._enabled("LengthRule") and len(text) > 2000:
             out.append(_r("LengthRule", "warn", "输出超过 2000 字"))
         if self._enabled("GarbledTextRule") and _GBK_GARBLE_RE.search(text):

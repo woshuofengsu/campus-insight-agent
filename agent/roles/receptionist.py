@@ -65,6 +65,20 @@ class ReceptionistAgent(BaseAgent):
             return self._reply("", status="routed", intent="handoff", done=False,
                                chain_note="用户主动要求转人工")
 
+        # Prompt 注入防护（P2-06 第一层：输入过滤）—— 拦截 + 留痕
+        from agent.prompt_guard import detect_injection, safe_reply
+        inj = detect_injection(text)
+        if inj:
+            ctx["state"]["injection_blocked"] = inj
+            try:
+                from data import db_agent
+                db_agent.log_agent(ctx.get("uid"), ctx.get("role") or "resident",
+                                   text, "注入拦截", routed=f"注入-{inj}", status="拦截",
+                                   error=f"检测到注入类别「{inj}」")
+            except Exception:
+                pass
+            return self._reply(safe_reply(), intent="注入拦截", chain_note=f"拦截注入（{inj}）")
+
         corrected = A.correct_text(text)
         if corrected and corrected != text:
             ctx["state"]["pending_correct"] = {"original": text, "corrected": corrected}
