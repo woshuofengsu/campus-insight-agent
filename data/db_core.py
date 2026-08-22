@@ -564,6 +564,18 @@ def _m31_agent_sessions(conn):
     )
 
 
+def _m32_agent_handoffs(conn):
+    """v32：人工处理包（无缝转人工：上下文打包给负责人，免重复询问）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS agent_handoffs ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT DEFAULT '', "
+        "user_id INTEGER NOT NULL, role TEXT DEFAULT 'resident', "
+        "intent TEXT DEFAULT '', reason TEXT DEFAULT '', package_json TEXT DEFAULT '{}', "
+        "status TEXT DEFAULT '待处理', assigned_to INTEGER, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -760,6 +772,7 @@ def init_db(db_path: str):
         (29, "proposal_comments", _m29_proposal_comments),
         (30, "agent", _m30_agent),
         (31, "agent_sessions", _m31_agent_sessions),
+        (32, "agent_handoffs", _m32_agent_handoffs),
     ]
     for version, name, fn in post:
         if version <= current:

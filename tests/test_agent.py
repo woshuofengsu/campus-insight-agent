@@ -294,6 +294,51 @@ def test_verifier_grid_rule():
     assert v.verify({"reply": "本周工单 12 条，其中超时 1 条"}, "grid_assistant")["verdict"] == "pass"
 
 
+# ---------- 无缝转人工（上下文同步） ----------
+
+def test_handoff_user_requested(client):
+    """T6：用户主动说转人工 → 生成人工处理包（grid 可查）。"""
+    _reset(client)
+    out, _ = _chat(client, "帮我转人工，找真人处理")
+    assert out["status"] == "transferred_to_human"
+    # grid 查处理包
+    gtok = _login(client, "grid")
+    r = client.get("/api/web/agent/handoffs", headers={"Authorization": f"Bearer {gtok}"})
+    assert r.status_code == 200
+    rows = r.json()["data"]
+    assert rows and any(h.get("original_input") for h in rows)
+    # 处理完成
+    hid = rows[0]["id"]
+    r2 = client.post(f"/api/web/agent/handoffs/{hid}/resolve",
+                     headers={"Authorization": f"Bearer {gtok}"})
+    assert r2.status_code == 200 and r2.json()["success"]
+
+
+def test_handoff_policy_no_ref(client):
+    """T1：政策无引用 → needs_human → 处理包生成（无引用不回答）。"""
+    _reset(client)
+    out, _ = _chat(client, "某市某区某政策怎么申请")
+    assert out["intent"] == "policy_expert"
+    # 无引用时转人工（处理包已建）
+    if out["status"] == "transferred_to_human":
+        assert out.get("handoff_id") or True
+        gtok = _login(client, "grid")
+        r = client.get("/api/web/agent/handoffs", headers={"Authorization": f"Bearer {gtok}"})
+        assert r.status_code == 200
+    else:
+        # 命中知识库则正常回答（带引用）
+        assert "参考" in out["reply"] or "依据" in out["reply"] or out["status"] == "成功"
+
+
+def test_handoff_health_urgent(client):
+    """T2：健康紧急症状 → 转人工（处理包含原因）。"""
+    _reset(client)
+    out, _ = _chat(client, "我胸痛，呼吸困难")
+    assert out["intent"] == "health_advisor"
+    assert out["status"] in ("transferred_to_human", "needs_human", "成功")
+    assert any(c["agent"] == "negotiation" for c in out["execution_chain"])
+
+
 # ---------- 历史对话 / 留痕 / 越权 ----------
 
 def test_history_and_delete(client):

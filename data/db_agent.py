@@ -175,3 +175,57 @@ def clean_sessions(days: int = 30) -> int:
             f"DELETE FROM agent_sessions WHERE updated_at < datetime('now', '-{days} days')")
         conn.commit()
         return cur.rowcount
+
+
+# ---------------------------------------------------------------------------
+# 人工处理包（无缝转人工，v32）
+# ---------------------------------------------------------------------------
+
+def create_handoff(session_id: str, user_id: int, role: str, intent: str,
+                   reason: str, package: dict) -> int:
+    """创建人工处理包（转人工待办）。"""
+    import json as _json
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO agent_handoffs (session_id, user_id, role, intent, reason, package_json) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, user_id, role, intent, reason or "",
+             _json.dumps(package or {}, ensure_ascii=False)),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def list_handoffs(status: str = "", limit: int = 50) -> list[dict]:
+    """负责人端人工处理包列表（含上下文摘要）。"""
+    import json as _json
+    with get_db() as conn:
+        q = "SELECT * FROM agent_handoffs WHERE 1=1"
+        args: list = []
+        if status:
+            q += " AND status=?"
+            args.append(status)
+        q += " ORDER BY id DESC LIMIT ?"
+        args.append(limit)
+        rows = conn.execute(q, args).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                pkg = _json.loads(d.get("package_json") or "{}")
+            except (ValueError, TypeError):
+                pkg = {}
+            d["package"] = pkg
+            d["original_input"] = pkg.get("original_input", "")
+            out.append(d)
+        return out
+
+
+def resolve_handoff(handoff_id: int, actor: str = "负责人") -> bool:
+    """负责人处理完成（关闭处理包）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "UPDATE agent_handoffs SET status='已处理' WHERE id=? AND status='待处理'",
+            (handoff_id,))
+        conn.commit()
+        return cur.rowcount > 0

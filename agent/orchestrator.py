@@ -139,6 +139,12 @@ class Orchestrator:
     def _dispatch(self, ctx: dict, intent: str) -> dict:
         """按意图路由到业务/自动角色 Agent，末尾过合规审计。"""
         from agent.roles.config import ROUTE_MAP
+        # 用户主动转人工（T6）→ 直接生成人工处理包
+        if intent == "handoff":
+            self._log("receptionist", "转人工", "用户主动要求")
+            return self._finish(ctx, "已为您转接工作人员，他们会直接联系您。", "transferred_to_human",
+                                "handoff",
+                                [{"type": "navigate", "to": "/resident/messages", "label": "查看消息"}], None)
         target = ROUTE_MAP.get(intent)
         if target is None and intent in self.agents:
             target = intent  # 续接会话时 intent 即角色 key
@@ -187,11 +193,12 @@ class Orchestrator:
                 arb = self.arbiter.arbitrate(conflict)
                 self._log("arbiter", "仲裁", f"校验拦截→{arb['decision']}：{arb['explanation']}")
                 if arb["decision"] == "human":
-                    result = self._safe_fallback(result, "该内容需人工确认，已为您转人工。")
-                    result["status"] = "transferred_to_human"
-                else:
-                    result = self._safe_fallback(result, "该内容需人工审核，请稍候。")
-                    result["status"] = "拦截"
+                    result = self._transfer_to_human(ctx, retry, "校验拦截：" + arb["explanation"])
+                    return self._finish(ctx, result["reply"], result["status"], target,
+                                        [{"type": "navigate", "to": "/resident/messages", "label": "查看消息"}],
+                                        result.get("handoff_id"))
+                result = self._safe_fallback(result, "该内容需人工审核，请稍候。")
+                result["status"] = "拦截"
             else:
                 self._log("verifier", "重试通过", "重试后校验通过")
                 result = retry
@@ -203,6 +210,14 @@ class Orchestrator:
                                "\n\n已为您提供安全建议，如需详细内容请咨询社区工作人员。").strip()
         else:
             self._log("verifier", "通过", "校验通过")
+
+        # 业务 Agent 标记 needs_human（政策无引用 / 健康紧急症状）→ 无缝转人工
+        if result.get("status") == "needs_human":
+            reason = result.get("chain_note", "需人工确认")
+            result = self._transfer_to_human(ctx, result, reason)
+            return self._finish(ctx, result["reply"], result["status"], target,
+                                [{"type": "navigate", "to": "/resident/messages", "label": "查看消息"}],
+                                result.get("handoff_id"))
 
         # 主动协商：处理目标 Agent 消息队列中的协商消息（事件触发，按优先级）
         result = self._handle_negotiations(target, result)
@@ -225,8 +240,12 @@ class Orchestrator:
             arb = self.arbiter.arbitrate({"audit_failed": True, "agent": target,
                                           "reason": audit.get("reason")})
             self._log("arbiter", "仲裁", arb["explanation"])
-            return self._finish(ctx, audit.get("reply", "该内容需人工审核。"), "拦截",
-                                target, [], result.get("related_id"))
+            # 无缝转人工（T7：合规不通过 → 人工审核处理包）
+            result = self._transfer_to_human(ctx, result, "合规审计：" + audit.get("reason", ""))
+            return self._finish(ctx, audit.get("reply", "该内容需人工审核。"), result["status"],
+                                target,
+                                [{"type": "navigate", "to": "/resident/messages", "label": "查看消息"}],
+                                result.get("handoff_id"))
 
         if result.get("chain_note"):
             self._log(target, "完成", result["chain_note"])
@@ -299,6 +318,93 @@ class Orchestrator:
         r = dict(result)
         r["reply"] = (r.get("reply", "") + f"\n\n{hint}").strip()
         return r
+
+    def _transfer_to_human(self, ctx: dict, result: dict, reason: str) -> dict:
+        """无缝转人工：生成人工处理包（上下文快照）→ 审计脱敏 → 落库 → 通知负责人。
+
+        处理包：session/user/original_input/intent/collected_fields/execution_chain/
+                pending_issues/recent_history/verification_result。
+        负责人打开即可处理，无需重新询问用户。
+        """
+        from data import db_agent
+        uid = ctx.get("uid") or 0
+        role = ctx.get("role") or "resident"
+        text = ctx.get("user_input") or ""
+
+        # 已收集字段（黑板草稿）
+        collected = {}
+        for key in ("user:{0}:work_order_draft".format(uid), "user:{0}:proposal_draft".format(uid)):
+            try:
+                d = self.bb.read(key)
+                if d:
+                    collected.update(d)
+            except Exception:
+                pass
+        if not collected and ctx.get("state", {}).get("intent"):
+            collected = {"intent": ctx["state"]["intent"]}
+
+        # 最近对话
+        try:
+            recent = [{"role": "user" if not d.get("is_bot") else "assistant",
+                       "content": (d.get("text") or "")[:200], "time": (d.get("created_at") or "")[:16]}
+                      for d in db_agent.get_dialogs(uid, role, limit=5)]
+        except Exception:
+            recent = []
+
+        package = {
+            "session_id": self.bb.session_id,
+            "user": {
+                "user_id": uid, "name": ctx.get("name") or "",
+                "phone_masked": "", "role": role,
+            },
+            "original_input": text,
+            "intent": ctx.get("intent") or result.get("intent") or "",
+            "collected_fields": collected,
+            "execution_chain": self.execution_chain[-8:],
+            "pending_issues": [reason],
+            "related_citations": [],
+            "recent_history": recent,
+            "verification_result": self.bb.read("verify_result") or {},
+            "transferred_at": datetime.now().isoformat(),
+        }
+
+        # 合规审计员脱敏检查（处理包不得含完整手机号/身份证）
+        audit = self.agents["compliance_auditor"].process({
+            "output_text": text + " " + str(collected) + " " + reason,
+            "role": role, "uid": uid, "user_input": text,
+            "intent": result.get("intent") or "", "related_id": None, "status": "转人工",
+        })
+        if not audit.get("passed"):
+            # 移除敏感字段（脱敏兜底）
+            for f in ("phone", "phone_masked"):
+                package["user"].pop(f, None)
+            collected.pop("phone", None)
+
+        try:
+            hid = db_agent.create_handoff(self.bb.session_id, uid, role,
+                                          package["intent"], reason, package)
+            # 通知负责人（消息中心）
+            from data.db_notifications import create_notification
+            from data.db_user import list_users
+            for gu in list_users(role="grid"):
+                try:
+                    create_notification(gu["id"], "agent_handoff",
+                                        f"🤝 人工处理：{package['intent']}",
+                                        f"用户「{ctx.get('name') or uid}」需人工处理：{reason}（AI 已整理上下文）",
+                                        related_id=hid)
+                except Exception:
+                    pass
+        except Exception as e:  # noqa: BLE001
+            _log.warning("转人工落库/通知失败：%s", e)
+            hid = None
+
+        self._log("negotiation", "转人工", f"{reason}（处理包 #{hid or '—'}）")
+        result = dict(result)
+        result["reply"] = (result.get("reply", "") +
+                           "\n\n已为您转接工作人员，他们会直接联系您，不用重新说一遍。").strip()
+        result["status"] = "transferred_to_human"
+        result["handoff_id"] = hid
+        return result
 
     def _community_or_withdraw(self, ctx: dict, intent: str) -> dict:
         """联系社区 / 撤回引导（接待员直答，仍过审计）。"""

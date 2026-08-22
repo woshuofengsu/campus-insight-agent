@@ -178,11 +178,11 @@ class PolicyExpertAgent(BaseAgent):
                                related_id=r.get("question_id"),
                                actions=[{"type": "buttons", "options": ["有帮助", "无帮助"]}],
                                chain_note="命中知识库，附带引用")
-        return self._reply(f"暂未找到答案。{r.get('manual_text', '')}", "未匹配", "政策问答",
+        return self._reply(f"暂未找到答案。{r.get('manual_text', '')}", "needs_human", "政策问答",
                            related_id=r.get("question_id"),
                            actions=[{"type": "confirm_transfer", "label": "转人工咨询",
                                      "related_id": r.get("question_id")}],
-                           chain_note="未命中知识库，提示转人工")
+                           chain_note="未命中知识库：转人工（无引用不回答）")
 
 
 # ---------------------------------------------------------------------------
@@ -211,10 +211,10 @@ class HealthAdvisorAgent(BaseAgent):
                 })
                 return self._reply(
                     "您描述的疑似紧急症状需要专业人士确认。社区顾问不做诊断，请及时就医，必要时拨打 120。已为您转人工跟进。",
-                    "成功", "健康顾问",
+                    "needs_human", "健康顾问",
                     actions=[{"type": "buttons", "options": ["拨打 120", "联系社区", "紧急求助"]},
                              {"type": "navigate", "to": "/resident/health", "label": "去健康防护"}],
-                    chain_note="疑似紧急症状：主动转人工（停机点）")
+                    chain_note="疑似紧急症状：转人工（停机点）")
             return self._reply(
                 "您感觉不舒服吗？请不要着急。社区顾问不做诊断，如果症状持续或加重，请及时就医。"
                 "需要的话，可以帮您联系社区或家属，也可以长按红色紧急求助按钮。",

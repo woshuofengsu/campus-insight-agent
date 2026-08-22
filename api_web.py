@@ -2431,6 +2431,26 @@ def web_agent_logs(request: Request, role: str = "", intent: str = "",
                              keyword=keyword, limit=limit))
 
 
+@app.get("/api/web/agent/handoffs")
+def web_agent_handoffs(request: Request, status: str = "", limit: int = 50):
+    """负责人端人工处理包列表（无缝转人工：AI 已整理上下文，可直接处理）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import list_handoffs
+    return ok(list_handoffs(status=status, limit=limit))
+
+
+@app.post("/api/web/agent/handoffs/{hid}/resolve")
+def web_agent_handoff_resolve(hid: int, request: Request):
+    """负责人处理完成（关闭人工处理包）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import resolve_handoff
+    if not resolve_handoff(hid, _user(request).get("name") or "负责人"):
+        return fail(2001, "处理包不存在或已处理")
+    return ok({"handoff_id": hid}, "已处理完成")
+
+
 @app.get("/api/web/export/agent-logs")
 def web_export_agent_logs(request: Request):
     """导出 Agent 留痕 CSV（负责人，脱敏——不含完整手机号，导出本身留痕）。"""

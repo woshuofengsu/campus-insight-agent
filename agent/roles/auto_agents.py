@@ -82,6 +82,23 @@ class GridAssistantAgent(BaseAgent):
                                    chain_note="负责人已确认，生成脱敏导出")
             return self._reply("已取消导出。", "已取消", "导出数据", chain_note="负责人取消导出")
 
+        # 人工处理包（无缝转人工：AI 已整理上下文，可直接处理）
+        if any(k in text for k in ("处理包", "人工待办", "转人工的")):
+            from data.db_agent import list_handoffs
+            rows = list_handoffs(status="待处理", limit=10)
+            if not rows:
+                return self._reply("当前没有待处理的人工处理包。", "成功", "网格员工作助手",
+                                   chain_note="查询人工处理包（空）")
+            lines = []
+            for h in rows:
+                pkg = h.get("package") or {}
+                lines.append(f"· #{h['id']} [{h.get('intent')}] {pkg.get('original_input', '')[:30]}"
+                             f"（{h.get('reason', '')[:20]}）")
+            return self._reply("🤝 待处理人工包（AI 已整理上下文）：\n" + "\n".join(lines),
+                               "成功", "网格员工作助手",
+                               actions=[{"type": "navigate", "to": "/grid/messages", "label": "去消息中心处理"}],
+                               chain_note="返回人工处理包列表（含上下文摘要）")
+
         if intent in ("待办提醒", "grid") and any(k in text for k in ("待办", "超时", "今天要做什么", "要处理", "待处理")):
             r_text, status, _ = _grid_todos()
             return self._reply(r_text, status, "待办提醒",

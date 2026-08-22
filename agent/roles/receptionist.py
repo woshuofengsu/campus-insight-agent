@@ -59,6 +59,12 @@ class ReceptionistAgent(BaseAgent):
             text = pc["corrected"] if text in ("对", "确认", "是的", "确定", "对，提交") else pc["original"]
             ctx["user_input"] = text
 
+        # 用户主动要求转人工（T6：转人工/人工客服/找真人）
+        if any(k in text for k in ("转人工", "人工客服", "找真人", "人工处理", "叫工作人员", "真人帮我")):
+            ctx["state"]["user_requested_human"] = True
+            return self._reply("", status="routed", intent="handoff", done=False,
+                               chain_note="用户主动要求转人工")
+
         corrected = A.correct_text(text)
         if corrected and corrected != text:
             ctx["state"]["pending_correct"] = {"original": text, "corrected": corrected}

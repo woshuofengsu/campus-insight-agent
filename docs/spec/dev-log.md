@@ -263,6 +263,35 @@
 - **动效/适老**：卡片 hover 上浮+阴影加深、老年按钮按压缩放、登录页蓝深渐变、Agent 头部主色统一；老年端字号≥20/按钮≥60/行距1.8 达标。
 - **验证**：34 测试全绿（api_web+agent），6 个关键路由（含新 Profile/Messages）200 + app 挂载，npm build 通过。
 
+## 十、多智能体协作增强（5 方案连续落地，docs/spec/13-agent-collaboration.md）✅
+
+**1. 多 Agent 角色体系 + 黑板（1a98fe0）**
+- 9 声明式角色（`agent/roles/`：接待员/报修调度员/提案协商员/健康顾问/政策专员/通知管理员/天气守护员/网格员工作助手/合规审计员，含元数据/工具白名单/停机点）；薄壳设计复用现有数据层不复制业务。
+- `agent/blackboard.py`：共享键（写入者/版本/锁/历史）+ 消息协议（task_request/task_response/notify/error/handoff）。
+- `agent/orchestrator.py`：接待员→路由→业务Agent→合规审计→返回 + **执行链**（前端 AgentChat 可视化，颜色区分角色/校验/协商/仲裁/审计节点）。
+
+**2. 主动协商 + 冲突仲裁**
+- 事件触发：天气守护员极端天气→通知健康顾问/通知管理员（协商并入回复「协作提示」）；健康顾问疑似紧急症状→handoff。
+- `agent/arbiter.py`：合规优先→安全优先→专业优先→人工优先→数据一致→默认保守；接入 Verifier block 与审计失败路径。
+- 循环防护：同目标协商 >2 轮强制转人工。
+
+**3. LLM 幻觉防线（agent/verifier.py）**
+- 统一校验器按业务选规则集：通用（空输出/敏感词/手机号/身份证/乱码/超长）+ 政策（引用强制，无引用不回答）+ 健康（不诊断/不荐药/紧急转就医）+ 网格（不代替审批/导出脱敏）；PASS/WARN/BLOCK；BLOCK 重试一次仍失败→仲裁/转人工；WARN 降级。
+- 适配：离线规则引擎天然无幻觉，Verifier 是 LLM 链路强制防线 + 全输出统一挂链。
+
+**4. 数据安全与合规 v3.0（64e7471，docs/spec/12）**
+- stdlib 加密 `utils/crypto.py`（scrypt+HMAC 流，接口等价 AES-GCM 可无缝切换）；密码强度 `utils/password.py` + 改密端点（PBKDF2 更新+留痕）。
+- PIPL 闭环：隐私政策页 `/resident/privacy`、个人数据导出 `GET /me/export`（脱敏）、账号注销 `POST /me/delete`（匿名化+停用，auth/me 校验 is_active）。
+- **Agent 会话落库 v31**（重启不丢、多实例不串线，修复评审 P1-C5-01）；合规审计员补身份证检测。
+
+**5. 无缝转人工（本轮，v32 agent_handoffs）**
+- 触发已接入 5 类：政策无引用（T1）/健康紧急症状（T2）/用户主动转人工（T6）/审计不通过（T7）/Verifier block 仲裁转人工（T8）。
+- 处理包：session/用户(脱敏)/原始输入/意图/已收集字段(黑板草稿)/执行链快照/待确认事项/最近 5 条对话/校验结果 → 审计脱敏 → 落库 → 通知 grid。
+- 负责人：`GET /agent/handoffs`（含上下文摘要）、`POST /{id}/resolve`；AI 助手「查处理包」直接返回；新增 grid 消息中心页 `/grid/messages`。
+- 用户端：回复附「已转接工作人员，不用重新说一遍」+ 查看消息入口。
+
+**验证**：`tests/test_agent.py` 26 项 + `tests/test_security.py` 8 项；全量 pytest **394 passed**；npm build 通过；压测保持零失败。
+
 ## 六、验证 ✅
 
 - 全量测试 **338 passed**（328 旧 + 10 新模块单元测试 `tests/unit/test_new_modules.py`）。

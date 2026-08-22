@@ -184,6 +184,8 @@ export const agent = {
   deleteHistory: (id) => api.delete(`/agent/history/${id}`),
   clearHistory: () => api.delete('/agent/history'),
   logs: (params) => api.get('/agent/logs', { params }),
+  handoffs: (params) => api.get('/agent/handoffs', { params }),
+  resolveHandoff: (id) => api.post(`/agent/handoffs/${id}/resolve`),
   exportLogs: () => api.get('/export/agent-logs', { responseType: 'blob' }),
 }
 
