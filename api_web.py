@@ -2249,6 +2249,106 @@ def web_emergency_status(request: Request):
     return ok(get_latest_sos(uid))
 
 
+# ---------------- Agent 统一入口模块（识别意图 → 引导补全 → 路由执行 → 返回） ----------------
+
+class AgentChat(BaseModel):
+    text: str = Field(..., min_length=1, max_length=200)
+
+
+@app.post("/api/web/agent/chat")
+def web_agent_chat(req: AgentChat, request: Request):
+    """居民端 / 负责人端 Agent 对话（按登录角色路由）。"""
+    from agent.web_agent_service import handle_chat
+    u = _user(request)
+    role = u.get("role")
+    if role not in ("resident", "grid"):
+        return fail(1003, "当前角色暂不支持 Agent 对话")
+    try:
+        out = handle_chat(role, u.get("uid"), u.get("name") or "居民", req.text)
+        return ok(out, "ok")
+    except Exception as e:  # noqa: BLE001
+        return fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
+
+
+@app.post("/api/web/agent/elderly/chat")
+def web_agent_elderly_chat(req: AgentChat, request: Request):
+    """老年端 Agent 对话（语音转写文本或文字输入）。"""
+    from agent.web_agent_service import handle_chat
+    u = _user(request)
+    role = u.get("role")
+    if role not in ("elderly", "resident"):
+        return fail(1003, "无权限")
+    uid = _resolve_elder_uid(request) or u.get("uid")
+    try:
+        out = handle_chat("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid)
+        return ok(out, "ok")
+    except Exception as e:  # noqa: BLE001
+        return fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
+
+
+@app.get("/api/web/agent/history")
+def web_agent_history(request: Request):
+    """居民端最近 5 条对话（可查看详情，可删除）。"""
+    from data.db_agent import get_dialogs
+    u = _user(request)
+    return ok(get_dialogs(u.get("uid"), u.get("role") or "resident", limit=5))
+
+
+@app.delete("/api/web/agent/history/{did}")
+def web_agent_history_delete(did: int, request: Request):
+    """居民删除自己的对话（归属校验）。"""
+    from data.db_agent import delete_dialog
+    u = _user(request)
+    if not delete_dialog(did, u.get("uid")):
+        return fail(1003, "无权限删除该记录")
+    return ok({"deleted": did}, "已删除")
+
+
+@app.delete("/api/web/agent/history")
+def web_agent_history_clear(request: Request):
+    """居民清空自己的历史对话。"""
+    from data.db_agent import clear_dialogs
+    u = _user(request)
+    n = clear_dialogs(u.get("uid"), u.get("role") or "resident")
+    return ok({"cleared": n}, "已清空")
+
+
+@app.get("/api/web/agent/logs")
+def web_agent_logs(request: Request, role: str = "", intent: str = "",
+                   status: str = "", keyword: str = "", limit: int = 200):
+    """负责人查 Agent 留痕（模块来源=Agent，可按角色/意图/状态/关键词筛选）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import get_agent_logs
+    return ok(get_agent_logs(role=role, intent=intent, status=status,
+                             keyword=keyword, limit=limit))
+
+
+@app.get("/api/web/export/agent-logs")
+def web_export_agent_logs(request: Request):
+    """导出 Agent 留痕 CSV（负责人，脱敏——不含完整手机号，导出本身留痕）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import get_agent_logs
+    from data.db_notifications import log_activity
+    import csv
+    from io import StringIO
+    rows = get_agent_logs(limit=1000)
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["ID", "角色", "用户输入", "纠正后", "识别意图", "路由结果", "状态", "异常", "关联编号", "时间"])
+    for r in rows:
+        w.writerow([r.get("id"), r.get("role"), (r.get("user_input") or "")[:80],
+                    (r.get("corrected") or "")[:80], r.get("intent"), r.get("routed"),
+                    r.get("status"), (r.get("error") or "")[:80], r.get("related_id"),
+                    (r.get("created_at") or "")[:16]])
+    log_activity(_user(request).get("name") or "负责人", "导出Agent留痕",
+                 module="Agent", detail=f"导出 {len(rows)} 条（脱敏）")
+    from fastapi.responses import Response
+    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=agent-logs.csv"})
+
+
 _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "dist")
 
 

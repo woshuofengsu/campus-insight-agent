@@ -1,0 +1,128 @@
+# -*- coding: utf-8 -*-
+"""Agent 统一入口模块数据层：历史对话 + Agent 留痕。
+
+- agent_dialogs：三端用户与 Agent 的对话历史（居民最近 5 条可删；老年 5 条大字不可删；负责人不保留）。
+- agent_logs：Agent 留痕（模块来源=Agent，保存 7 天；负责人可查可导出，居民/老人不可见）。
+"""
+import logging
+from datetime import datetime, timedelta
+
+from data.database import get_db
+
+MODULE = "Agent"
+
+_log = logging.getLogger(__name__)
+
+RETENTION_DAYS = 7
+
+
+def _now() -> datetime:
+    return datetime.now()
+
+
+# ---------------------------------------------------------------------------
+# 历史对话
+# ---------------------------------------------------------------------------
+
+def add_dialog(user_id: int, role: str, text: str, is_bot: int = 0,
+               intent: str = "", related_id: int | None = None) -> int:
+    """记录一条对话（用户消息或 Agent 回复）。返回 id。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO agent_dialogs (user_id, role, text, is_bot, intent, related_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, role, (text or "")[:500], is_bot, intent or "", related_id),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def get_dialogs(user_id: int, role: str, limit: int = 5) -> list[dict]:
+    """查用户最近对话（居民/老年端用）。"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM agent_dialogs WHERE user_id=? AND role=? "
+            "ORDER BY id DESC LIMIT ?", (user_id, role, limit),
+        ).fetchall()
+        return [dict(r) for r in reversed(rows)]  # 时间正序
+
+
+def delete_dialog(dialog_id: int, user_id: int) -> bool:
+    """居民删除自己的历史对话（归属校验）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM agent_dialogs WHERE id=? AND user_id=?", (dialog_id, user_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def clear_dialogs(user_id: int, role: str) -> int:
+    """清空某用户历史（居民端删除全部）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM agent_dialogs WHERE user_id=? AND role=?", (user_id, role))
+        conn.commit()
+        return cur.rowcount
+
+
+def clean_dialogs(days: int = 30) -> int:
+    """清理超过 N 天的对话（调度器调用）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            f"DELETE FROM agent_dialogs WHERE created_at < datetime('now', '-{days} days')")
+        conn.commit()
+        return cur.rowcount
+
+
+# ---------------------------------------------------------------------------
+# Agent 留痕
+# ---------------------------------------------------------------------------
+
+def log_agent(user_id: int | None, role: str, user_input: str, intent: str,
+              routed: str = "", status: str = "成功", error: str = "",
+              corrected: str = "", related_id: int | None = None) -> int:
+    """Agent 留痕（模块来源=Agent，保存 7 天）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO agent_logs (user_id, role, user_input, corrected, intent, routed, "
+            "status, error, related_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, role, (user_input or "")[:500], (corrected or "")[:500],
+             (intent or "")[:100], (routed or "")[:200], status, (error or "")[:500],
+             related_id),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def get_agent_logs(role: str = "", intent: str = "", status: str = "",
+                   keyword: str = "", limit: int = 200) -> list[dict]:
+    """负责人查 Agent 留痕（按模块来源=Agent、时间、状态筛选）。"""
+    q = "SELECT * FROM agent_logs WHERE 1=1"
+    args: list = []
+    if role:
+        q += " AND role=?"
+        args.append(role)
+    if intent:
+        q += " AND intent=?"
+        args.append(intent)
+    if status:
+        q += " AND status=?"
+        args.append(status)
+    if keyword:
+        q += " AND (user_input LIKE ? OR routed LIKE ? OR error LIKE ?)"
+        kw = f"%{keyword}%"
+        args += [kw, kw, kw]
+    q += " ORDER BY id DESC LIMIT ?"
+    args.append(limit)
+    with get_db() as conn:
+        rows = conn.execute(q, args).fetchall()
+        return [dict(r) for r in rows]
+
+
+def clean_agent_logs(days: int = RETENTION_DAYS) -> int:
+    """清理超过 7 天的 Agent 留痕（调度器调用）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            f"DELETE FROM agent_logs WHERE created_at < datetime('now', '-{days} days')")
+        conn.commit()
+        return cur.rowcount

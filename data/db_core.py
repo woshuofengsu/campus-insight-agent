@@ -534,6 +534,25 @@ def _m29_proposal_comments(conn):
     )
 
 
+def _m30_agent(conn):
+    """v30：Agent 统一入口模块 — 历史对话 + Agent 留痕表。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS agent_dialogs ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "role TEXT DEFAULT 'resident', text TEXT DEFAULT '', is_bot INTEGER DEFAULT 0, "
+        "intent TEXT DEFAULT '', related_id INTEGER, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS agent_logs ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, "
+        "role TEXT DEFAULT 'resident', user_input TEXT DEFAULT '', corrected TEXT DEFAULT '', "
+        "intent TEXT DEFAULT '', routed TEXT DEFAULT '', status TEXT DEFAULT '成功', "
+        "error TEXT DEFAULT '', related_id INTEGER, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -728,6 +747,7 @@ def init_db(db_path: str):
         (27, "proposal_auditor", _m27_proposal_auditor),
         (28, "issue_supplement_pending", _m28_issue_supplement_pending),
         (29, "proposal_comments", _m29_proposal_comments),
+        (30, "agent", _m30_agent),
     ]
     for version, name, fn in post:
         if version <= current:
