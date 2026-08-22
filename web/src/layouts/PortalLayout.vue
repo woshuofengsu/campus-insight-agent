@@ -59,36 +59,21 @@ function logout() {
 </script>
 
 <template>
-  <!-- 网格员端：深色侧边导航 + 顶栏 -->
+  <!-- 网格员端：保持原样（浅色侧边导航 + 顶栏 + AI 工作助手） -->
   <n-layout v-if="store.isGrid" style="min-height:100vh" has-sider>
-    <n-layout-sider bordered width="230" :style="{ background: 'var(--dark-bg)' }">
-      <div style="padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.12);">
-        <div style="font-weight:800;color:#fff;font-size:1.05rem;">🏘️ 社区先知</div>
-        <div style="color:rgba(255,255,255,0.6);font-size:0.75rem;">网格员工作台</div>
+    <n-layout-sider bordered width="230">
+      <div style="padding:18px 16px;border-bottom:1px solid var(--border);">
+        <div style="font-weight:800;color:#2E7D32;font-size:1.05rem;">🏘️ 社区先知</div>
+        <div style="color:var(--muted);font-size:0.75rem;">网格员工作台</div>
       </div>
-      <div style="padding:8px 0;">
-        <div v-for="m in gridMenus" :key="m.key"
-             :style="{
-               display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 18px',
-               cursor: 'pointer', fontSize: '0.92rem', color: active === m.key ? '#fff' : 'rgba(255,255,255,0.75)',
-               background: active === m.key ? 'rgba(45,91,255,0.35)' : 'transparent',
-               borderLeft: active === m.key ? '3px solid #6A8DFF' : '3px solid transparent',
-             }"
-             @click="router.push(m.key)">
-          <span>{{ m.icon }}</span>{{ m.label }}
-        </div>
-      </div>
+      <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
+              :value="active" @update:value="(k) => router.push(k)" />
       <!-- AI 工作助手（默认收起，不遮挡主内容） -->
-      <div style="margin:8px;border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;">
-        <button @click="agentOpen = !agentOpen"
-                :style="{
-                  width: '100%', padding: '8px', borderRadius: '8px', cursor: 'pointer',
-                  border: 'none', color: '#fff', fontSize: '0.85rem',
-                  background: agentOpen ? 'rgba(45,91,255,0.5)' : 'rgba(255,255,255,0.08)',
-                }">
+      <div style="margin:8px 8px 0;border-top:1px solid var(--border);padding-top:8px;">
+        <n-button block :type="agentOpen ? 'primary' : 'default'" size="small" @click="agentOpen = !agentOpen">
           🤖 AI 工作助手 {{ agentOpen ? '▲' : '▼' }}
-        </button>
-        <div v-if="agentOpen" style="margin-top:8px;background:var(--card-bg);border-radius:10px;overflow:hidden;">
+        </n-button>
+        <div v-if="agentOpen" style="margin-top:8px;">
           <AgentChat role="grid" />
         </div>
       </div>
@@ -96,11 +81,11 @@ function logout() {
 
     <n-layout>
       <WeatherBanner />
-      <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--card-bg);">
+      <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
         <div style="font-weight:700;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
           <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
-          <n-tag :bordered="false" type="primary" size="small">● AI 治理</n-tag>
+          <n-tag :bordered="false" type="success" size="small">● AI 治理</n-tag>
           <span style="color:var(--muted);">{{ store.user?.name }}</span>
           <n-button size="small" quaternary @click="logout">退出</n-button>
         </div>
