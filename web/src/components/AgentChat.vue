@@ -138,14 +138,12 @@ async function clearAll() {
 
 <template>
   <div class="agent-chat" :class="{ collapsed }">
-    <!-- 标题栏（负责人端可收起） -->
-    <div class="agent-head" @click="collapsed && emit('toggle')">
-      <div style="display:flex;align-items:center;gap:6px;flex:1;">
-        <span>🤖 AI 小助手</span>
-        <n-tag v-if="role === 'grid'" size="tiny" type="info">工作助手</n-tag>
+    <!-- 简洁工具栏（无蓝色板块与标题文字；历史入口与 grid 收起保留） -->
+    <div class="agent-head">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <n-button v-if="role !== 'grid'" size="tiny" quaternary @click="showHistory = !showHistory">{{ showHistory ? '收起历史' : '📋 历史' }}</n-button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <n-button v-if="role !== 'grid'" size="tiny" quaternary @click="showHistory = !showHistory">历史</n-button>
         <n-button v-if="role === 'grid'" size="tiny" quaternary @click="emit('toggle')">{{ collapsed ? '展开' : '收起' }}</n-button>
       </div>
     </div>
@@ -210,8 +208,8 @@ async function clearAll() {
 <style scoped>
 .agent-chat { display: flex; flex-direction: column; }
 .agent-chat.collapsed { display: none; }
-.agent-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
-  background: var(--primary, #2D5BFF); color: #fff; border-radius: 10px 10px 0 0; cursor: pointer; }
+.agent-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px;
+  border-bottom: 1px solid var(--border); }
 .agent-history { padding: 8px 12px; border-bottom: 1px solid var(--border); max-height: 140px; overflow-y: auto; }
 .agent-body { padding: 12px; overflow-y: auto; flex: 1; min-height: 240px; max-height: 420px;
   background: var(--bg, #f5f7f5); }
