@@ -427,6 +427,14 @@ class CommunityAgent:
         result = executor.invoke(invoke_kwargs)
         output = result.get("output", "")
         steps = result.get("intermediate_steps", [])
+        # LLM 用量记账（P2-05）：尽力而为，失败不影响主流程
+        try:
+            import time as _t
+            from data.db_llm_usage import record_usage
+            record_usage("engine", len(oriented_input or "") // 4, len(output or "") // 4,
+                         duration_ms=0, input_preview=(oriented_input or "")[:80])
+        except Exception:
+            pass
         return output, steps
 
     def _summarize_plan(self, plan_results: list[dict], user_input: str) -> str | None:
@@ -448,6 +456,12 @@ class CommunityAgent:
             )
             resp = llm.invoke(prompt)
             content = (getattr(resp, "content", "") or "").strip()
+            try:
+                from data.db_llm_usage import record_usage
+                record_usage("plan_summary", len(prompt) // 4, len(content) // 4,
+                             input_preview=(user_input or "")[:80])
+            except Exception:
+                pass
             return content or None
         except Exception:
             logger.debug("计划总结失败", exc_info=True)

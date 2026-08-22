@@ -576,6 +576,18 @@ def _m32_agent_handoffs(conn):
     )
 
 
+def _m33_llm_usage(conn):
+    """v33：LLM 用量统计（P2-05：费用可预测、预算告警、规则优先可验证）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS llm_usage ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, module TEXT DEFAULT '', "
+        "tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, "
+        "cost_yuan REAL DEFAULT 0, duration_ms INTEGER DEFAULT 0, "
+        "cache_hit INTEGER DEFAULT 0, input_preview TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -773,6 +785,7 @@ def init_db(db_path: str):
         (30, "agent", _m30_agent),
         (31, "agent_sessions", _m31_agent_sessions),
         (32, "agent_handoffs", _m32_agent_handoffs),
+        (33, "llm_usage", _m33_llm_usage),
     ]
     for version, name, fn in post:
         if version <= current:

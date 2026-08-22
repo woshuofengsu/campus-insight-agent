@@ -2451,6 +2451,18 @@ def web_agent_handoff_resolve(hid: int, request: Request):
     return ok({"handoff_id": hid}, "已处理完成")
 
 
+@app.get("/api/web/agent/llm-usage")
+def web_agent_llm_usage(request: Request, days: int = 7):
+    """LLM 用量统计（P2-05：调用/token/费用/缓存命中，规则优先可验证）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_llm_usage import get_usage_summary, get_usage_trend
+    return ok({
+        "summary": get_usage_summary(days=days),
+        "trend": get_usage_trend(days=days),
+    })
+
+
 @app.get("/api/web/export/agent-logs")
 def web_export_agent_logs(request: Request):
     """导出 Agent 留痕 CSV（负责人，脱敏——不含完整手机号，导出本身留痕）。"""

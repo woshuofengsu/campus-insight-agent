@@ -82,6 +82,20 @@ class GridAssistantAgent(BaseAgent):
                                    chain_note="负责人已确认，生成脱敏导出")
             return self._reply("已取消导出。", "已取消", "导出数据", chain_note="负责人取消导出")
 
+        # LLM 用量（P2-05：规则优先 → 用量接近 0，可验证降本）
+        if any(k in text for k in ("LLM用量", "用量统计", "token费用", "AI费用", "模型调用")):
+            try:
+                from data.db_llm_usage import get_usage_summary
+                s = get_usage_summary(days=7)
+                return self._reply(
+                    f"📊 LLM 用量（近 {s['days']} 天）：\n· 调用 {s['calls']} 次\n"
+                    f"· 输入 token {s['tokens_in']} / 输出 {s['tokens_out']}\n"
+                    f"· 费用 ¥{s['cost_yuan']}\n· 缓存命中 {s['cache_hits']} 次\n"
+                    f"（Web 端以规则引擎为主，LLM 用量接近 0 即降本验证）",
+                    "成功", "网格员工作助手", chain_note="返回 LLM 用量统计（规则优先）")
+            except Exception:
+                return self._reply("用量数据暂不可用。", "失败", "网格员工作助手")
+
         # 人工处理包（无缝转人工：AI 已整理上下文，可直接处理）
         if any(k in text for k in ("处理包", "人工待办", "转人工的")):
             from data.db_agent import list_handoffs

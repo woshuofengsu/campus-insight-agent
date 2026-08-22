@@ -363,6 +363,23 @@ def test_injection_output_detected():
     assert v.verify({"reply": "正常回答，参考：《医保政策》"}, "policy_expert")["verdict"] == "pass"
 
 
+# ---------- LLM 用量统计（P2-05） ----------
+
+def test_llm_usage_record_and_summary(client):
+    from data.db_llm_usage import record_usage, record_cache_hit, get_usage_summary
+    record_usage("engine", 1000, 200, duration_ms=300, input_preview="test")
+    record_cache_hit("engine", "test")
+    s = get_usage_summary(days=7)
+    assert s["calls"] >= 2
+    assert s["tokens_in"] >= 1000
+    assert s["cache_hits"] >= 1
+    assert s["cost_yuan"] >= 0
+    # grid 可查
+    gtok = _login(client, "grid")
+    r = client.get("/api/web/agent/llm-usage", headers={"Authorization": f"Bearer {gtok}"})
+    assert r.status_code == 200 and r.json()["data"]["summary"]["calls"] >= 2
+
+
 # ---------- 历史对话 / 留痕 / 越权 ----------
 
 def test_history_and_delete(client):
