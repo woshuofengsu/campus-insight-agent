@@ -448,6 +448,26 @@ def test_opinion_flow(client):
     assert b["total"] >= 1
 
 
+# ---------- Bug 回归：老年端话题切换 / 通知查询 ----------
+
+def test_elderly_topic_switch(client):
+    """中途改话题（C5）：报修追问中切到「我不舒服」→ 应转健康顾问而非被当追问回答。"""
+    _reset(client, role="elderly", elder=True)
+    out, _ = _chat(client, "家里灯不亮了", role="elderly", elder=True)
+    assert out["intent"] == "repair_dispatch"
+    out, _ = _chat(client, "我不舒服", role="elderly", elder=True)
+    assert out["intent"] == "health_advisor", out["intent"]
+    _reset(client, role="elderly", elder=True)
+
+
+def test_elderly_notice_query(client):
+    """老年端通知查询：应返回通知列表而非未知意图。"""
+    _reset(client, role="elderly", elder=True)
+    out, _ = _chat(client, "最近有什么通知", role="elderly", elder=True)
+    assert out["intent"] == "notification", out["intent"]
+    assert "通知" in out["reply"] or "暂无" in out["reply"] or "没有" in out["reply"]
+
+
 # ---------- 历史对话 / 留痕 / 越权 ----------
 
 def test_history_and_delete(client):

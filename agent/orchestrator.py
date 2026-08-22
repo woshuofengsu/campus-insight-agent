@@ -100,7 +100,7 @@ class Orchestrator:
 
         # 1) 续接：黑板上已有业务会话（追问/草稿确认）→ 直接路由到对应业务 Agent
         st = ctx["state"]
-        resumed = self._resume_target(st, text)
+        resumed = self._resume_target(st, text, role)
         if resumed:
             ctx["intent"] = resumed
             ctx["user_input"] = text
@@ -122,19 +122,45 @@ class Orchestrator:
 
     # ---- 分发 ----
 
-    def _resume_target(self, st: dict, text: str) -> str | None:
-        """根据黑板 state 判断是否续接某业务 Agent（追问/草稿确认/导出确认）。"""
+    # 追问应答词白名单（话题切换检测用）：这些输入视为对当前追问的回答
+    _ANSWER_WORDS = {
+        "确认", "确认提交", "提交", "对", "是", "确定", "对，提交", "不是", "算了", "取消",
+        "家里", "公共区域", "室内", "室外", "紧急", "一般", "公开", "私有", "不报了", "不要了",
+    }
+
+    def _resume_target(self, st: dict, text: str, role: str = "resident") -> str | None:
+        """根据黑板 state 判断是否续接某业务 Agent（追问/草稿确认/导出确认）。
+
+        话题切换（C5）：续接前若用户输入非追问应答词且命中**其他新意图**，
+        则视为中途改话题——返回 None（由 receptionist 重新识别新意图，原流程草稿保留）。
+        """
         if not st:
             return None
         step = st.get("step")
         intent = st.get("intent")
+        target = None
         if st.get("pending_export"):
-            return "grid_assistant"
-        if step == "ask_type" or step == "ask_urgency" or (step == "confirm" and intent == "repair"):
-            return "repair_dispatch"
-        if step == "ask_public" or (step == "confirm" and intent == "proposal"):
-            return "proposal_collab"
-        return None
+            target = "grid_assistant"
+        elif step == "ask_type" or step == "ask_urgency" or (step == "confirm" and intent == "repair"):
+            target = "repair_dispatch"
+        elif step == "ask_public" or (step == "confirm" and intent == "proposal"):
+            target = "proposal_collab"
+        if not target:
+            return None
+        # 话题切换检测：非应答词且识别到其他意图 → 中断当前流程
+        if text not in self._ANSWER_WORDS and step:
+            try:
+                from agent import web_agent as A
+                from agent.roles.receptionist import INTENT_KEY_MAP
+                new_cn = A.detect_intent(text, role)
+                if new_cn:
+                    new_key = INTENT_KEY_MAP.get(new_cn)
+                    # 其他业务意图（非当前续接目标）→ 视为话题切换
+                    if new_key and new_key != target and new_key not in ("community", "withdraw"):
+                        return None
+            except Exception:
+                pass
+        return target
 
     def _dispatch(self, ctx: dict, intent: str) -> dict:
         """按意图路由到业务/自动角色 Agent，末尾过合规审计。"""
@@ -152,6 +178,9 @@ class Orchestrator:
         target = ROUTE_MAP.get(intent)
         if target is None and intent in self.agents:
             target = intent  # 续接会话时 intent 即角色 key
+        # 老年端通知查询 → 直答通知列表（不进负责人通知管理）
+        if intent == "notification" and ctx.get("role") == "elderly":
+            return self._community_or_withdraw(ctx, "notification")
         if not target:
             # 联系社区 / 撤回引导 等接待员可直答的意图
             if intent in ("community", "withdraw"):
@@ -411,17 +440,35 @@ class Orchestrator:
         return result
 
     def _community_or_withdraw(self, ctx: dict, intent: str) -> dict:
-        """联系社区 / 撤回引导（接待员直答，仍过审计）。"""
+        """联系社区 / 撤回引导 / 老年通知查询（接待员直答，仍过审计）。"""
         if intent == "community":
             from agent.web_agent_service import _exec_community_phone
             phone = _exec_community_phone()
             reply = f"社区服务中心电话：{phone}"
             actions = [{"type": "confirm_call", "label": "一键拨打", "phone": phone}]
             self._log("receptionist", "联系社区", "提供电话并支持一键拨打")
-        else:
+        elif intent == "withdraw":
             reply = "工单在「待审核」状态可以撤回。已为您打开我的报修列表。"
             actions = [{"type": "navigate", "to": "/resident/work-orders", "label": "去我的报修"}]
             self._log("receptionist", "撤回引导", "引导到工单详情")
+        elif intent == "notification":
+            # 老年端通知查询 → 直接返回老年端可见通知列表（大字）
+            try:
+                from data.db_notice import get_visible_notices
+                rows = get_visible_notices("elderly", ctx.get("uid"), limit=5)
+                if rows:
+                    lines = [f"· {n.get('title', '')}" for n in rows]
+                    reply = "🔔 最近通知：\n" + "\n".join(lines)
+                else:
+                    reply = "最近没有新通知。"
+                actions = [{"type": "navigate", "to": "/elderly/notices", "label": "去听通知"}]
+            except Exception:
+                reply = "通知查询暂时不可用。"
+                actions = []
+            self._log("receptionist", "通知查询", "返回老年端通知列表")
+        else:
+            reply = "正在为您处理。"
+            actions = []
         audit = self.agents["compliance_auditor"].process({
             "output_text": reply, "role": ctx.get("role"), "uid": ctx.get("uid"),
             "user_input": ctx.get("user_input", ""), "intent": intent,
