@@ -121,15 +121,26 @@ def worker(uid, tokens, results):
             if st6 == 200:
                 with lock:
                     stats["ok"] += 1
+            # Agent 对话（意图识别 + 追问 + 取消清理）
+            st7, j7, dt = req("POST", "/api/web/agent/chat", r_token, {"text": f"压测报修{uid}楼道灯不亮"})
+            with lock:
+                PERF["agent_chat"] = PERF.get("agent_chat", []) + [dt]
+            if st7 == 200 and j7.get("success"):
+                with lock:
+                    stats["ok"] += 1
+                req("POST", "/api/web/agent/chat", r_token, {"text": "算了"})
+            else:
+                errors.append(f"worker{uid}: agent_chat {st7} {j7}")
         else:
             with lock:
                 stats["fail"] += 1
             errors.append(f"worker{uid}: issue_create {st} {j}")
     else:
-        # grid：读列表 + 导出 + 统计
+        # grid：读列表 + 导出 + 统计 + Agent 待办/留痕
         for path in ["/api/web/issues", "/api/web/proposals", "/api/web/notices/manage",
                      "/api/web/health/consults", "/api/web/qa/questions", "/api/web/qa/stats",
-                     "/api/web/weather/tasks", "/api/web/elderly/manage/medications"]:
+                     "/api/web/weather/tasks", "/api/web/elderly/manage/medications",
+                     "/api/web/agent/logs"]:
             st, j, dt = req("GET", path, tok)
             with lock:
                 PERF[path] = PERF.get(path, []) + [dt]
