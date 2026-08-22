@@ -22,8 +22,19 @@ onMounted(() => {
 })
 
 const themeOverrides = computed(() => theme.isDark
-  ? { common: { primaryColor: '#4caf50', primaryColorHover: '#66bb6a', primaryColorPressed: '#388e3c', bodyColor: '#0f1a15', cardColor: '#16251e', textColorBase: '#e5efe8' } }
-  : { common: { primaryColor: '#2E7D32', primaryColorHover: '#3B8F44', primaryColorPressed: '#256B28' } })
+  ? {
+      common: {
+        primaryColor: '#2D5BFF', primaryColorHover: '#6A8DFF', primaryColorPressed: '#1E3A8A',
+        bodyColor: '#0F172A', cardColor: '#1E293B', textColorBase: '#E2E8F0',
+        borderRadius: '10px',
+      },
+    }
+  : {
+      common: {
+        primaryColor: '#2D5BFF', primaryColorHover: '#6A8DFF', primaryColorPressed: '#1E3A8A',
+        borderRadius: '10px',
+      },
+    })
 </script>
 
 <template>

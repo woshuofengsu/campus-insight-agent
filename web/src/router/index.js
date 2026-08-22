@@ -25,6 +25,8 @@ const routes = [
       { path: 'qa', name: 'r-qa', component: () => import('../views/resident/QA.vue'), meta: { title: '政策问答' } },
       { path: 'health', name: 'r-health', component: () => import('../views/resident/Health.vue'), meta: { title: '健康防护' } },
       { path: 'weather', name: 'r-weather', component: () => import('../views/resident/Weather.vue'), meta: { title: '天气' } },
+      { path: 'profile', name: 'r-profile', component: () => import('../views/resident/Profile.vue'), meta: { title: '我的' } },
+      { path: 'messages', name: 'r-messages', component: () => import('../views/resident/Messages.vue'), meta: { title: '消息中心' } },
     ],
   },
 

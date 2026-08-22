@@ -211,7 +211,7 @@ async function clearAll() {
 .agent-chat { display: flex; flex-direction: column; }
 .agent-chat.collapsed { display: none; }
 .agent-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
-  background: var(--accent, #2E7D32); color: #fff; border-radius: 10px 10px 0 0; cursor: pointer; }
+  background: var(--primary, #2D5BFF); color: #fff; border-radius: 10px 10px 0 0; cursor: pointer; }
 .agent-history { padding: 8px 12px; border-bottom: 1px solid var(--border); max-height: 140px; overflow-y: auto; }
 .agent-body { padding: 12px; overflow-y: auto; flex: 1; min-height: 240px; max-height: 420px;
   background: var(--bg, #f5f7f5); }

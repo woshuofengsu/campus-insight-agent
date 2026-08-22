@@ -20,12 +20,12 @@ const navs = [
 </script>
 
 <template>
-  <div style="min-height:100vh;background:#fff;">
-    <div style="background:#2E7D32;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="min-height:100vh;background:#F7F8FA;">
+    <div style="background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:1.3rem;font-weight:800;">🏘️ 社区服务</div>
       <n-button size="small" text style="color:#fff;" @click="store.logout(); router.replace('/login')">退出</n-button>
     </div>
-    <div style="display:flex;gap:8px;padding:10px 12px;background:#f0faf0;flex-wrap:wrap;">
+    <div style="display:flex;gap:8px;padding:10px 12px;background:var(--primary-light,#E8EDFF);flex-wrap:wrap;">
       <n-button v-for="n in navs" :key="n.key" size="large" round
                 :type="route.path.startsWith(n.key) ? 'primary' : 'default'"
                 @click="router.push(n.key)" style="min-height:52px;font-size:1.1rem;">

@@ -71,7 +71,7 @@ const entries = [
 
     <!-- Agent 智能入口（默认展开可收起） -->
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--accent,#2E7D32);color:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--primary,#2D5BFF);color:#fff;">
         <b>🤖 社区小助手</b>
         <n-button size="tiny" text style="color:#fff;" @click="agentOpen = !agentOpen">{{ agentOpen ? '收起 ▲' : '展开 ▼' }}</n-button>
       </div>
