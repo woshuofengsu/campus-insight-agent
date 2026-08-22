@@ -199,6 +199,23 @@ function cancelCall() {
       🆘 最近求助：{{ home.latest_sos.status || '处理中' }}
     </div>
 
+    <!-- 语音对话区：社区小助手（语音优先，点开全页） -->
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#2E7D32;color:#fff;">
+        <b style="font-size:1.2rem;">🤖 社区小助手（按住说话）</b>
+        <n-button size="small" text style="color:#fff;" @click="router.push('/elderly/agent')">全页对话 ›</n-button>
+      </div>
+      <div style="padding:12px;">
+        <n-button type="error" block size="large" style="min-height:72px;font-size:1.3rem;" @click="router.push('/elderly/agent')">
+          🎤 按住说话，报修 / 查政策 / 问天气
+        </n-button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;justify-content:center;">
+          <n-button v-for="(q, i) in ['家里灯不亮了', '医保怎么报销', '今天天气', '我要联系社区']" :key="i" size="large"
+                    @click="router.push('/elderly/agent')">{{ q }}</n-button>
+        </div>
+      </div>
+    </div>
+
     <!-- 两行三列大按钮 -->
     <div v-for="(row, ri) in rows" :key="ri" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;">
       <n-badge v-for="b in row" :key="b.label" :value="b.label === '用药提醒' ? home?.due_medications || 0 : 0"

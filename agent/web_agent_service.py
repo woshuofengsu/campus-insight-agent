@@ -77,8 +77,10 @@ def _exec_report(uid: int, name: str, data: dict) -> tuple[str, str, int | None]
 def _exec_proposal(uid: int, name: str, data: dict) -> tuple[str, str, int | None]:
     """提交提案（草稿确认后）。"""
     from data.db_proposal import submit_proposal
+    desc = data.get("desc", "")
+    title = (data.get("title") or desc[:30] or "社区建议").strip()
     pid, msg = submit_proposal(
-        title=data.get("title", ""), description=data.get("desc", ""),
+        title=title, description=desc,
         category=data.get("category", "其他"),
         reporter_name=name or "居民", reporter_phone=data.get("phone") or "13800000000",
         is_public=data.get("is_public", 0), reporter_id=uid,
@@ -258,15 +260,18 @@ def handle_chat(role: str, uid: int, name: str, text: str,
 
     intent = A.detect_intent(text, role)
     if not intent:
-        # 出行联想
-        if A.detect_go_out(text):
+        # 紧急语义（哗哗的/快点来/爆了等）默认联想为报修
+        if urgent:
+            intent = "报修"
+        elif A.detect_go_out(text):
             return _reply(s, "出行联想", "需要帮您查天气吗？", "成功",
                           [{"type": "buttons", "options": ["查今天天气", "不用了"]}], uid, role, text)
-        if emotion:
+        elif emotion:
             return _reply(s, "情绪安抚", "我理解您的着急，马上为您处理。请告诉我具体的问题，比如是漏水、灯坏还是其他。",
                           "成功", [{"type": "buttons", "options": ["报修", "提案", "政策问答", "查天气"]}], uid, role, text)
-        return _reply(s, "未知意图", A.unknown_reply(role), "成功",
-                      [{"type": "buttons", "options": A.quick_entries(role)}], uid, role, text)
+        else:
+            return _reply(s, "未知意图", A.unknown_reply(role), "成功",
+                          [{"type": "buttons", "options": A.quick_entries(role)}], uid, role, text)
 
     s["intent"] = intent
     s["step"] = None

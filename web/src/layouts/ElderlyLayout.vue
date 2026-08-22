@@ -9,6 +9,7 @@ const store = useUserStore()
 
 const navs = [
   { key: '/elderly/home', label: '🏠 首页' },
+  { key: '/elderly/agent', label: '🤖 小助手' },
   { key: '/elderly/report', label: '🗣️ 报修' },
   { key: '/elderly/orders', label: '🔧 我的报修' },
   { key: '/elderly/medication', label: '💊 用药' },

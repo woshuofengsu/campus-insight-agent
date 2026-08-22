@@ -176,4 +176,15 @@ export const upload = (files, folder = 'web') => {
   return api.post(`/upload?folder=${folder}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
 
+// Agent 统一入口
+export const agent = {
+  chat: (data) => api.post('/agent/chat', data),
+  elderlyChat: (data) => api.post('/agent/elderly/chat', data),
+  history: () => api.get('/agent/history'),
+  deleteHistory: (id) => api.delete(`/agent/history/${id}`),
+  clearHistory: () => api.delete('/agent/history'),
+  logs: (params) => api.get('/agent/logs', { params }),
+  exportLogs: () => api.get('/export/agent-logs', { responseType: 'blob' }),
+}
+
 export default api

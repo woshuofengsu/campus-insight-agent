@@ -1,9 +1,10 @@
 <script setup>
-// 居民首页：天气摘要 + 未读通知 + 紧急通知强制弹窗 + 快捷入口
+// 居民首页：Agent 智能入口 + 天气摘要 + 未读通知 + 紧急通知强制弹窗 + 快捷入口
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { weather, notices } from '../../api'
+import AgentChat from '../../components/AgentChat.vue'
 
 const router = useRouter()
 const store = useUserStore()
@@ -11,6 +12,7 @@ const store = useUserStore()
 const w = ref(null)
 const noticeList = ref([])
 const urgentModal = ref(null) // 紧急通知弹窗
+const agentOpen = ref(true) // Agent 默认展开可收起
 
 onMounted(async () => {
   try { w.value = await weather.current() } catch { /* 天气失败不阻塞 */ }
@@ -65,6 +67,15 @@ const entries = [
     <div v-if="unread() > 0" class="card" style="background:#f0fdf4;border:1px solid #86efac;">
       <b>🔔 您有 {{ unread() }} 条未读通知</b>
       <n-button size="small" type="success" ghost style="margin-left:8px;" @click="router.push('/resident/notices')">查看</n-button>
+    </div>
+
+    <!-- Agent 智能入口（默认展开可收起） -->
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--accent,#2E7D32);color:#fff;">
+        <b>🤖 社区小助手</b>
+        <n-button size="tiny" text style="color:#fff;" @click="agentOpen = !agentOpen">{{ agentOpen ? '收起 ▲' : '展开 ▼' }}</n-button>
+      </div>
+      <AgentChat v-if="agentOpen" role="resident" />
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">

@@ -54,6 +54,7 @@ const routes = [
     children: [
       { path: '', redirect: '/elderly/home' },
       { path: 'home', name: 'e-home', component: () => import('../views/elderly/Home.vue'), meta: { title: '首页' } },
+      { path: 'agent', name: 'e-agent', component: () => import('../views/elderly/Agent.vue'), meta: { title: '社区小助手' } },
       { path: 'report', name: 'e-report', component: () => import('../views/elderly/Report.vue'), meta: { title: '语音报修' } },
       { path: 'medication', name: 'e-medication', component: () => import('../views/elderly/Medication.vue'), meta: { title: '用药提醒' } },
       { path: 'notices', name: 'e-notices', component: () => import('../views/elderly/Notices.vue'), meta: { title: '听通知' } },

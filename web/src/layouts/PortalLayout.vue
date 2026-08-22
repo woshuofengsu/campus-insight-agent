@@ -1,15 +1,17 @@
 <script setup>
-// 居民端 / 网格员端共用布局：侧边导航 + 顶栏
-import { computed, h } from 'vue'
+// 居民端 / 网格员端共用布局：侧边导航 + 顶栏 + 网格员 AI 工作助手（侧边栏，默认收起）
+import { computed, h, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useThemeStore } from '../stores/theme'
 import WeatherBanner from '../components/WeatherBanner.vue'
+import AgentChat from '../components/AgentChat.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
 const theme = useThemeStore()
+const agentOpen = ref(false) // AI 工作助手默认收起
 
 const menus = computed(() => {
   if (store.isGrid) {
@@ -45,13 +47,23 @@ function logout() {
 
 <template>
   <n-layout style="min-height:100vh" has-sider>
-    <n-layout-sider bordered width="210">
+    <n-layout-sider bordered width="230">
       <div style="padding:18px 16px;border-bottom:1px solid var(--border);">
         <div style="font-weight:800;color:#2E7D32;font-size:1.05rem;">🏘️ 社区先知</div>
         <div style="color:var(--muted);font-size:0.75rem;">{{ store.isGrid ? '网格员工作台' : '社区治理平台' }}</div>
       </div>
       <n-menu :options="menus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
               :value="active" @update:value="(k) => router.push(k)" />
+
+      <!-- 网格员 AI 工作助手（默认收起，不遮挡主内容） -->
+      <div v-if="store.isGrid" style="margin:8px 8px 0;border-top:1px solid var(--border);padding-top:8px;">
+        <n-button block :type="agentOpen ? 'primary' : 'default'" size="small" @click="agentOpen = !agentOpen">
+          🤖 AI 工作助手 {{ agentOpen ? '▲' : '▼' }}
+        </n-button>
+        <div v-if="agentOpen" style="margin-top:8px;">
+          <AgentChat role="grid" />
+        </div>
+      </div>
     </n-layout-sider>
 
     <n-layout>
