@@ -380,6 +380,42 @@ def test_llm_usage_record_and_summary(client):
     assert r.status_code == 200 and r.json()["data"]["summary"]["calls"] >= 2
 
 
+# ---------- P2-01 跨部门仲裁 / P2-02 重复上报合并 ----------
+
+def test_dept_priority_and_scope():
+    from agent.roles.config import DEPT_PRIORITY, DEPT_SCOPE
+    assert DEPT_PRIORITY["compliance_auditor"] < DEPT_PRIORITY["professional"]
+    assert "费用争议" in DEPT_SCOPE["repair_dispatch"]["cannot"]
+    assert "审批" in DEPT_SCOPE["grid_assistant"]["cannot"]
+    from agent.arbiter import Arbiter
+    arb = Arbiter()
+    # 费用争议 → 人工（manual_required）
+    assert arb.arbitrate({"cost_involved": True})["decision"] == "human"
+    # 隐私 vs 通知 → 合规拦截
+    assert arb.arbitrate({"audit_failed": True})["decision"] == "block"
+
+
+def test_duplicate_issue_merge(client):
+    """重复上报：同楼栋同类问题 → merged 提示 + 通知双方。"""
+    _reset(client)
+    tok = _login(client, "resident")
+    r = client.post("/api/web/issues", json={
+        "title": "楼道灯不亮了", "location": "幸福小区3号楼2单元", "description": "楼道灯坏了不亮需要维修",
+        "urgency": "一般", "issue_type": "室外", "reporter_phone": "13900000001",
+    }, headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200 and r.json()["success"]
+    first = r.json()["data"]
+    assert first["merged"] is False
+    # 第二个居民重复上报同楼栋同问题
+    r2 = client.post("/api/web/issues", json={
+        "title": "楼道灯坏了", "location": "幸福小区3号楼2单元", "description": "楼道灯坏了不亮需要维修",
+        "urgency": "一般", "issue_type": "室外", "reporter_phone": "13900000002",
+    }, headers={"Authorization": f"Bearer {tok}"})
+    assert r2.status_code == 200 and r2.json()["success"]
+    d2 = r2.json()["data"]
+    assert d2["merged"] is True and d2["original_id"] == first["issue_id"]
+
+
 # ---------- 历史对话 / 留痕 / 越权 ----------
 
 def test_history_and_delete(client):

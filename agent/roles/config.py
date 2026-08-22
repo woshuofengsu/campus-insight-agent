@@ -70,3 +70,24 @@ ROUTE_MAP = {
     "weather": "weather_guardian",
     "grid": "grid_assistant",
 }
+
+# 跨部门仲裁优先级（P2-01）：数字越小优先级越高；compliance 一票否决
+DEPT_PRIORITY = {
+    "compliance_auditor": 1,   # 合规审计部：最终否决权
+    "safety_emergency": 2,     # 安全/紧急
+    "professional": 3,         # 专业部门（报修/提案/健康/政策/通知/天气）
+    "cost_liability": 4,       # 费用/责任 → 转人工
+    "default": 5,              # 默认保守 → 转人工
+}
+
+# 各业务 Agent 可裁决/不可裁决范围（P2-01 部门权限表）
+DEPT_SCOPE = {
+    "repair_dispatch": {"can": ["报修分类", "紧急程度", "分派"], "cannot": ["费用争议", "责任归属"]},
+    "proposal_collab": {"can": ["提案类别", "公示规则"], "cannot": ["执行部门资源", "预算"]},
+    "health_advisor": {"can": ["健康建议", "就医指引"], "cannot": ["政策合规", "药品批准"]},
+    "policy_expert": {"can": ["政策解读", "引用规则"], "cannot": ["医疗诊断", "个例适用"]},
+    "notification_manager": {"can": ["通知发布", "发布范围"], "cannot": ["隐私合规", "法律风险"]},
+    "weather_guardian": {"can": ["天气预警", "联动建议"], "cannot": ["应急措施执行"]},
+    "grid_assistant": {"can": ["数据检索", "导出", "统计"], "cannot": ["审批", "决策"]},
+    "compliance_auditor": {"can": ["全部（否决权）"], "cannot": []},
+}

@@ -325,7 +325,29 @@ def web_issue_create(req: IssueCreate, request: Request):
     )
     if iid <= 0:
         return fail(2001, hint or "提交失败")
-    return ok({"issue_id": iid, "hint": hint}, "提交成功")
+    # 重复上报检测（P2-02）：7 天内同楼栋同类问题 → 合并提示 + 通知双方（原工单不动）
+    dup = None
+    try:
+        from data.db_repair import find_duplicate_issue
+        dup = find_duplicate_issue(req.location, req.description)
+    except Exception:
+        dup = None
+    if dup:
+        try:
+            from data.db_notifications import create_notification
+            if dup.get("reporter_id"):
+                create_notification(dup["reporter_id"], "issue",
+                                    f"工单 #{dup['id']} 有新的居民上报了相同问题",
+                                    f"您报修的「{(dup.get('title') or '')[:20]}」又有居民上报，我们正在一并处理。")
+            if u.get("uid"):
+                create_notification(u.get("uid"), "issue",
+                                    f"您上报的问题已合并处理",
+                                    f"您报修的问题与工单 #{dup['id']} 相同，已合并处理，可在「我的报修」查看进度。")
+        except Exception:
+            pass
+        return ok({"issue_id": iid, "merged": True, "original_id": dup["id"],
+                   "hint": hint}, "已提交，检测到重复上报已合并处理")
+    return ok({"issue_id": iid, "merged": False, "hint": hint}, "提交成功")
 
 
 def _db_submit_issue(**kw):

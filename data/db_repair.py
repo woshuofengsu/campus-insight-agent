@@ -643,6 +643,38 @@ def get_safety_reminders(limit: int = 100) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def find_duplicate_issue(location: str, description: str, days: int = 7) -> dict | None:
+    """重复上报检测（P2-02）：7 天内、同楼栋（地址前 5 字）、关键词重合 ≥2 的同类工单。
+
+    返回原工单 dict（含 reporter 信息），无则 None。降级：地址空或描述过短不检测。
+    """
+    loc = (location or "").strip()
+    desc = (description or "").strip()
+    if not loc or len(desc) < 4:
+        return None
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM community_issues WHERE status NOT IN ('已关闭', '已撤回', '已转出') "
+                "AND reported_at >= datetime('now', ? || ' days') "
+                "AND substr(location, 1, 5) = substr(?, 1, 5) ORDER BY reported_at DESC LIMIT 20",
+                (f"-{days}", loc),
+            ).fetchall()
+    except Exception:
+        return None
+    def _bigrams(s):
+        return {s[i:i + 2] for i in range(max(0, len(s) - 1))}
+
+    kw = _bigrams(desc)
+    for r in rows:
+        old = (r.get("description") or "") + (r.get("title") or "")
+        old_kw = _bigrams(old)
+        overlap = len(kw & old_kw)
+        if overlap >= 2:
+            return dict(r)
+    return None
+
+
 def get_issue_timeline(issue_id: int) -> list[dict]:
     """工单留痕时间线（最近在前）。"""
     with get_db() as conn:
