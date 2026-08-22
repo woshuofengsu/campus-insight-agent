@@ -667,7 +667,7 @@ def find_duplicate_issue(location: str, description: str, days: int = 7) -> dict
 
     kw = _bigrams(desc)
     for r in rows:
-        old = (r.get("description") or "") + (r.get("title") or "")
+        old = (r["description"] or "") + (r["title"] or "")
         old_kw = _bigrams(old)
         overlap = len(kw & old_kw)
         if overlap >= 2:
