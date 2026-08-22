@@ -41,7 +41,7 @@ async function demo(role) {
 </script>
 
 <template>
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1E3A8A 0%,#2D5BFF 60%,#6A8DFF 100%);">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#CFDFFF 0%,#9DB8FF 55%,#6A8DFF 100%);">
     <div style="background:var(--card-bg);border-radius:20px;padding:40px 36px;width:380px;box-shadow:0 16px 48px rgba(0,0,0,0.25);">
       <div style="text-align:center;margin-bottom:24px;">
         <div style="font-size:2.4rem;">🏘️</div>
