@@ -139,12 +139,16 @@ class Orchestrator:
     def _dispatch(self, ctx: dict, intent: str) -> dict:
         """按意图路由到业务/自动角色 Agent，末尾过合规审计。"""
         from agent.roles.config import ROUTE_MAP
-        # 用户主动转人工（T6）→ 直接生成人工处理包
+        # 用户主动转人工（T6）→ 生成人工处理包（上下文同步）
         if intent == "handoff":
             self._log("receptionist", "转人工", "用户主动要求")
-            return self._finish(ctx, "已为您转接工作人员，他们会直接联系您。", "transferred_to_human",
-                                "handoff",
-                                [{"type": "navigate", "to": "/resident/messages", "label": "查看消息"}], None)
+            result = self._transfer_to_human(
+                ctx, {"reply": "", "intent": "handoff", "status": "needs_human"},
+                "用户主动要求转人工（T6）")
+            return self._finish(ctx, "已为您转接工作人员，他们会直接联系您，不用重新说一遍。",
+                                result["status"], "handoff",
+                                [{"type": "navigate", "to": "/resident/messages", "label": "查看消息"}],
+                                result.get("handoff_id"))
         target = ROUTE_MAP.get(intent)
         if target is None and intent in self.agents:
             target = intent  # 续接会话时 intent 即角色 key
