@@ -553,6 +553,17 @@ def _m30_agent(conn):
     )
 
 
+def _m31_agent_sessions(conn):
+    """v31：Agent 会话落库（重启不丢、多实例不串线）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS agent_sessions ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL UNIQUE, "
+        "user_id INTEGER NOT NULL, role TEXT DEFAULT 'resident', "
+        "state_json TEXT DEFAULT '{}', "
+        "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -748,6 +759,7 @@ def init_db(db_path: str):
         (28, "issue_supplement_pending", _m28_issue_supplement_pending),
         (29, "proposal_comments", _m29_proposal_comments),
         (30, "agent", _m30_agent),
+        (31, "agent_sessions", _m31_agent_sessions),
     ]
     for version, name, fn in post:
         if version <= current:

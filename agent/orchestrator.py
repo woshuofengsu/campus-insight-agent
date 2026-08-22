@@ -31,6 +31,8 @@ class Orchestrator:
     """多 Agent 编排器（每用户会话一个实例，黑板带 session_id）。"""
 
     def __init__(self, session_id: str | None = None):
+        from agent.blackboard import Blackboard
+        from agent.roles import create_agents
         self.bb = Blackboard(session_id=session_id)
         self.agents = create_agents(self.bb)
         from agent.arbiter import Arbiter
@@ -38,6 +40,7 @@ class Orchestrator:
         self.arbiter = Arbiter()
         self.verifier = Verifier()
         self.execution_chain: list[dict] = []
+        self._persisted = False  # 会话落库（v31）
 
     # ---- 执行链 ----
 
@@ -62,9 +65,17 @@ class Orchestrator:
             elder_uid: int | None = None) -> dict:
         """处理一轮用户消息。返回 {reply, intent, status, actions, related_id, execution_chain, session_id}。"""
         text = (user_input or "").strip()[:200]
+        # 会话落库：重启后从 agent_sessions 恢复 state（P1-C5-01 修复）
+        from data import db_agent
+        try:
+            persisted = db_agent.load_session(self.bb.session_id)
+            if persisted and isinstance(persisted, dict):
+                self._persisted = True
+        except Exception:
+            persisted = None
         st = self.bb.read(_state_key(uid))
         if st is None:
-            st = {}
+            st = persisted or {}
             self.bb.write(_state_key(uid), st, "orchestrator")
         ctx = {"role": role, "uid": uid, "name": name, "user_input": text,
                "elder_uid": elder_uid,
@@ -79,7 +90,12 @@ class Orchestrator:
                 except Exception:
                     pass
             self.bb.write(_state_key(uid), {}, "orchestrator")
-            self._log("receptionist", "取消", "用户取消，清理草稿")
+            try:
+                from data import db_agent
+                db_agent.delete_session(self.bb.session_id)
+            except Exception:
+                pass
+            self._log("receptionist", "取消", "用户取消，清理草稿与会话")
             return self._finish(ctx, "已取消，没有生成草稿。", "已取消", "取消", [], None)
 
         # 1) 续接：黑板上已有业务会话（追问/草稿确认）→ 直接路由到对应业务 Agent
@@ -307,6 +323,13 @@ class Orchestrator:
 
     def _finish(self, ctx: dict, reply: str, status: str, intent: str,
                 actions: list, related_id) -> dict:
+        # 会话落库：state 持久化（重启不丢）
+        try:
+            from data import db_agent
+            db_agent.save_session(self.bb.session_id, ctx.get("uid") or 0,
+                                  ctx.get("role") or "resident", ctx.get("state") or {})
+        except Exception as e:  # noqa: BLE001
+            _log.warning("会话落库失败：%s", e)
         # 对话落库（历史）
         try:
             from data import db_agent

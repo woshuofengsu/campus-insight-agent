@@ -27,6 +27,7 @@ const routes = [
       { path: 'weather', name: 'r-weather', component: () => import('../views/resident/Weather.vue'), meta: { title: '天气' } },
       { path: 'profile', name: 'r-profile', component: () => import('../views/resident/Profile.vue'), meta: { title: '我的' } },
       { path: 'messages', name: 'r-messages', component: () => import('../views/resident/Messages.vue'), meta: { title: '消息中心' } },
+      { path: 'privacy', name: 'r-privacy', component: () => import('../views/resident/Privacy.vue'), meta: { title: '隐私政策' } },
     ],
   },
 

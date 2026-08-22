@@ -242,6 +242,8 @@ def web_me(request: Request):
     row = get_user_by_id(u.get("uid"))
     if not row:
         return fail(1004, "用户不存在")
+    if not row.get("is_active"):
+        return fail(1003, "账号已注销")
     return ok({
         "user_id": row["id"], "role": row["role"],
         "name": row.get("name") or row.get("username"),
@@ -2253,6 +2255,98 @@ def web_emergency_status(request: Request):
 
 class AgentChat(BaseModel):
     text: str = Field(..., min_length=1, max_length=200)
+
+
+# ---- PIPL 合规：修改密码 / 个人数据导出 / 账号注销（数据安全 v3.0） ----
+
+class ChangePassword(BaseModel):
+    old_password: str = Field(default="")
+    new_password: str = Field(..., min_length=8)
+
+
+@app.post("/api/web/auth/change-password")
+def web_change_password(req: ChangePassword, request: Request):
+    """修改密码（校验强度；演示账号居民/老人为空密码时免旧密码）。"""
+    from data.db_core import get_db, _hash_password, _verify_password
+    from utils.password import validate_password
+    u = _user(request)
+    uid = u.get("uid")
+    okp, msg = validate_password(req.new_password)
+    if not okp:
+        return fail(2001, msg)
+    with get_db() as conn:
+        row = conn.execute("SELECT password_hash FROM user_profile WHERE id=?", (uid,)).fetchone()
+        if row is None:
+            return fail(1004, "用户不存在")
+        stored = row["password_hash"] or ""
+        if stored and not _verify_password(req.old_password, stored):
+            return fail(1001, "原密码不正确")
+        conn.execute("UPDATE user_profile SET password_hash=? WHERE id=?",
+                     (_hash_password(req.new_password), uid))
+        conn.commit()
+    from data.db_notifications import log_activity
+    log_activity(u.get("name") or "用户", "修改密码", module="安全",
+                 detail=f"用户 #{uid} 修改登录密码（留痕，不含明文）")
+    return ok({}, "密码已修改")
+
+
+@app.get("/api/web/me/export")
+def web_me_export(request: Request):
+    """PIPL：导出本人数据（JSON，脱敏——不含完整手机号）。"""
+    from data.db_core import get_db
+    import json
+    from io import StringIO
+    u = _user(request)
+    uid = u.get("uid")
+    out = {"user_id": uid, "name": u.get("name") or "", "role": u.get("role") or ""}
+    with get_db() as conn:
+        for table, cols in (("community_issues", "reported_at"), ("proposals", "created_at"),
+                            ("health_consults", "created_at"), ("agent_dialogs", "created_at")):
+            try:
+                rows = conn.execute(
+                    f"SELECT * FROM {table} WHERE user_id=? ORDER BY {cols} DESC LIMIT 50",
+                    (uid,)).fetchall()
+            except Exception:
+                continue
+            out[table] = [dict(r) for r in rows]
+    # 脱敏：手机号打码
+    def mask(obj):
+        if isinstance(obj, dict):
+            for k in list(obj.keys()):
+                if k == "phone" or k.endswith("_phone"):
+                    v = str(obj[k] or "")
+                    obj[k] = (v[:3] + "****" + v[-4:]) if len(v) == 11 else v
+                elif isinstance(obj[k], (dict, list)):
+                    mask(obj[k])
+        elif isinstance(obj, list):
+            for i in obj:
+                mask(i)
+    mask(out)
+    from data.db_notifications import log_activity
+    log_activity(u.get("name") or "用户", "导出本人数据", module="安全",
+                 detail=f"用户 #{uid} 导出个人数据（脱敏）")
+    from fastapi.responses import Response
+    return Response(json.dumps(out, ensure_ascii=False, indent=2).encode("utf-8"),
+                    media_type="application/json",
+                    headers={"Content-Disposition": "attachment; filename=my-data.json"})
+
+
+@app.post("/api/web/me/delete")
+def web_me_delete(request: Request):
+    """PIPL：注销账号（匿名化个人字段 + 停用；保留必要日志）。"""
+    from data.db_core import get_db
+    from data.db_notifications import log_activity
+    u = _user(request)
+    uid = u.get("uid")
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE user_profile SET is_active=0, username='已注销用户' || id, "
+            "phone='', community='', building='' WHERE id=? AND role != 'grid'",
+            (uid,))
+        conn.commit()
+    log_activity(u.get("name") or "用户", "注销账号", module="安全",
+                 detail=f"用户 #{uid} 注销（匿名化个人字段，保留日志）")
+    return ok({}, "账号已注销（个人数据已匿名化，日志按法规保留）")
 
 
 @app.post("/api/web/agent/chat")

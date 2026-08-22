@@ -13,6 +13,8 @@ from utils.text import check_sensitive
 
 # 完整手机号模式（11 位 1 开头）
 _PHONE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+# 完整身份证模式（18 位）
+_IDCARD_RE = re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")
 
 
 class ComplianceAuditorAgent(BaseAgent):
@@ -55,6 +57,17 @@ class ComplianceAuditorAgent(BaseAgent):
             except Exception:
                 pass
             return {"passed": False, "reason": "包含完整手机号", "reply": "该内容涉及隐私，需人工审核。"}
+
+        # 2.5 身份证检测（数据安全 v3.0）
+        m2 = _IDCARD_RE.search(text)
+        if m2:
+            from data.db_agent import log_agent
+            try:
+                log_agent(uid, role, user_input, intent, routed="审计拦截-完整身份证号",
+                          status="拦截", error="回复包含完整身份证号", related_id=related_id)
+            except Exception:
+                pass
+            return {"passed": False, "reason": "包含完整身份证号", "reply": "该内容涉及隐私，需人工审核。"}
 
         # 3. 留痕（正常通过）
         from data.db_agent import log_agent

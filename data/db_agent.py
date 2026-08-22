@@ -126,3 +126,52 @@ def clean_agent_logs(days: int = RETENTION_DAYS) -> int:
             f"DELETE FROM agent_logs WHERE created_at < datetime('now', '-{days} days')")
         conn.commit()
         return cur.rowcount
+
+
+# ---------------------------------------------------------------------------
+# Agent 会话落库（v31：重启不丢、多实例不串线）
+# ---------------------------------------------------------------------------
+
+def save_session(session_id: str, user_id: int, role: str, state: dict) -> None:
+    """保存会话状态（upsert）。state 为可 JSON 序列化 dict。"""
+    import json as _json
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO agent_sessions (session_id, user_id, role, state_json) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(session_id) DO UPDATE SET state_json=excluded.state_json, "
+            "user_id=excluded.user_id, role=excluded.role, updated_at=CURRENT_TIMESTAMP",
+            (session_id, user_id, role, _json.dumps(state or {}, ensure_ascii=False)),
+        )
+        conn.commit()
+
+
+def load_session(session_id: str) -> dict | None:
+    """读取会话状态；不存在返回 None。"""
+    import json as _json
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT state_json FROM agent_sessions WHERE session_id=?", (session_id,)
+        ).fetchone()
+    if not row or not row["state_json"]:
+        return None
+    try:
+        return _json.loads(row["state_json"])
+    except (ValueError, TypeError):
+        return None
+
+
+def delete_session(session_id: str) -> None:
+    """删除会话（取消/结束）。"""
+    with get_db() as conn:
+        conn.execute("DELETE FROM agent_sessions WHERE session_id=?", (session_id,))
+        conn.commit()
+
+
+def clean_sessions(days: int = 30) -> int:
+    """清理超过 N 天的会话（调度器调用）。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            f"DELETE FROM agent_sessions WHERE updated_at < datetime('now', '-{days} days')")
+        conn.commit()
+        return cur.rowcount

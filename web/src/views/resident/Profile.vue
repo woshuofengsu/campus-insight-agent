@@ -46,6 +46,33 @@ async function clearHistory() {
     message.error(e.message)
   }
 }
+
+// PIPL：导出本人数据
+async function exportMyData() {
+  try {
+    const api = await import('../../api')
+    const blob = await api.default.get('/me/export', { responseType: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'my-data.json'; a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+// PIPL：注销账号（二次确认）
+async function deleteAccount() {
+  try {
+    const api = await import('../../api')
+    await api.default.post('/me/delete')
+    message.success('账号已注销，个人数据已匿名化')
+    store.logout()
+    setTimeout(() => { window.location.href = '/login' }, 800)
+  } catch (e) {
+    message.error(e.message)
+  }
+}
 </script>
 
 <template>
@@ -101,7 +128,13 @@ async function clearHistory() {
       <div style="display:flex;flex-direction:column;gap:4px;">
         <div class="svc" @click="theme.toggle()"><span>🌙</span> {{ theme.isDark ? '日间模式' : '夜间模式' }}</div>
         <div class="svc" @click="clearHistory"><span>🗑️</span> 清除历史对话</div>
-        <div class="svc" @click="store.logout(); router.replace('/login')"><span>🚪</span> 退出登录</div>
+        <div class="svc" @click="exportMyData"><span>📤</span> 导出我的数据（脱敏）</div>
+        <div class="svc" @click="router.push('/resident/privacy')"><span>🔒</span> 隐私政策</div>
+        <n-popconfirm @positive-click="deleteAccount" :positive-button-props="{ type: 'error' }">
+          <template #trigger><div class="svc" style="color:#dc2626;"><span>🚪</span> 注销账号（数据匿名化）</div></template>
+          注销后您的报修/提案记录将匿名化、不可恢复，确认注销？
+        </n-popconfirm>
+        <div class="svc" @click="store.logout(); router.replace('/login')"><span>🔑</span> 退出登录</div>
       </div>
       <div class="muted" style="font-size:0.75rem;margin-top:12px;">社区先知 · 社区治理智能体 · 演示数据均为虚构</div>
     </div>

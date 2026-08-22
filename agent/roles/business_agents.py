@@ -34,6 +34,9 @@ class RepairDispatchAgent(BaseAgent):
         uid = ctx.get("uid"); name = ctx.get("name") or "居民"
         st = self._read(_state_key(uid)) or {}
         draft = self._read(_draft_key(uid, "work_order_draft"))
+        # 会话恢复（落库后黑板可能无 draft）：有 step 但无 draft 时补空草稿
+        if draft is None and st.get("step"):
+            draft = {}
 
         # 追问/确认阶段
         step = st.get("step")
@@ -107,6 +110,8 @@ class ProposalCollabAgent(BaseAgent):
         uid = ctx.get("uid"); name = ctx.get("name") or "居民"
         st = self._read(_state_key(uid)) or {}
         draft = self._read(_draft_key(uid, "proposal_draft"))
+        if draft is None and st.get("step"):
+            draft = {}
 
         step = st.get("step")
         if step == "ask_public":
