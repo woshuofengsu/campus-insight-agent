@@ -66,6 +66,7 @@ async function send(text, fromQuick = false) {
       actions: r.actions || [],
       related_id: r.related_id,
       corrected: r.corrected,
+      chain: r.execution_chain || [],
     }
     msgs.value.push(m)
     // 追问按钮自动出现在下一条消息（quick 选项）
@@ -113,6 +114,21 @@ async function onAction(a) {
 
 function sendOption(opt) {
   send(opt, true)
+}
+
+// 执行链节点颜色：校验=蓝/绿/黄/红，协商=紫，仲裁=橙，角色=灰
+function chainColor(c) {
+  const a = c.action || ''
+  if (c.agent === 'verifier') {
+    if (a.includes('通过')) return '#16a34a'
+    if (a.includes('降级')) return '#d97706'
+    if (a.includes('拦截') || a.includes('重试')) return '#dc2626'
+    return '#2D5BFF'
+  }
+  if (c.agent === 'negotiation') return '#7c3aed'
+  if (c.agent === 'arbiter') return '#ea580c'
+  if (c.agent === 'compliance_auditor') return '#0891b2'
+  return 'var(--muted)'
 }
 
 async function delHistory(id) {
@@ -170,7 +186,17 @@ async function clearAll() {
             <div style="white-space:pre-wrap;">{{ m.text }}</div>
             <div v-if="m.intent && m.status" style="margin-top:6px;display:flex;gap:6px;align-items:center;">
               <n-tag size="tiny" type="info">{{ m.intent }}</n-tag>
-              <n-tag size="tiny" :type="m.status === '成功' ? 'success' : m.status === '需确认' || m.status === '追问' ? 'warning' : 'default'">{{ m.status }}</n-tag>
+              <n-tag size="tiny" :type="m.status === '成功' ? 'success' : m.status === '需确认' || m.status === '追问' ? 'warning' : m.status === '拦截' || m.status === 'transferred_to_human' ? 'error' : 'default'">{{ m.status }}</n-tag>
+            </div>
+            <!-- 多 Agent 执行链（含校验/协商/仲裁节点） -->
+            <div v-if="m.chain && m.chain.length" style="margin-top:8px;border:1px dashed var(--border);border-radius:8px;padding:8px;background:var(--bg);">
+              <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px;">🤖 多智能体执行链（{{ m.chain.length }} 步）</div>
+              <div v-for="(c, ci) in m.chain" :key="ci" style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:0.78rem;"
+                   :style="{ color: chainColor(c) }">
+                <span>{{ c.icon }}</span>
+                <span style="font-weight:600;">{{ c.name }}</span>
+                <span class="muted">：{{ c.action }} {{ c.note ? '· ' + c.note : '' }}</span>
+              </div>
             </div>
             <!-- 动作按钮 -->
             <div v-if="m.actions && m.actions.length" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">

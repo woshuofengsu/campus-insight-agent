@@ -2257,14 +2257,21 @@ class AgentChat(BaseModel):
 
 @app.post("/api/web/agent/chat")
 def web_agent_chat(req: AgentChat, request: Request):
-    """居民端 / 负责人端 Agent 对话（按登录角色路由）。"""
-    from agent.web_agent_service import handle_chat
+    """居民端 / 负责人端 Agent 对话（多 Agent 编排：接待员→业务Agent→合规审计→执行链）。"""
+    from agent.orchestrator import Orchestrator
     u = _user(request)
     role = u.get("role")
     if role not in ("resident", "grid"):
         return fail(1003, "当前角色暂不支持 Agent 对话")
     try:
-        out = handle_chat(role, u.get("uid"), u.get("name") or "居民", req.text)
+        # 每用户独立 Orchestrator（黑板带 session_id）
+        orch = getattr(request.app.state, "_agent_orchs", None)
+        if orch is None:
+            orch = request.app.state._agent_orchs = {}
+        key = f"{role}:{u.get('uid')}"
+        if key not in orch:
+            orch[key] = Orchestrator()
+        out = orch[key].run(role, u.get("uid"), u.get("name") or "居民", req.text)
         return ok(out, "ok")
     except Exception as e:  # noqa: BLE001
         return fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
@@ -2272,15 +2279,21 @@ def web_agent_chat(req: AgentChat, request: Request):
 
 @app.post("/api/web/agent/elderly/chat")
 def web_agent_elderly_chat(req: AgentChat, request: Request):
-    """老年端 Agent 对话（语音转写文本或文字输入）。"""
-    from agent.web_agent_service import handle_chat
+    """老年端 Agent 对话（语音转写文本或文字输入，多 Agent 编排）。"""
+    from agent.orchestrator import Orchestrator
     u = _user(request)
     role = u.get("role")
     if role not in ("elderly", "resident"):
         return fail(1003, "无权限")
     uid = _resolve_elder_uid(request) or u.get("uid")
     try:
-        out = handle_chat("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid)
+        orch = getattr(request.app.state, "_agent_orchs", None)
+        if orch is None:
+            orch = request.app.state._agent_orchs = {}
+        key = f"elderly:{uid}"
+        if key not in orch:
+            orch[key] = Orchestrator()
+        out = orch[key].run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid)
         return ok(out, "ok")
     except Exception as e:  # noqa: BLE001
         return fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
