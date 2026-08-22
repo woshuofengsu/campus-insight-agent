@@ -6,6 +6,7 @@ const routes = [
   { path: '/', redirect: '/login' },
   { path: '/login', name: 'login', component: () => import('../views/Login.vue') },
   { path: '/screen', name: 'screen', component: () => import('../views/Screen.vue'), meta: { title: '治理大屏' } },
+  { path: '/stability', name: 'stability', component: () => import('../views/Stability.vue'), meta: { title: '系统稳定性演示' } },
 
   // 居民端
   {

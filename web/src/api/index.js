@@ -186,7 +186,17 @@ export const agent = {
   logs: (params) => api.get('/agent/logs', { params }),
   handoffs: (params) => api.get('/agent/handoffs', { params }),
   resolveHandoff: (id) => api.post(`/agent/handoffs/${id}/resolve`),
+  llmUsage: (params) => api.get('/agent/llm-usage', { params }),
+  analytics: (params) => api.get('/agent/analytics', { params }),
   exportLogs: () => api.get('/export/agent-logs', { responseType: 'blob' }),
+}
+
+// 舆情监测（P3-01）
+export const opinions = {
+  list: (params) => api.get('/opinions', { params }),
+  create: (data) => api.post('/opinions', data),
+  convert: (id) => api.post(`/opinions/${id}/convert`),
+  brief: (params) => api.get('/opinions/brief', { params }),
 }
 
 export default api

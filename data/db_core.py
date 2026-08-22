@@ -588,6 +588,18 @@ def _m33_llm_usage(conn):
     )
 
 
+def _m34_public_opinion(conn):
+    """v34：舆情监测（P3-01：12345/媒体/手动录入 → 分级 → 一键转工单）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS public_opinion ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT DEFAULT '手动录入', "
+        "content TEXT DEFAULT '', keywords TEXT DEFAULT '', level TEXT DEFAULT '黄色', "
+        "status TEXT DEFAULT '待关注', related_issue_id INTEGER, "
+        "created_by TEXT DEFAULT '', note TEXT DEFAULT '', "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -786,6 +798,7 @@ def init_db(db_path: str):
         (31, "agent_sessions", _m31_agent_sessions),
         (32, "agent_handoffs", _m32_agent_handoffs),
         (33, "llm_usage", _m33_llm_usage),
+        (34, "public_opinion", _m34_public_opinion),
     ]
     for version, name, fn in post:
         if version <= current:

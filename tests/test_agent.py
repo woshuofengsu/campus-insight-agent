@@ -416,6 +416,38 @@ def test_duplicate_issue_merge(client):
     assert d2["merged"] is True and d2["original_id"] == first["issue_id"]
 
 
+# ---------- P2-03 聚类 / P3-01 舆情 ----------
+
+def test_analytics_clusters_and_brief(client):
+    gtok = _login(client, "grid")
+    r = client.get("/api/web/agent/analytics", headers={"Authorization": f"Bearer {gtok}"})
+    assert r.status_code == 200
+    d = r.json()["data"]
+    assert "clusters" in d and "trend" in d and "brief" in d
+    assert isinstance(d["brief"], str)
+
+
+def test_opinion_flow(client):
+    """舆情：录入自动分级 → 一键转工单 → 简报。"""
+    gtok = _login(client, "grid")
+    # 录入红色舆情（含火灾）
+    r = client.post("/api/web/opinions", json={"content": "媒体曝光：社区附近发生火灾事故，居民担忧"},
+                    headers={"Authorization": f"Bearer {gtok}"})
+    assert r.status_code == 200 and r.json()["success"]
+    oid = r.json()["data"]["opinion_id"]
+    # 列表含分级
+    r2 = client.get("/api/web/opinions", headers={"Authorization": f"Bearer {gtok}"})
+    rows = r2.json()["data"]
+    assert rows and rows[0]["level"] == "红色"
+    # 一键转工单
+    r3 = client.post(f"/api/web/opinions/{oid}/convert", headers={"Authorization": f"Bearer {gtok}"})
+    assert r3.status_code == 200 and r3.json()["data"]["issue_id"]
+    # 简报
+    r4 = client.get("/api/web/opinions/brief", headers={"Authorization": f"Bearer {gtok}"})
+    b = r4.json()["data"]
+    assert b["total"] >= 1
+
+
 # ---------- 历史对话 / 留痕 / 越权 ----------
 
 def test_history_and_delete(client):

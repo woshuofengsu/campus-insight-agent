@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend deps
+        run: |
+          pip install -r requirements.txt 2>/dev/null || pip install fastapi uvicorn pydantic pytest langchain-openai langchain langchain-classic
+
+      - name: Run backend tests
+        run: python -m pytest tests/ -q
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend deps
+        run: cd web && npm install
+
+      - name: Build frontend
+        run: cd web && npm run build
+
+      - name: Smoke (pages serve)
+        run: |
+          python -m uvicorn api_web:app --port 8000 &
+          sleep 8
+          python smoke_test.py http://127.0.0.1:8000 | tail -3

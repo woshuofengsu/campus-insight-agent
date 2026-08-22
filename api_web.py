@@ -2485,6 +2485,67 @@ def web_agent_llm_usage(request: Request, days: int = 7):
     })
 
 
+@app.get("/api/web/agent/analytics")
+def web_agent_analytics(request: Request, days: int = 7):
+    """问题聚类 + 趋势 + 数据简报（P2-03 / P3-03）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from agent.analytics import get_issue_clusters, get_weekly_trend, build_data_brief
+    return ok({
+        "clusters": get_issue_clusters(days=days),
+        "trend": get_weekly_trend(days=days),
+        "brief": build_data_brief(),
+    })
+
+
+# ---- 舆情监测（P3-01） ----
+
+class OpinionCreate(BaseModel):
+    content: str = Field(..., min_length=2, max_length=500)
+    source: str = Field(default="手动录入")
+    level: str = Field(default="", pattern="^(|红色|橙色|黄色|蓝色)$")
+
+
+@app.post("/api/web/opinions")
+def web_opinion_create(req: OpinionCreate, request: Request):
+    """录入舆情（自动关键词分级）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_opinion import add_opinion
+    oid = add_opinion(req.content, source=req.source,
+                      created_by=_user(request).get("name") or "负责人", level=req.level)
+    return ok({"opinion_id": oid}, "已录入并分级")
+
+
+@app.get("/api/web/opinions")
+def web_opinion_list(request: Request, level: str = "", status: str = "", limit: int = 100):
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_opinion import list_opinions
+    return ok(list_opinions(level=level, status=status, limit=limit))
+
+
+@app.post("/api/web/opinions/{oid}/convert")
+def web_opinion_convert(oid: int, request: Request):
+    """舆情一键转工单（自动填充描述+来源，红色/橙色为紧急）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_opinion import convert_to_issue
+    okp, msg, iid = convert_to_issue(oid, _user(request).get("name") or "负责人")
+    if not okp:
+        return fail(2001, msg)
+    return ok({"issue_id": iid}, msg)
+
+
+@app.get("/api/web/opinions/brief")
+def web_opinion_brief(request: Request, days: int = 7):
+    """舆情简报（分级统计 + 高优先级列表）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_opinion import build_brief
+    return ok(build_brief(days=days))
+
+
 @app.get("/api/web/export/agent-logs")
 def web_export_agent_logs(request: Request):
     """导出 Agent 留痕 CSV（负责人，脱敏——不含完整手机号，导出本身留痕）。"""
