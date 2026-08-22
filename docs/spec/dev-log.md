@@ -309,7 +309,28 @@
 - API 层：120/120 全成功；Agent 层：24/24 全成功。
 - 与修复前持平且更稳（预置公示提案后投票成功率提升），无回归。
 
-## 七、遗留项（用户白天处理）
+## 十一、P2 七项 + P3 五项优化落地（docs/spec/14-p2-p3.md）✅
+
+**P2 批次（7/7）**
+- P2-06 Prompt 注入防护：`prompt_guard.py` 输入过滤 6 类（指令覆盖/提示词泄露/角色扮演/数据泄露/越权/安全绕过）+ 固定安全语 + 留痕；Verifier `InjectionOutputRule` 输出检测；`prompt.py` 系统提示加固；后端权限强制（既有）。
+- P2-05 LLM 成本：v33 `llm_usage` + 记账（engine 两调用点）+ `GET /agent/llm-usage` + grid 助手「查用量」；规则引擎零 LLM 即降本验证。
+- P2-07 引用强制：Verifier CitationRequiredRule（无引用不回答）+ policy_expert 自动附引用（既有，补测）。
+- P2-01 跨部门仲裁：`DEPT_PRIORITY` 部门优先级（合规一票否决）+ `DEPT_SCOPE` 权限表。
+- P2-02 重复上报合并：`find_duplicate_issue`（7 天同楼栋 + 双字特征 ≥2，排除自身）→ merged 提示 + 双方通知。
+- P2-04 分层瘦身（适配）：独立服务模块抽取（db_llm_usage/db_opinion/analytics/verifier/arbiter/prompt_guard）；完整 routes 分包列为后续。
+- P2-03 语义聚类：`analytics.py` 双字特征聚类（高频主题+环比）+ 周趋势 + 数据简报。
+
+**P3 批次（5/5）**
+- P3-01 舆情：v34 `public_opinion` + 关键词分级（红/橙/黄/蓝）+ 一键转工单（红橙自动紧急）+ 简报 + 4 端点；外部 API 留占位。
+- P3-03 数据驾驶舱：Screen 大屏 + `build_data_brief` 数据叙事。
+- P3-04 异常屏：`ErrorState.vue` 4 态 + `/stability` 演示安全屏（质量基线 + 模拟异常）。
+- P3-05 CI/CD：`.github/workflows/ci.yml`（pytest + npm build + 冒烟）。
+- P3-02 多租户（适配）：schema `community` 字段已有按社区过滤；tenant_id 全表迁移列规模化阶段（避免破坏存量）。
+
+**验证**：tests/test_agent.py 33 项 + security 8 + api_web 21；全量 pytest **401 passed**；构建通过；压测零失败。
+**按用户要求**：SLA 升级提醒不再外发 SMTP_TO（QQ 邮箱），改发 SMTP_USER 自己留档（站内消息为主渠道）。
+
+
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。
 2. **在线负责人列表**：紧急升级通知默认发全部 grid 角色（已预留 online_user_ids 参数）。Web 无长连接，心跳不精确。
