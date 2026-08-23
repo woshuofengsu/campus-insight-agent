@@ -48,7 +48,27 @@ class WeatherGuardianAgent(BaseAgent):
         return self._reply(r_text, status, "天气守护员", chain_note="查询天气并附带预警与生活建议")
 
     def process_negotiation(self, msg: dict) -> dict | None:
-        """天气守护员处理协商（如通知管理员的预警解除确认等）；默认不响应。"""
+        """天气守护员处理协商（真协商 P2-A2-02）。
+
+        - notify（极端天气事件）：转发健康顾问评估，请求健康提醒文案
+        - task_response（健康顾问确认）：若评估建议需升级（老人防护），转通知管理员
+        """
+        payload = msg.get("payload") or {}
+        mtype = msg.get("type")
+        if mtype == "task_response" and payload.get("event") == "extreme_weather":
+            # 仅健康顾问的确认触发升级（避免对通知管理员的确认重复升级）
+            suggestion = payload.get("suggestion") or ""
+            if payload.get("accepted") and msg.get("from") == "health_advisor":
+                escalate = any(k in suggestion for k in ("老人", "减少外出", "防暑", "保暖"))
+                if escalate:
+                    self._post("notification_manager", "notify", {
+                        "event": "extreme_weather", "tags": payload.get("tags", ""),
+                        "suggestion": "建议发布天气预警通知（含老人防护提示），待负责人确认",
+                    })
+                    return {"accepted": True,
+                            "reply": f"健康顾问已确认风险，转通知管理员生成预警通知草稿（{suggestion}）"}
+                return {"accepted": True, "reply": f"健康评估已确认，无需升级通知（{suggestion}）"}
+            return {"accepted": False, "reply": "健康顾问评估无需特别防护"}
         return None
 
 

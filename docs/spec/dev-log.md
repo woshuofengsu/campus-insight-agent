@@ -405,6 +405,18 @@
 - **测试**：test_batch_operations（造 2 工单 → 批量派单 2/0 → 批量关闭含不存在 ID 2/1 → 居民 403）。
 - **验证**：web+agent 套件 61 passed；全量待跑；npm build 通过。**提交**：本轮。
 
+## 十八、P2-A2-02 真协商（评审 A 维度：非 LLM 自主协商，声明式轻量协作）✅
+
+- **链式协商 `orchestrator._drain_negotiations`**：一次用户输入内完成多轮 Agent↔Agent 消息往返——处理目标队列后，响应引发的新消息（如健康确认 → 天气 → 通知管理员）继续协商，直到队列清空或轮次达上限（沿用单目标 2 轮防护）。
+- **三 Agent 协商剧本（天气联动健康，规则驱动，接 LLM 后由 prompt 承担）**：
+  - 天气守护员发现极端天气 → 发健康顾问评估
+  - 健康顾问评估（高温/寒潮/台风/暴雨 → 建议老人防护，标记 escalate）
+  - 天气守护员收到健康确认 → 若需防护，升级给通知管理员
+  - 通知管理员生成预警通知草稿（停机点：负责人确认后才发布，Agent 不自动发紧急通知）
+- **修复副作用**：`_drain_negotiations` 跳过 receptionist（路由汇总终点，_dispatch 每轮向其 post task_response 留痕），避免协商轮次误累加导致 repair/proposal 流程误转人工（4 个回归测试因此修复）。
+- **测试**：test_real_negotiation_chain（构造高温预警 → 验证健康确认→升级→通知草稿全链 + 无循环转人工 + 消息消费清空）；test_negotiation_loop_guard 保持。
+- **验证**：agent 套件 40 passed；全量待跑。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

@@ -246,6 +246,33 @@ def test_negotiation_loop_guard():
     assert r2["status"] == "transferred_to_human"
 
 
+def test_real_negotiation_chain():
+    """真协商（P2-A2-02）：一次输入内多轮 Agent↔Agent 消息往返。
+
+    天气守护员（有极端天气预警）→ 健康顾问评估 → 天气确认并升级 → 通知管理员生成草稿。
+    验证：协商响应被链式消费（天气最终能收到健康确认并转给通知管理员），且无循环转人工。
+    """
+    from agent.orchestrator import Orchestrator
+    o = Orchestrator()
+    # 构造：weather_guardian 处理天气时发 extreme_weather 给 health_advisor
+    # （直接模拟其 process 的 post 结果，避免依赖真实天气数据）
+    o.bb.post_message("health_advisor", {
+        "from": "weather_guardian", "to": "health_advisor", "type": "notify",
+        "priority": "high", "payload": {"event": "extreme_weather", "tags": "高温橙色",
+                                         "suggestion": "提醒老人注意防暑"},
+    })
+    # 链式协商：以 weather_guardian 为目标（其队列空，但 health 有消息）
+    result = o._drain_negotiations({"reply": "今日晴热，注意防暑", "status": "成功"}, "weather_guardian")
+    assert result["status"] != "transferred_to_human", "真协商不应触发循环防护"
+    # 健康顾问确认 → 天气升级给通知管理员 → 通知管理员生成草稿，均应出现在回复协作提示中
+    assert "健康顾问已确认风险" in result["reply"] or "健康评估已确认" in result["reply"]
+    # 极端天气（高温）应触发升级链路
+    assert "通知管理员生成预警通知草稿" in result["reply"]
+    # 黑板协商消息应被消费清空
+    for k in o.bb.messages.values():
+        assert len(k) == 0, f"协商后仍有残留消息：{k}"
+
+
 # ---------- LLM 幻觉防线（Verifier） ----------
 
 def test_verifier_general_rules():

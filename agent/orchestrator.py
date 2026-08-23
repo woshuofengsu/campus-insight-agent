@@ -272,7 +272,8 @@ class Orchestrator:
                                 result.get("handoff_id"))
 
         # 主动协商：处理目标 Agent 消息队列中的协商消息（事件触发，按优先级）
-        result = self._handle_negotiations(target, result)
+        # 真协商（P2-A2-02）：链式处理——响应引发的新消息继续协商，直到队列空或达轮次上限
+        result = self._drain_negotiations(result, target)
         # 记录目标 Agent 发起的协商（handoff/notify 等，消息保留供后续消费）
         self._record_outbound_negotiations(target)
 
@@ -354,6 +355,26 @@ class Orchestrator:
                 result = dict(result)
                 result["reply"] = (result["reply"] + f"\n\n⚡ 协作提示：{hint}").strip()
         self.bb.clear_messages(target)
+        return result
+
+    def _drain_negotiations(self, result: dict, target: str) -> dict:
+        """链式真协商（P2-A2-02）：处理目标队列后，响应引发的新消息继续协商。
+
+        一次用户输入内完成多轮 Agent↔Agent 消息往返（如：天气→健康→通知），
+        直到所有队列清空或总轮次达上限（防无限循环，上限由 _handle_negotiations 的
+        单目标轮次防护 + 这里的目标遍历次数共同兜底）。
+
+        注意：receptionist 是路由汇总终点（_dispatch 每轮向其 post task_response 留痕），
+        不参与业务协商，跳过以免轮次误累加。
+        """
+        result = self._handle_negotiations(target, result)
+        # 响应可能触发发起方再次发消息给第三方（如健康确认 → 天气 → 通知管理员）
+        for _ in range(5):
+            active = [k for k in self.agents if k != "receptionist" and self.bb.get_messages(k)]
+            if not active:
+                break
+            for k in active:
+                result = self._handle_negotiations(k, result)
         return result
 
     def _call_agent(self, agent, ctx: dict) -> dict:

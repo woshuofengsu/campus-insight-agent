@@ -238,13 +238,24 @@ class HealthAdvisorAgent(BaseAgent):
                            chain_note="引导到健康咨询表单")
 
     def process_negotiation(self, msg: dict) -> dict | None:
-        """健康顾问处理协商：天气守护员极端天气 → 准备健康提醒文案。"""
+        """健康顾问处理协商（真协商 P2-A2-02）：天气守护员极端天气 → 健康风险评估。"""
         payload = msg.get("payload") or {}
         if payload.get("event") == "extreme_weather":
-            return {
-                "accepted": True,
-                "reply": f"已根据天气预警准备健康提醒：{payload.get('suggestion', '')}",
-            }
+            tags = payload.get("tags", "")
+            # 极端天气对老人有风险 → 建议升级通知（触发天气→通知管理员链路）
+            suggestion = "提醒老人注意防暑/保暖，减少外出，备好常用药"
+            if any(k in tags for k in ("高温", "寒潮", "台风", "暴雨")):
+                return {
+                    "accepted": True,
+                    "reply": f"已根据天气预警准备健康提醒：{suggestion}",
+                    "suggestion": suggestion,
+                    "event": "extreme_weather",
+                    "tags": tags,
+                    "escalate": True,
+                }
+            return {"accepted": True, "reply": f"已根据天气预警准备健康提醒：{payload.get('suggestion', '')}",
+                    "suggestion": payload.get("suggestion", ""), "event": "extreme_weather",
+                    "tags": tags, "escalate": False}
         return None
 
 
@@ -274,3 +285,17 @@ class NotificationManagerAgent(BaseAgent):
         return self._reply("通知发布请到「通知管理」创建（支持定时与附件）。", "成功", "通知管理员",
                            actions=[{"type": "navigate", "to": "/grid/notices", "label": "去通知管理"}],
                            chain_note="引导到通知管理")
+
+    def process_negotiation(self, msg: dict) -> dict | None:
+        """通知管理员处理协商（真协商 P2-A2-02）：天气升级的预警通知草稿。
+
+        停机点：紧急通知必须负责人手动发布——Agent 只生成草稿引导，不自动发布。
+        """
+        payload = msg.get("payload") or {}
+        if payload.get("event") == "extreme_weather":
+            return {
+                "accepted": True,
+                "reply": "已生成天气预警通知草稿（含老人防护提示），需负责人确认后发布",
+                "draft_ready": True,
+            }
+        return None
