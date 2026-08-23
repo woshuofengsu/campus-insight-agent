@@ -1,9 +1,9 @@
 <script setup>
 // 治理大屏（开场展示）：社区运行数据总览
 import { ref, onMounted } from 'vue'
-import { issues, proposals, weather, qa } from '../api'
+import { issues, proposals, weather, agent } from '../api'
 
-const data = ref({ issues: 0, pending: 0, props: 0, alerts: 0, qaCount: 0, temp: '--' })
+const data = ref({ issues: 0, pending: 0, props: 0, alerts: 0, selfRate: '--', temp: '--' })
 const tick = ref(0)
 
 async function load() {
@@ -12,13 +12,13 @@ async function load() {
     const ps = (await proposals.list()) || []
     const alerts = (await weather.alerts()) || []
     const w = await weather.current()
-    const qs = (await qa.questions()) || []
+    const sr = (await agent.selfResolution()) || {}
     data.value = {
       issues: all.length,
       pending: all.filter((i) => ['待审核', '已审核待派单', '处理中'].includes(i.status)).length,
       props: ps.filter((p) => p.status === '公示中').length,
       alerts: alerts.length,
-      qaCount: qs.length,
+      selfRate: sr.self_resolution_rate ?? '--',
       temp: w?.temp_high || '--',
     }
   } catch { /* 大屏失败不阻塞 */ }
@@ -34,7 +34,7 @@ const cards = [
   { label: '处理中', value: () => data.value.pending, color: '#ffb74d', icon: '🔄' },
   { label: '公示提案', value: () => data.value.props, color: '#81c784', icon: '💡' },
   { label: '天气预警', value: () => data.value.alerts, color: '#e57373', icon: '⚠️' },
-  { label: '政策问答', value: () => data.value.qaCount, color: '#ba68c8', icon: '📖' },
+  { label: 'AI 自转率', value: () => (data.value.selfRate === '--' ? '--' : data.value.selfRate + '%'), color: '#ba68c8', icon: '🤖' },
 ]
 </script>
 

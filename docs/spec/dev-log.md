@@ -379,6 +379,14 @@
 - 前端 `web/src/api/index.js` 全部调用路径逐一核对，与拆后路由完全一致，无遗漏。
 - **验证**：全量 pytest 待跑；TestClient 冒烟 34 个端点全绿（含 grid 专属：导出/舆情/管理/分析）。**提交**：本轮。
 
+## 十五、P3-B5-01 AI 自转率统计（量化「AI 直答 vs 转人工」，评审 B 维度）✅
+
+- `data/db_agent.get_self_resolution_stats(days)`：按 agent_logs + agent_handoffs 聚合——总轮数 / AI 直答成功 / 转人工（处理包数）/ 拦截失败，自转率 = AI成功 ÷ (成功+转人工+拦截失败)，附意图分布 top10。
+- 端点：`GET /api/web/agent/self-resolution`（grid 专属，复用鉴权）。
+- 大屏：`Screen.vue`「政策问答」卡替换为「AI 自转率」卡（30 秒自动刷新）；`web/src/api/index.js` 加 `agent.selfResolution`。
+- **测试**：test_self_resolution_stats（造数 2 成功+1 拦截+1 转人工 → 断言各口径 + grid 可查 / 居民 403）。
+- **验证**：核心套件 38 passed；全量待跑；npm build 通过。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

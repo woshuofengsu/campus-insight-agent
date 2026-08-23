@@ -120,6 +120,15 @@ def agent_llm_usage(request: Request, days: int = 7):
     return _ok({"summary": get_usage_summary(days=days), "trend": get_usage_trend(days=days)})
 
 
+@router.get("/self-resolution")
+def agent_self_resolution(request: Request, days: int = 7):
+    """AI 自转率统计（P3-B5-01：AI 直答 vs 转人工量化）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import get_self_resolution_stats
+    return _ok(get_self_resolution_stats(days=days))
+
+
 @router.get("/analytics")
 def agent_analytics(request: Request, days: int = 7):
     """问题聚类 + 趋势 + 数据简报（P2-03 / P3-03）。"""

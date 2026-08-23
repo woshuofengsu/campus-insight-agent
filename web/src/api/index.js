@@ -187,6 +187,7 @@ export const agent = {
   handoffs: (params) => api.get('/agent/handoffs', { params }),
   resolveHandoff: (id) => api.post(`/agent/handoffs/${id}/resolve`),
   llmUsage: (params) => api.get('/agent/llm-usage', { params }),
+  selfResolution: (params) => api.get('/agent/self-resolution', { params }),
   analytics: (params) => api.get('/agent/analytics', { params }),
   exportLogs: () => api.get('/export/agent-logs', { responseType: 'blob' }),
 }
