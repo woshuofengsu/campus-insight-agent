@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目质量检测报告 V3 — 社区治理多智能体平台（8.25 / A-）</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --card: #ffffff; --ink: #1f2937; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #0e9f6e; --accent-2: #0ea5e9;
+    --good: #059669; --warn: #d97706; --bad: #dc2626; --pill: #eef2ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.7;
+    padding: 32px 16px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  /* 封面 */
+  .hero {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 55%, #0e7490 100%);
+    color: #fff; border-radius: 18px; padding: 40px 36px; margin-bottom: 28px;
+    box-shadow: 0 12px 30px rgba(6,78,59,.25);
+  }
+  .hero .tag { display:inline-block; background: rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.25);
+    border-radius: 999px; padding: 4px 14px; font-size: .82rem; letter-spacing: .06em; margin-bottom: 14px; }
+  .hero h1 { font-size: 1.65rem; font-weight: 800; letter-spacing: .03em; margin-bottom: 8px; }
+  .hero .sub { color: #d1fae5; font-size: .95rem; margin-bottom: 18px; }
+  .scoreline { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+  .score-big { font-size: 3.1rem; font-weight: 900; background: linear-gradient(90deg,#6ee7b7,#7dd3fc);
+    -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.1; }
+  .score-meta { font-size: .95rem; color: #d1fae5; }
+  .score-meta b { color:#a7f3d0; }
+  .meta-row { display:flex; flex-wrap:wrap; gap:8px 22px; margin-top:18px; font-size:.85rem; color:#bbf7d0; }
+  .meta-row span b { color:#fff; }
+  /* 卡片 */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 26px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .card h2 { font-size: 1.15rem; font-weight: 800; margin-bottom: 14px; padding-left: 12px;
+    border-left: 4px solid var(--accent); }
+  .card h3 { font-size: 1rem; font-weight: 700; margin: 18px 0 8px; }
+  p { margin-bottom: 10px; }
+  ul { padding-left: 20px; margin-bottom: 10px; }
+  li { margin-bottom: 6px; }
+  .hl { font-weight: 700; color: var(--accent); }
+  .hl2 { font-weight: 700; color: var(--accent-2); }
+  .big { font-size: 1.05rem; }
+  /* 摘要亮点 */
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 6px 0 4px; }
+  .three .t { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px; }
+  .three .t .n { font-size: .8rem; color: var(--good); font-weight: 700; margin-bottom: 6px; }
+  .three .t p { font-size: .9rem; margin: 0; }
+  .three.warn .t { background: #fffbeb; border-color: #fde68a; }
+  .three.warn .t .n { color: var(--warn); }
+  @media (max-width: 720px) { .three { grid-template-columns: 1fr; } }
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 8px 0 4px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tot td { background: #ecfdf5 !important; font-weight: 800; color: #065f46; }
+  .up { color: var(--good); font-weight: 700; }
+  /* 检查项 */
+  .ok { color: var(--good); } .no { color: var(--bad); }
+  /* 徽章 */
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: .76rem; font-weight: 600; }
+  .b-p1 { background: #fee2e2; color: #b91c1c; } .b-p2 { background: #fef3c7; color: #b45309; }
+  .b-p3 { background: #e0f2fe; color: #0369a1; } .b-new { background: #ede9fe; color: #6d28d9; }
+  .b-keep { background: #e5e7eb; color: #374151; } .b-dec { background: #dcfce7; color: #15803d; }
+  /* 维度块 */
+  .dim { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; margin-bottom: 14px; }
+  .dim h3 { margin: 0 0 6px; }
+  .dim .score { color: var(--accent-2); font-weight: 800; }
+  /* 风险 */
+  .risk { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 14px 16px; }
+  /* 页脚 */
+  .foot { text-align: center; color: var(--muted); font-size: .82rem; margin-top: 26px; }
+  .foot code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
+  /* 雷达图容器 */
+  .radar-wrap { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+  .radar-wrap svg { flex: 0 0 auto; }
+  .radar-legend { font-size: .85rem; color: var(--muted); }
+  .radar-legend b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 封面 -->
+  <div class="hero">
+    <span class="tag">🗂️ 全维度质量检测 · 第 3 轮复测</span>
+    <h1>《社区治理多智能体平台》项目质量检测报告（V3）</h1>
+    <div class="sub">评审问题全量闭环后 · FastAPI+Vue3 主服务 · 9 角色 Agent + 真协商 + 红黑榜 + traceId + LLM 评测集</div>
+    <div class="scoreline">
+      <div class="score-big">8.25<span style="font-size:1.4rem;">/10</span></div>
+      <div class="score-meta">
+        等级 <b style="font-size:1.5rem;color:#6ee7b7;">A-</b><br>
+        较 V2 <b>7.62 / B+</b> 提升 <b style="color:#fbbf24;">+0.63</b>
+      </div>
+    </div>
+    <div class="meta-row">
+      <span>评审对象：<b>campus-insight-agent</b></span>
+      <span>测试复核：<b>423 passed</b></span>
+      <span>评测集：<b>20/20 满分</b></span>
+      <span>api_web：<b>2400+ → 227 行</b></span>
+      <span>评审日期：<b>2026-08</b></span>
+      <span>方法：<b>12 维度加权（评测方法论.md）</b></span>
+    </div>
+  </div>
+
+  <!-- 一、执行摘要 -->
+  <div class="card">
+    <h2>一、一页纸执行摘要</h2>
+    <p class="big"><span class="hl">一句话总体评价</span>：V2 列出的 <b>3 项 P1 硬伤全部闭环</b>（api_web 拆分、草稿落库、存量加密+HTTPS），
+      <b>7 项 P2/P3 问题落地 5 项</b>（真协商/红黑榜/批量操作/traceId/自转率/评测集），代码规模可控
+      （api_web 227 行骨架 + 14 路由模块 118 端点），423 测试 + 20 条评测集满分——
+      「演示级完备」已实质性推向「可上线工程」。</p>
+
+    <h3>三大核心亮点</h3>
+    <div class="three">
+      <div class="t"><div class="n">① 工程质变</div>
+        <p>api_web 2400+ 行单体 → 227 行纯装配骨架 + 14 模块；traceId 全链路（请求→业务留痕→Agent 留痕→异常）；423 测试 + CI 五步流水线。</p></div>
+      <div class="t"><div class="n">② 能力闭环可度量</div>
+        <p>真协商（一次输入内天气→健康→通知三 Agent 多轮往返）+ NLU（方言/指代/否定）+ <b>20 条 golden 评测集满分</b>——「AI 能力」从演示叙事变为可量化证据。</p></div>
+      <div class="t"><div class="n">③ 治理深度上台阶</div>
+        <p>红黑榜（表扬/鞭策双向）+ 满意度下钻到单工单 + 批量派单/关闭 + AI 自转率 <b>62%</b>（真实库实测）——「AI 治理」不是花架子。</p></div>
+    </div>
+
+    <h3>三大最紧急问题（已降级）</h3>
+    <div class="three warn">
+      <div class="t"><div class="n">① P2-G1-03 工单快照 phone 明文</div>
+        <p>user_profile / emergency_contacts 已加密，但 community_issues 的 reporter_phone / assignee_phone / agent_phone 三列仍明文——G 维度最后一块。</p></div>
+      <div class="t"><div class="n">② P2-B1-02 舆情外部源未接</div>
+        <p>auto_ingest 占位，12345 API / 媒体抓取无真实源。</p></div>
+      <div class="t"><div class="n">③ P1-D3-02 LLM 实测缺位</div>
+        <p>评测集为规则引擎满分；真实 DEEPSEEK key 未接入，LLM 幻觉防线缺实战样本。</p></div>
+    </div>
+
+    <p><span class="hl">一句话改进方向</span>：补工单快照加密（收尾 G 维度）→ 接真实舆情源与 LLM 实测（从演示走向试点）。</p>
+  </div>
+
+  <!-- 二、评分总表 -->
+  <div class="card">
+    <h2>二、评分总表（与 V1 / V2 对照）</h2>
+    <table>
+      <tr><th>维度</th><th>权重</th><th>V1</th><th>V2</th><th>V3</th><th>变化</th><th>依据</th></tr>
+      <tr><td>A. Agent 架构设计</td><td>18%</td><td>6.5</td><td>8.0</td><td><b>8.5</b></td><td class="up">+0.5</td><td>真协商链式多轮（_drain_negotiations）；仍无热插拔/LLM 自主协商</td></tr>
+      <tr><td>B. 业务闭环完整性</td><td>18%</td><td>8.5</td><td>9.0</td><td><b>9.5</b></td><td class="up">+0.5</td><td>红黑榜/满意度下钻/自转率量化；外部源未接</td></tr>
+      <tr><td>C. Agent 能力质量</td><td>15%</td><td>7.0</td><td>7.5</td><td><b>8.5</b></td><td class="up">+1.0</td><td>NLU（方言/指代/否定）+ 20 条评测集满分；仍规则级</td></tr>
+      <tr><td>D. 数据与智能</td><td>10%</td><td>6.5</td><td>7.0</td><td><b>7.5</b></td><td class="up">+0.5</td><td>自转率/评测集 bad case 抽取回流雏形；无向量/图谱/预测</td></tr>
+      <tr><td>E. 用户体验</td><td>8%</td><td>8.0</td><td>8.3</td><td><b>8.5</b></td><td class="up">+0.2</td><td>批量勾选操作；仍无主动催办提醒</td></tr>
+      <tr><td>F. 工程质量与部署</td><td>8%</td><td>7.5</td><td>8.0</td><td><b>9.5</b></td><td class="up">+1.5</td><td>api_web 拆分完成 + traceId + 423 测试 + HTTPS 三档方案</td></tr>
+      <tr><td>G. 安全与合规</td><td>6%</td><td>6.0</td><td>7.0</td><td><b>8.0</b></td><td class="up">+1.0</td><td>存量加密迁移完成 + HTTPS 落地；工单快照 phone 明文残留</td></tr>
+      <tr><td>H. 成本与性能</td><td>5%</td><td>7.5</td><td>8.0</td><td><b>8.3</b></td><td class="up">+0.3</td><td>自转率证明规则引擎有效；分级模型路由未做</td></tr>
+      <tr><td>I. 产品价值与竞争力</td><td>5%</td><td>7.0</td><td>7.5</td><td><b>7.8</b></td><td class="up">+0.3</td><td>红黑榜/自转率/批量加深治理叙事；仍无真实用户</td></tr>
+      <tr><td>J. 演示与表达</td><td>4%</td><td>8.0</td><td>8.5</td><td><b>8.8</b></td><td class="up">+0.3</td><td>红黑榜双栏/批量栏/自转率大屏；无录屏</td></tr>
+      <tr><td>K. 团队与执行</td><td>3%</td><td>6.0</td><td>6.5</td><td><b>7.0</b></td><td class="up">+0.5</td><td>13 项问题连续闭环、评测集工程化；单人</td></tr>
+      <tr><td>L. 风险扣分</td><td>-10~0</td><td>-0.2</td><td>-0.3</td><td><b>-0.3</b></td><td>0</td><td>LLM 未接入=幻觉风险未实测；工单快照明文</td></tr>
+      <tr class="tot"><td>总分</td><td>100%</td><td>7.03</td><td>7.62</td><td>8.25</td><td class="up">+0.63</td><td>A- 级</td></tr>
+    </table>
+
+    <h3>能力雷达（10 满）</h3>
+    <div class="radar-wrap">
+      <svg width="430" height="430" viewBox="-130 -130 260 260" xmlns="http://www.w3.org/2000/svg" style="background:#fbfdfe;border-radius:12px;border:1px solid #eef2f7;">
+        <!-- 网格：11 边形，半径 25/50/75/100 -->
+        <g fill="none" stroke="#e2e8f0" stroke-width="1">
+          <polygon points="0,-100 58.78,-80.90 95.11,-30.90 95.11,30.90 58.78,80.90 0,100 -58.78,80.90 -95.11,30.90 -95.11,-30.90 -58.78,-80.90" />
+          <polygon points="0,-75 44.08,-60.68 71.33,-23.18 71.33,23.18 44.08,60.68 0,75 -44.08,60.68 -71.33,23.18 -71.33,-23.18 -44.08,-60.68" />
+          <polygon points="0,-50 29.39,-40.45 47.56,-15.45 47.56,15.45 29.39,40.45 0,50 -29.39,40.45 -47.56,15.45 -47.56,-15.45 -29.39,-40.45" />
+          <polygon points="0,-25 14.70,-20.23 23.78,-7.73 23.78,7.73 14.70,20.23 0,25 -14.70,20.23 -23.78,7.73 -23.78,-7.73 -14.70,-20.23" />
+        </g>
+        <!-- 轴线 -->
+        <g stroke="#cbd5e1" stroke-width="1">
+          <line x1="0" y1="0" x2="0" y2="-100"/><line x1="0" y1="0" x2="95.11" y2="-30.90"/>
+          <line x1="0" y1="0" x2="95.11" y2="30.90"/><line x1="0" y1="0" x2="58.78" y2="80.90"/>
+          <line x1="0" y1="0" x2="0" y2="100"/><line x1="0" y1="0" x2="-58.78" y2="80.90"/>
+          <line x1="0" y1="0" x2="-95.11" y2="30.90"/><line x1="0" y1="0" x2="-95.11" y2="-30.90"/>
+          <line x1="0" y1="0" x2="-58.78" y2="-80.90"/><line x1="0" y1="0" x2="58.78" y2="-80.90"/>
+        </g>
+        <!-- V3 数据多边形（11 维，顺序：A,B,C,D,E,F,G,H,I,J,K） -->
+        <!-- 8.5,9.5,8.5,7.5,8.5,9.5,8.0,8.3,7.8,8.8,7.0 -->
+        <polygon points="0,-85 90.34,-29.36 80.85,-26.27 71.33,-23.18 80.85,-26.27 90.34,-29.36 76.00,-52.59 78.90,-25.64 74.14,-24.10 83.75,-27.23 0,-70"
+          fill="rgba(14,159,110,.22)" stroke="#0e9f6e" stroke-width="2"/>
+        <!-- 顶点圆点 -->
+        <g fill="#0e9f6e">
+          <circle cx="0" cy="-85" r="3"/><circle cx="90.34" cy="-29.36" r="3"/><circle cx="80.85" cy="-26.27" r="3"/>
+          <circle cx="71.33" cy="-23.18" r="3"/><circle cx="80.85" cy="-26.27" r="3"/><circle cx="90.34" cy="-29.36" r="3"/>
+          <circle cx="76.00" cy="-52.59" r="3"/><circle cx="78.90" cy="-25.64" r="3"/><circle cx="74.14" cy="-24.10" r="3"/>
+          <circle cx="83.75" cy="-27.23" r="3"/><circle cx="0" cy="-70" r="3"/>
+        </g>
+        <!-- 标签（外圈，字号 11） -->
+        <g font-size="11" fill="#334155" text-anchor="middle" font-weight="600">
+          <text x="0" y="-114">业务闭环 9.5</text>
+          <text x="108" y="-30">工程 9.5</text>
+          <text x="108" y="40">演示 8.8</text>
+          <text x="66" y="96">Agent 8.5</text>
+          <text x="0" y="116">体验 8.5</text>
+          <text x="-66" y="96">能力 8.5</text>
+          <text x="-108" y="40">成本 8.3</text>
+          <text x="-108" y="-30">安全 8.0</text>
+          <text x="-66" y="-96">价值 7.8</text>
+          <text x="0" y="-116" dy="14">数据 7.5</text>
+          <text x="66" y="-96">团队 7.0</text>
+        </g>
+      </svg>
+      <div class="radar-legend">
+        <div><b>V3（8.25 / A-）</b> · 11 维度评分（10 满）</div>
+        <div>业务闭环 9.5 · 工程 9.5 · 演示 8.8</div>
+        <div>Agent 架构 8.5 · 体验 8.5 · 能力 8.5</div>
+        <div>成本性能 8.3 · 安全 8.0 · 价值 7.8</div>
+        <div>数据智能 7.5 · 团队 7.0</div>
+        <div style="margin-top:8px;color:#059669;">▲ 较 V2 主要提升：工程 +1.5、能力 +1.0、安全 +1.0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 三、逐维度检测 -->
+  <div class="card">
+    <h2>三、逐维度检测（V2 问题闭环情况与剩余硬伤）</h2>
+
+    <div class="dim"><h3>A. 多 Agent 架构 <span class="score">8.5（+0.5）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> <b>A2 真协商落地</b>：<code>orchestrator._drain_negotiations</code> 链式多轮——一次用户输入内天气→健康→通知三 Agent 消息往返（健康确认→天气升级→通知草稿），跳过 receptionist 防轮次误累加；循环防护（单目标 2 轮 + 遍历 5 次）保留。</li>
+        <li><span class="ok">✅</span> A1 角色建模结构化（9 声明式角色/工具白名单/停机点）+ A3 编排（执行链/超时重试/锁冲突）+ A5 上下文（会话落库 v31 + 草稿落库 v35 + 转人工包快照）。</li>
+        <li><span class="no">❌</span> A4 无热插拔/同角色多实例；黑板内存不跨 worker 共享（state/draft 均已落库缓解）。</li>
+        <li><span class="no">❌</span> 真协商为规则驱动剧本，非 LLM 自主协商（接 key 后由 prompt 承担，评测集已留接口）。</li>
+      </ul></div>
+
+    <div class="dim"><h3>B. 业务闭环 <span class="score">9.5（+0.5）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> <b>红黑榜 + 满意度下钻</b>（P2-B4-01）：db_board.py 红榜（满意工单/高效网格员/完成提案）vs 黑榜（不满意/SLA 超时/低效网格员），<code>GET /agent/board</code> + <code>/agent/satisfaction-drilldown</code> 下钻到单工单。</li>
+        <li><span class="ok">✅</span> <b>AI 自转率量化</b>（P3-B5-01）：<code>get_self_resolution_stats</code> 按 agent_logs+handoffs 聚合，真实库实测 <b>62%</b>（AI 58 / 转人工 26）；大屏「AI 自转率」卡。</li>
+        <li><span class="ok">✅</span> 报修（重复合并/跨部门仲裁/超时升级/满意度闭环）+ 舆情（分级/一键转工单/简报）。</li>
+        <li><span class="no">❌</span> 舆情外部源（12345 API/媒体抓取）仅 auto_ingest 占位，未接真实源。</li>
+      </ul></div>
+
+    <div class="dim"><h3>C. Agent 能力 <span class="score">8.5（+1.0）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> <b>NLU 增强</b>（P1-C1-01）：方言归一化（北京/上海词表）+ 指代消解（recent_entity）+ 否定纠偏（不是A是B），receptionist/orchestrator/service 三处同口径；test_nlu.py 10 项。</li>
+        <li><span class="ok">✅</span> <b>LLM 评测集</b>（P1-D3-01）：20 条 golden（政策/报修/健康/注入/转人工/方言/否定）+ scripts/llm_eval.py 五维跑分 <b>20/20 满分</b> + CI 接入；评测暴露并修复健康紧急症状触发、注入变体词表 2 个真 bug。</li>
+        <li><span class="ok">✅</span> 幻觉防线（Verifier 引用强制/健康不诊断/网格不代替审批）+ 注入防护（6 类输入过滤/输出检测/提示加固）。</li>
+        <li><span class="no">❌</span> 仍规则级（无向量语义）；接 LLM 后需补分级模型路由。</li>
+      </ul></div>
+
+    <div class="dim"><h3>D. 数据与智能 <span class="score">7.5（+0.5）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> 聚类（双字特征）+ 周趋势 + 数据简报 + LLM 用量统计 + 自转率统计。</li>
+        <li><span class="ok">✅</span> bad case 抽取路径已建（评测集从 agent_logs 的 status=拦截/转人工 抽取回流）。</li>
+        <li><span class="no">❌</span> 无向量库/知识图谱/趋势预测；bad case 人工标注回流流程未跑通（需接 LLM 后）。</li>
+      </ul></div>
+
+    <div class="dim"><h3>E. 体验 <span class="score">8.5（+0.2）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> 异常屏（ErrorState 4 态）+ 演示安全屏（/stability）+ 转人工「不用重新说一遍」+ <b>工单页批量操作栏（勾选/全选/批量派单/关闭）</b>（P2-E2-01）。</li>
+        <li><span class="no">❌</span> 无主动服务提醒（「工单超 24h 帮您催办吗」无触发）。</li>
+      </ul></div>
+
+    <div class="dim"><h3>F. 工程 <span class="score">9.5（+1.5）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> <b>api_web 拆分收官</b>（P1-F2-01）：2400+ 行 → 227 行纯装配骨架，api_routes/ 14 模块 118 端点；拆分中修复上传 BytesIO、messages ntype 两个潜伏 bug；前端调用路径逐一核对。</li>
+        <li><span class="ok">✅</span> <b>traceId 链路追踪</b>（P2-F4-01）：中间件生成/透传 X-Request-ID → activity/agent/exception_log 三表 v37 落库 → <code>GET /agent/traces/{id}</code> 全链路查询。</li>
+        <li><span class="ok">✅</span> 423 测试（agent 41 + api_web 22 + security 9 + nlu 10 + llm_eval 2 + 其余）+ CI 五步（pytest→评测集→npm install→build→smoke）+ HTTPS 三档部署文档。</li>
+        <li><span class="no">❌</span> 无结构化日志（系统日志未 JSON 化）；无请求级性能采样。</li>
+      </ul></div>
+
+    <div class="dim"><h3>G. 安全 <span class="score">8.0（+1.0）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> <b>存量加密迁移完成</b>（P1-G1-02 前半）：v36 phone_enc 列 + 迁移脚本可回滚 + 读写解密（web_me/web_contacts_list）。</li>
+        <li><span class="ok">✅</span> <b>HTTPS 落地</b>（后半）：docs/deploy-https.md 三档（ngrok 演示/Nginx+certbot 生产/compose web+web-nginx）+ nginx 模板 + 证书 gitignore。</li>
+        <li><span class="ok">✅</span> Crypto 加密工具 + 密码强度 + 改密 + PIPL 三件套 + 注入防护 + 会话落库 + 审计身份证检测 + traceId 可追溯。</li>
+        <li><span class="no">❌</span> <b>工单快照 phone 明文</b>（新发现）：community_issues 的 reporter_phone/assignee_phone/agent_phone 未迁移（展示已脱敏，存量列明文）。</li>
+        <li><span class="no">❌</span> 演示密码 demo123 弱（刻意保留，答辩说明）。</li>
+      </ul></div>
+
+    <div class="dim"><h3>H. 成本性能 <span class="score">8.3（+0.3）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> 规则引擎零 LLM 成本 + 用量统计可验证降本 + 自转率 62% 证明规则优先有效 + 压测零失败。</li>
+        <li><span class="no">❌</span> 无按任务分级模型路由（接 key 后需补）。</li>
+      </ul></div>
+
+    <div class="dim"><h3>I. 产品价值 <span class="score">7.8（+0.3）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> 红黑榜/自转率/批量操作/真协商加深「AI 治理」深度，答辩叙事从「演示功能」升级为「治理效能」。</li>
+        <li><span class="no">❌</span> 无真实试点数据/用户；商业模式未展开。</li>
+      </ul></div>
+
+    <div class="dim"><h3>J. 演示 <span class="score">8.8（+0.3）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> 执行链可视化（含协商多轮节点）+ 稳定性屏 + 异常屏 + 红黑榜双栏 + 自转率大屏 + 批量操作演示。</li>
+        <li><span class="no">❌</span> 无录屏兜底；无完整异常路径脚本。</li>
+      </ul></div>
+
+    <div class="dim"><h3>K. 团队 <span class="score">7.0（+0.5）</span></h3>
+      <ul>
+        <li><span class="ok">✅</span> V2 起 13 项问题连续闭环（3 P1 + 5 P2/P3 + 评测集），交付密度与可追溯性（dev-log 二十节）优秀。</li>
+        <li><span class="no">❌</span> 单人；行业经验/可持续投入无证据。</li>
+      </ul></div>
+
+    <div class="risk"><b>L. 风险（-0.3）</b>：LLM 未接入 → 幻觉防线无实战样本（评测集为规则引擎满分）；工单快照 phone 明文；测试基建共享 config.DB_PATH 偶发 flaky（已缓解）。</div>
+  </div>
+
+  <!-- 四、问题清单 -->
+  <div class="card">
+    <h2>四、问题清单总表（V3，8 项）</h2>
+    <table>
+      <tr><th>ID</th><th>标题</th><th>优先级</th><th>维度</th><th>工作量</th><th>状态</th></tr>
+      <tr><td>P2-G1-03</td><td>工单快照 phone 明文（issues 三列未加密）</td><td><span class="badge b-p2">P2</span></td><td>G</td><td>中</td><td><span class="badge b-new">新发现</span></td></tr>
+      <tr><td>P2-B1-02</td><td>舆情外部源未接入（12345/媒体占位）</td><td><span class="badge b-p2">P2</span></td><td>B</td><td>中</td><td><span class="badge b-keep">保留</span></td></tr>
+      <tr><td>P1-D3-02</td><td>LLM 实测缺位（评测集规则满分，无真实 key 样本）</td><td><span class="badge b-p1">P1</span></td><td>D</td><td>中</td><td><span class="badge b-new">新发现</span></td></tr>
+      <tr><td>P2-I3-01</td><td>多租户未实现（仅 community 字段过滤）</td><td><span class="badge b-p2">P2</span></td><td>I</td><td>大</td><td><span class="badge b-dec">决策规模化阶段</span></td></tr>
+      <tr><td>P2-H1-02</td><td>无任务分级模型路由（接 key 后）</td><td><span class="badge b-p2">P2</span></td><td>H</td><td>小</td><td><span class="badge b-keep">保留</span></td></tr>
+      <tr><td>P2-A4-01</td><td>无热插拔/同角色多实例/跨 worker 黑板共享</td><td><span class="badge b-p2">P2</span></td><td>A</td><td>大</td><td><span class="badge b-keep">保留</span></td></tr>
+      <tr><td>P3-J1-02</td><td>无录屏/异常演示脚本</td><td><span class="badge b-p3">P3</span></td><td>J</td><td>小</td><td><span class="badge b-keep">保留</span></td></tr>
+      <tr><td>P3-I4-01</td><td>商业模式未展开</td><td><span class="badge b-p3">P3</span></td><td>I</td><td>中</td><td><span class="badge b-keep">保留</span></td></tr>
+    </table>
+    <p style="margin-top:8px;color:var(--muted);font-size:.88rem;">（8 项改进方案见《建议升级报告 V3》）</p>
+  </div>
+
+  <!-- 五、亮点 -->
+  <div class="card">
+    <h2>五、亮点与最佳实践</h2>
+    <ol style="padding-left:22px;">
+      <li><b>评审问题 100% 闭环推进</b>：V2 的 15 项问题中 13 项已解决或降级（3 P1 全闭环 + 2 P1 能力项 + 3 P2 + 1 P3），剩余 8 项中 2 项为新发现、4 项为明确决策保留。</li>
+      <li><b>评测驱动修复</b>：LLM 评测集 20 条直接暴露 2 个真 bug（健康紧急症状误判、注入变体漏拦）——「先立标准再谈能力」的工程方法值得延续。</li>
+      <li><b>工程拆分零回归</b>：api_web 2400→227 行 + 118 端点迁移，全量 423 测试全程绿，且迁移中顺手修掉 2 个潜伏 bug。</li>
+      <li><b>可度量叙事</b>：AI 自转率 62%、红黑榜双栏、traceId 全链路——答辩每个亮点都有真实数据和代码支撑。</li>
+    </ol>
+  </div>
+
+  <!-- 六、待补充材料 -->
+  <div class="card">
+    <h2>六、待补充材料</h2>
+    <ol style="padding-left:22px;">
+      <li>.env 配置真实 DEEPSEEK key，评测集 LLM 双跑 + Verifier 实战记录。</li>
+      <li>真实社区试点计划与数据接入（舆情 API 申请、居民数据导入、工单快照加密迁移）。</li>
+      <li>录屏/异常路径演示脚本。</li>
+      <li>多租户/热插拔的规模化路线图（产品化阶段）。</li>
+    </ol>
+  </div>
+
+  <div class="foot">
+    社区先知 CommunityInsight · 项目质量检测报告 V3 · 按《评测方法论.md》12 维度方法生成 ·
+    可复算：<code>python scripts/review_score.py --history</code>
+  </div>
+</div>
+</body>
+</html>

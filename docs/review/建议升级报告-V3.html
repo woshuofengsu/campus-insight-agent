@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>建议升级报告 V3 — 社区治理多智能体平台（8.25 / A- 配套方案）</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --card: #ffffff; --ink: #1f2937; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #0e9f6e; --accent-2: #0ea5e9;
+    --good: #059669; --warn: #d97706; --bad: #dc2626; --purple: #7c3aed;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.75;
+    padding: 32px 16px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  .hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0e7490 60%, #0e9f6e 120%);
+    color: #fff; border-radius: 18px; padding: 36px 34px; margin-bottom: 24px;
+    box-shadow: 0 12px 30px rgba(14,116,144,.25);
+  }
+  .hero .tag { display:inline-block; background: rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.25);
+    border-radius: 999px; padding: 4px 14px; font-size: .82rem; margin-bottom: 12px; }
+  .hero h1 { font-size: 1.55rem; font-weight: 800; margin-bottom: 8px; }
+  .hero .sub { color: #cffafe; font-size: .95rem; }
+  .hero .score { margin-top: 14px; font-size: 1rem; }
+  .hero .score b { color: #6ee7b7; font-size: 1.35rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 26px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .card h2 { font-size: 1.12rem; font-weight: 800; margin-bottom: 14px; padding-left: 12px;
+    border-left: 4px solid var(--accent); }
+  .card h3 { font-size: 1rem; font-weight: 700; margin: 16px 0 8px; color: var(--ink); }
+  .card h3 .tag { font-size: .76rem; font-weight: 600; margin-left: 6px; vertical-align: 2px; }
+  p { margin-bottom: 10px; }
+  ul { padding-left: 20px; margin-bottom: 10px; }
+  li { margin-bottom: 7px; }
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: .76rem; font-weight: 600; }
+  .b-p1 { background: #fee2e2; color: #b91c1c; } .b-p2 { background: #fef3c7; color: #b45309; }
+  .b-p3 { background: #e0f2fe; color: #0369a1; } .b-new { background: #ede9fe; color: #6d28d9; }
+  .field { margin-bottom: 6px; }
+  .field .k { display:inline-block; min-width: 52px; font-weight: 700; color: var(--accent-2); }
+  .hl { font-weight: 700; color: var(--accent); }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .88em; }
+  /* 路线图 */
+  .roadmap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
+  .roadmap .phase { border-radius: 12px; padding: 16px; border: 1px solid var(--line); }
+  .roadmap .p1 { background: #fff7ed; border-color: #fed7aa; }
+  .roadmap .p2 { background: #eff6ff; border-color: #bfdbfe; }
+  .roadmap .p3 { background: #f0fdf4; border-color: #bbf7d0; }
+  .roadmap .phase .n { font-weight: 800; margin-bottom: 8px; }
+  .roadmap .p1 .n { color: #c2410c; } .roadmap .p2 .n { color: #1d4ed8; } .roadmap .p3 .n { color: #15803d; }
+  .roadmap .phase .t { font-size: .82rem; color: var(--muted); margin-bottom: 8px; }
+  .roadmap .phase ul { padding-left: 16px; font-size: .88rem; }
+  .roadmap .phase li { margin-bottom: 4px; }
+  @media (max-width: 720px) { .roadmap { grid-template-columns: 1fr; } }
+  /* 答辩一句话 */
+  .quote { background: linear-gradient(135deg,#f0fdf4,#ecfeff); border: 1px solid #a7f3d0;
+    border-radius: 14px; padding: 20px 24px; font-size: 1.02rem; }
+  .quote .q { color: var(--muted); font-size: .85rem; margin-bottom: 6px; }
+  .quote p { margin: 0; }
+  .quote b { color: #065f46; }
+  /* 附件 */
+  .attach { display: flex; gap: 10px; flex-wrap: wrap; }
+  .attach a { display:inline-block; background: #f1f5f9; border:1px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; text-decoration: none; color: var(--ink); font-size: .9rem; }
+  .attach a:hover { border-color: var(--accent); background: #ecfdf5; }
+  .foot { text-align: center; color: var(--muted); font-size: .82rem; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <span class="tag">📈 升级路线 · 与检测报告 V3 配套</span>
+    <h1>《社区治理多智能体平台》建议升级报告（V3）</h1>
+    <div class="sub">对应检测结果 <b style="color:#6ee7b7;">8.25 / A-</b> · V2 提出的 15 项问题中 13 项已解决或降级 · 本报告聚焦剩余 8 项（含 2 项新发现）</div>
+    <div class="score">排序依据：<b>答辩价值</b> · 方案粒度：<b>可落地</b> · 验证方式：<b>可量化</b></div>
+  </div>
+
+  <!-- 一、P1 级 -->
+  <div class="card">
+    <h2>一、P1 级（2 项：1 新发现 + 1 能力延续）</h2>
+
+    <h3>P1-D3-02 LLM 实测缺位 <span class="badge b-new">新发现</span> <span class="badge b-p1">D 维度</span></h3>
+    <div class="field"><span class="k">证据</span>：评测集 20 条规则引擎满分，但 .env 未配真实 DEEPSEEK key——LLM 幻觉防线（Verifier 引用强制/输出检测/审计）无真实对抗样本；答辩若被问「LLM 到底跑过没有」缺乏实证。</div>
+    <div class="field"><span class="k">方案</span>：接 key 后 <code>scripts/llm_eval.py</code> 双跑（OfflineAgent vs LLM）——脚本已按 provider 可扩展，仅需加 LLM 实现；bad case（LLM 答错/引用缺失）从 agent_logs 抽取 → 人工标注 → 回流 golden 或补 Verifier 规则。</div>
+    <div class="field"><span class="k">验证</span>：评测集 LLM 通过率 ≥ 80%；幻觉率（无引用/编造）&lt; 5%。</div>
+    <div class="field"><span class="k">工作量</span>：中。 <span class="k">依赖</span>：真实 key + 评测集已有。</div>
+
+    <h3>P2-G1-03 工单快照 phone 明文 <span class="badge b-new">新发现</span> <span class="badge b-p1">G 维度</span></h3>
+    <div class="field"><span class="k">证据</span>：v36 迁移覆盖 user_profile/emergency_contacts，但 <code>community_issues.reporter_phone / assignee_phone / agent_phone</code> 三列仍明文（真实库实测 13800138000）；展示层已脱敏，存量列未加密。</div>
+    <div class="field"><span class="k">方案</span>：沿用 <code>scripts/migrate_phone_encryption.py</code> 模式——issues 表加 phone_enc 三列 + 迁移（明文置空/密文保留）+ <code>_issue_view</code> 解密读取 + rollback；与 v36 同脚本扩展（表名参数化）。</div>
+    <div class="field"><span class="k">验证</span>：迁移后 SELECT issues.* 无明文；工单列表/详情/导出仍脱敏显示。</div>
+    <div class="field"><span class="k">工作量</span>：中（复用模式，半日）。 <span class="k">依赖</span>：无。</div>
+  </div>
+
+  <!-- 二、P2 级 -->
+  <div class="card">
+    <h2>二、P2 级（4 项）</h2>
+    <ul>
+      <li><b>P2-B1-02 舆情外部源</b>：先落地「文件导入」即可演示（CSV：12345 工单/媒体文章 → auto_ingest 解析入库 → 分级）；API 申请后接真实源。<b>工作量：中。</b></li>
+      <li><b>P2-I3-01 多租户</b>：已决策产品化阶段——community_id 列级隔离 + 租户配置表；当前 community 字段按社区过滤满足演示。<b>工作量：大。</b></li>
+      <li><b>P2-H1-02 分级模型路由</b>：接 LLM 后——简单意图（报修/天气/通知）走规则；复杂（政策引用/协商）走小模型；仅跨部门冲突走大模型。<b>工作量：小。</b></li>
+      <li><b>P2-A4-01 热插拔/多实例</b>：黑板状态已落库（v31/v35），多 worker 可共享 DB 恢复；热插拔角色注册表 + 实例池。<b>工作量：大，产品化阶段。</b></li>
+    </ul>
+  </div>
+
+  <!-- 三、P3 级 -->
+  <div class="card">
+    <h2>三、P3 级（2 项）</h2>
+    <ul>
+      <li><b>P3-J1-02 录屏/异常演示脚本</b>：OBS 录制 3 段（居民报修闭环 / 老年端语音+转人工 / 网格员批量+红黑榜）+ 异常路径脚本（注入拦截/协商循环/审计拦截各 1 条）。<b>工作量：小。</b></li>
+      <li><b>P3-I4-01 商业模式</b>：政府购买服务（基层治理数字化）+ SaaS（多社区订阅）+ 演示页定价说明。<b>工作量：中。</b></li>
+    </ul>
+  </div>
+
+  <!-- 四、路线图 -->
+  <div class="card">
+    <h2>四、三阶段路线图</h2>
+    <div class="roadmap">
+      <div class="phase p1">
+        <div class="n">🚀 冲刺（1 周，答辩前）</div>
+        <div class="t">补 G 维度最后一块 + 演示素材齐备</div>
+        <ul>
+          <li>工单快照加密（P2-G1-03，半天）</li>
+          <li>演示录屏 3 段</li>
+          <li>异常路径脚本</li>
+        </ul>
+      </div>
+      <div class="phase p2">
+        <div class="n">🔧 能力加固（1-2 月）</div>
+        <div class="t">从演示走向真实试点</div>
+        <ul>
+          <li>接 LLM 实测（P1-D3-02）</li>
+          <li>舆情文件导入（P2-B1-02）</li>
+          <li>评测集 bad case 回流闭环</li>
+          <li>真实社区试点数据接入</li>
+        </ul>
+      </div>
+      <div class="phase p3">
+        <div class="n">🏢 产品化（3-6 月）</div>
+        <div class="t">规模化与商业验证</div>
+        <ul>
+          <li>多租户（P2-I3-01）</li>
+          <li>热插拔（P2-A4-01）</li>
+          <li>分级模型路由（P2-H1-02）</li>
+          <li>商业模式验证</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 五、答辩一句话 -->
+  <div class="card">
+    <h2>五、答辩一句话</h2>
+    <div class="quote">
+      <div class="q">「我们交付的不只是功能」</div>
+      <p>三次全维度评审从 <b>7.03 → 7.62 → 8.25（A-）</b>，三个 P1 硬伤全闭环，api_web 从 2400 行拆到 227 行骨架；AI 自转率实测 <b>62%</b>、<b>20 条评测集满分</b>、traceId 全链路可追溯——「AI 治理」有数据、有防线、可验证。</p>
+    </div>
+  </div>
+
+  <!-- 附 -->
+  <div class="card">
+    <h2>附：评测方法论（可复用）</h2>
+    <p style="color:var(--muted);">检测方法、评分权重与脚本如下——后续每次大改动后可一键重测，对比总分与逐维度变化。</p>
+    <div class="attach">
+      <a href="评测方法论.md">📄 评测方法论.md（12 维度 + 检测步骤）</a>
+      <a href="scripts-none">💻 scripts/review_score.py（加权评分可复算）</a>
+      <a href="项目质量检测报告-V3.html">📊 检测报告 V3（8.25/A-）</a>
+    </div>
+  </div>
+
+  <div class="foot">
+    社区先知 CommunityInsight · 建议升级报告 V3 · 与《项目质量检测报告-V3》配套
+  </div>
+</div>
+</body>
+</html>
