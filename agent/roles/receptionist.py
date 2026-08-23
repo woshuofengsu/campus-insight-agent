@@ -44,6 +44,13 @@ class ReceptionistAgent(BaseAgent):
         text = (ctx.get("user_input") or "").strip()[:200]
         role = ctx.get("role") or "resident"
 
+        # NLU 预处理（P1-C1-01）：方言归一化 → 指代消解（最近实体）→ 否定取肯定目标
+        recent_entity = (ctx["state"].get("user_context") or {}).get("recent_entity")
+        pre = A.nlu_preprocess(text, recent_entity)
+        if pre != text:
+            text = pre
+            ctx["user_input"] = text
+
         # 礼貌 / 自我介绍 / 使用帮助
         if A.detect_polite(text):
             return self._reply(self._polite(), intent="礼貌回复", chain_note="识别到礼貌用语")
@@ -113,9 +120,15 @@ class ReceptionistAgent(BaseAgent):
         self._write("user_input", text)
         intent_key = INTENT_KEY_MAP.get(intent, "receptionist")
         self._write("user_intent", intent_key)
-        self._write("user_context", {
+        # 会话最近实体（P1-C1-01 指代消解用）：报修/提案对象，如「水管」「路灯」
+        entity = A.extract_recent_entity(text)
+        prev_ctx = ctx["state"].get("user_context") or {}
+        prev_ctx.update({
             "role": role, "uid": ctx.get("uid"), "name": ctx.get("name"),
             "text": text, "intent_cn": intent,
         })
+        if entity:
+            prev_ctx["recent_entity"] = entity
+        self._write("user_context", prev_ctx)
         return self._reply("", status="routed", intent=intent_key, done=False,
                            chain_note=f"识别为「{intent}」，路由中")

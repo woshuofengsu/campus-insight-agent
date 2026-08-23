@@ -68,7 +68,6 @@ GO_OUT_WORDS = ("我要出门", "出去", "出门", "要出去", "想出去")
 # ---------------------------------------------------------------------------
 # 错别字/病句纠正（规则级；纠正后必须用户确认）
 # ---------------------------------------------------------------------------
-
 _CORRECTIONS = [
     # (pattern, replacement)  正则
     (r"\b我加\b", "我家"),
@@ -100,6 +99,105 @@ def correct_text(text: str) -> str:
     for pat, rep in _CORRECTIONS:
         t = re.sub(pat, rep, t)
     return t
+
+
+# ---------------------------------------------------------------------------
+# NLU 增强（P1-C1-01）：方言归一化 / 指代消解 / 否定与模糊处理
+# 规则级离线兜底：接 LLM 后由 prompt 承担，此处保持轻量可验证。
+# ---------------------------------------------------------------------------
+
+# 北京 / 上海常用口语 → 普通话（演示级词表，够覆盖答辩常用表达）
+DIALECT_MAP = [
+    # 北京话
+    ("您嘞", "您"), ("嘛呢", "干什么呢"), ("咋了", "怎么了"), ("咋", "怎么"),
+    ("瞅瞅", "看看"), ("倍儿", "很"), ("忒", "太"), ("得嘞", "好的"),
+    ("胡同", "小区"), ("楼道", "楼道"), ("楼底下", "楼下"),
+    ("水电闸", "电闸"), ("没辙", "没办法"), ("待会儿", "等会儿"),
+    # 上海话
+    ("阿拉", "我"), ("侬", "你"), ("伊", "他"), ("啥事体", "什么事"),
+    ("做啥", "干什么"), ("白相", "玩"), ("汏", "洗"), ("覅", "不要"),
+    ("勿要", "不要"), ("勿", "不"), ("老灵", "很好"), ("蛮好", "很好"),
+    ("辰光", "时间"), ("今朝", "今天"), ("明朝", "明天"), ("夜里厢", "晚上"),
+    ("落雨", "下雨"), ("打烊", "关门"),
+]
+
+# 指代触发词（「那个/上次的/刚才的」→ 会话最近实体）
+REFERENCE_WORDS = ("那个", "这个", "上次的", "上次", "刚才", "之前", "那东西", "那事",
+                   "它", "那个东西", "这个事")
+# 指代消解时若文本已含明确业务关键词则不动（避免误替换）
+_REFERENCE_SKIP_KWS = ("漏水", "灯", "水", "电梯", "门", "马桶", "插座", "电",
+                       "修", "报修", "政策", "医保", "天气", "通知", "提案")
+
+# 否定/纠偏模式：「不是A是B」「不要A要B」「不是A，要B」→ 取 B 重识别
+_NEGATION_PATTERNS = [
+    re.compile(r"不(?:是|要)(.+?)(?:是|要|改成|换)(.+)"),
+    re.compile(r"不是(.+?)[，,。](?:是|要)(.+)"),
+]
+
+
+def normalize_dialect(text: str) -> str:
+    """方言口语 → 普通话（北京/上海常用词表，规则级）。"""
+    t = (text or "").strip()
+    for src, dst in DIALECT_MAP:
+        t = t.replace(src, dst)
+    return t
+
+
+def resolve_reference(text: str, recent_entity: str | None) -> str:
+    """指代消解：「那个/上次的」→ 会话最近实体（黑板 user_context.recent_entity）。
+
+    若文本本身已含明确业务关键词，不做替换（避免把「那个灯」误改成「那个水管」）。
+    """
+    if not recent_entity:
+        return text
+    if not any(w in text for w in REFERENCE_WORDS):
+        return text
+    if any(kw in text for kw in _REFERENCE_SKIP_KWS):
+        return text
+    # 用最近实体替换指代词：如「那个又坏了」→「{实体}又坏了」
+    t = text
+    for w in REFERENCE_WORDS:
+        t = t.replace(w, recent_entity)
+    return t
+
+
+def extract_negation_target(text: str) -> str | None:
+    """否定/纠偏：「不是A是B」→ 返回 B（肯定目标）；无则 None。"""
+    for pat in _NEGATION_PATTERNS:
+        m = pat.search(text)
+        if m:
+            target = m.group(2).strip("，。！？,. ")
+            if target:
+                return target
+    return None
+
+
+def nlu_preprocess(text: str, recent_entity: str | None = None) -> str:
+    """NLU 预处理链（方言 → 指代 → 否定），返回用于意图识别的文本。
+
+    用于接待员识别与话题切换检测，保证两处口径一致（P1-C1-01）。
+    """
+    t = normalize_dialect(text)
+    t = resolve_reference(t, recent_entity)
+    neg = extract_negation_target(t)
+    if neg:
+        t = neg
+    return t
+
+
+# 报修/提案常见实体词（供 recent_entity 提取；演示级，按出现优先级排序）
+_ENTITY_WORDS = ("水管", "水龙头", "马桶", "灯泡", "灯", "电梯", "门", "锁", "插座",
+                 "窗户", "纱窗", "墙皮", "下水道", "热水器", "空调", "冰箱", "洗衣机",
+                 "路灯", "垃圾桶", "健身器材", "座椅", "路面", "井盖", "监控", "门禁",
+                 "充电桩", "晾衣架", "楼道", "单元门", "花坛", "草坪")
+
+
+def extract_recent_entity(text: str) -> str | None:
+    """从文本提取最近实体（报修/提案对象），供指代消解使用；无则 None。"""
+    for w in _ENTITY_WORDS:
+        if w in (text or ""):
+            return w
+    return None
 
 
 # ---------------------------------------------------------------------------

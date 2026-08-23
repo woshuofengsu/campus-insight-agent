@@ -168,7 +168,10 @@ class Orchestrator:
             try:
                 from agent import web_agent as A
                 from agent.roles.receptionist import INTENT_KEY_MAP
-                new_cn = A.detect_intent(text, role)
+                # NLU 预处理与接待员同口径（P1-C1-01）：方言/指代/否定后再识别
+                recent_entity = (st.get("user_context") or {}).get("recent_entity")
+                nlu_text = A.nlu_preprocess(text, recent_entity)
+                new_cn = A.detect_intent(nlu_text, role)
                 if new_cn:
                     new_key = INTENT_KEY_MAP.get(new_cn)
                     # 其他业务意图（非当前续接目标）→ 视为话题切换

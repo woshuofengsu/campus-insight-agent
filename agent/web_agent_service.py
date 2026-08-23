@@ -27,7 +27,7 @@ def _sess(role: str, uid: int | None) -> dict:
     key = f"{role}:{uid or 0}"
     if key not in _SESSIONS:
         _SESSIONS[key] = {"intent": None, "step": None, "data": {}, "pending_correct": None,
-                          "draft": None, "pending_action": None}
+                          "draft": None, "pending_action": None, "recent_entity": None}
     return _SESSIONS[key]
 
 
@@ -209,6 +209,11 @@ def handle_chat(role: str, uid: int, name: str, text: str,
     s = _sess(role, uid)
     eff_uid = elder_uid or uid
 
+    # NLU 预处理（P1-C1-01）：方言归一化 → 指代消解（最近实体）→ 否定取肯定目标
+    pre = A.nlu_preprocess(text, s.get("recent_entity"))
+    if pre != text:
+        text = pre
+
     # 1. 礼貌 / 自我介绍 / 使用帮助（全局快捷）
     if A.detect_polite(text):
         return _reply(s, "礼貌回复", _polite_reply(), "成功", [], uid, role, text)
@@ -276,6 +281,10 @@ def handle_chat(role: str, uid: int, name: str, text: str,
     s["intent"] = intent
     s["step"] = None
     s["data"] = {"desc": text}
+    # 会话最近实体（P1-C1-01 指代消解用）
+    entity = A.extract_recent_entity(text)
+    if entity:
+        s["recent_entity"] = entity
 
     # 老年端：身体不适 → 提示联系社区/家属 + 紧急求助按钮
     if role == "elderly" and intent == "身体不适":

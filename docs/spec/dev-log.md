@@ -358,7 +358,17 @@
 - docker-compose.yml 新增 web（Dockerfile.web，expose 8000）+ web-nginx（80/443）服务；nginx/certs/ 入 .gitignore。
 
 **验证**：全量 pytest **406 passed**（含草稿 2 + 迁移 1 新增）；npm build 通过；uvicorn 重启后 health 200 / agent 路由 401 鉴权正常。
-**提交**：d8e357a（①②）→ 本轮（③④）待提交。
+**提交**：d8e357a（①②）→ 3dbd02e（③④）。
+
+## 十三、P1-C1-01 NLU 增强（方言 / 指代消解 / 否定与模糊处理，评审 C 维度扣分项）✅
+
+- **方言归一化** `web_agent.normalize_dialect`：北京（您嘞/嘛呢/咋/瞅瞅/倍儿/忒/得嘞…）+ 上海（阿拉/侬/伊/啥事体/勿要/老灵/今朝/落雨…）口语 → 普通话，演示级词表。
+- **指代消解** `resolve_reference`：黑板/会话存 `recent_entity`（报修/提案对象实体词表提取，如水管/电梯/路灯），「那个/上次的/刚才」→ 替换为最近实体继续识别；已含业务关键词不误替换。
+- **否定/纠偏** `extract_negation_target`：「不是A是B」「不要A要B」→ 取 B 重识别；`nlu_preprocess` 链式（方言→指代→否定）统一口径。
+- **接入三处**：receptionist.process（主识别链）、orchestrator._resume_target（话题切换检测同口径）、web_agent_service.handle_chat（Streamlit 备用版同能力）。
+- **测试**：`tests/test_nlu.py` 10 项（6 单元 + 4 端到端：方言路由报修、否定重路由政策、指代续接报修、无实体不误路由）。
+
+**验证**：核心套件 80 passed 无回归；全量待跑。**提交**：本轮。
 
 
 
