@@ -129,6 +129,26 @@ def agent_self_resolution(request: Request, days: int = 7):
     return _ok(get_self_resolution_stats(days=days))
 
 
+@router.get("/board")
+def agent_red_black_board(request: Request, days: int = 30, limit: int = 5):
+    """红黑榜（P2-B4-01：满意工单/高效网格员/完成提案 vs 不满意/超时/低效网格员）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_board import get_red_black_board
+    return _ok(get_red_black_board(days=days, limit=limit))
+
+
+@router.get("/satisfaction-drilldown")
+def agent_satisfaction_drilldown(request: Request, category: str = "",
+                                 assignee: str = "", satisfaction: str = "", limit: int = 50):
+    """满意度下钻（P2-B4-01：按分类/网格员/评价筛选到单工单）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_board import get_satisfaction_drilldown
+    return _ok(get_satisfaction_drilldown(category=category, assignee=assignee,
+                                          satisfaction=satisfaction, limit=limit))
+
+
 @router.get("/analytics")
 def agent_analytics(request: Request, days: int = 7):
     """问题聚类 + 趋势 + 数据简报（P2-03 / P3-03）。"""

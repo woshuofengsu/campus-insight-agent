@@ -387,6 +387,16 @@
 - **测试**：test_self_resolution_stats（造数 2 成功+1 拦截+1 转人工 → 断言各口径 + grid 可查 / 居民 403）。
 - **验证**：核心套件 38 passed；全量待跑；npm build 通过。**提交**：本轮。
 
+## 十六、P2-B4-01 红黑榜 / 满意度下钻（评审 B 维度：无红黑榜、满意度无下钻）✅
+
+- **`data/db_board.py`**：
+  - `get_red_black_board(days, limit)`：红榜 = 近期满意工单（含处理时长）+ 高效网格员（满意率≥60% 且件数达标）+ 已完成满意提案；黑榜 = 不满意工单（含原因）+ 低效网格员（不满意占比≥30%）+ SLA 超时工单（复用 db_sla）。
+  - `get_satisfaction_drilldown(category/assignee/satisfaction, limit)`：满意度下钻到单工单明细（含汇总 rate）。
+- **端点**：`GET /api/web/agent/board`、`GET /api/web/agent/satisfaction-drilldown`（grid 专属）。
+- **前端**：网格员工作台 Dashboard.vue 加红榜/黑榜双栏卡片（满意工单/高效网格员 vs 不满意/SLA 超时）；`api/index.js` 加 `agent.board` / `agent.satisfactionDrilldown`。
+- **测试**：test_red_black_board（造数满意+不满意工单走完整状态机 → 断言进榜/下钻/权限）。
+- **验证**：agent 套件 39 passed；全量待跑；npm build 通过。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

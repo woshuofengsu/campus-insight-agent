@@ -1,9 +1,9 @@
 <script setup>
-// 网格员工作台：待办统计 + 紧急工单 + 待审核提案
+// 网格员工作台：待办统计 + 紧急工单 + 待审核提案 + 红黑榜
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import { issues, proposals } from '../../api'
+import { issues, proposals, agent } from '../../api'
 
 const router = useRouter()
 const message = useMessage()
@@ -11,6 +11,7 @@ const message = useMessage()
 const stats = ref({ total: 0, pending: 0, processing: 0, resolved: 0 })
 const urgent = ref([])
 const pendingProps = ref([])
+const board = ref({ red_board: { satisfied_issues: [], good_workers: [], done_proposals: [] }, black_board: { dissatisfied_issues: [], slow_workers: [], sla_breaches: [] } })
 
 onMounted(async () => {
   try {
@@ -27,6 +28,9 @@ onMounted(async () => {
     const ps = (await proposals.list()) || []
     pendingProps.value = ps.filter((p) => p.status === '待审核' || p.status === '重新执行').slice(0, 5)
   } catch { /* 忽略 */ }
+  try {
+    board.value = (await agent.board()) || board.value
+  } catch { /* 红黑榜失败不阻塞 */ }
 })
 
 const cards = [
@@ -65,6 +69,47 @@ const cards = [
       <div v-for="p in pendingProps" :key="p.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;">
         <span>{{ p.title }} <span class="muted">（{{ p.status }}）</span></span>
         <n-button size="small" type="primary" ghost @click="router.push('/grid/proposals')">审核</n-button>
+      </div>
+    </div>
+
+    <!-- 红黑榜（P2-B4-01） -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+      <div class="card" style="border:1px solid #dcfce7;margin:0;">
+        <div style="font-weight:700;color:#059669;margin-bottom:10px;">🏆 红榜 · 值得表扬</div>
+        <div v-if="board.red_board.satisfied_issues.length">
+          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">近期满意工单</div>
+          <div v-for="i in board.red_board.satisfied_issues.slice(0,3)" :key="'ri'+i.id"
+               style="padding:6px 0;border-bottom:1px solid #f0fdf4;font-size:0.9rem;">
+            #{{ i.id }} {{ i.title }} <span class="muted">（{{ i.assignee_name || '—' }} · {{ i.hours ?? '?' }}h）</span>
+          </div>
+        </div>
+        <div v-if="board.red_board.good_workers.length" style="margin-top:8px;">
+          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">高效网格员</div>
+          <div v-for="w in board.red_board.good_workers.slice(0,3)" :key="'rw'+w.name"
+               style="padding:6px 0;font-size:0.9rem;">
+            👍 {{ w.name }} · 解决 {{ w.solved }} 单 · 满意 {{ w.satisfied }}
+            <span class="muted" v-if="w.avg_hours">（均 {{ w.avg_hours }}h）</span>
+          </div>
+        </div>
+        <div v-if="!board.red_board.satisfied_issues.length && !board.red_board.good_workers.length" class="muted" style="font-size:0.9rem;">暂无红榜数据</div>
+      </div>
+      <div class="card" style="border:1px solid #fee2e2;margin:0;">
+        <div style="font-weight:700;color:#dc2626;margin-bottom:10px;">⚠️ 黑榜 · 需要改进</div>
+        <div v-if="board.black_board.dissatisfied_issues.length">
+          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">不满意工单</div>
+          <div v-for="i in board.black_board.dissatisfied_issues.slice(0,3)" :key="'bi'+i.id"
+               style="padding:6px 0;border-bottom:1px solid #fef2f2;font-size:0.9rem;">
+            #{{ i.id }} {{ i.title }} <span class="muted">{{ i.satisfaction_reason || '' }}</span>
+          </div>
+        </div>
+        <div v-if="board.black_board.sla_breaches.length" style="margin-top:8px;">
+          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">SLA 超时</div>
+          <div v-for="b in board.black_board.sla_breaches.slice(0,3)" :key="'sl'+b.id"
+               style="padding:6px 0;font-size:0.9rem;">
+            ⏰ #{{ b.id }} {{ b.title }} <span class="muted">（{{ b.level }}）</span>
+          </div>
+        </div>
+        <div v-if="!board.black_board.dissatisfied_issues.length && !board.black_board.sla_breaches.length" class="muted" style="font-size:0.9rem;">暂无黑榜数据</div>
       </div>
     </div>
 

@@ -406,6 +406,55 @@ def test_self_resolution_stats(client):
     assert r.status_code == 400 and r.json()["code"] == 1003
 
 
+# ---------- P2-B4-01 红黑榜 / 满意度下钻 ----------
+
+def test_red_black_board(client):
+    """红黑榜：满意工单进红榜、不满意进黑榜；grid 端点可查、居民 403。"""
+    from data.db_core import get_db
+    from data.db_repair import submit_issue, resolve_issue, feedback_issue
+    from data.db_board import get_red_black_board, get_satisfaction_drilldown
+    # 造数：一个满意工单 + 一个不满意工单（独立测试用户）
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO user_profile (username, role, name, is_active) "
+            "VALUES ('board_user', 'resident', '红黑榜测试', 1)")
+        conn.commit()
+        ru = conn.execute("SELECT id FROM user_profile WHERE username='board_user'").fetchone()["id"]
+    iid_ok = submit_issue("红榜测试灯坏了", "公共设施", "室内", "幸福小区1号楼1单元101",
+                          "楼道灯不亮了需要维修", "一般", "红黑榜测试", "13911112222",
+                          reporter_id=ru)[0]
+    iid_bad = submit_issue("黑榜测试水管漏", "公共设施", "室内", "幸福小区1号楼1单元102",
+                           "水管漏水严重需要处理", "紧急", "红黑榜测试", "13911113333",
+                           reporter_id=ru)[0]
+    from data.db_repair import audit_issue, dispatch_issue, start_process
+    for iid in (iid_ok, iid_bad):
+        audit_issue(iid, True, opinion="通过", actor="负责人")
+        dispatch_issue(iid, "李师傅", "13900000001", actor="负责人")
+        start_process(iid, actor="李师傅")
+        resolve_issue(iid, "已维修完成", no_photo_reason="现场已清理", actor="李师傅")
+    feedback_issue(iid_ok, True, actor="红黑榜测试")
+    feedback_issue(iid_bad, False, reason="修完还在漏水", actor="红黑榜测试")
+    board = get_red_black_board(days=30, limit=5)
+    red_ids = [i["id"] for i in board["red_board"]["satisfied_issues"]]
+    black_ids = [i["id"] for i in board["black_board"]["dissatisfied_issues"]]
+    assert iid_ok in red_ids
+    assert iid_bad in black_ids
+    # 下钻：不满意筛选能查到具体工单和原因
+    dd = get_satisfaction_drilldown(satisfaction="不满意", limit=50)
+    assert any(i["id"] == iid_bad for i in dd["items"])
+    assert dd["summary"]["dissatisfied"] >= 1
+    # grid 端点可查；居民 403
+    gtok = _login(client, "grid")
+    r = client.get("/api/web/agent/board", headers={"Authorization": f"Bearer {gtok}"})
+    assert r.status_code == 200 and "red_board" in r.json()["data"]
+    r = client.get("/api/web/agent/satisfaction-drilldown?limit=50",
+                   headers={"Authorization": f"Bearer {gtok}"})
+    assert r.status_code == 200 and "items" in r.json()["data"]
+    rtok = _login(client, "resident")
+    r = client.get("/api/web/agent/board", headers={"Authorization": f"Bearer {rtok}"})
+    assert r.status_code == 400 and r.json()["code"] == 1003
+
+
 # ---------- P2-01 跨部门仲裁 / P2-02 重复上报合并 ----------
 
 def test_dept_priority_and_scope():
