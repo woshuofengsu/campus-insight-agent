@@ -7,6 +7,10 @@
 #
 # 同时启动 FastAPI 服务（可选）:
 #   docker-compose --profile api up -d
+#
+# HTTPS（修复④，见 docs/deploy-https.md）:
+#   docker-compose --profile https up -d        # web 容器 + Nginx 反代(80/443)
+#   证书签发: sudo certbot --nginx -d <域名>     # 或将 /etc/letsencrypt 拷入 ./nginx/certs/
 
 version: "3.9"
 
@@ -43,3 +47,43 @@ services:
     restart: unless-stopped
     profiles:
       - api
+
+  # ── 可选：FastAPI + Vue3 主服务（Dockerfile.web，端口 8000） ──
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: community-insight-web
+    expose:
+      - "8000"        # 仅容器内可达，对外由 web-nginx 反代（HTTPS）
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/web/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - https
+
+  # ── HTTPS 反代（Nginx 终结 TLS，证书挂载，见 docs/deploy-https.md §3） ──
+  web-nginx:
+    image: nginx:1.27-alpine
+    container_name: community-insight-nginx
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/community-insight.conf:/etc/nginx/conf.d/default.conf:ro
+      # Let's Encrypt 证书目录（签发后挂载；不入库）
+      - ./nginx/certs:/etc/letsencrypt/live/insight.example.com:ro
+    restart: unless-stopped
+    profiles:
+      - https

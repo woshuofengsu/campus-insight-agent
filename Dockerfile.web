@@ -2,6 +2,10 @@
 # 构建前端: cd web && npm run build
 # 构建: docker build -f Dockerfile.web -t community-insight-web .
 # 运行: docker run -p 8000:8000 community-insight-web
+#
+# HTTPS（修复④ P1-G1-02，见 docs/deploy-https.md）：
+#   容器内保持 HTTP（uvicorn 8000），TLS 由外部 Nginx 终结——证书挂载不进镜像。
+#   docker-compose --profile https up -d 即可获得 web + Nginx(80/443) 反代组合。
 
 FROM python:3.12-slim
 

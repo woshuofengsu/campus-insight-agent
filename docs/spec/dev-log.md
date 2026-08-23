@@ -330,6 +330,36 @@
 **验证**：tests/test_agent.py 33 项 + security 8 + api_web 21；全量 pytest **401 passed**；构建通过；压测零失败。
 **按用户要求**：SLA 升级提醒不再外发 SMTP_TO（QQ 邮箱），改发 SMTP_USER 自己留档（站内消息为主渠道）。
 
+## 十二、四个 P1 修复（最终完善版 v5.0 适配实施，docs/review/建议升级报告-V2.md 对应项）✅
+
+**① 草稿内容不落库（P1-A5-02，v35 draft_contents）**
+- 新增 `data/db_draft.py`：save_draft/load_draft/delete_draft/clean_drafts(7 天)，草稿类型 work_order_draft/proposal_draft。
+- Orchestrator：`_finish` 每轮 save_draft（status=成功且报修/提案意图时删除）；run() 恢复时从库回填黑板草稿；取消分支 delete_draft+delete_session。
+- 调度器 `_draft_clean` 每 30 分钟清理超期草稿（7 天）。
+- 测试：test_draft_persist_and_restore / test_orchestrator_draft_full_restore。
+
+**② 存量手机号明文（P1-G1-02，v36 phone_enc）**
+- schema v36 为 user_profile.phone / emergency_contacts.phone 增加 phone_enc 加密列（PRAGMA 检查幂等）。
+- `scripts/migrate_phone_encryption.py`：migrate()/rollback() 可回滚；已加密跳过。
+- 读写解密：web_me / web_contacts_list 解密 phone_enc 返回；迁移后 SELECT phone 无明文。
+- 测试：test_phone_encryption_migration（加密往返 + 迁移幂等）。
+
+**③ api_web 2172 行拆分（P1-F2-01，api_routes/ 包 + include_router）**
+- 新建 `api_routes/deps.py`（_ok/_fail/_user/_require_role/_resolve_elder_uid 共享依赖，与 api_web 行为一致）。
+- 拆出 `api_routes/agent.py`（/api/web/agent/* 共 10 端点）、`api_routes/export.py`（8 个 CSV 导出）、`api_routes/upload.py`（附件上传）。
+- api_web.py 末尾 include_router 挂载（必须在 SPA catch-all 之前）；本模块保留端点删除，仅留指向注释。
+- 修复迁移中发现的潜在 bug：上传 `_FakeUploadFile.getbuffer()` 原返回 io.BytesIO 导致正常上传必失败（超 5MB 分支不触发所以旧测试没拦住）→ 改返回 bytes。
+- 顺带修复：`/api/web/health` 加入 _PUBLIC_PATHS（Docker HEALTHCHECK 用 curl -f 无 token 会 401 误报）。
+- 每拆一个模块跑一次全量回归（67 项核心 + 全量）。
+
+**④ 无 HTTPS（P1-G1-02 后半，docs/deploy-https.md）**
+- 三档方案：ngrok 临时公网 HTTPS（答辩演示）/ Nginx + certbot 单机生产（自动续期 cron）/ docker-compose --profile https（web 容器 + Nginx 反代挂证书）。
+- `nginx/community-insight.conf` 反代模板（HTTP→HTTPS 301 + TLS1.2/1.3 + 6m body + X-Forwarded-Proto）。
+- docker-compose.yml 新增 web（Dockerfile.web，expose 8000）+ web-nginx（80/443）服务；nginx/certs/ 入 .gitignore。
+
+**验证**：全量 pytest **406 passed**（含草稿 2 + 迁移 1 新增）；npm build 通过；uvicorn 重启后 health 200 / agent 路由 401 鉴权正常。
+**提交**：d8e357a（①②）→ 本轮（③④）待提交。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

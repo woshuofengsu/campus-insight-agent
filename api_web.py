@@ -145,9 +145,10 @@ app = FastAPI(title="CommunityInsight Web API", version="3.0.0",
               lifespan=_lifespan)
 
 
-# 公开路径：登录 + 文档 + 前端静态
-_PUBLIC_PATHS = {"/api/web/auth/login", "/api/web/auth/demo", "/web/docs", "/web/redoc",
-                 "/web/openapi.json", "/", "/index.html", "/favicon.ico"}
+# 公开路径：登录 + 健康检查 + 文档 + 前端静态
+_PUBLIC_PATHS = {"/api/web/auth/login", "/api/web/auth/demo", "/api/web/health",
+                 "/web/docs", "/web/redoc", "/web/openapi.json",
+                 "/", "/index.html", "/favicon.ico"}
 
 
 @app.middleware("http")
@@ -261,43 +262,7 @@ def web_me(request: Request):
 
 
 # ---------------- 附件上传 ----------------
-
-class UploadResult(BaseModel):
-    path: str
-
-
-@app.post("/api/web/upload")
-async def web_upload(request: Request, folder: str = "web"):
-    """上传附件（图片/PDF，≤5MB）。multipart/form-data，字段名 files。"""
-    from utils.uploads import save_uploaded_files
-    try:
-        form = await request.form()
-        files = form.getlist("files")
-        objs = []
-        for f in files:
-            data = await f.read()
-            objs.append(_FakeUploadFile(f.filename or "x.jpg", len(data), data))
-        if not objs:
-            return fail(1001, "未选择文件")
-        saved, errs = save_uploaded_files(objs, folder=folder, max_count=5)
-        if errs:
-            return fail(2001, "；".join(errs))
-        return ok({"paths": saved}, "上传成功")
-    except Exception as e:  # noqa: BLE001
-        return fail(1001, f"上传失败：{e}")
-
-
-class _FakeUploadFile:
-    """把 multipart 上传对象适配成 utils/uploads 需要的接口（name/size/getbuffer）。"""
-
-    def __init__(self, name, size, data):
-        self.name = name
-        self.size = size
-        self._data = data
-
-    def getbuffer(self):
-        import io
-        return io.BytesIO(self._data)
+# 已随路由拆分（P2-04 / P1-F2-01）移入 api_routes/upload.py（POST /api/web/upload）。
 
 
 # ---------------- 报修模块（复用 db_repair） ----------------
@@ -1545,136 +1510,8 @@ def web_qa_feedback(qid: int, req: QaFeedback, request: Request):
 
 
 # ---------------- 导出（复用数据层导出函数，统一 CSV） ----------------
-
-@app.get("/api/web/export/issues")
-def web_export_issues(request: Request):
-    """导出报修工单 CSV（负责人，脱敏，留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_repair import get_issues
-    import csv
-    from io import StringIO
-    rows = get_issues(limit=1000)
-    buf = StringIO()
-    w = csv.writer(buf)
-    w.writerow(["编号", "标题", "分类", "类型", "紧急度", "状态", "地址", "报修人", "电话", "维修人员", "提交时间"])
-    for r in rows:
-        p = r.get("reporter_phone") or ""
-        w.writerow([r.get("id"), r.get("title"), r.get("category"), r.get("issue_type"),
-                    r.get("urgency"), r.get("status"), r.get("location"),
-                    r.get("reporter_name"), (p[:3] + "****" + p[-4:]) if len(p) == 11 else "****",
-                    r.get("assignee_name") or "", (r.get("reported_at") or "")[:16]])
-    from data.db_notifications import log_activity
-    log_activity(_user(request).get("name") or "负责人", "导出工单数据", module="报修",
-                 detail=f"导出 {len(rows)} 条（脱敏，不含照片附件）")
-    from fastapi.responses import Response
-    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=issues.csv"})
-
-
-@app.get("/api/web/export/proposals")
-def web_export_proposals(request: Request):
-    """导出提案 CSV（负责人，含排名/脱敏，留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_proposal import get_export_rows, log_export
-    rows = get_export_rows()
-    import csv
-    from io import StringIO
-    buf = StringIO()
-    if rows:
-        w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
-        w.writeheader()
-        w.writerows(rows)
-    log_export(actor=_user(request).get("name") or "负责人")
-    from fastapi.responses import Response
-    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=proposals.csv"})
-
-
-@app.get("/api/web/export/notices")
-def web_export_notices(request: Request):
-    """导出通知列表 + 已读统计（负责人，留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_notice import export_notices_csv
-    from fastapi.responses import Response
-    content, fname = export_notices_csv(actor=_user(request).get("name") or "负责人")
-    return Response(content.encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": f"attachment; filename={fname}"})
-
-
-@app.get("/api/web/export/knowledge")
-def web_export_knowledge(request: Request):
-    """导出政策知识库 CSV（负责人，脱敏留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_policy import get_knowledge_list
-    import csv
-    from io import StringIO
-    rows = get_knowledge_list(limit=1000)
-    buf = StringIO()
-    w = csv.writer(buf)
-    w.writerow(["ID", "标题", "分类", "状态", "版本", "有效期", "引用次数", "更新时间"])
-    for k in rows:
-        w.writerow([k.get("id"), (k.get("title") or "")[:40], k.get("category"),
-                    k.get("audit_status"), k.get("version") or 1,
-                    f"{k.get('effective_date') or ''}~{k.get('expire_date') or ''}",
-                    k.get("cite_count") or 0, (k.get("updated_at") or k.get("created_at") or "")[:16]])
-    from data.db_notifications import log_activity
-    log_activity(_user(request).get("name") or "负责人", "导出知识库", module="政策问答",
-                 detail=f"导出 {len(rows)} 条（不含正文全文与审核意见）")
-    from fastapi.responses import Response
-    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=knowledge.csv"})
-
-
-@app.get("/api/web/export/health-contents")
-def web_export_health_contents(request: Request):
-    """导出健康内容 CSV（负责人，脱敏留痕，不含附件与内部备注）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_health_content import export_contents_csv
-    from fastapi.responses import Response
-    content, fname = export_contents_csv(actor=_user(request).get("name") or "负责人")
-    return Response(content.encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": f"attachment; filename={fname}"})
-
-
-@app.get("/api/web/export/health-consults")
-def web_export_health_consults(request: Request):
-    """导出健康咨询 CSV（负责人，电话脱敏留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_health_content import export_consults_csv
-    from fastapi.responses import Response
-    content, fname = export_consults_csv(actor=_user(request).get("name") or "负责人")
-    return Response(content.encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": f"attachment; filename={fname}"})
-
-
-@app.get("/api/web/export/weather-tasks")
-def web_export_weather_tasks(request: Request):
-    """导出天气检查任务记录 CSV（负责人，留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_weather import list_check_tasks
-    from data.db_notifications import log_activity
-    import csv
-    from io import StringIO
-    rows = list_check_tasks(limit=1000)
-    buf = StringIO()
-    w = csv.writer(buf)
-    w.writerow(["编号", "预警类型", "等级", "状态", "确认人", "备注", "检查时间", "创建时间"])
-    for r in rows:
-        w.writerow([r.get("id"), r.get("alert_type"), r.get("level"), r.get("status"),
-                    r.get("checker") or "", r.get("note") or "",
-                    (r.get("checked_at") or "")[:16], (r.get("created_at") or "")[:16]])
-    log_activity(_user(request).get("name") or "负责人", "导出天气检查任务",
-                 module="天气", detail=f"导出 {len(rows)} 条检查任务记录")
-    from fastapi.responses import Response
-    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=weather-tasks.csv"})
+# 已随路由拆分（P2-04 / P1-F2-01）移入 api_routes/export.py：
+#   /api/web/export/issues|proposals|notices|knowledge|health-contents|health-consults|weather-tasks|agent-logs
 
 
 # ---------------- 老年关怀管理（负责人端：用药审核 / 联系人审核 / SOS 响应） ----------------
@@ -1924,26 +1761,9 @@ def web_weather_forecast(request: Request, days: int = 3):
 
 # ---------------- 老年端免登录（elder_id 参数 + 绑定校验） ----------------
 # 使用方式：token 为绑定家属的居民，请求 /api/web/elderly/*?elder_id=X 时以老人身份操作。
-# 在 JWT 中间件中处理：见下方 hook —— 由端点内的 _resolve_elder_uid 使用。
+# 实现已随路由拆分移入 api_routes/deps.py（P2-04），此处仅为向后兼容的模块级引用。
 
-def _resolve_elder_uid(request: Request) -> int | None:
-    """老年端免登录：?elder_id=X 且当前 token 用户是该老人的绑定家属 → 返回老人 uid。"""
-    u = _user(request)
-    uid = u.get("uid")
-    elder_id = request.query_params.get("elder_id")
-    if not elder_id or not str(elder_id).isdigit():
-        return None
-    elder_id = int(elder_id)
-    if u.get("role") == "elderly" and elder_id == uid:
-        return uid
-    try:
-        from data.db_user import get_bound_elderly
-        bound = get_bound_elderly(uid)
-        if bound and bound.get("id") == elder_id:
-            return elder_id
-    except Exception:
-        pass
-    return None
+from api_routes.deps import _resolve_elder_uid  # noqa: F401  (供本模块端点使用)
 
 
 
@@ -2291,9 +2111,9 @@ def web_emergency_status(request: Request):
 
 
 # ---------------- Agent 统一入口模块（识别意图 → 引导补全 → 路由执行 → 返回） ----------------
-
-class AgentChat(BaseModel):
-    text: str = Field(..., min_length=1, max_length=200)
+# 已随路由拆分（P2-04 / P1-F2-01）移入 api_routes/agent.py：
+#   /api/web/agent/chat|elderly/chat|history|logs|handoffs|llm-usage|analytics
+# 由文件末尾 app.include_router(agent.router) 挂载，实现与行为不变。
 
 
 # ---- PIPL 合规：修改密码 / 个人数据导出 / 账号注销（数据安全 v3.0） ----
@@ -2388,133 +2208,6 @@ def web_me_delete(request: Request):
     return ok({}, "账号已注销（个人数据已匿名化，日志按法规保留）")
 
 
-@app.post("/api/web/agent/chat")
-def web_agent_chat(req: AgentChat, request: Request):
-    """居民端 / 负责人端 Agent 对话（多 Agent 编排：接待员→业务Agent→合规审计→执行链）。"""
-    from agent.orchestrator import Orchestrator
-    u = _user(request)
-    role = u.get("role")
-    if role not in ("resident", "grid"):
-        return fail(1003, "当前角色暂不支持 Agent 对话")
-    try:
-        # 每用户独立 Orchestrator（黑板带 session_id）
-        orch = getattr(request.app.state, "_agent_orchs", None)
-        if orch is None:
-            orch = request.app.state._agent_orchs = {}
-        key = f"{role}:{u.get('uid')}"
-        if key not in orch:
-            orch[key] = Orchestrator()
-        out = orch[key].run(role, u.get("uid"), u.get("name") or "居民", req.text)
-        return ok(out, "ok")
-    except Exception as e:  # noqa: BLE001
-        return fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
-
-
-@app.post("/api/web/agent/elderly/chat")
-def web_agent_elderly_chat(req: AgentChat, request: Request):
-    """老年端 Agent 对话（语音转写文本或文字输入，多 Agent 编排）。"""
-    from agent.orchestrator import Orchestrator
-    u = _user(request)
-    role = u.get("role")
-    if role not in ("elderly", "resident"):
-        return fail(1003, "无权限")
-    uid = _resolve_elder_uid(request) or u.get("uid")
-    try:
-        orch = getattr(request.app.state, "_agent_orchs", None)
-        if orch is None:
-            orch = request.app.state._agent_orchs = {}
-        key = f"elderly:{uid}"
-        if key not in orch:
-            orch[key] = Orchestrator()
-        out = orch[key].run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid)
-        return ok(out, "ok")
-    except Exception as e:  # noqa: BLE001
-        return fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
-
-
-@app.get("/api/web/agent/history")
-def web_agent_history(request: Request):
-    """居民端最近 5 条对话（可查看详情，可删除）。"""
-    from data.db_agent import get_dialogs
-    u = _user(request)
-    return ok(get_dialogs(u.get("uid"), u.get("role") or "resident", limit=5))
-
-
-@app.delete("/api/web/agent/history/{did}")
-def web_agent_history_delete(did: int, request: Request):
-    """居民删除自己的对话（归属校验）。"""
-    from data.db_agent import delete_dialog
-    u = _user(request)
-    if not delete_dialog(did, u.get("uid")):
-        return fail(1003, "无权限删除该记录")
-    return ok({"deleted": did}, "已删除")
-
-
-@app.delete("/api/web/agent/history")
-def web_agent_history_clear(request: Request):
-    """居民清空自己的历史对话。"""
-    from data.db_agent import clear_dialogs
-    u = _user(request)
-    n = clear_dialogs(u.get("uid"), u.get("role") or "resident")
-    return ok({"cleared": n}, "已清空")
-
-
-@app.get("/api/web/agent/logs")
-def web_agent_logs(request: Request, role: str = "", intent: str = "",
-                   status: str = "", keyword: str = "", limit: int = 200):
-    """负责人查 Agent 留痕（模块来源=Agent，可按角色/意图/状态/关键词筛选）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_agent import get_agent_logs
-    return ok(get_agent_logs(role=role, intent=intent, status=status,
-                             keyword=keyword, limit=limit))
-
-
-@app.get("/api/web/agent/handoffs")
-def web_agent_handoffs(request: Request, status: str = "", limit: int = 50):
-    """负责人端人工处理包列表（无缝转人工：AI 已整理上下文，可直接处理）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_agent import list_handoffs
-    return ok(list_handoffs(status=status, limit=limit))
-
-
-@app.post("/api/web/agent/handoffs/{hid}/resolve")
-def web_agent_handoff_resolve(hid: int, request: Request):
-    """负责人处理完成（关闭人工处理包）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_agent import resolve_handoff
-    if not resolve_handoff(hid, _user(request).get("name") or "负责人"):
-        return fail(2001, "处理包不存在或已处理")
-    return ok({"handoff_id": hid}, "已处理完成")
-
-
-@app.get("/api/web/agent/llm-usage")
-def web_agent_llm_usage(request: Request, days: int = 7):
-    """LLM 用量统计（P2-05：调用/token/费用/缓存命中，规则优先可验证）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_llm_usage import get_usage_summary, get_usage_trend
-    return ok({
-        "summary": get_usage_summary(days=days),
-        "trend": get_usage_trend(days=days),
-    })
-
-
-@app.get("/api/web/agent/analytics")
-def web_agent_analytics(request: Request, days: int = 7):
-    """问题聚类 + 趋势 + 数据简报（P2-03 / P3-03）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from agent.analytics import get_issue_clusters, get_weekly_trend, build_data_brief
-    return ok({
-        "clusters": get_issue_clusters(days=days),
-        "trend": get_weekly_trend(days=days),
-        "brief": build_data_brief(),
-    })
-
-
 # ---- 舆情监测（P3-01） ----
 
 class OpinionCreate(BaseModel):
@@ -2563,29 +2256,16 @@ def web_opinion_brief(request: Request, days: int = 7):
     return ok(build_brief(days=days))
 
 
-@app.get("/api/web/export/agent-logs")
-def web_export_agent_logs(request: Request):
-    """导出 Agent 留痕 CSV（负责人，脱敏——不含完整手机号，导出本身留痕）。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
-    from data.db_agent import get_agent_logs
-    from data.db_notifications import log_activity
-    import csv
-    from io import StringIO
-    rows = get_agent_logs(limit=1000)
-    buf = StringIO()
-    w = csv.writer(buf)
-    w.writerow(["ID", "角色", "用户输入", "纠正后", "识别意图", "路由结果", "状态", "异常", "关联编号", "时间"])
-    for r in rows:
-        w.writerow([r.get("id"), r.get("role"), (r.get("user_input") or "")[:80],
-                    (r.get("corrected") or "")[:80], r.get("intent"), r.get("routed"),
-                    r.get("status"), (r.get("error") or "")[:80], r.get("related_id"),
-                    (r.get("created_at") or "")[:16]])
-    log_activity(_user(request).get("name") or "负责人", "导出Agent留痕",
-                 module="Agent", detail=f"导出 {len(rows)} 条（脱敏）")
-    from fastapi.responses import Response
-    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=agent-logs.csv"})
+# ---------------- 路由模块挂载（P2-04 / P1-F2-01：api_web 单体拆分） ----------------
+# 必须在 SPA catch-all（/{full_path:path}）之前挂载，否则会被兜底路由吞掉。
+
+from api_routes import agent as _agent_routes
+from api_routes import export as _export_routes
+from api_routes import upload as _upload_routes
+
+app.include_router(_agent_routes.router)
+app.include_router(_export_routes.router)
+app.include_router(_upload_routes.router)
 
 
 _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "dist")
