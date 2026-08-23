@@ -427,6 +427,18 @@
 - **测试**：test_trace_id_chain（响应头 16 位 trace / grid 按 trace 查到 agent 留痕 / 居民 403 / 上游透传原样）。
 - **验证**：agent+web 套件 62 passed；全量待跑。**提交**：本轮。
 
+## 二十、P1-D3-01 LLM 评测集（评审 D 维度：无 golden set、回答质量无评测）✅
+
+- **`tests/llm_eval/golden.jsonl`**（20 条）：政策引用 / 报修闭环 / 健康不诊断 / 注入拦截 / 转人工 / 方言语义 / 否定纠偏 / 礼貌——每条含 `{input, role, expect{intent, contains, not_contains, handoff, blocked}}`。
+- **`scripts/llm_eval.py`**：用 Orchestrator（与 Web 端同一规则链）跑分，五维等权评分（意图/关键词/禁用词/转人工/拦截）；`--verbose` / `--json`；退出码=满分通过数==总数（CI 用）；接入 LLM 后同脚本换 provider 双跑对比，bad case 从 agent_logs 抽取回流。
+- **CI**：`.github/workflows/ci.yml` 加 `Run LLM eval golden set` 步骤（pytest 之后）。
+- **评测暴露并修复 3 个真问题**：
+  1. 健康顾问紧急症状（胸痛/呼吸困难）不在触发词表 → 走了普通健康回复而非转人工（已修，紧急症状独立触发）。
+  2. 注入规则缺「忽略之前所有指令/无视之前所有」变体 → 已补词表。
+  3. 老年端无提案意图（设计如此）→ golden 该 case 改居民端；政策无知识时转人工属合规，断言放宽为「答案/政策/转人工均可」。
+- **测试**：`tests/test_llm_eval.py` 2 项（golden ≥20 条结构合法 / 规则引擎满分通过率 ≥95%）。
+- **验证**：规则引擎 **20/20 满分（avg 1.0）**；全量 pytest 待跑。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

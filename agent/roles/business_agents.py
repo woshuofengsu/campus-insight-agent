@@ -201,7 +201,9 @@ class HealthAdvisorAgent(BaseAgent):
     def process(self, ctx: dict) -> dict:
         text = ctx.get("user_input") or ""
         # 身体不适 → 提示联系社区/家属 + 紧急求助（不诊断）
-        if any(k in text for k in ("不舒服", "难受", "头晕", "头疼", "胸闷", "心慌", "没力气")):
+        # 紧急症状（胸痛/呼吸困难等）独立触发，确保即使不在普通不适词表也转人工（P1-D3-01 评测暴露）
+        if any(k in text for k in ("不舒服", "难受", "头晕", "头疼", "胸闷", "心慌", "没力气",
+                                   "胸痛", "呼吸困难", "意识不清", "大出血", "抽搐")):
             # 疑似紧急症状 → 主动协商：handoff 接待员转人工
             urgent_symptom = any(k in text for k in ("胸痛", "呼吸困难", "意识不清", "大出血", "抽搐"))
             if urgent_symptom:
