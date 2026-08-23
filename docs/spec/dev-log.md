@@ -370,6 +370,15 @@
 
 **验证**：核心套件 80 passed 无回归；全量待跑。**提交**：本轮。
 
+## 十四、api_web 剩余模块全部拆完（P1-F2-01 收官，api_web 2291 → 206 行）✅
+
+- **api_routes/ 包完整化**（13 模块 + deps）：agent(10) / auth(6) / issues(8) / proposals(9) / notices(5) / policy(15：qa 10 + knowledge 5) / health(16) / elderly(18：本体 13 + 管理 5) / weather(8) / messages(2) / opinions(4) / export(8) / upload(1)。
+- api_web.py 瘦身为纯装配骨架：App + CORS + JWT 鉴权中间件 + health + 15 条 include_router（2 个多 router 模块）+ SPA fallback，共 **206 行**（原 2291 行），达成方案「api_web < 300 行」目标。
+- 拆分为并行子代理协作（5 路同时产出路由文件），我统一接线：删旧块、include_router、冒烟 + 全量回归。
+- **顺带修复潜伏 bug**：`web_messages` 原 SQL `SELECT ntype` 但表列实为 `type`（老代码一直报 no such column，无测试覆盖）→ 改 `type AS ntype` 保持响应字段不变。
+- 前端 `web/src/api/index.js` 全部调用路径逐一核对，与拆后路由完全一致，无遗漏。
+- **验证**：全量 pytest 待跑；TestClient 冒烟 34 个端点全绿（含 grid 专属：导出/舆情/管理/分析）。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。
