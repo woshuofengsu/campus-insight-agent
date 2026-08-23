@@ -600,6 +600,30 @@ def _m34_public_opinion(conn):
     )
 
 
+def _m35_draft_contents(conn):
+    """v35：草稿内容持久化（P1-A5-02：报修/提案草稿完整落库，重启恢复）。"""
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS draft_contents ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "draft_type TEXT NOT NULL, content_json TEXT DEFAULT '{}', "
+        "current_step TEXT DEFAULT '', updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+        "UNIQUE(user_id, draft_type))"
+    )
+
+
+def _add_column(conn, table: str, column: str, ddl: str) -> None:
+    """SQLite 兼容加列（列已存在则跳过）。"""
+    cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
+def _m36_phone_enc(conn):
+    """v36：敏感字段加密列（P1-G1-02：手机号迁移到密文，明文置空）。"""
+    _add_column(conn, "user_profile", "phone_enc", "phone_enc TEXT DEFAULT ''")
+    _add_column(conn, "emergency_contacts", "phone_enc", "phone_enc TEXT DEFAULT ''")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -799,6 +823,8 @@ def init_db(db_path: str):
         (32, "agent_handoffs", _m32_agent_handoffs),
         (33, "llm_usage", _m33_llm_usage),
         (34, "public_opinion", _m34_public_opinion),
+        (35, "draft_contents", _m35_draft_contents),
+        (36, "phone_enc", _m36_phone_enc),
     ]
     for version, name, fn in post:
         if version <= current:

@@ -468,6 +468,44 @@ def test_elderly_notice_query(client):
     assert "通知" in out["reply"] or "暂无" in out["reply"] or "没有" in out["reply"]
 
 
+# ---------- 草稿内容落库（P1-A5-02） ----------
+
+def test_draft_persist_and_restore(client):
+    """草稿内容完整落库：保存/更新/删除/清理。"""
+    from data.db_draft import save_draft, load_draft, delete_draft, clean_drafts
+    uid = 99020
+    save_draft(uid, "work_order_draft", {"desc": "我家水管漏水", "type": "室内"}, step="ask_urgency")
+    d = load_draft(uid, "work_order_draft")
+    assert d and d["content"]["desc"] == "我家水管漏水" and d["content"]["type"] == "室内"
+    assert d["step"] == "ask_urgency"
+    save_draft(uid, "work_order_draft", {"desc": "我家水管漏水", "type": "室内", "urgency": "一般"}, step="confirm")
+    d2 = load_draft(uid, "work_order_draft")
+    assert d2["content"]["urgency"] == "一般" and d2["step"] == "confirm"
+    delete_draft(uid, "work_order_draft")
+    assert load_draft(uid, "work_order_draft") is None
+    save_draft(uid, "work_order_draft", {"desc": "x"}, step="confirm")
+    clean_drafts(days=7)
+    assert load_draft(uid, "work_order_draft") is not None
+    delete_draft(uid, "work_order_draft")
+
+
+def test_orchestrator_draft_full_restore(client):
+    """端到端：报修追问草稿落库 → 新 Orchestrator（模拟重启）恢复完整字段继续。"""
+    from agent.orchestrator import Orchestrator
+    from data.db_draft import load_draft
+    o1 = Orchestrator()
+    o1.run("resident", 99021, "测试", "我家水管漏水了")   # ask_type
+    o1.run("resident", 99021, "测试", "家里")            # ask_urgency
+    d = load_draft(99021, "work_order_draft")
+    assert d and d["content"]["desc"] == "我家水管漏水了" and d["content"]["type"] == "室内"
+    o2 = Orchestrator(session_id=o1.bb.session_id)      # 模拟重启
+    r3 = o2.run("resident", 99021, "测试", "紧急")
+    assert r3["status"] == "需确认" and "紧急" in r3["reply"]
+    r4 = o2.run("resident", 99021, "测试", "确认提交")
+    assert r4["status"] == "成功"
+    assert load_draft(99021, "work_order_draft") is None
+
+
 # ---------- 历史对话 / 留痕 / 越权 ----------
 
 def test_history_and_delete(client):

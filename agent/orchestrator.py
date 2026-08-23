@@ -27,6 +27,11 @@ def _draft_keys(uid):
     return [f"user:{uid}:work_order_draft", f"user:{uid}:proposal_draft"]
 
 
+def _draft_type_of(key: str) -> str:
+    """user:{uid}:work_order_draft → work_order_draft。"""
+    return key.rsplit(":", 1)[-1] if ":" in key else key
+
+
 class Orchestrator:
     """多 Agent 编排器（每用户会话一个实例，黑板带 session_id）。"""
 
@@ -77,6 +82,15 @@ class Orchestrator:
         if st is None:
             st = persisted or {}
             self.bb.write(_state_key(uid), st, "orchestrator")
+        # 草稿内容落库恢复（P1-A5-02）：从 draft_contents 回填黑板草稿
+        try:
+            from data.db_draft import load_draft
+            for key in _draft_keys(uid):
+                d = load_draft(uid, _draft_type_of(key))
+                if d and d.get("content"):
+                    self.bb.write(key, d["content"], "system_restore")
+        except Exception:
+            pass
         ctx = {"role": role, "uid": uid, "name": name, "user_input": text,
                "elder_uid": elder_uid,
                "state": st}
@@ -87,6 +101,8 @@ class Orchestrator:
                 try:
                     self.bb.unlock(k)
                     self.bb.write(k, None, "orchestrator", lock=False)
+                    from data.db_draft import delete_draft
+                    delete_draft(uid, _draft_type_of(k))
                 except Exception:
                     pass
             self.bb.write(_state_key(uid), {}, "orchestrator")
@@ -480,6 +496,19 @@ class Orchestrator:
 
     def _finish(self, ctx: dict, reply: str, status: str, intent: str,
                 actions: list, related_id) -> dict:
+        # 草稿内容落库（P1-A5-02）：每轮持久化黑板草稿；提交成功则删除
+        try:
+            from data.db_draft import save_draft, delete_draft
+            uid = ctx.get("uid") or 0
+            for key in _draft_keys(uid):
+                val = self.bb.read(key)
+                if val and isinstance(val, dict):
+                    save_draft(uid, _draft_type_of(key), val,
+                               step=(ctx.get("state") or {}).get("step", ""))
+                elif status == "成功" and intent in ("repair_dispatch", "proposal_collab"):
+                    delete_draft(uid, _draft_type_of(key))
+        except Exception as e:  # noqa: BLE001
+            _log.warning("草稿落库失败：%s", e)
         # 会话落库：state 持久化（重启不丢）
         try:
             from data import db_agent

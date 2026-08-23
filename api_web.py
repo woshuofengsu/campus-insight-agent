@@ -244,11 +244,18 @@ def web_me(request: Request):
         return fail(1004, "用户不存在")
     if not row.get("is_active"):
         return fail(1003, "账号已注销")
+    phone = row.get("phone") or ""
+    if not phone and row.get("phone_enc"):
+        try:
+            from utils.crypto import Crypto
+            phone = Crypto().decrypt(row["phone_enc"])
+        except Exception:
+            phone = ""
     return ok({
         "user_id": row["id"], "role": row["role"],
         "name": row.get("name") or row.get("username"),
         "community": row.get("community") or "", "building": row.get("building") or "",
-        "unit": row.get("unit") or "", "phone": row.get("phone") or "",
+        "unit": row.get("unit") or "", "phone": phone,
         "resident_id": row.get("resident_id") or "",
     })
 
@@ -1819,7 +1826,17 @@ class ContactCreate(BaseModel):
 def web_contacts_list(request: Request):
     from data.db_elderly_care import list_emergency_contacts
     u = _user(request)
-    return ok([dict(r) for r in list_emergency_contacts(u.get("uid"))])
+    out = []
+    for r in list_emergency_contacts(u.get("uid")):
+        d = dict(r)
+        if not d.get("phone") and d.get("phone_enc"):
+            try:
+                from utils.crypto import Crypto
+                d["phone"] = Crypto().decrypt(d["phone_enc"])
+            except Exception:
+                d["phone"] = ""
+        out.append(d)
+    return ok(out)
 
 
 @app.post("/api/web/elderly/emergency-contacts")

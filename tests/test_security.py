@@ -30,7 +30,33 @@ def _ensure_schema():
         init_db(config.DB_PATH)
     except Exception:
         pass
-    yield
+
+
+def test_phone_encryption_migration():
+    """迁移：phone → phone_enc（明文置空）；解密读写正常；回滚。"""
+    from data.db_core import get_db
+    from utils.crypto import Crypto
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO user_profile (username, role, name, phone, is_active) "
+                     "VALUES ('mig_test', 'resident', '迁移测试', '13987654321', 1)")
+        conn.commit()
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("mig", "scripts/migrate_phone_encryption.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    n = m.migrate()
+    assert n >= 1
+    with get_db() as conn:
+        row = conn.execute("SELECT phone, phone_enc FROM user_profile WHERE username='mig_test'").fetchone()
+        assert row["phone"] == "" and row["phone_enc"]
+        assert row["phone_enc"] != "13987654321"
+        assert Crypto().decrypt(row["phone_enc"]) == "13987654321"
+    m.rollback()
+    with get_db() as conn:
+        row = conn.execute("SELECT phone FROM user_profile WHERE username='mig_test'").fetchone()
+        assert row["phone"] == "13987654321"
+        conn.execute("DELETE FROM user_profile WHERE username='mig_test'")
+        conn.commit()
 
 
 def _login(client, role="resident"):
