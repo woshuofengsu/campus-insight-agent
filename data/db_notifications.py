@@ -219,14 +219,20 @@ def log_activity(actor: str, action: str, target_type: str = "",
     文档要求全局留痕字段：操作人、时间、类型、前值、后值、关联编号、模块来源。
     before_value / after_value 记录变更前/后值（状态、分类、紧急程度等），
     module 记录模块来源（报修/提案/天气/疾病预防/通知/老年端/政策问答）。
+    trace_id（P2-F4-01）：从请求上下文读取，串联同一次用户操作的业务留痕。
     """
+    try:
+        from utils.tracing import get_trace_id
+        trace_id = get_trace_id()
+    except Exception:
+        trace_id = ""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO activity_log (actor, action, target_type, target_id, "
-            "target_title, detail, module, before_value, after_value) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "target_title, detail, module, before_value, after_value, trace_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (actor, action, target_type, target_id, target_title, detail,
-             module, before_value, after_value),
+             module, before_value, after_value, trace_id),
         )
         conn.commit()
         return cur.lastrowid
@@ -234,10 +240,15 @@ def log_activity(actor: str, action: str, target_type: str = "",
 
 def log_exception(module: str, error: str, detail: str = "") -> int:
     """记录系统异常日志（单独保存 7 天，不混入业务留痕）。返回日志 ID。"""
+    try:
+        from utils.tracing import get_trace_id
+        trace_id = get_trace_id()
+    except Exception:
+        trace_id = ""
     with get_db() as conn:
         cur = conn.execute(
-            "INSERT INTO exception_log (module, error, detail) VALUES (?, ?, ?)",
-            (module, (error or "")[:500], (detail or "")[:2000]),
+            "INSERT INTO exception_log (module, error, detail, trace_id) VALUES (?, ?, ?, ?)",
+            (module, (error or "")[:500], (detail or "")[:2000], trace_id),
         )
         conn.commit()
         return cur.lastrowid

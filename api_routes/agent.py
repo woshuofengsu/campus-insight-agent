@@ -158,3 +158,12 @@ def agent_analytics(request: Request, days: int = 7):
     return _ok({"clusters": get_issue_clusters(days=days),
                 "trend": get_weekly_trend(days=days),
                 "brief": build_data_brief()})
+
+
+@router.get("/traces/{trace_id}")
+def agent_trace_chain(trace_id: str, request: Request):
+    """链路追踪：按 trace_id 查同一次操作的全部留痕（P2-F4-01）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import get_trace_chain
+    return _ok(get_trace_chain(trace_id))

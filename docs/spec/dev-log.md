@@ -417,6 +417,16 @@
 - **测试**：test_real_negotiation_chain（构造高温预警 → 验证健康确认→升级→通知草稿全链 + 无循环转人工 + 消息消费清空）；test_negotiation_loop_guard 保持。
 - **验证**：agent 套件 40 passed；全量待跑。**提交**：本轮。
 
+## 十九、P2-F4-01 traceId 链路追踪（评审 F 维度：无 traceId、日志无串联）✅
+
+- **`utils/tracing.py`**（新增）：contextvar 保存当前请求 trace_id（`set/get/clear` + `new_trace_id` 短 UUID）。
+- **中间件**（api_web.py）：每请求生成/透传 `X-Request-ID`（上游带头则原样透传）→ 写入 contextvar → 响应头回传；请求结束清理。
+- **schema v37**：activity_log / agent_logs / exception_log 加 `trace_id` 列（`_add_column` 幂等）。
+- **数据层注入**：`log_activity` / `log_agent` / `log_exception` 从上下文读 trace_id 落库——一次用户操作（报修/对话/审核）的全部业务留痕 + Agent 留痕 + 异常共享同一 trace。
+- **查询端点**：`GET /api/web/agent/traces/{trace_id}`（grid 专属），返回 `{trace_id, activity[], agent[], exceptions[]}` 完整链路。
+- **测试**：test_trace_id_chain（响应头 16 位 trace / grid 按 trace 查到 agent 留痕 / 居民 403 / 上游透传原样）。
+- **验证**：agent+web 套件 62 passed；全量待跑。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

@@ -646,3 +646,31 @@ def test_export_agent_logs_grid_only(client):
     r = client.get("/api/web/export/agent-logs", headers={"Authorization": f"Bearer {token2}"})
     assert r.status_code == 200
     assert "text/csv" in r.headers.get("content-type", "")
+
+
+# ---------- P2-F4-01 链路追踪 trace_id ----------
+
+def test_trace_id_chain(client):
+    """每个请求带 X-Request-ID；业务留痕 + Agent 留痕落同 trace；grid 可按 trace 查链路。"""
+    token = _login(client, "resident")
+    h = {"Authorization": f"Bearer {token}"}
+    # 一次 Agent 对话（会产生 activity + agent 留痕）
+    r = client.post("/api/web/agent/chat", json={"text": "今天天气怎么样"}, headers=h)
+    assert r.status_code == 200
+    tid = r.headers.get("X-Request-ID")
+    assert tid and len(tid) == 16
+    # grid 查链路：应能查到该 trace 的 agent 留痕
+    gtok = _login(client, "grid")
+    gh = {"Authorization": f"Bearer {gtok}"}
+    r = client.get(f"/api/web/agent/traces/{tid}", headers=gh)
+    assert r.status_code == 200 and r.json()["success"]
+    d = r.json()["data"]
+    assert d["trace_id"] == tid
+    assert len(d["agent"]) >= 1
+    # 居民不可查
+    r = client.get(f"/api/web/agent/traces/{tid}", headers=h)
+    assert r.status_code == 400 and r.json()["code"] == 1003
+    # 上游透传：请求头带 X-Request-ID 应原样透传
+    r = client.post("/api/web/agent/chat", json={"text": "医保怎么报销"},
+                    headers={**h, "X-Request-ID": "abcdef1234567890"})
+    assert r.headers.get("X-Request-ID") == "abcdef1234567890"

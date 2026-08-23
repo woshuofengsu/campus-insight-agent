@@ -81,14 +81,19 @@ def clean_dialogs(days: int = 30) -> int:
 def log_agent(user_id: int | None, role: str, user_input: str, intent: str,
               routed: str = "", status: str = "成功", error: str = "",
               corrected: str = "", related_id: int | None = None) -> int:
-    """Agent 留痕（模块来源=Agent，保存 7 天）。"""
+    """Agent 留痕（模块来源=Agent，保存 7 天；含 trace_id 链路追踪 P2-F4-01）。"""
+    try:
+        from utils.tracing import get_trace_id
+        trace_id = get_trace_id()
+    except Exception:
+        trace_id = ""
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO agent_logs (user_id, role, user_input, corrected, intent, routed, "
-            "status, error, related_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "status, error, related_id, trace_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (user_id, role, (user_input or "")[:500], (corrected or "")[:500],
              (intent or "")[:100], (routed or "")[:200], status, (error or "")[:500],
-             related_id),
+             related_id, trace_id),
         )
         conn.commit()
         return cur.lastrowid
@@ -126,6 +131,27 @@ def clean_agent_logs(days: int = RETENTION_DAYS) -> int:
             f"DELETE FROM agent_logs WHERE created_at < datetime('now', '-{days} days')")
         conn.commit()
         return cur.rowcount
+
+
+def get_trace_chain(trace_id: str, limit: int = 50) -> dict:
+    """按 trace_id 串联同一次用户操作的链路（P2-F4-01）。
+
+    返回 {trace_id, activity: [...], agent: [...], exceptions: [...]}，
+    用于负责人排查「一次请求经过了哪些业务操作 / Agent 调用 / 异常」。
+    """
+    with get_db() as conn:
+        activity = [dict(r) for r in conn.execute(
+            "SELECT id, actor, action, target_type, target_id, module, detail, "
+            "before_value, after_value, created_at FROM activity_log "
+            "WHERE trace_id=? ORDER BY id LIMIT ?", (trace_id, limit)).fetchall()]
+        agent = [dict(r) for r in conn.execute(
+            "SELECT id, role, user_input, intent, routed, status, error, created_at "
+            "FROM agent_logs WHERE trace_id=? ORDER BY id LIMIT ?", (trace_id, limit)).fetchall()]
+        exceptions = [dict(r) for r in conn.execute(
+            "SELECT id, module, error, detail, created_at FROM exception_log "
+            "WHERE trace_id=? ORDER BY id LIMIT ?", (trace_id, limit)).fetchall()]
+    return {"trace_id": trace_id, "activity": activity, "agent": agent,
+            "exceptions": exceptions}
 
 
 # ---------------------------------------------------------------------------

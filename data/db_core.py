@@ -624,6 +624,13 @@ def _m36_phone_enc(conn):
     _add_column(conn, "emergency_contacts", "phone_enc", "phone_enc TEXT DEFAULT ''")
 
 
+def _m37_trace_id(conn):
+    """v37：链路追踪 trace_id 列（activity_log / agent_logs / exception_log，P2-F4-01）。"""
+    _add_column(conn, "activity_log", "trace_id", "trace_id TEXT DEFAULT ''")
+    _add_column(conn, "agent_logs", "trace_id", "trace_id TEXT DEFAULT ''")
+    _add_column(conn, "exception_log", "trace_id", "trace_id TEXT DEFAULT ''")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -825,6 +832,7 @@ def init_db(db_path: str):
         (34, "public_opinion", _m34_public_opinion),
         (35, "draft_contents", _m35_draft_contents),
         (36, "phone_enc", _m36_phone_enc),
+        (37, "trace_id", _m37_trace_id),
     ]
     for version, name, fn in post:
         if version <= current:

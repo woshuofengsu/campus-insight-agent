@@ -112,21 +112,40 @@ _PUBLIC_PATHS = {"/api/web/auth/login", "/api/web/auth/demo", "/api/web/health",
 
 @app.middleware("http")
 async def _web_auth_middleware(request: Request, call_next):
-    """JWT 鉴权：/api/web/* 除公开路径外必须带 Bearer token。"""
+    """JWT 鉴权 + 链路追踪：/api/web/* 除公开路径外必须带 Bearer token。
+
+    P2-F4-01：每个请求生成/透传 X-Request-ID（trace_id），写入 contextvar，
+    data 层 log_activity/log_agent 自动落库；响应头回传便于排查。
+    """
     _ensure_db()
+    # 链路追踪：透传上游 X-Request-ID，无则生成
+    from utils.tracing import set_trace_id, new_trace_id
+    tid = request.headers.get("X-Request-ID") or new_trace_id()
+    set_trace_id(tid)
     path = request.url.path
     if not path.startswith("/api/web/") or path in _PUBLIC_PATHS or path.startswith("/web/"):
-        return await call_next(request)
+        try:
+            resp = await call_next(request)
+        finally:
+            set_trace_id("")
+        resp.headers["X-Request-ID"] = tid
+        return resp
     auth = request.headers.get("Authorization", "")
     payload = None
     if auth.startswith("Bearer "):
         payload = verify_token(auth[7:])
     if payload is None:
+        set_trace_id("")
         return JSONResponse(status_code=401, content={
             "success": False, "data": None, "error": "未登录或登录已过期", "code": 1002, "message": "未登录",
-        })
+        }, headers={"X-Request-ID": tid})
     request.state.user = payload
-    return await call_next(request)
+    try:
+        resp = await call_next(request)
+    finally:
+        set_trace_id("")
+    resp.headers["X-Request-ID"] = tid
+    return resp
 
 
 def _user(request: Request) -> dict:
