@@ -154,6 +154,7 @@ def web_health():
 
 from api_routes import agent as _agent_routes
 from api_routes import auth as _auth_routes
+from api_routes import batch as _batch_routes
 from api_routes import elderly as _elderly_routes
 from api_routes import export as _export_routes
 from api_routes import health as _health_routes
@@ -168,6 +169,7 @@ from api_routes import weather as _weather_routes
 
 app.include_router(_agent_routes.router)
 app.include_router(_auth_routes.router)
+app.include_router(_batch_routes.router)
 app.include_router(_elderly_routes.router)
 app.include_router(_elderly_routes.manage_router)
 app.include_router(_export_routes.router)

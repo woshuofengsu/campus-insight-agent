@@ -194,6 +194,13 @@ export const agent = {
   exportLogs: () => api.get('/export/agent-logs', { responseType: 'blob' }),
 }
 
+// 批量操作（P2-E2-01）
+export const batch = {
+  dispatch: (issueIds, assigneeName, assigneePhone) => api.post('/batch/dispatch', { issue_ids: issueIds, assignee_name: assigneeName, assignee_phone: assigneePhone }),
+  close: (issueIds, reason) => api.post('/batch/close', { issue_ids: issueIds, reason }),
+  reply: (questionIds, reply) => api.post('/batch/reply', { question_ids: questionIds, reply }),
+}
+
 // 舆情监测（P3-01）
 export const opinions = {
   list: (params) => api.get('/opinions', { params }),

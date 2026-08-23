@@ -397,6 +397,14 @@
 - **测试**：test_red_black_board（造数满意+不满意工单走完整状态机 → 断言进榜/下钻/权限）。
 - **验证**：agent 套件 39 passed；全量待跑；npm build 通过。**提交**：本轮。
 
+## 十七、P2-E2-01 批量操作（评审 E 维度：批量操作有限）✅
+
+- **`api_routes/batch.py`**（新增，grid 专属）：`POST /api/web/batch/dispatch`（批量派单同维修人员）、`POST /api/web/batch/close`（批量关闭带原因）、`POST /api/web/batch/reply`（批量回复政策提问）。
+- 逐条调用既有数据层函数（dispatch_issue/close_issue/reply_question），返回 `{success, failed, results:[{id, ok, msg}]}`——单条失败不中断整体（如不存在的 ID 单独记 failed）。
+- **前端**：工单管理页加批量操作栏（勾选/全选 → 批量派单/关闭）；`api/index.js` 加 `batch` 封装。
+- **测试**：test_batch_operations（造 2 工单 → 批量派单 2/0 → 批量关闭含不存在 ID 2/1 → 居民 403）。
+- **验证**：web+agent 套件 61 passed；全量待跑；npm build 通过。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

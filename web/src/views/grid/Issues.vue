@@ -1,8 +1,8 @@
 <script setup>
-// 工单管理：审核/派单/处理/解决/关闭/协商/转出/确认补充/改分类（真实输入 + 筛选 + 时限 + 导出 + 安全提醒）
+// 工单管理：审核/派单/处理/解决/关闭/协商/转出/确认补充/改分类（真实输入 + 筛选 + 时限 + 导出 + 安全提醒 + 批量操作）
 import { ref, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { issues, exportApi } from '../../api'
+import { issues, exportApi, batch } from '../../api'
 
 const message = useMessage()
 const list = ref([])
@@ -10,6 +10,11 @@ const loading = ref(true)
 const expanded = ref({})
 const tab = ref('orders')
 const safety = ref([])
+// 批量选择（P2-E2-01）
+const selected = ref([])
+const batchAssignee = ref('')
+const batchPhone = ref('')
+const batchCloseReason = ref('批量关闭')
 // 筛选
 const statusFilter = ref('全部')
 const catFilter = ref('全部')
@@ -87,6 +92,31 @@ async function exportIssues() {
     message.error(e.message)
   }
 }
+
+// ---- 批量操作（P2-E2-01）----
+function toggleAll() {
+  selected.value = selected.value.length === filtered.value.length ? [] : filtered.value.map((i) => i.id)
+}
+async function batchDispatch() {
+  if (!selected.value.length) return message.warning('请先勾选工单')
+  if (!batchAssignee.value.trim()) return message.warning('请填写维修人员姓名')
+  try {
+    const out = await batch.dispatch(selected.value, batchAssignee.value.trim(), batchPhone.value.trim())
+    message.success(`批量派单完成：成功 ${out.success}，失败 ${out.failed}`)
+    selected.value = []
+    load()
+  } catch (e) { message.error(e.message) }
+}
+async function batchClose() {
+  if (!selected.value.length) return message.warning('请先勾选工单')
+  if (!batchCloseReason.value.trim()) return message.warning('请填写关闭原因')
+  try {
+    const out = await batch.close(selected.value, batchCloseReason.value.trim())
+    message.success(`批量关闭完成：成功 ${out.success}，失败 ${out.failed}`)
+    selected.value = []
+    load()
+  } catch (e) { message.error(e.message) }
+}
 </script>
 
 <template>
@@ -105,18 +135,31 @@ async function exportIssues() {
           <n-button size="small" @click="exportIssues">⬇️ 导出</n-button>
         </div>
 
+        <!-- 批量操作栏（P2-E2-01） -->
+        <div class="card" style="padding:10px 12px;margin:0 0 12px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#f8fafc;">
+          <n-checkbox :checked="selected.length === filtered.length && filtered.length > 0" @update:checked="toggleAll">全选（{{ selected.length }}）</n-checkbox>
+          <n-input v-model:value="batchAssignee" placeholder="批量派单：维修人员姓名" size="small" style="width:180px;" />
+          <n-input v-model:value="batchPhone" placeholder="电话" size="small" style="width:130px;" />
+          <n-button size="small" type="info" @click="batchDispatch">🔧 批量派单</n-button>
+          <n-input v-model:value="batchCloseReason" placeholder="批量关闭原因" size="small" style="width:160px;" />
+          <n-button size="small" quaternary type="error" @click="batchClose">🚫 批量关闭</n-button>
+        </div>
+
         <n-spin :show="loading">
           <div v-for="i in filtered" :key="i.id" class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" @click="expanded[i.id] = !expanded[i.id]">
-              <div>
-                <b>#{{ i.id }} {{ i.title }}</b>
-                <span class="status-pill" :style="{
-                  background: i.status === '处理结束' ? '#ecfdf5' : i.status === '已关闭' ? '#f5f5f5' : i.status === '已撤回' ? '#f5f5f5' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#fef2f2' : '#eef2ff',
-                  color: i.status === '处理结束' ? '#059669' : i.status === '已关闭' || i.status === '已撤回' ? '#888' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#dc2626' : '#4f46e5',
-                }" style="margin-left:8px;">{{ i.status }}</span>
-                <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:#dc2626;margin-left:4px;">🔴 紧急</span>
-                <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:#dc2626;margin-left:4px;">🚫 违规标记</span>
-                <span v-if="i.non_community_responsibility" class="status-pill" style="background:#fffbeb;color:#b45309;margin-left:4px;">🏗️ 第三方施工</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <n-checkbox :checked="selected.includes(i.id)" @update:checked="(v) => { if (v) selected.push(i.id); else selected = selected.filter((x) => x !== i.id) }" @click.stop />
+                <div>
+                  <b>#{{ i.id }} {{ i.title }}</b>
+                  <span class="status-pill" :style="{
+                    background: i.status === '处理结束' ? '#ecfdf5' : i.status === '已关闭' ? '#f5f5f5' : i.status === '已撤回' ? '#f5f5f5' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#fef2f2' : '#eef2ff',
+                    color: i.status === '处理结束' ? '#059669' : i.status === '已关闭' || i.status === '已撤回' ? '#888' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#dc2626' : '#4f46e5',
+                  }" style="margin-left:8px;">{{ i.status }}</span>
+                  <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:#dc2626;margin-left:4px;">🔴 紧急</span>
+                  <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:#dc2626;margin-left:4px;">🚫 违规标记</span>
+                  <span v-if="i.non_community_responsibility" class="status-pill" style="background:#fffbeb;color:#b45309;margin-left:4px;">🏗️ 第三方施工</span>
+                </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
                 <span v-if="deadlineText(i)" class="status-pill" :style="i.overdue ? 'background:#fef2f2;color:#dc2626;' : 'background:#f0fdf4;color:#16a34a;'">{{ deadlineText(i) }}</span>

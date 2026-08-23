@@ -475,3 +475,49 @@ def test_elderly_free_login(client):
             unbind_elderly(ru)
         except Exception:
             pass
+
+
+def test_batch_operations(client):
+    """P2-E2-01 批量派单/关闭/回复：负责人可用、逐条明细、居民 403。"""
+    # 造 2 个待派单工单
+    res = _login(client, "demo_resident", "")
+    h = {"Authorization": f"Bearer {res['token']}"}
+    ids = []
+    for t in ("批量测试工单一", "批量测试工单二"):
+        r = client.post("/api/web/issues", json={
+            "title": t, "category": "公共设施", "issue_type": "室内",
+            "location": "海淀小区3号楼2单元", "description": f"{t}需要维修处理",
+            "urgency": "一般", "reporter_name": "王阿姨", "reporter_phone": "13800138000",
+        }, headers=h)
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["data"]["issue_id"])
+    g = _login(client)
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    # 批量派单（先审核）
+    for iid in ids:
+        r = client.post(f"/api/web/issues/{iid}/action", json={"action": "audit", "approve": True}, headers=gh)
+        assert r.json()["success"], r.text
+    r = client.post("/api/web/batch/dispatch", json={
+        "issue_ids": ids, "assignee_name": "批量维修工", "assignee_phone": "13900000001",
+    }, headers=gh)
+    assert r.status_code == 200 and r.json()["success"], r.text
+    out = r.json()["data"]
+    assert out["success"] == 2 and out["failed"] == 0
+    for iid in ids:
+        r = client.get(f"/api/web/issues/{iid}", headers=gh)
+        assert r.json()["data"]["assignee_name"] == "批量维修工"
+    # 批量关闭（含一个不存在的 ID → 逐条失败不中断）
+    r = client.post("/api/web/batch/close", json={
+        "issue_ids": ids + [999999], "reason": "演示批量关闭",
+    }, headers=gh)
+    out = r.json()["data"]
+    assert out["success"] == 2 and out["failed"] == 1
+    assert [x["id"] for x in out["results"] if not x["ok"]] == [999999]
+    for iid in ids:
+        r = client.get(f"/api/web/issues/{iid}", headers=gh)
+        assert r.json()["data"]["status"] == "已关闭"
+    # 居民不可用批量操作
+    r = client.post("/api/web/batch/dispatch", json={
+        "issue_ids": ids, "assignee_name": "x", "assignee_phone": "",
+    }, headers=h)
+    assert r.status_code == 400 and r.json()["code"] == 1003
