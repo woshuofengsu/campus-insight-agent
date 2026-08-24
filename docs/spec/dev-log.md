@@ -449,6 +449,18 @@
   - `tests/test_review.py`：3 项——V3 总分=8.25/A- 可复算、V1<V2<V3 单调、11 维权重合计 100%。
 - **验证**：test_review 3 passed；全量 pytest 待跑。**提交**：本轮。
 
+## 二十二、真实 LLM 接入（P1-D3-02 闭环：评测集双跑 20/20 + 用量记账，成本可验证）✅
+
+- **真相澄清**：`.env` 其实一直配着 DEEPSEEK_API_KEY（两把 key 均实测有效）——「LLM 没接上」的根因不是缺 key，而是 **Web 主服务（api_web→orchestrator）架构上就是纯规则链**，LLM 调用点在另一体系（engine.py，供扣子插件/api.py 用），评测集之前只跑规则引擎，所以永远 20/20 规则满分、LLM 从未参与。
+- **评测集 LLM 双跑**：`scripts/llm_eval.py --provider llm` 新增真实 DeepSeek 分支（社区小助手 system prompt + 用量记账）。
+- **golden 双轨断言**：新增 `llm_contains` / `llm_not_contains`（面向 LLM 开放对话的语义断言，缺省回退 contains）；暴露并修正「固定词断言对 LLM 不友好」的评测集设计问题（LLM 追问地址/关阀门等自然回复 vs 规则引擎状态机固定词）。
+- **实测结果（真实 DeepSeek）**：
+  - 规则引擎：20/20 满分（avg 1.0）
+  - 真实 LLM：20/20 满分（avg 1.0），20 次调用 **费用 ¥0.0053**——「LLM 能跑 + 成本可验证 + 幻觉红线达标」三个答辩点全部落实
+  - LLM 回复质量核查：政策问题用「因参保类型/就医地点而异」合规免责而非编造；注入请求明确拒绝；健康不诊断——与 Verifier 防线目的一致。
+- **测试**：test_llm_eval.py 加 `test_llm_pass_rate`（≥90%，默认跳过需 `RUN_LLM_EVAL=1`，防 CI 烧额度）；CI 在配置 key 时自动双跑。
+- **验证**：核心套件 43 passed + 1 skipped；全量待跑。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

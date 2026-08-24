@@ -25,7 +25,9 @@ jobs:
         run: python -m pytest tests/ -q
 
       - name: Run LLM eval golden set (P1-D3-01)
-        run: python scripts/llm_eval.py
+        run: |
+          python scripts/llm_eval.py
+          if [ -n "$DEEPSEEK_API_KEY" ]; then python scripts/llm_eval.py --provider llm; fi
 
       - name: Setup Node
         uses: actions/setup-node@v4

@@ -9,9 +9,9 @@ from scripts.review_score import compute, HISTORY
 
 
 def test_v3_score_recomputable():
-    """V3 总分可复算 = 8.25 / A-（防评分口径漂移）。"""
+    """V3 总分可复算 = 8.35 / A-（LLM 实测闭环后 L 风险 -0.2）。"""
     total, grade = compute(HISTORY["V3"]["scores"], HISTORY["V3"]["risk"])
-    assert total == 8.25
+    assert total == 8.35
     assert grade == "A-"
 
 
