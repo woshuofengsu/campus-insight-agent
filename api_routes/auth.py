@@ -70,8 +70,8 @@ def me(request: Request):
     phone = row.get("phone") or ""
     if not phone and row.get("phone_enc"):
         try:
-            from utils.crypto import Crypto
-            phone = Crypto().decrypt(row["phone_enc"])
+            from utils.crypto import get_crypto
+            phone = get_crypto().decrypt(row["phone_enc"])
         except Exception:
             phone = ""
     return _ok({

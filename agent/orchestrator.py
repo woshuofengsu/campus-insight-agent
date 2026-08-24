@@ -46,6 +46,7 @@ class Orchestrator:
         self.verifier = Verifier()
         self.execution_chain: list[dict] = []
         self._persisted = False  # 会话落库（v31）
+        self.last_active = time.time()  # LRU 淘汰用（P1-1）
 
     # ---- 执行链 ----
 
@@ -70,6 +71,7 @@ class Orchestrator:
             elder_uid: int | None = None) -> dict:
         """处理一轮用户消息。返回 {reply, intent, status, actions, related_id, execution_chain, session_id}。"""
         text = (user_input or "").strip()[:200]
+        self.last_active = time.time()  # LRU 淘汰用（P1-1）
         # 会话落库：重启后从 agent_sessions 恢复 state（P1-C5-01 修复）
         from data import db_agent
         try:

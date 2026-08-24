@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Web 版 Agent 服务：会话状态机 + 路由执行（api_web 端点调用）。
+"""Web 版 Agent 服务：会话状态机 + 路由执行。
+
+【定位说明 / 遗留标注（P2-1）】
+- 主链路已由 agent/orchestrator.py（多 Agent 编排）承担，本模块的
+  handle_chat / _step_answer / _grid_handle 等会话状态机为【遗留·保留未接入】：
+  - 当前代码库无外部调用方、无测试覆盖（仅 Streamlit 备用版可能使用）。
+  - 保留其 **_exec_* 纯函数**（如 _exec_community_phone 被 orchestrator 引用、
+    其余 _exec_report/_exec_proposal 等复用统一数据层），这些是本模块仍有价值的部分。
+- 后续若接入 Streamlit 备线，建议直接委托 Orchestrator().run() 以消除双份规则，
+  而非维护本模块的独立状态机。
 
 handle_chat(role, uid, name, text) → {
     reply: str,          # Agent 回复文本

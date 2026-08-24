@@ -45,17 +45,6 @@ def fail(code: int, message: str) -> JSONResponse:
 
 # ---------------- App ----------------
 
-app = FastAPI(title="CommunityInsight Web API", version="3.0.0",
-              docs_url="/web/docs", redoc_url="/web/redoc", openapi_url="/web/openapi.json")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 _db_ready = False
 
 
@@ -102,6 +91,14 @@ async def _lifespan(app):
 app = FastAPI(title="CommunityInsight Web API", version="3.0.0",
               docs_url="/web/docs", redoc_url="/web/redoc", openapi_url="/web/openapi.json",
               lifespan=_lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # 公开路径：登录 + 健康检查 + 文档 + 前端静态

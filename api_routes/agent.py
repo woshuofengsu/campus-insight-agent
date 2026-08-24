@@ -7,6 +7,22 @@ from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid
 
 router = APIRouter(prefix="/api/web/agent", tags=["agent"])
 
+_MAX_AGENT_SESSIONS = 500
+
+
+def _get_orchestrator(request: Request, key: str):
+    """取/建用户 Orchestrator，超上限时淘汰最久未活动的会话（LRU，P1-1）。"""
+    from agent.orchestrator import Orchestrator
+    orchs = getattr(request.app.state, "_agent_orchs", None)
+    if orchs is None:
+        orchs = request.app.state._agent_orchs = {}
+    if key not in orchs:
+        if len(orchs) >= _MAX_AGENT_SESSIONS:
+            oldest = min(orchs, key=lambda k: getattr(orchs[k], "last_active", 0))
+            orchs.pop(oldest, None)
+        orchs[key] = Orchestrator()
+    return orchs[key]
+
 
 class AgentChat(BaseModel):
     text: str = Field(..., min_length=1, max_length=200)
@@ -15,19 +31,14 @@ class AgentChat(BaseModel):
 @router.post("/chat")
 def agent_chat(req: AgentChat, request: Request):
     """居民端 / 负责人端 Agent 对话（多 Agent 编排：接待员→业务Agent→合规审计→执行链）。"""
-    from agent.orchestrator import Orchestrator
     u = _user(request)
     role = u.get("role")
     if role not in ("resident", "grid"):
         return _fail(1003, "当前角色暂不支持 Agent 对话")
     try:
-        orch = getattr(request.app.state, "_agent_orchs", None)
-        if orch is None:
-            orch = request.app.state._agent_orchs = {}
         key = f"{role}:{u.get('uid')}"
-        if key not in orch:
-            orch[key] = Orchestrator()
-        return _ok(orch[key].run(role, u.get("uid"), u.get("name") or "居民", req.text))
+        orch = _get_orchestrator(request, key)
+        return _ok(orch.run(role, u.get("uid"), u.get("name") or "居民", req.text))
     except Exception as e:  # noqa: BLE001
         return _fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
 
@@ -35,20 +46,15 @@ def agent_chat(req: AgentChat, request: Request):
 @router.post("/elderly/chat")
 def agent_elderly_chat(req: AgentChat, request: Request):
     """老年端 Agent 对话（语音转写文本或文字输入，多 Agent 编排）。"""
-    from agent.orchestrator import Orchestrator
     u = _user(request)
     role = u.get("role")
     if role not in ("elderly", "resident"):
         return _fail(1003, "无权限")
     try:
         uid = _resolve_elder_uid(request) or u.get("uid")
-        orch = getattr(request.app.state, "_agent_orchs", None)
-        if orch is None:
-            orch = request.app.state._agent_orchs = {}
         key = f"elderly:{uid}"
-        if key not in orch:
-            orch[key] = Orchestrator()
-        return _ok(orch[key].run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid))
+        orch = _get_orchestrator(request, key)
+        return _ok(orch.run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid))
     except Exception as e:  # noqa: BLE001
         return _fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
 

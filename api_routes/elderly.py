@@ -211,8 +211,8 @@ def web_contacts_list(request: Request):
         d = dict(r)
         if not d.get("phone") and d.get("phone_enc"):
             try:
-                from utils.crypto import Crypto
-                d["phone"] = Crypto().decrypt(d["phone_enc"])
+                from utils.crypto import get_crypto
+                d["phone"] = get_crypto().decrypt(d["phone_enc"])
             except Exception:
                 d["phone"] = ""
         out.append(d)

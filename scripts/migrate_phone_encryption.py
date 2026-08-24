@@ -17,6 +17,14 @@ from data.database import get_db
 from utils.crypto import Crypto
 
 
+def _ensure_db() -> None:
+    """确保数据库已初始化（_DB_PATH 已设），否则 get_db 会报 not initialized（原脚本 bug）。"""
+    from data import db_core
+    if not db_core._DB_PATH:
+        import config
+        db_core.init_db(config.DB_PATH)
+
+
 def _crypto() -> Crypto:
     try:
         return Crypto()
@@ -30,6 +38,7 @@ _TABLES = [
 
 
 def migrate() -> int:
+    _ensure_db()
     c = _crypto()
     total = 0
     with get_db() as conn:
@@ -54,6 +63,7 @@ def migrate() -> int:
 
 
 def rollback() -> int:
+    _ensure_db()
     c = _crypto()
     total = 0
     with get_db() as conn:

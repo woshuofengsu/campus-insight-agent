@@ -461,6 +461,33 @@
 - **测试**：test_llm_eval.py 加 `test_llm_pass_rate`（≥90%，默认跳过需 `RUN_LLM_EVAL=1`，防 CI 烧额度）；CI 在配置 key 时自动双跑。
 - **验证**：核心套件 43 passed + 1 skipped；全量待跑。**提交**：本轮。
 
+## 二十三、评审改进落地（P0 安全硬伤 + P1 智能增强，8 项）✅
+
+依据《评审报告》执行评审主席提出的 P0/P1 改进，全部落地并全量验证。
+
+**P0 安全硬伤（4 项）**
+1. **加密话术去夸大（P0-1）**：`utils/crypto.py` docstring 原写「生产建议 AES-256-GCM」，改用诚实声明——stdlib `scrypt 派生 + HMAC-CTR 流 + MAC 校验`，接口与 AES-GCM 语义一致、生产可切换，明确「stdlib 仅供演示」。消除评委深究即穿帮的夸大点。
+2. **工单手机号落库加密（P0-2）**：
+   - schema **v38**：`community_issues` 加 `reporter_phone_enc`/`agent_phone_enc`/`assignee_phone_enc`。
+   - `db_repair.py`：`submit_issue`/`dispatch_issue` 落库写密文+明文置空；`get_issue`/`get_issues`/`get_pending_review_issues`/`get_overdue_issues`/`find_duplicate_issue` 经 `_decrypt_row_phones` 解密还原，路由层 `_mask_phone` 契约不变。
+   - 迁移脚本 `scripts/migrate_issue_phone_encryption.py`（可回滚+幂等）。
+   - **修复真实 bug**：v36/v38 两个迁移脚本此前**未调 `init_db` 导致 `get_db` 报 not initialized、完全跑不起来** —— 这是演示库长期明文手机号的根因。加 `_ensure_db()` 修复。
+   - **演示库数据安全达标**：执行迁移后 `community_issues`(185+2)/`user_profile`(4)/`emergency_contacts`(3) 明文手机号全部归零、加密生效；登录/读取路径无回归。
+3. **JWT 密钥 fail-fast（P0-3）**：`api_routes/deps.py` 加 `_load_secret()`——生产（`DEMO_MODE=false`）且未配 `WEB_JWT_SECRET` 拒绝启动（RuntimeError）；演示用兜底并告警。消除硬编码兜底密钥「可伪造 token」风险。
+4. **api_web 去冗余（P0-4）**：删除被覆盖的第一个 `FastAPI app`（CORS 曾挂在被丢弃实例上失效），合并为单实例，CORS 挂带 lifespan 的实例。
+
+**P1 智能/工程增强（4 项）**
+5. **Agent 会话 LRU（P1-1）**：`_agent_orchs` 内存会话超上限（500）淘汰最久未活动，防内存膨胀。`orchestrator` 加 `last_active`。
+6. **仲裁决策留痕（P1-2）**：`arbiter.arbitrate` 每次决策落 `agent_logs`（模块来源=Agent，grid 可查 `intent=仲裁`），让评委看到仲裁真实运行。
+7. **健康顾问协商接可选 LLM 润色（P1-3）**：`_llm_polish_health_suggestion`——`LLM_NEGOTIATION=1` 且配 key 时走真实 DeepSeek，产出过 Verifier 健康规则集（BLOCK 回退规则文案），`record_usage` 记账；escalate 用确定性 tags 判定不依赖 LLM 措辞，保证守护员升级逻辑稳定。**真实 LLM 实测**：0.0001 元/次记账。
+8. **韧性演示脚本（P1-4）**：`scripts/demo_resilience.py` 一键三场景（注入拦截/健康幻觉防线/LLM 降级），录屏素材。
+
+**附带优化（review 发现）**：`Crypto()` 每次构造走昂贵 scrypt（n=2**14），批量解密（`get_issues` 可达 1000 行×多号码）重复派生 → 加 `get_crypto()` 模块级单例，`db_repair`/`auth`/`elderly` 三处统一调用。
+
+**文档**：`docs/deploy-keys.md`（密钥清单/生成/注入/轮换双写/泄露处置/部署自查）；`docs/scaling.md`（多租户过滤 + 黑板换 Redis + SQLite→PostgreSQL 演进路径）；`.gitignore` 加 `*.db.bak`。
+
+**验证**：全量 **440 passed, 1 skipped**（初始 426 + 新增 14）。新增测试：`test_issue_phone_encryption.py` 7 项、`test_agent_session_limit.py` 3 项、test_agent 内仲裁留痕/LLM 润色 4 项。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

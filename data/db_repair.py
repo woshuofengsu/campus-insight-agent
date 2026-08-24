@@ -27,6 +27,39 @@ _THIRD_PARTY_KEYWORDS = ["施工方", "施工损坏", "第三方施工", "外面
 _PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 
 
+def _enc_phone(phone: str) -> str:
+    """手机号加密（落库用）。空串返回空串；加密失败降级返回空串并记日志，不阻断工单提交。"""
+    if not phone:
+        return ""
+    try:
+        from utils.crypto import get_crypto
+        return get_crypto().encrypt(phone)
+    except Exception:
+        return ""
+
+
+def _dec_phone(enc: str, plain: str = "") -> str:
+    """手机号解密（读取展示用）。优先解 enc；失败回退 plain（兼容未迁移历史数据）。"""
+    if enc:
+        try:
+            from utils.crypto import get_crypto
+            return get_crypto().decrypt(enc)
+        except Exception:
+            pass
+    return plain or ""
+
+
+def _decrypt_row_phones(r: dict) -> dict:
+    """把工单行里的 *_enc 解密回明文字段（供路由层 _mask_phone/_issue_view 使用）。
+    不改动 *_enc 列本身，仅还原明文展示字段，保证与未加密时的字段契约一致。"""
+    if not isinstance(r, dict):
+        return r
+    r["reporter_phone"] = _dec_phone(r.get("reporter_phone_enc", ""), r.get("reporter_phone", ""))
+    r["agent_phone"] = _dec_phone(r.get("agent_phone_enc", ""), r.get("agent_phone", ""))
+    r["assignee_phone"] = _dec_phone(r.get("assignee_phone_enc", ""), r.get("assignee_phone", ""))
+    return r
+
+
 def _validate_phone(phone: str) -> bool:
     return bool(_PHONE_RE.match(phone or ""))
 
@@ -141,11 +174,13 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
             "INSERT INTO community_issues (title, category, issue_type, location, "
             "description, urgency, status, reporter_id, reporter_name, reporter_phone, "
             "photo_before, is_agent_report, agent_name, agent_phone, agent_relation, "
-            "is_violation, non_community_responsibility) "
-            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "is_violation, non_community_responsibility, "
+            "reporter_phone_enc, agent_phone_enc) "
+            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?)",
             (title, category, issue_type, location, description, urgency, reporter_id,
-             reporter_name, reporter_phone, photo_before, is_agent_report,
-             agent_name, agent_phone, agent_relation, is_violation, non_resp),
+             reporter_name, photo_before, is_agent_report,
+             agent_name, agent_relation, is_violation, non_resp,
+             _enc_phone(reporter_phone), _enc_phone(agent_phone)),
         )
         issue_id = cur.lastrowid
         if draft_id:
@@ -201,8 +236,9 @@ def dispatch_issue(issue_id: int, assignee_name: str, assignee_phone: str,
         old = row["status"]
         old_name = row["assignee_name"] or ""
         conn.execute(
-            "UPDATE community_issues SET status='已派单', assignee_name=?, assignee_phone=? WHERE id=?",
-            (assignee_name, assignee_phone, issue_id),
+            "UPDATE community_issues SET status='已派单', assignee_name=?, "
+            "assignee_phone='', assignee_phone_enc=? WHERE id=?",
+            (assignee_name, _enc_phone(assignee_phone), issue_id),
         )
         conn.commit()
 
@@ -599,7 +635,7 @@ def edit_issue(issue_id: int, actor: str = "居民",
 def get_issue(issue_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM community_issues WHERE id=?", (issue_id,)).fetchone()
-        return dict(row) if row else None
+        return _decrypt_row_phones(dict(row)) if row else None
 
 
 def get_issues(status: str | None = None, issue_type: str | None = None,
@@ -631,7 +667,7 @@ def get_issues(status: str | None = None, issue_type: str | None = None,
     args.append(limit)
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 def get_safety_reminders(limit: int = 100) -> list[dict]:
@@ -676,7 +712,7 @@ def find_duplicate_issue(location: str, description: str, days: int = 7,
         old_kw = _bigrams(old)
         overlap = len(kw & old_kw)
         if overlap >= 2:
-            return dict(r)
+            return _decrypt_row_phones(dict(r))
     return None
 
 
@@ -697,7 +733,7 @@ def get_pending_review_issues(limit: int = 50) -> list[dict]:
             "SELECT * FROM community_issues WHERE status IN ('待审核','退回补充信息') "
             "ORDER BY reported_at DESC LIMIT ?", (limit,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 # 报修超时时限（从审核通过时间 approved_at 计时）
@@ -719,7 +755,7 @@ def get_overdue_issues() -> list[dict]:
             "AND status IN ('已审核待派单','已派单','处理中','待居民反馈') "
             f"AND ({clauses}) ORDER BY approved_at"
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 def mark_issue_overdue_notice(actor: str = "系统") -> list[dict]:

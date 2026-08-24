@@ -12,10 +12,10 @@ docs/superpowers/
 
 uploads/
 *.db
+*.db.bak
 web/dist/
 web/node_modules/
 
-# HTTPS 证书等部署机密（见 docs/deploy-https.md）
-nginx/certs/
+# HTTPS 证书等部署机密（?docs/deploy-https.md?nginx/certs/）
 
 .env.bak

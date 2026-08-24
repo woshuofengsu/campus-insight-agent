@@ -1,12 +1,15 @@
 # utils/crypto.py
-"""敏感字段加密工具（数据安全 v3.0，适配项目零第三方依赖）。
+"""敏感字段加密工具（数据安全 v3.0，零第三方依赖）。
 
-生产建议：AES-256-GCM（cryptography 库，CRYPTO_KEY 为 base64 32 字节）。
-本项目演示环境用 Python stdlib 实现等价接口（scrypt 派生密钥 + HMAC 流异或 + MAC 校验），
-接口 encrypt/decrypt 与 AES-GCM 完全一致，可无缝切换。
+加密方案（诚实声明）：
+    本项目演示环境使用 Python stdlib 实现的对称加密：
+    scrypt 派生密钥 + HMAC-SHA256 计数流（CTR 风格）异或明文 + HMAC 完整性校验。
+    接口 encrypt/decrypt 与 AES-256-GCM 语义一致（机密性 + 完整性 + 随机 nonce），
+    生产环境可将 _derive_key/_stream 替换为 cryptography 库的 AES-256-GCM，无需改调用方。
 
 - 密钥来源：环境变量 CRYPTO_KEY；未配置时用演示默认值并打日志（生产必须配置）。
 - 密文格式：base64(nonce(12B) + ciphertext + mac(32B))
+- 注意：stdlib 实现仅供演示。生产必须切换为 AES-256-GCM（见 docs/deploy-https.md）。
 """
 import base64
 import hashlib
@@ -69,3 +72,16 @@ class Crypto:
             out += hmac.new(self._key, nonce + counter.to_bytes(8, "big"), hashlib.sha256).digest()
             counter += 1
         return out[:length]
+
+
+# 缓存单例：Crypto() 每次构造都会走昂贵的 scrypt 派生（n=2**14）。
+# get_issues 等批量解密（每条工单多个号码）若反复构造会重复派生，故缓存避免性能损耗。
+_crypto_singleton: "Crypto | None" = None
+
+
+def get_crypto() -> "Crypto":
+    """返回模块级 Crypto 单例（密钥派生只做一次）。线程安全（GIL 下简单缓存足够）。"""
+    global _crypto_singleton
+    if _crypto_singleton is None:
+        _crypto_singleton = Crypto()
+    return _crypto_singleton

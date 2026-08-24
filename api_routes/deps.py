@@ -4,15 +4,33 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+_log = logging.getLogger(__name__)
+
 # ---------------- JWT（stdlib HMAC HS256，零第三方依赖） ----------------
 
-_SECRET = os.getenv("WEB_JWT_SECRET", "community-insight-web-jwt-2026")
+def _load_secret() -> str:
+    """加载 JWT 密钥。生产（DEMO_MODE=false）必须配置 WEB_JWT_SECRET，否则拒绝启动；
+    演示模式（默认开）用固定兜底值并打告警（仅供比赛演示，严禁生产）。"""
+    secret = os.getenv("WEB_JWT_SECRET", "").strip()
+    if secret:
+        return secret
+    demo = os.getenv("DEMO_MODE", "true").strip().lower() not in ("false", "0", "no")
+    if demo:
+        _log.warning("WEB_JWT_SECRET 未配置，使用演示兜底密钥（严禁生产环境）")
+        return "demo-only-insecure-jwt-secret"
+    raise RuntimeError(
+        "WEB_JWT_SECRET 未配置且 DEMO_MODE=false：生产环境必须配置 JWT 密钥，拒绝启动。"
+    )
+
+
+_SECRET = _load_secret()
 
 
 def _b64(data: bytes) -> str:

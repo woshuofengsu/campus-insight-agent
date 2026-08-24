@@ -7,6 +7,66 @@ from agent import web_agent as A
 from agent.roles.base import BaseAgent
 
 
+def _llm_polish_health_suggestion(tags: str, base: str) -> str:
+    """可选 LLM 润色健康协商建议（P1-3）。
+
+    仅在 LLM_NEGOTIATION=1 且配置了 key 时走真实 DeepSeek；产出强制过 Verifier（健康规则集），
+    BLOCK/WARN 一律回退规则文案（幻觉兜底）。任何异常一律回退规则文案。
+    """
+    import json as _json
+    import os
+    import time as _time
+    import urllib.request
+
+    if os.getenv("LLM_NEGOTIATION", "0") != "1":
+        return base
+    try:
+        from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+    except Exception:
+        return base
+    if not DEEPSEEK_API_KEY:
+        return base
+    start = _time.time()
+    try:
+        payload = {
+            "model": DEEPSEEK_MODEL or "deepseek-chat",
+            "messages": [
+                {"role": "system", "content":
+                 "你是社区健康顾问。根据天气预警标签，用一句不超过50字的口语化中文给出老年人"
+                 "防护建议。不做诊断、不推荐药物、紧急情况提示就医。"},
+                {"role": "user", "content": f"天气预警：{tags}。基础建议：{base}"},
+            ],
+            "max_tokens": 120,
+            "temperature": 0.3,
+        }
+        req = urllib.request.Request(
+            f"{(DEEPSEEK_BASE_URL or 'https://api.deepseek.com/v1').rstrip('/')}/chat/completions",
+            data=_json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                     "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            out = _json.loads(resp.read().decode("utf-8"))
+        text = (out.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+        usage = out.get("usage", {})
+        try:
+            from data.db_llm_usage import record_usage
+            record_usage("协商润色", int(usage.get("prompt_tokens", 0)),
+                         int(usage.get("completion_tokens", 0)),
+                         duration_ms=int((_time.time() - start) * 1000),
+                         input_preview=f"{tags}/{base[:30]}")
+        except Exception:
+            pass
+        # 幻觉防线：健康规则集校验，不过则回退规则文案
+        from agent.verifier import Verifier
+        v = Verifier().verify({"reply": text}, biz_type="health")
+        if v["verdict"] == "pass":
+            return text
+        return base
+    except Exception:
+        return base
+
+
 def _state_key(uid):
     return f"user:{uid}:state"
 
@@ -245,8 +305,12 @@ class HealthAdvisorAgent(BaseAgent):
         if payload.get("event") == "extreme_weather":
             tags = payload.get("tags", "")
             # 极端天气对老人有风险 → 建议升级通知（触发天气→通知管理员链路）
-            suggestion = "提醒老人注意防暑/保暖，减少外出，备好常用药"
-            if any(k in tags for k in ("高温", "寒潮", "台风", "暴雨")):
+            escalate = any(k in tags for k in ("高温", "寒潮", "台风", "暴雨"))
+            base = "提醒老人注意防暑/保暖，减少外出，备好常用药" if escalate else (payload.get("suggestion") or "")
+            # P1-3：可选 LLM 润色建议文案（产出过 Verifier 健康规则集，BLOCK 回退规则文案）。
+            # 注意：escalate 用原始确定性条件判定（tags 高危词），不依赖 LLM 措辞，保证守护员升级逻辑稳定。
+            suggestion = _llm_polish_health_suggestion(tags, base)
+            if escalate:
                 return {
                     "accepted": True,
                     "reply": f"已根据天气预警准备健康提醒：{suggestion}",
@@ -255,8 +319,8 @@ class HealthAdvisorAgent(BaseAgent):
                     "tags": tags,
                     "escalate": True,
                 }
-            return {"accepted": True, "reply": f"已根据天气预警准备健康提醒：{payload.get('suggestion', '')}",
-                    "suggestion": payload.get("suggestion", ""), "event": "extreme_weather",
+            return {"accepted": True, "reply": f"已根据天气预警准备健康提醒：{suggestion}",
+                    "suggestion": suggestion, "event": "extreme_weather",
                     "tags": tags, "escalate": False}
         return None
 

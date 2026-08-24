@@ -631,6 +631,13 @@ def _m37_trace_id(conn):
     _add_column(conn, "exception_log", "trace_id", "trace_id TEXT DEFAULT ''")
 
 
+def _m38_issue_phone_enc(conn):
+    """v38：工单手机号加密列（P0：reporter/agent/assignee 手机号落库加密，明文置空）。"""
+    _add_column(conn, "community_issues", "reporter_phone_enc", "reporter_phone_enc TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "agent_phone_enc", "agent_phone_enc TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "assignee_phone_enc", "assignee_phone_enc TEXT DEFAULT ''")
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -833,6 +840,7 @@ def init_db(db_path: str):
         (35, "draft_contents", _m35_draft_contents),
         (36, "phone_enc", _m36_phone_enc),
         (37, "trace_id", _m37_trace_id),
+        (38, "issue_phone_enc", _m38_issue_phone_enc),
     ]
     for version, name, fn in post:
         if version <= current:

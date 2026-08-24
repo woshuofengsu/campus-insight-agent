@@ -674,3 +674,86 @@ def test_trace_id_chain(client):
     r = client.post("/api/web/agent/chat", json={"text": "医保怎么报销"},
                     headers={**h, "X-Request-ID": "abcdef1234567890"})
     assert r.headers.get("X-Request-ID") == "abcdef1234567890"
+
+
+def test_arbiter_decision_audited(client):
+    """仲裁决策留痕（P1-2）：每次 arbitrate 落 agent_logs，grid 可按 intent=仲裁 查到。"""
+    from agent.arbiter import Arbiter
+    # 合规审计不通过 → 触发 compliance_first 裁决
+    Arbiter().arbitrate({"audit_failed": True, "agent": "policy_expert",
+                         "reason": "包含完整手机号"})
+    # 安全风险 → 触发 safety_first（转人工）
+    Arbiter().arbitrate({"verify_failed": True, "safety_risk": True, "agent": "health_advisor"})
+
+    # 直接查数据层留痕
+    from data.db_agent import get_agent_logs
+    logs = get_agent_logs(intent="仲裁")
+    assert len(logs) >= 2
+    routed = {l.get("routed") for l in logs}
+    assert any("compliance_first" in str(r) for r in routed)
+    assert any("safety_first" in str(r) for r in routed)
+
+
+def test_llm_polish_falls_back_by_default(client, monkeypatch):
+    """P1-3：默认（LLM_NEGOTIATION 未开）协商建议原样返回规则文案，不调用 LLM。"""
+    from agent.roles.business_agents import _llm_polish_health_suggestion
+    monkeypatch.delenv("LLM_NEGOTIATION", raising=False)
+    base = "提醒老人注意防暑/保暖，减少外出，备好常用药"
+    assert _llm_polish_health_suggestion("高温橙色", base) == base
+
+
+def test_llm_polish_block_falls_back(client, monkeypatch):
+    """P1-3：开启 LLM 且真实网络返回含诊断词 → Verifier 拦截 → 回退规则文案。"""
+    import agent.roles.business_agents as B
+    monkeypatch.setenv("LLM_NEGOTIATION", "1")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fake-key")
+    base = "提醒老人注意防暑/保暖，减少外出"
+
+    # mock 真实 urllib 网络调用，返回违反健康规则的文案
+    class _FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            import json as _j
+            return _j.dumps({
+                "choices": [{"message": {"content": "你这是可能得了肺炎"}}],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 6},
+            }).encode("utf-8")
+
+    import urllib.request as U
+    monkeypatch.setattr(U, "urlopen", lambda *a, **k: _FakeResp())
+
+    out = B._llm_polish_health_suggestion("高温橙色", base)
+    assert out == base  # Verifier 拦截（NoDiagnosisRule）→ 回退规则文案
+
+
+def test_llm_polish_pass_uses_llm(client, monkeypatch):
+    """P1-3：开启 LLM 且网络返回合规文案 → Verifier 通过 → 采用 LLM 结果。"""
+    import agent.roles.business_agents as B
+    monkeypatch.setenv("LLM_NEGOTIATION", "1")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fake-key")
+
+    class _FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            import json as _j
+            return _j.dumps({
+                "choices": [{"message": {"content": "高温天气，提醒老人多喝水少外出，防暑降温。"}}],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 6},
+            }).encode("utf-8")
+
+    import urllib.request as U
+    monkeypatch.setattr(U, "urlopen", lambda *a, **k: _FakeResp())
+
+    out = B._llm_polish_health_suggestion("高温橙色", "提醒老人注意防暑/保暖，减少外出")
+    assert "高温天气" in out  # LLM 合规文案被采用
+    assert "确诊" not in out
