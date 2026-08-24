@@ -488,6 +488,36 @@
 
 **验证**：全量 **440 passed, 1 skipped**（初始 426 + 新增 14）。新增测试：`test_issue_phone_encryption.py` 7 项、`test_agent_session_limit.py` 3 项、test_agent 内仲裁留痕/LLM 润色 4 项。**提交**：本轮。
 
+## 二十四、移动端适配落地（手机浏览器直访，Vue3 移动排版 + naive-ui 按需 + 修复打包白屏）✅
+
+基于《docs/mobile-deploy.md》移动端方案落地，覆盖移动排版/交互/包体积，并修复一个真机白屏 bug。
+
+**移动端排版与交互（§2–§3）**
+- `index.html`：viewport 加 `viewport-fit=cover`、`format-detection`、`theme-color`；标题改「社区先知」。
+- 新建 `web/src/mobile.css`：断点体系（≤359/360-427/428-767/≥768）；触屏热区 ≥44px（`@media (hover:none) and (pointer:coarse)` 下按钮/输入/卡片）；输入控件字号 ≥16px 防 iOS 聚焦放大；`touch-action:manipulation` 消 300ms 延迟；`overscroll-behavior-y:contain` 防下拉误触；老年端文本类 `max(rem,px)` 字号下限、横屏提示层、网格员手机抽屉导航规则。
+- `PortalLayout.vue`：居民端 header/底栏/内容区安全区改用 `calc()+env()`（不靠全局 `!important` 覆盖 inline，避免优先级拉扯）；网格员端 <768px 隐藏桌面侧栏改 `n-drawer` 抽屉 + 顶栏 ☰。
+- `ElderlyLayout.vue`：header/导航条安全区 `calc+env`；导航按钮 52px→64px；加横屏「请竖屏使用」提示层。
+- 新建 `web/src/composables/useKeyboard.js`（`focusin` 滚入可视区 + visualViewport 归位），`main.js` 挂载。
+- `useSpeech.js` 降级 reason 细分（`mic-denied`/`https-required`/`network`）；`Agent.vue` 按 reason 显示大字引导文案；`Home.vue` SOS 长按加 `data-longpress` 防系统菜单。
+
+**排版美化（登录页/老年端）**
+- `Login.vue`：卡片加 `max-width:calc(100vw-32px)` + 安全区（防 320px 小屏溢出）；快速体验按钮改两行布局、老年入口独占一行、热区 44px。
+- `ElderlyLayout.vue` 导航按钮加 padding(0 22px)/字号 1.15rem/字重 700，更舒展清晰。
+
+**naive-ui 按需引入（§4.2，减包 ~50%）**
+- 装 `unplugin-vue-components`，`vite.config.js` 加 `Components({resolvers:[NaiveUiResolver()]})`，`main.js` 移除 `app.use(naive)` 全量注册。
+- **结果**：naive-ui chunk **1438KB→740KB**（gzip 392→211KB）。
+
+**修复真机白屏 bug（重要）**
+- 现象：手机真机 / Playwright 桌面 Chromium 访问首页白屏，`TypeError: e is not a function`。
+- 根因：之前 `vite.config.js` 的 `manualChunks` 把 vue/vue-router/pinia/axios 硬归到同一个 vendor chunk，破坏 axios 等库跨 chunk 的导出绑定。
+- 修复：改 `manualChunks(id)` 只把 naive-ui 及直接依赖拆独立 chunk，其余交给 Vite 默认聚合。`docs/mobile-deploy.md` 已同步纠正该配置并注明坑。
+
+**验证**
+- 新版 bundle：`naiveui` 740KB / `index` 40KB / 无 vendor，**无 `e is not a function`**。
+- Playwright（移动视口 375px）：登录页卡片 343px 不溢出、无横向滚动；**29 路由全量扫描 0 报错 + 0 未注册组件**；居民/网格/老年三端首页正常渲染；老年 `.elderly-btn` 高度 72px ≥ 60px。
+- 后端全量 **440 passed, 1 skipped**（纯前端改动，无回归）。**提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

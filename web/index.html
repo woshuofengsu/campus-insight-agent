@@ -3,11 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>web</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#2D5BFF" />
+    <title>社区先知</title>
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    <!-- 真机调试：只需本行即生效，生产可移除 -->
+    <script>
+      if (location.search.includes('debug=1')) {
+        var s = document.createElement('script')
+        s.src = 'https://cdn.jsdelivr.net/npm/eruda@3.4.1'
+        s.onload = function () { window.eruda && eruda.init() }
+        document.body.appendChild(s)
+      }
+    </script>
   </body>
 </html>

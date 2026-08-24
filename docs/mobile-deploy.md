@@ -1,0 +1,206 @@
+# 移动端部署方案（Mobile Deploy Plan）
+
+> 面向手机客户端到端落地的方案。目标形态：**手机浏览器直访（H5 响应式）**。
+> 部署环境未最终确定（局域网演示 / 公网+域名 / 公网自签三种，见 §5）。
+> 演示重点端：**老年端 + 居民端**。
+> 状态：§2–§4 代码已落地并 `npm run build` 通过；§5–§7 视部署环境择机执行。
+
+---
+
+## 一、方案选型
+
+| 方案 | 选择 | 迁移成本 | 说明 |
+|---|---|---|---|
+| H5 响应式 | **采用** | 无 | 现有 Vue3 + Vite + Naive UI 同源架构，零迁移 |
+| PWA | 可选 | 0.5 天（手写，不引插件以避免 Vite 8 兼容风险） | 需"类 App"图标/离线壳/全屏演示时启用 |
+| 微信小程序 | 不采用 | 重写 | 仅当分发限定微信生态时；WXML 不能复用 Vue SFC |
+| 原生 App | 不采用 | 重写 | 仅需要蓝牙/NFC/后台定位/推送时 |
+
+结论：主路线 H5 + 可选 PWA。**硬约束：语音识别（webkitSpeechRecognition）要求 HTTPS（或 localhost）**——这直接决定部署环境选择，是移动端第一硬约束。
+
+---
+
+## 二、响应式排版与适配（已落地）
+
+### 2.1 viewport / 安全区基础（`web/index.html`）
+
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="theme-color" content="#2D5BFF" />
+```
+
+- `viewport-fit=cover`：没有它 iOS 刘海屏 `env(safe-area-inset-*)` 恒为 0，安全区全失效。
+- 不加 `maximum-scale=1`/`user-scalable=no`：老年端依赖系统放大手势。iOS 聚焦放大用 §3.1 的输入 16px 方案规避。
+
+### 2.2 断点与全局移动规则（`web/src/mobile.css`，新建）
+
+断点：`≤359`(xs) / `360-427`(sm) / `428-767`(md) / `≥768`(lg 保持现状)。
+
+```css
+body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;       /* 消 300ms 延迟 + 禁双击缩放 */
+  overscroll-behavior-y: contain;   /* 防下拉刷新打断长按 SOS */
+}
+@media (hover: none) and (pointer: coarse) {
+  .n-button { min-height: 44px; }
+  input, textarea, select, .n-input__input-el { font-size: 16px !important; }
+}
+```
+
+### 2.3 输入防 iOS 聚焦放大（`mobile.css`）
+
+任何输入控件字号 ≥16px（§2.2 同块），iOS 不会自动放大。
+
+### 2.4 安全区（布局样式写在 `.vue` 内，用 `calc()+env()`，不用全局 `!important` 覆盖 inline）
+
+- `PortalLayout.vue` 居民端：header `padding-top:calc(env(safe-area-inset-top))`、底栏 `padding-bottom:env(safe-area-inset-bottom)`、内容区 `padding-bottom:calc(76px + env(...))`。
+- `ElderlyLayout.vue`：头部/导航条 `calc + env`；`.elderly-nav`/`.elderly-page` 的 safe-area 在 `mobile.css` 兜底。
+
+### 2.5 老年端字号策略（review 修正：**不动全局根字号**）
+
+不在 `html` 上放大根字号（避免与老年端大量 px 内联如 `min-height`/`padding` 失衡），改用 `max(rem, px)` 设像素下限：
+
+```css
+.elderly-page  { font-size: max(1.25rem, 20px); }
+.elderly-title { font-size: max(1.8rem, 28px); }
+.elderly-btn   { font-size: max(1.35rem, 21px) !important; min-height: 72px !important; }
+```
+
+老年端导航按钮 `min-height` 由 52px 提升到 **64px**（≥60px 下限）。
+
+---
+
+## 三、手机端交互适配（已落地）
+
+### 3.1 软键盘（`web/src/composables/useKeyboard.js`，新建 + `main.js` 挂载）
+
+`focusin` 后 300ms 把聚焦元素 `scrollIntoView({block:'center'})`；visualViewport 兜底 iOS 键盘收起归位。CSS：`html { scroll-padding-bottom:120px; }`。
+
+### 3.2 语音降级（`useSpeech.js` + `Agent.vue`）
+
+`onerror` 细分 reason，UI 按 reason 显示大字号引导：
+
+| reason | 来源 | UI 文案 |
+|---|---|---|
+| `unsupported` | 环境无 Web Speech | 当前浏览器不支持语音，请用文字输入 |
+| `mic-denied` | 权限被拒 | 请点地址栏🔒→麦克风→允许 |
+| `https-required` | 非安全上下文 | 语音需 HTTPS，请用 Safari/Chrome 直接打开 |
+| `network` | 网络错误 | 网络不稳，请再按一次 |
+
+### 3.3 长按防误触（`Home.vue` + `mobile.css`）
+
+SOS 长按按钮加 `data-longpress`，CSS `.elderly-btn,[data-longpress]{-webkit-touch-callout:none}` 防系统菜单。长按 3 秒逻辑已有（`pressStart`/`pressCancel`，3000ms）。
+
+### 3.4 网格员端手机可看（`PortalLayout.vue`）
+
+<768px 隐藏桌面侧栏（`.grid-desktop-sider`），显示顶栏汉堡 + `n-drawer` 抽屉导航；≥768px 保持桌面侧栏。
+
+### 3.5 横屏提示（`ElderlyLayout.vue` + `mobile.css`）
+
+浏览器无法强制竖屏，用提示层兜底：
+
+```css
+@media (orientation: landscape) and (max-height: 500px) {
+  .elderly-rotate-mask { display: flex; }
+}
+```
+
+---
+
+## 四、打包与构建（已落地）
+
+### 4.1 构建命令
+
+```powershell
+cd web
+npm ci
+npm run build   # 产物 → web/dist/
+npx vite preview --host 0.0.0.0 --port 4173
+```
+
+FastAPI（`api_web.py:204-207`）已托管 `web/dist`（`_DIST` + SPA fallback），直接起后端即可访问。
+
+### 4.2 vendor 拆包（已落地，`web/vite.config.js`）
+
+Vite 8（rolldown）要求 `manualChunks` 用**函数形式**。**注意坑**：不要把 vue/vue-router/pinia/axios 硬归到同一个 vendor chunk——会破坏 axios 跨 chunk 的导出绑定，导致真机白屏 `TypeError: e is not a function`（已被真机测试抓出）。正确做法：只把体积最大的 naive-ui 独立拆 chunk，其余交给 Vite 默认聚合。
+
+```js
+manualChunks(id) {
+  if (id.includes('node_modules')) {
+    if (id.includes('naive-ui') || id.includes('@css-render') || id.includes('@juggle') ||
+        id.includes('date-fns') || id.includes('evtd') || id.includes('seemly')) return 'naiveui'
+  }
+  return undefined
+},
+```
+
+效果：`naiveui-*.js` 1.44MB（独立 chunk，不随业务代码变化，可 `immutable` 一年缓存）/ `index-*.js` ~40KB（vue+router+pinia+axios 默认聚合）。已验证无 `e is not a function` 报错。
+
+### 4.3 PWA（可选，手写方案，未落地）
+
+`web/public/manifest.webmanifest` + `pwa-192/512.png` + `sw.js`（缓存优先 `/assets/`），`index.html` 加 `<link rel="manifest">`，`main.js` 生产注册 SW。零构建插件依赖。
+
+---
+
+## 五、部署到服务器（三种环境，**待定**）
+
+> 优先级 B > A(降级) > C。老年端语音演示**必须 HTTPS**。
+
+### 5.1 公网 + 域名 + Let's Encrypt（正式）
+
+Certbot 申请证书 → Nginx 静态直出 `dist` + `/api` 反代 8000。关键配置：
+
+```nginx
+location /assets/ { root /opt/.../dist; add_header Cache-Control "public, max-age=31536000, immutable"; }
+location = /index.html { root /opt/.../dist; add_header Cache-Control "no-cache"; }
+location / { root /opt/.../dist; try_files $uri $uri/ /index.html; }
+location ~ ^/(api|web)/ { proxy_pass http://127.0.0.1:8000; }
+```
+
+### 5.2 局域网演示
+
+```powershell
+python -m uvicorn api_web:app --host 0.0.0.0 --port 8000
+```
+
+**硬限制**：非 HTTPS 非 localhost 时 iOS/Android 均禁用麦克风与语音识别 → 自动降级文字输入。仅安卓演示机可用 `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 免。iOS 在此环境只演示文字链路。
+
+### 5.3 公网自签证书（临时）
+
+`openssl req -x509 ...` + uvicorn `--ssl-keyfile/--ssl-certfile`，手机需手动信任，仅 24h 临时演示。
+
+---
+
+## 六、手机端测试清单（未执行，需真机）
+
+### 6.1 调试通道
+
+`index.html` 加 `?debug=1` 触发 Eruda 控制台；Android 用 `chrome://inspect`。
+
+### 6.2 设备 × 浏览器矩阵
+
+iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) · iPad Mini(768)；浏览器：iOS Safari、iOS 微信、Android Chrome、安卓微信、系统浏览器（X5）。
+
+### 6.3 通用测试点
+
+键盘弹出不遮输入框 / 底栏不被 Home Indicator 遮挡 / 无 300ms 延迟 / 下拉不触发刷新 / 系统最大字号档不溢出 / 微信内可登录浏览。
+
+### 6.4 老年端专项（重点，从未真机）
+
+字号实测 ≥20px / 按钮 ≥60px / 对比度 WCAG AA / 长按 SOS 防系统菜单 / HTTPS 下语音转文字+朗读 / 降级走文字 / 横屏提示 / 连点防误触 / 朗读音量可调。
+
+> **补充必须项（review 三刀之一）**：微信内置浏览器内自动朗读（`speechSynthesis`）可能静默失败——列为必测项，iOS 微信若失败则确保不阻塞、按钮态正确复位。
+
+---
+
+## 七、安全与合规
+
+| 项 | 要求 |
+|---|---|
+| 传输 | 生产仅 443，80 强制 301；语音 API 受此约束 |
+| JWT 密钥 | 按 `docs/deploy-keys.md` 注入，生产无密钥拒绝启动（已实现） |
+| Token | 现 localStorage；正式版可选迁 httpOnly Cookie |
+| 手机号展示 | 已加密落库 + 前端脱敏（`138****8000`）；列表页抽查无明文 |
+| 语音隐私 | 转写文本入库、原始录音 7 天保留；隐私页补一句"语音识别由浏览器厂商处理" |

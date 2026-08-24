@@ -14,6 +14,7 @@ const router = useRouter()
 const store = useUserStore()
 const theme = useThemeStore()
 const agentOpen = ref(false) // AI 工作助手默认收起
+const drawerOpen = ref(false) // 网格员端移动端抽屉导航
 
 const gridMenus = [
   { key: '/grid/dashboard', label: '工作台', icon: '📊' },
@@ -61,7 +62,7 @@ function logout() {
 <template>
   <!-- 网格员端：保持原样（浅色侧边导航 + 顶栏 + AI 工作助手） -->
   <n-layout v-if="store.isGrid" style="min-height:100vh" has-sider>
-    <n-layout-sider bordered width="230">
+    <n-layout-sider class="grid-desktop-sider" bordered width="230">
       <div style="padding:18px 16px;border-bottom:1px solid var(--border);">
         <div style="font-weight:800;color:#2E7D32;font-size:1.05rem;">🏘️ 社区先知</div>
         <div style="color:var(--muted);font-size:0.75rem;">网格员工作台</div>
@@ -78,9 +79,13 @@ function logout() {
         </div>
       </div>
     </n-layout-sider>
-
     <n-layout>
       <WeatherBanner />
+      <!-- 移动端顶栏（<768px 显示） -->
+      <n-layout-header bordered class="grid-mobile-header" style="display:flex;align-items:center;gap:12px;padding:0 16px;min-height:56px;background:var(--card-bg);position:sticky;top:0;z-index:10;">
+        <n-button quaternary @click="drawerOpen = true">☰</n-button>
+        <span style="font-weight:700;">{{ route.meta.title || '工作台' }}</span>
+      </n-layout-header>
       <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
         <div style="font-weight:700;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
@@ -94,12 +99,19 @@ function logout() {
         <router-view />
       </n-layout-content>
     </n-layout>
+    <!-- 移动端抽屉导航 -->
+    <n-drawer v-model:show="drawerOpen" placement="left" :width="240" :auto-close="true">
+      <n-drawer-content title="🏘️ 社区先知" :native-scrollbar="false">
+        <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
+                :value="active" @update:value="(k) => { router.push(k); drawerOpen = false }" />
+      </n-drawer-content>
+    </n-drawer>
   </n-layout>
 
   <!-- 居民端：顶部栏 + 底部标签栏 + 内容 -->
   <n-layout v-else style="min-height:100vh">
     <WeatherBanner />
-    <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--card-bg);position:sticky;top:0;z-index:10;">
+    <n-layout-header bordered style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top)) 20px 0;min-height:56px;background:var(--card-bg);position:sticky;top:0;z-index:10;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));">
       <div style="font-weight:800;color:var(--primary);">🏘️ 社区先知</div>
       <div style="display:flex;align-items:center;gap:12px;">
         <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
@@ -107,11 +119,11 @@ function logout() {
         <n-button size="small" quaternary @click="logout">退出</n-button>
       </div>
     </n-layout-header>
-    <n-layout-content content-style="background:var(--bg);padding-bottom:76px;">
+    <n-layout-content :content-style="{ background: 'var(--bg)', paddingBottom: 'calc(76px + env(safe-area-inset-bottom))' }">
       <router-view />
     </n-layout-content>
     <!-- 底部标签栏 -->
-    <div style="position:fixed;bottom:0;left:0;right:0;height:64px;background:var(--card-bg);border-top:1px solid var(--border);display:flex;z-index:20;">
+    <div style="position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom);background:var(--card-bg);border-top:1px solid var(--border);display:flex;z-index:20;min-height:64px;">
       <div v-for="t in residentTabs" :key="t.key"
            :style="{
              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',

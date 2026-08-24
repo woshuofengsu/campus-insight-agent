@@ -1,0 +1,76 @@
+/* ============================================================
+   移动端适配层（叠加在 style.css 之上，仅处理排版/hotspot/手势）
+   原则：不改业务逻辑；布局类安全区样式写在各自 .vue 里，这里只
+   放可复用的全局移动规则，避免用 !important 去覆盖 inline style。
+   ============================================================ */
+
+/* ---------- 触摸基础 ---------- */
+body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;   /* 消除 300ms 延迟 + 禁双击缩放 */
+  overscroll-behavior-y: contain; /* 防误触下拉刷新打断长按 SOS */
+}
+img, .n-button, .n-tag, .card { user-select: none; -webkit-user-select: none; }
+
+/* ---------- 断点：xs≤359 / sm 360-427 / md 428-767 / lg≥768 ---------- */
+.page { padding: 24px; }
+@media (max-width: 767px) { .page { padding: 16px; } }
+@media (max-width: 359px) { .page { padding: 12px; } }
+@media (max-width: 427px) { .stat-card .num { font-size: 1.5rem; } }
+
+/* ---------- 触屏热区：居民/网格端 ≥44px（Naive small 按钮默认 28px 不达标） ---------- */
+@media (hover: none) and (pointer: coarse) {
+  .n-button { min-height: 44px; }
+  .n-button--tiny, .n-button--small { min-height: 40px; margin: 2px 0; }
+  .n-input, .n-select { min-height: 44px; }
+  .card[style*="cursor:pointer"], .card.clickable { min-height: 44px; }
+}
+
+/* ---------- 触屏输入：iOS 聚焦防自动放大（任何输入控件字号 ≥16px） ---------- */
+@media (hover: none) and (pointer: coarse) {
+  input, textarea, select,
+  .n-input__input-el, .n-input textarea, .n-base-selection {
+    font-size: 16px !important;
+  }
+}
+
+/* ---------- 长按防系统菜单干扰（老年端 SOS 等长按热区） ---------- */
+.elderly-btn, [data-longpress] { -webkit-touch-callout: none; }
+
+/* ---------- 老年端文本类字号下限（方案：不动全局根字号，用 max(rem,px) 保底） ----------
+   避免改动 html 根字号放大整个 rem，从而与老年端大量 px 内联样式（min-height、padding）
+   失衡。用 max() 保证即使浏览器把默认字号调小，老年端正文/标题/按钮仍 ≥ 设计下限。 */
+.elderly-page { font-size: max(1.25rem, 20px); }
+.elderly-title { font-size: max(1.8rem, 28px); }
+.elderly-btn { font-size: max(1.35rem, 21px) !important; min-height: 72px !important; }
+html { scroll-padding-bottom: 120px; }
+
+/* ---------- 网格员端：手机/平板竖屏隐藏桌面侧栏，改抽屉 ---------- */
+@media (max-width: 767px) {
+  .grid-desktop-sider { display: none !important; }
+  .grid-mobile-header { display: flex !important; }
+}
+.grid-mobile-header { display: none; }
+
+/* ---------- 老年端安全区（头部在 .vue 内已用 calc+env；导航条/内容区在此兜底） ---------- */
+.elderly-nav {
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+.elderly-page {
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+}
+
+/* ---------- 老年端横屏提示层 ---------- */
+.elderly-rotate-mask {
+  display: none;
+  position: fixed; inset: 0; z-index: 999;
+  background: #1E293B; color: #fff;
+  flex-direction: column; align-items: center; justify-content: center;
+  font-size: 1.5rem; line-height: 2; text-align: center;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .elderly-rotate-mask { display: flex; }
+}

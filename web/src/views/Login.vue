@@ -42,7 +42,7 @@ async function demo(role) {
 
 <template>
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#CFDFFF 0%,#9DB8FF 55%,#6A8DFF 100%);">
-    <div style="background:var(--card-bg);border-radius:20px;padding:40px 36px;width:380px;box-shadow:0 16px 48px rgba(0,0,0,0.25);">
+    <div style="background:var(--card-bg);border-radius:20px;padding:40px 36px;width:380px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,0.25);padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right));">
       <div style="text-align:center;margin-bottom:24px;">
         <div style="font-size:2.4rem;">🏘️</div>
         <div style="font-size:1.4rem;font-weight:800;color:#1f2937;">社区先知</div>
@@ -60,11 +60,11 @@ async function demo(role) {
       </n-form>
 
       <n-divider style="font-size:0.8rem;color:#9ca3af;">快速体验</n-divider>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <n-button secondary type="success" @click="demo('resident')">居民</n-button>
-        <n-button secondary type="warning" @click="demo('grid')">网格员</n-button>
-        <n-button secondary type="error" @click="demo('elderly')">👴 老年入口（免登录）</n-button>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <n-button secondary type="success" @click="demo('resident')" style="min-height:44px;">居民</n-button>
+        <n-button secondary type="warning" @click="demo('grid')" style="min-height:44px;">网格员</n-button>
       </div>
+      <n-button secondary type="error" block style="margin-top:8px;min-height:44px;" @click="demo('elderly')">👴 老年入口（免登录）</n-button>
       <div style="text-align:center;color:#9ca3af;font-size:0.75rem;margin-top:16px;">
         居民/老人演示免密 · 网格员 demo123
       </div>

@@ -39,9 +39,16 @@ export function useSpeech() {
           }
         }
       }
-      rec.onerror = () => {
+      rec.onerror = (e) => {
         clearInterval(timer)
-        resolve({ ok: final.length > 0, reason: final ? 'partial' : 'error', text: final })
+        const reasonMap = {
+          'not-allowed': 'mic-denied',
+          'service-not-allowed': 'https-required',
+          network: 'network',
+          aborted: 'error',
+          'no-speech': 'empty',
+        }
+        resolve({ ok: final.length > 0, reason: reasonMap[e.error] || 'error', text: final })
       }
       rec.onend = () => {
         clearInterval(timer)

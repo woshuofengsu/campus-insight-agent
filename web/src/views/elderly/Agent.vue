@@ -25,6 +25,16 @@ onMounted(() => {
   })
 })
 
+function reasonMsg(reason) {
+  const t = {
+    'mic-denied': '麦克风权限未开启：请点浏览器地址栏的🔒，选择"麦克风"→允许',
+    'https-required': '语音需要 HTTPS 访问，请用 Safari 或 Chrome 直接打开',
+    network: '网络不稳，请再按一次说话',
+    unsupported: '当前浏览器不支持语音，请用下方文字输入',
+  }
+  return t[reason] || '没听清，请再说一次'
+}
+
 async function startListen() {
   listening.value = true
   remain.value = 60
@@ -36,8 +46,9 @@ async function startListen() {
     pendingText.value = r.text
     speak(`您说的是：${r.text}，对吗？说“对”确认，或点“重新说”。`)
   } else {
-    message.warning('没听清，请再说一次或直接打字')
-    speak('没听清，请再说一次')
+    const msg = reasonMsg(r.reason)
+    message.warning(msg)
+    speak(msg)
   }
 }
 

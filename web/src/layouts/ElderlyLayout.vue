@@ -21,17 +21,18 @@ const navs = [
 
 <template>
   <div style="min-height:100vh;background:#F7F8FA;">
-    <div style="background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:1.3rem;font-weight:800;">🏘️ 社区服务</div>
       <n-button size="small" text style="color:#fff;" @click="store.logout(); router.replace('/login')">退出</n-button>
     </div>
-    <div style="display:flex;gap:8px;padding:10px 12px;background:var(--primary-light,#E8EDFF);flex-wrap:wrap;">
+    <div class="elderly-nav" style="display:flex;gap:10px;padding:12px 14px;background:var(--primary-light,#E8EDFF);flex-wrap:wrap;">
       <n-button v-for="n in navs" :key="n.key" size="large" round
                 :type="route.path.startsWith(n.key) ? 'primary' : 'default'"
-                @click="router.push(n.key)" style="min-height:52px;font-size:1.1rem;">
+                @click="router.push(n.key)" style="min-height:64px;font-size:1.15rem;font-weight:700;padding:0 22px;">
         {{ n.label }}
       </n-button>
     </div>
     <router-view />
+    <div class="elderly-rotate-mask">📱<br/>请竖屏使用<br/>转动手机回到竖屏</div>
   </div>
 </template>

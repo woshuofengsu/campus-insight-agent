@@ -234,7 +234,7 @@ function cancelCall() {
 
     <!-- 紧急求助（长按 3 秒） -->
     <div style="margin-top:20px;">
-      <n-button size="large" type="error" block class="elderly-btn" style="min-height:84px;font-size:1.6rem;background:#dc2626;"
+      <n-button size="large" type="error" block class="elderly-btn" data-longpress style="min-height:84px;font-size:1.6rem;background:#dc2626;"
                 @mousedown="pressStart" @mouseup="pressCancel" @mouseleave="pressCancel" @touchstart="pressStart" @touchend="pressCancel">
         🆘 紧急求助（长按 3 秒）
       </n-button>

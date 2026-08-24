@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 streamlit_errors.log
+*.log
 docs/superpowers/
 
 uploads/
