@@ -37,19 +37,35 @@ def _user_payload(u: dict) -> dict:
 
 
 @router.post("/api/web/auth/login")
-def login(req: LoginRequest):
-    """居民/负责人/老人登录。"""
+def login(req: LoginRequest, request: Request):
+    """居民/负责人/老人登录。
+
+    WS0.3：登录失败计数（防爆破）。同一 username|ip 连续失败 ≥5 次锁定 5 分钟，
+    锁定期间即便密码正确也拒绝；成功后清零。
+    """
+    from utils.login_guard import check, record_fail, reset
+    ip = request.client.host if request.client else "unknown"
+    if check(req.username, ip):
+        return _fail(1002, "尝试次数过多，请稍后再试")
     from data.db_user import authenticate
     user = authenticate(req.username, req.password)
     if user is None:
+        record_fail(req.username, ip)
         return _fail(1002, "用户名或密码错误")
+    reset(req.username, ip)
     user["_token"] = make_token(user["id"], user["role"], user.get("name") or user.get("username") or "")
     return _ok(_user_payload(user))
 
 
 @router.post("/api/web/auth/demo")
 def demo_login(req: DemoLoginRequest):
-    """演示快速登录：直接取该角色第一个演示账号。"""
+    """演示快速登录：直接取该角色第一个演示账号。
+
+    WS0.1 安全止血：生产（DEMO_MODE=false）硬关闭，杜绝无密领取任意角色 JWT 的越权。
+    """
+    import config
+    if not getattr(config, "DEMO_MODE", True):
+        return _fail(1003, "演示登录未开启")
     from data.db_user import list_users
     for u in list_users(role=req.role):
         u["_token"] = make_token(u["id"], u["role"], u.get("name") or u.get("username") or "")

@@ -1,8 +1,14 @@
 .env
+.env.bak
 __pycache__/
 .pytest_cache/
 *.pyc
 *.db
+*.db.bak
+*.db.bak*
+*.db-wal
+*.db-shm
+*.db-journal
 .streamlit/
 *.egg-info/
 dist/
@@ -13,12 +19,7 @@ streamlit_errors.log
 docs/superpowers/
 
 uploads/
-*.db
-*.db.bak
-*.db.bak*
 web/dist/
 web/node_modules/
 
-# HTTPS 证书等部署机密（?docs/deploy-https.md?nginx/certs/）
-
-.env.bak
+# 部署机密：HTTPS 证书/密钥放入 nginx/certs/（勿提交），详见 docs/deploy-https.md

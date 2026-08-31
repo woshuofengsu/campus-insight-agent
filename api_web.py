@@ -25,6 +25,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 _log = logging.getLogger(__name__)
 
+# WS0.1：演示登录门控（生产 DEMO_MODE=false 时该端点在中间件层硬关）。
+from config import DEMO_MODE  # noqa: E402
+
+_DEMO_LOGIN_PATH = "/api/web/auth/demo"
+
+
+def _json_err(code: int, message: str, status: int) -> JSONResponse:
+    return JSONResponse(status_code=status, content={
+        "success": False, "data": None, "error": message, "code": code, "message": message,
+    })
+
 # ---------------- JWT（stdlib HMAC HS256） ----------------
 # 已随路由拆分（P2-04 / P1-F2-01）移入 api_routes/deps.py，此处仅向后兼容引用。
 
@@ -45,19 +56,24 @@ def fail(code: int, message: str) -> JSONResponse:
 
 # ---------------- App ----------------
 
-_db_ready = False
+_db_path_seeded: str | None = None
 
 
 def _ensure_db():
-    global _db_ready
-    if _db_ready:
-        return
+    """确保当前 config.DB_PATH 已建表 + 灌种子数据。
+
+    按 DB 路径维度记忆（而非布尔），避免多库/测试隔离时漏灌种子：
+    每个独立 DB_PATH 最多初始化一次；换库会重新初始化。
+    """
+    global _db_path_seeded
     from config import DB_PATH
+    if _db_path_seeded == DB_PATH:
+        return
     from data.db_core import init_db
     from data.seed import seed_all
     init_db(DB_PATH)
     seed_all(DB_PATH)
-    _db_ready = True
+    _db_path_seeded = DB_PATH
 
 
 _scheduler_started = False
@@ -88,22 +104,27 @@ async def _lifespan(app):
     yield
 
 
+# WS0.2：生产（DEMO_MODE=false）关闭交互式 API 文档，避免接口面暴露。
 app = FastAPI(title="CommunityInsight Web API", version="3.0.0",
-              docs_url="/web/docs", redoc_url="/web/redoc", openapi_url="/web/openapi.json",
+              docs_url=("/web/docs" if DEMO_MODE else None),
+              redoc_url=("/web/redoc" if DEMO_MODE else None),
+              openapi_url=("/web/openapi.json" if DEMO_MODE else None),
               lifespan=_lifespan)
 
+# WS0.2：CORS 白名单化（从环境变量读，缺省仅本机开发端口；不再用 allow_origins=["*"]）。
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS",
+                  "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# 公开路径：登录 + 健康检查 + 文档 + 前端静态
-_PUBLIC_PATHS = {"/api/web/auth/login", "/api/web/auth/demo", "/api/web/health",
-                 "/web/docs", "/web/redoc", "/web/openapi.json",
+# 公开路径：登录 + 演示登录（DEMO_MODE 门控）+ 健康检查 + 前端静态
+_PUBLIC_PATHS = {"/api/web/auth/login", "/api/web/health",
                  "/", "/index.html", "/favicon.ico"}
 
 
@@ -120,7 +141,12 @@ async def _web_auth_middleware(request: Request, call_next):
     tid = request.headers.get("X-Request-ID") or new_trace_id()
     set_trace_id(tid)
     path = request.url.path
-    if not path.startswith("/api/web/") or path in _PUBLIC_PATHS or path.startswith("/web/"):
+    # WS0.1：演示登录在中间件层硬关（生产 DEMO_MODE=false 直接 403，不落到路由层）。
+    if path == _DEMO_LOGIN_PATH and not DEMO_MODE:
+        set_trace_id("")
+        return _json_err(1003, "演示登录未开启", 403)
+    is_demo = path == _DEMO_LOGIN_PATH
+    if not path.startswith("/api/web/") or path in _PUBLIC_PATHS or is_demo or path.startswith("/web/"):
         try:
             resp = await call_next(request)
         finally:
