@@ -54,6 +54,8 @@ USE_REAL_WEATHER = True        # 和风天气免费 API（感知模块触发用�
 COMMUNITY_CITY = _secret("COMMUNITY_CITY", "") or _secret("CAMPUS_CITY", "北京")
 COMMUNITY_CITY_ID = _secret("COMMUNITY_CITY_ID", "") or _secret("CAMPUS_CITY_ID", "101010100")
 COMMUNITY_DISTRICT = _secret("COMMUNITY_DISTRICT", "") or _secret("CAMPUS_DISTRICT", "海淀区")
+# 多租户默认标识（P2-1 演示级）：单库默认社区，作为 tenant_id 默认值；未来接多社区时按社区写入。
+DEFAULT_TENANT = _secret("DEFAULT_TENANT", "") or COMMUNITY_DISTRICT or "default"
 COMMUNITY_BG_IMAGE = _secret("COMMUNITY_BG_IMAGE", "") or _secret("CAMPUS_BG_IMAGE", "")  # URL 或本地路径
 
 # 真实 API 密钥

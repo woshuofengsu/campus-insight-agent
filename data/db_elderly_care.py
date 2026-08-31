@@ -21,6 +21,7 @@ from datetime import date, datetime
 
 from data.db_core import get_db
 from data.db_notifications import create_notification, log_activity
+from data.db_repair import _dec_phone, _enc_phone
 
 MODULE = "老年端"
 
@@ -760,9 +761,9 @@ def add_emergency_contact(user_id: int, name: str, phone: str, relation: str,
         if cnt >= 3:
             return 0, "紧急联系人最多 3 个，请先删除一个再添加。"
         cur = conn.execute(
-            "INSERT INTO emergency_contacts (user_id, name, phone, relation, setter_id, status) "
-            "VALUES (?,?,?,?,?,'待审核')",
-            (user_id, name, phone, relation, setter_id),
+            "INSERT INTO emergency_contacts (user_id, name, phone, phone_enc, relation, setter_id, status) "
+            "VALUES (?,?,?,?,?,?,'待审核')",
+            (user_id, name, "", _enc_phone(phone), relation, setter_id),
         )
         cid = cur.lastrowid
         conn.commit()
@@ -830,11 +831,12 @@ def modify_emergency_contact(contact_id: int, name: str, phone: str, relation: s
         ).fetchone()
         if row is None:
             return False, "紧急联系人不存在"
-        old = f"{row['relation']} {row['name']} {row['phone'][:3]}****{row['phone'][-4:]}"
+        old_phone = _dec_phone(row["phone_enc"] or "", row["phone"] or "")
+        old = f"{row['relation']} {row['name']} {old_phone[:3]}****{old_phone[-4:]}"
         conn.execute(
-            "UPDATE emergency_contacts SET name=?, phone=?, relation=?, status='待审核', "
+            "UPDATE emergency_contacts SET name=?, phone='', phone_enc=?, relation=?, status='待审核', "
             "audit_opinion='', updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (name, phone, relation, contact_id),
+            (name, _enc_phone(phone), relation, contact_id),
         )
         conn.commit()
     log_activity(actor or name, "修改紧急联系人", "emergency_contact", contact_id,
@@ -882,6 +884,20 @@ def get_emergency_contact(contact_id: int) -> dict | None:
         return dict(row) if row else None
 
 
+def _dec_contact(r: dict) -> dict:
+    """解密 emergency_contacts 行的 phone（兼容未迁移明文）。"""
+    r = dict(r)
+    r["phone"] = _dec_phone(r.get("phone_enc") or "", r.get("phone") or "")
+    return r
+
+
+def _dec_call_phone(r: dict) -> dict:
+    """解密 emergency_calls 行的 target_phone（兼容未迁移明文）。"""
+    r = dict(r)
+    r["target_phone"] = _dec_phone(r.get("target_phone_enc") or "", r.get("target_phone") or "")
+    return r
+
+
 def list_emergency_contacts(user_id: int | None = None) -> list[dict]:
     """列表。审核通过在前，其余按创建时间倒序。"""
     q = "SELECT * FROM emergency_contacts WHERE 1=1"
@@ -892,7 +908,7 @@ def list_emergency_contacts(user_id: int | None = None) -> list[dict]:
     q += " ORDER BY created_at DESC"
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
-        result = [dict(r) for r in rows]
+        result = [_dec_contact(dict(r)) for r in rows]
 
     prio = {"审核通过": 0, "待审核": 1, "审核不通过": 2}
     result.sort(key=lambda c: (prio.get(c["status"], 3), c["created_at"] or ""))
@@ -906,7 +922,7 @@ def get_approved_contacts(user_id: int) -> list[dict]:
             "SELECT * FROM emergency_contacts WHERE user_id=? AND status='审核通过' "
             "ORDER BY created_at ASC", (user_id,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_dec_contact(dict(r)) for r in rows]
 
 
 def get_contact_timeline(contact_id: int) -> list[dict]:
@@ -955,8 +971,8 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
         first = approved[0]
         cur = conn.execute(
             "INSERT INTO emergency_calls (user_id, call_type, target_name, target_phone, "
-            "result, status) VALUES (?, 'sos', ?, ?, '已触发，正在呼叫', '求助中')",
-            (user_id, first["name"], first["phone"]),
+            "target_phone_enc, result, status) VALUES (?, 'sos', ?, '', ?, '已触发，正在呼叫', '求助中')",
+            (user_id, first["name"], _enc_phone(first["phone"])),
         )
         call_id = cur.lastrowid
         conn.commit()
@@ -1109,7 +1125,7 @@ def get_sos_call(call_id: int) -> dict | None:
 def get_latest_sos(user_id: int) -> dict | None:
     with get_db() as conn:
         row = _latest_sos(conn, user_id=user_id)
-        return dict(row) if row else None
+        return _dec_call_phone(dict(row)) if row else None
 
 
 def get_sos_calls(user_id: int | None = None, status: str | None = None,
@@ -1126,7 +1142,7 @@ def get_sos_calls(user_id: int | None = None, status: str | None = None,
     args.append(limit)
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
-        return [dict(r) for r in rows]
+        return [_dec_call_phone(dict(r)) for r in rows]
 
 
 def get_sos_timeline(call_id: int) -> list[dict]:
@@ -1155,8 +1171,8 @@ def log_emergency_call(user_id: int, call_type: str, target_name: str,
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO emergency_calls (user_id, call_type, target_name, target_phone, "
-            "result, status) VALUES (?,?,?,?,?,?)",
-            (user_id, call_type, target_name, target_phone, result, status),
+            "target_phone_enc, result, status) VALUES (?,?,?,?,?,?,?)",
+            (user_id, call_type, target_name, "", _enc_phone(target_phone), result, status),
         )
         call_id = cur.lastrowid
         conn.commit()
@@ -1186,7 +1202,7 @@ def get_latest_contact_call(user_id: int) -> dict | None:
             "SELECT * FROM emergency_calls WHERE user_id=? AND call_type='contact' "
             "ORDER BY id DESC LIMIT 1", (user_id,)
         ).fetchone()
-        return dict(row) if row else None
+        return _dec_call_phone(dict(row)) if row else None
 
 
 def get_recent_contact_calls(user_id: int, limit: int = 5) -> list[dict]:
@@ -1195,7 +1211,7 @@ def get_recent_contact_calls(user_id: int, limit: int = 5) -> list[dict]:
             "SELECT * FROM emergency_calls WHERE user_id=? AND call_type='contact' "
             "ORDER BY id DESC LIMIT ?", (user_id, limit)
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_dec_call_phone(dict(r)) for r in rows]
 
 
 # =====================================================================

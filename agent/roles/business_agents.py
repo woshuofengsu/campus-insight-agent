@@ -75,6 +75,61 @@ def _draft_key(uid, name):
     return f"user:{uid}:{name}"
 
 
+# 报修地点归一类：区分「室内(家里)」vs「室外(公共区域)」。
+# 判据覆盖常见表述；无明确地点词时按上下文默认（默认室内，更贴合老人报修"家里"场景）。
+# 注意：室外词优先，避免"我家楼下"这类含"家"又含室外词的场景判错。
+_INDOOR_WORDS = ("内", "家", "屋", "卧室", "客厅", "厨房", "卫生间", "厕所", "浴室", "阳台")
+_OUTDOOR_WORDS = ("公共", "楼道", "走廊", "楼梯", "楼下", "广场", "过道", "门口", "外面", "室外", "花园", "车库", "电梯")
+
+
+def _classify_repair_location(text: str) -> str:
+    """根据用户描述判断报修地点是室内还是室外。"""
+    t = text or ""
+    # 室外词优先命中（如"我家楼下广场"含"家"也含"广场"，应判室外）
+    if any(w in t for w in _OUTDOOR_WORDS):
+        return "室外"
+    if any(w in t for w in _INDOOR_WORDS):
+        return "室内"
+    return "室内"  # 默认室内（老人常直接说"家里漏水"）
+
+
+def _classify_repair_urgency(text: str, state_urgent: bool | None) -> str:
+    """判断紧急程度。显式写紧急/急（排除"不着急/别急"否定）→ 紧急；否则按上下文标记兜底。"""
+    t = text or ""
+    # 否定词优先：不着急/别急/不用急 → 一般
+    if any(k in t for k in ("不着急", "别急", "不用急", "不急", "缓缓", "有空再说", "不紧")):
+        return "一般"
+    if any(k in t for k in ("紧急", "急", "很急", "马上", "立刻", "尽快", "快点")):
+        return "紧急"
+    return "紧急" if state_urgent else "一般"
+
+
+# 安全隐患词 → 隐患类型（P2 扩展2：报修中发现生命财产风险，协商通知管理员升级）。
+# 与 web_agent 意图词一致；只用复合/明确风险词，避免"燃气缴费/触电急救"等误路由。
+_HAZARD_MAP = [
+    (("燃气泄漏", "煤气泄漏", "燃气味", "煤气味", "漏气"), "燃气泄漏"),
+    (("漏电", "冒火花"), "漏电隐患"),
+    (("起火", "着火", "冒烟", "烧焦味", "焦味", "浓烟"), "火灾风险"),
+]
+
+
+def _detect_hazard(text: str) -> str:
+    """识别报修描述中的安全隐患类型，无则返回空串。"""
+    t = text or ""
+    for words, label in _HAZARD_MAP:
+        if any(w in t for w in words):
+            return label
+    return ""
+
+
+# 健康词表（从 HealthAdvisorAgent.process 内联提取，供协商共用；行为不变）
+_DISCOMFORT_WORDS = ("不舒服", "难受", "头晕", "头疼", "胸闷", "心慌", "没力气",
+                     "胸痛", "呼吸困难", "意识不清", "大出血", "抽搐")
+_URGENT_SYMPTOM_WORDS = ("胸痛", "呼吸困难", "意识不清", "大出血", "抽搐")
+# 对健康有影响的预警类型（扩展1：健康顾问反向查询天气守护员时过滤用）
+_WEATHER_HEALTH_TYPES = ("高温", "寒潮", "暴雨", "台风", "大雾", "雷电", "重污染")
+
+
 # ---------------------------------------------------------------------------
 # 报修调度员
 # ---------------------------------------------------------------------------
@@ -101,10 +156,10 @@ class RepairDispatchAgent(BaseAgent):
         # 追问/确认阶段
         step = st.get("step")
         if step == "ask_type":
-            draft["type"] = "室内" if ("内" in text or "家" in text) else "室外"
+            draft["type"] = _classify_repair_location(text)
             st["step"] = "ask_urgency" if draft.get("urgency") is None else "confirm"
         elif step == "ask_urgency":
-            draft["urgency"] = "紧急" if ("紧急" in text or "急" in text or st.get("urgent")) else "一般"
+            draft["urgency"] = _classify_repair_urgency(text, st.get("urgent"))
             st["step"] = "confirm"
         elif step == "confirm":
             if text in ("确认", "确认提交", "提交", "对", "是"):
@@ -122,6 +177,26 @@ class RepairDispatchAgent(BaseAgent):
 
         # 新报修
         if draft is None:
+            # P2 扩展2：安全隐患 → 紧急直确认 + 安全引导 + 协商通知管理员（跳过"家里/公共区域"追问）
+            hazard = _detect_hazard(text)
+            if hazard:
+                draft = {"desc": text, "type": _classify_repair_location(text), "urgency": "紧急"}
+                st["step"] = "confirm"
+                st["intent"] = "repair"
+                self._write(_draft_key(uid, "work_order_draft"), draft, lock=False)
+                self._write(_state_key(uid), st)
+                self._post("notification_manager", "notify", {
+                    "event": "safety_hazard", "hazard": hazard,
+                    "location": draft["type"], "desc": text[:60],
+                })
+                return self._reply(
+                    f"🚨 这属于{hazard}，请先确保安全：远离现场、不要开关电器、"
+                    f"{'开窗通风、' if hazard == '燃气泄漏' else ''}到安全位置，必要时拨打 119。\n\n"
+                    f"已按「紧急」为您准备好工单，确认后立即通知负责人处理：\n"
+                    f"· 问题：{text[:50]}\n· 位置：{draft['type']}\n· 紧急程度：紧急",
+                    "需确认", "报修",
+                    actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],
+                    chain_note=f"安全隐患（{hazard}）：紧急直确认 + 主动协商通知管理员")
             draft = {"desc": text, "type": "室内", "urgency": "紧急" if st.get("urgent") else None}
             if ctx.get("role") == "elderly":
                 draft["urgency"] = draft["urgency"] or "一般"
@@ -262,10 +337,9 @@ class HealthAdvisorAgent(BaseAgent):
         text = ctx.get("user_input") or ""
         # 身体不适 → 提示联系社区/家属 + 紧急求助（不诊断）
         # 紧急症状（胸痛/呼吸困难等）独立触发，确保即使不在普通不适词表也转人工（P1-D3-01 评测暴露）
-        if any(k in text for k in ("不舒服", "难受", "头晕", "头疼", "胸闷", "心慌", "没力气",
-                                   "胸痛", "呼吸困难", "意识不清", "大出血", "抽搐")):
+        if any(k in text for k in _DISCOMFORT_WORDS):
             # 疑似紧急症状 → 主动协商：handoff 接待员转人工
-            urgent_symptom = any(k in text for k in ("胸痛", "呼吸困难", "意识不清", "大出血", "抽搐"))
+            urgent_symptom = any(k in text for k in _URGENT_SYMPTOM_WORDS)
             if urgent_symptom:
                 self._post("receptionist", "handoff", {
                     "event": "urgent_symptom", "reason": "疑似紧急症状，需人工确认",
@@ -277,6 +351,20 @@ class HealthAdvisorAgent(BaseAgent):
                     actions=[{"type": "buttons", "options": ["拨打 120", "联系社区", "紧急求助"]},
                              {"type": "navigate", "to": "/resident/health", "label": "去健康防护"}],
                     chain_note="疑似紧急症状：转人工（停机点）")
+            # P2 扩展1：非紧急不适 + 生效天气预警 → 主动查询天气守护员（健康→天气反向协商）
+            try:
+                from data.db_weather import get_active_alerts
+                alerts = [a for a in get_active_alerts()
+                          if a.get("alert_type") in _WEATHER_HEALTH_TYPES]
+            except Exception:
+                alerts = []
+            if alerts:
+                tags = "、".join(f"{a.get('alert_type')}{a.get('level')}" for a in alerts[:2])
+                symptom = next((k for k in _DISCOMFORT_WORDS if k in text), "")
+                self._post("weather_guardian", "task_request", {
+                    "event": "health_weather_risk_query",
+                    "symptom": symptom, "tags": tags, "question": text[:60],
+                })
             return self._reply(
                 "您感觉不舒服吗？请不要着急。社区顾问不做诊断，如果症状持续或加重，请及时就医。"
                 "需要的话，可以帮您联系社区或家属，也可以长按红色紧急求助按钮。",
@@ -322,6 +410,20 @@ class HealthAdvisorAgent(BaseAgent):
             return {"accepted": True, "reply": f"已根据天气预警准备健康提醒：{suggestion}",
                     "suggestion": suggestion, "event": "extreme_weather",
                     "tags": tags, "escalate": False}
+        # P2 扩展1：天气守护员的风险评估回执（健康顾问发起反向查询的响应）
+        if msg.get("type") == "task_response" and payload.get("event") == "health_weather_risk_confirmed":
+            # 接线 arbiter professional_first：天气评估认为无直接风险、但症状描述需谨慎时，
+            # 以健康顾问专业判断为准（给 professional_first 规则一个真实触发源，决策落 agent_logs）
+            if payload.get("risk_level") in ("none", "") and payload.get("symptom") in ("头晕", "胸闷", "心慌"):
+                try:
+                    from agent.arbiter import Arbiter
+                    arb = Arbiter().arbitrate({
+                        "professional_domain": True, "agent": self.key,
+                        "reason": "天气评估无直接风险，但症状描述需保持谨慎建议"})
+                    self._write("last_arbitration", arb)
+                except Exception:
+                    pass
+            return {"accepted": True}  # 无 reply：不重复合并文本，仅留执行链节点
         return None
 
 
@@ -363,5 +465,14 @@ class NotificationManagerAgent(BaseAgent):
                 "accepted": True,
                 "reply": "已生成天气预警通知草稿（含老人防护提示），需负责人确认后发布",
                 "draft_ready": True,
+            }
+        # P2 扩展2：报修调度员上报安全隐患 → 生成紧急预警通知草稿（停机点：仍需负责人确认发布）
+        if payload.get("event") == "safety_hazard":
+            hazard = payload.get("hazard", "安全隐患")
+            return {
+                "accepted": True,
+                "reply": f"【通知管理员】已生成「{hazard}」紧急预警通知草稿"
+                         f"（提醒相关楼栋居民避险），待负责人确认后立即发布",
+                "draft_ready": True, "hazard": hazard,
             }
         return None

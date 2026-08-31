@@ -97,6 +97,15 @@ class Orchestrator:
                "elder_uid": elder_uid,
                "state": st}
 
+        # 协商循环计数按用户轮次重置（P2 扩展前置修复：此前跨轮累计，
+        # 同一用户连续多轮协商后相关 agent 计数达上限，会误触发"强制转人工"；
+        # 循环防护的本职——单轮内防死循环——由 _drain_negotiations 外层 5 次上限 + 单目标 2 轮共同保障。）
+        for _k in self.agents:
+            try:
+                self.bb.write(f"negotiation:{_k}", 0, "orchestrator")
+            except Exception:
+                pass
+
         # 取消指令：清理草稿与状态（彻底清空，避免残留 step 导致续接）
         if text in ("算了", "取消", "不要了", "先不弄了"):
             for k in _draft_keys(uid):
@@ -275,6 +284,20 @@ class Orchestrator:
 
         # 主动协商：处理目标 Agent 消息队列中的协商消息（事件触发，按优先级）
         # 真协商（P2-A2-02）：链式处理——响应引发的新消息继续协商，直到队列空或达轮次上限
+        # P1-1：LLM 自主协商（可选开关 LLM_ORCHESTRATION=1）——LLM 判断是否联动其他角色
+        try:
+            from agent.llm_negotiator import decide_collaboration
+            dec = decide_collaboration(ctx.get("user_input", ""), intent)
+            if dec.get("need") and dec.get("target") and dec["target"] in self.agents:
+                self._log("negotiation", "LLM自主协商", f"→{dec['target']}：{dec.get('reason', '')}")
+                self.bb.post_message(dec["target"], {
+                    "from": target, "to": dec["target"], "type": "notify",
+                    "payload": {"event": "llm_collaboration",
+                                "reason": dec.get("reason", ""),
+                                "context": ctx.get("user_input", "")[:60]},
+                })
+        except Exception:
+            pass
         result = self._drain_negotiations(result, target)
         # 记录目标 Agent 发起的协商（handoff/notify 等，消息保留供后续消费）
         self._record_outbound_negotiations(target)

@@ -304,3 +304,32 @@ def resolve_handoff(handoff_id: int, actor: str = "负责人") -> bool:
             (handoff_id,))
         conn.commit()
         return cur.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# 自转率量化（P0-3：AI 对话自解决率 + 工单社区自办结率）
+# ---------------------------------------------------------------------------
+
+def get_self_resolution_stats(days: int = 30) -> dict:
+    """自转率量化：AI 对话自解决率 + 工单社区自办结率。
+
+    - ai_self_resolution_rate = (总对话轮数 - 转人工次数) / 总对话轮数
+    - issue_self_resolution_rate = 社区内办结工单 / 总工单
+    """
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as conn:
+        total_dialogs = conn.execute(
+            "SELECT COUNT(*) c FROM agent_dialogs WHERE created_at>=? AND is_bot=0",
+            (since,)).fetchone()["c"]
+        transferred = conn.execute(
+            "SELECT COUNT(*) c FROM agent_handoffs WHERE created_at>=?", (since,)).fetchone()["c"]
+        total_issues = conn.execute("SELECT COUNT(*) c FROM community_issues").fetchone()["c"]
+        done_issues = conn.execute(
+            "SELECT COUNT(*) c FROM community_issues WHERE status IN ('已解决','已办结','已完成')"
+        ).fetchone()["c"]
+    ai_rate = round((total_dialogs - transferred) / total_dialogs * 100, 1) if total_dialogs else 0.0
+    issue_rate = round(done_issues / total_issues * 100, 1) if total_issues else 0.0
+    return {"days": days, "total_dialogs": total_dialogs, "transferred": transferred,
+            "ai_self_resolution_rate": ai_rate,
+            "total_issues": total_issues, "done_issues": done_issues,
+            "issue_self_resolution_rate": issue_rate}

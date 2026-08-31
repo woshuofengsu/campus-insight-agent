@@ -757,3 +757,138 @@ def test_llm_polish_pass_uses_llm(client, monkeypatch):
     out = B._llm_polish_health_suggestion("高温橙色", "提醒老人注意防暑/保暖，减少外出")
     assert "高温天气" in out  # LLM 合规文案被采用
     assert "确诊" not in out
+
+
+# =====================================================================
+# P2 扩展：多 Agent 协作边界拓宽（健康→天气反向 / 报修安全隐患升级 / 协商计数轮次重置）
+# =====================================================================
+
+
+def test_negotiation_count_resets_per_turn():
+    """前置修复：协商循环计数按轮重置，连续多轮不误触发强制转人工。"""
+    from agent.orchestrator import Orchestrator
+    o = Orchestrator()
+    o.bb.write("negotiation:health_advisor", 2, "orchestrator")  # 模拟已达上限
+    r = o.run("resident", 1, "测试用户", "我有点头晕")  # 无预警时不触发协商
+    # run() 开始时已重置计数，不会因历史累计而误转人工
+    assert o.bb.read("negotiation:health_advisor") == 0
+    assert r["status"] not in ("transferred_to_human", "拦截")
+
+
+def test_intent_hazard_keywords():
+    """扩展2前置：安全隐患词路由到报修；且不误伤『燃气缴费』等政策类。"""
+    from agent import web_agent as A
+    for role in ("resident", "elderly"):
+        assert A.detect_intent("楼道里闻到很浓的燃气味", role) == "报修"
+        assert A.detect_intent("电线冒火花", role) == "报修"
+    assert A.detect_intent("燃气缴费怎么交", "resident") == "政策问答"  # 不误路由
+    assert A.detect_intent("有人触电了快打120", "resident") != "报修"  # 急救场景不进报修流
+
+
+def test_negotiation_repair_safety_hazard(client):
+    """扩展2：燃气泄漏 → 紧急直确认 + 协商通知管理员生成预警草稿 + 协作提示。"""
+    _reset(client)
+    out, _ = _chat(client, "楼道里闻到很浓的燃气味")
+    assert out["intent"] == "repair_dispatch" and out["status"] == "需确认"
+    # 安全引导
+    assert "安全" in out["reply"] and "119" in out["reply"]
+    # 协商节点存在
+    assert any(c["agent"] == "negotiation" for c in out["execution_chain"])
+    # 协作提示并入了通知管理员草稿
+    assert "通知管理员" in out["reply"] and "燃气泄漏" in out["reply"]
+    _reset(client)  # 清草稿防污染
+
+
+def test_negotiation_health_weather_reverse(client):
+    """扩展1：健康顾问反向查询天气守护员（需先生效一条预警）。"""
+    from datetime import datetime, timedelta
+    from data.db_core import get_db
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    exp = (datetime.now() + timedelta(hours=6)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO weather_alerts (alert_id, alert_type, level, effective_time, expire_time, status) "
+            "VALUES ('test-hw-1', '高温', '红色', ?, ?, 'active')", (now, exp))
+        conn.commit()
+    try:
+        _reset(client)
+        out, _ = _chat(client, "我有点头晕")
+        assert out["intent"] == "health_advisor"
+        # 双向协商往返
+        agents = [c["agent"] for c in out["execution_chain"]]
+        assert any(c["agent"] == "negotiation" for c in out["execution_chain"])
+        # 协作提示含天气守护员
+        assert "协作提示" in out["reply"] and "天气守护员" in out["reply"]
+        # Verifier 健康规则反向验证：无诊断/药物词
+        assert "确诊" not in out["reply"] and "建议服用" not in out["reply"]
+    finally:
+        with get_db() as conn:
+            conn.execute("DELETE FROM weather_alerts WHERE alert_id='test-hw-1'")
+            conn.commit()
+
+
+def test_self_resolution_stats(client):
+    """自转率统计接口（P0-3）：负责人可查，返回两口径比率且数值在 [0,100]。"""
+    token = _login(client, "grid")
+    r = client.get("/api/web/agent/self-resolution",
+                   headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200 and r.json()["success"]
+    d = r.json()["data"]
+    assert 0 <= d["ai_self_resolution_rate"] <= 100
+    assert 0 <= d["issue_self_resolution_rate"] <= 100
+    assert d["total_dialogs"] >= 0
+    # 非负责人无权限
+    t2 = _login(client, "resident")
+    r2 = client.get("/api/web/agent/self-resolution",
+                    headers={"Authorization": f"Bearer {t2}"})
+    assert r2.status_code == 403 or not r2.json().get("success")
+
+
+def test_llm_negotiator_disabled_by_default():
+    """P1-1：LLM 协商默认关闭时，决策器返回 need=False（不破坏规则主干）。"""
+    from agent.llm_negotiator import decide_collaboration
+    d = decide_collaboration("楼道闻到燃气味", "repair")
+    assert d["need"] is False and d["target"] is None
+
+
+def test_llm_negotiator_no_key_falls_back(monkeypatch):
+    """P1-1：LLM 调用异常（网络/超时）时优雅降级 need=False，不抛异常。
+
+    注：config.DEEPSEEK_API_KEY 在模块加载时缓存，monkeypatch 改 env 不影响；
+    故用 mock urlopen 抛网络异常来确定性触发 error 降级（而非真实 LLM 调用）。
+    """
+    import urllib.request as U
+    from agent.llm_negotiator import decide_collaboration
+
+    def _boom(*a, **k):
+        raise OSError("network down")
+
+    monkeypatch.setenv("LLM_ORCHESTRATION", "1")
+    monkeypatch.setattr(U, "urlopen", _boom)
+    d = decide_collaboration("家里漏水", "repair")
+    assert d["need"] is False
+    assert d["reason"] == "error"
+
+
+def test_nlu_dialect():
+    """P1-5：NLU 方言归一化 → 指代消解 → 否定提取（≥9 断言）。"""
+    from agent import web_agent as A
+    # 方言：东北/四川/粤语说法归一化为普通话后能识别报修/天气
+    assert A.detect_intent(A.nlu_preprocess("我家水管咋整"), "resident") == "报修"
+    assert A.detect_intent(A.nlu_preprocess("灯泡不亮了咋整"), "elderly") == "报修"
+    assert A.detect_intent(A.nlu_preprocess("明天下雨吗"), "resident") == "天气查询"
+    # 指代消解：recent_entity 为"水管"时，"那个又坏了"→ 水管（不误替换为有明确词的）
+    t = A.resolve_reference("那个又坏了", "水管")
+    assert "水管" in t
+    # 文本已含明确业务词则不替换
+    t2 = A.resolve_reference("那个水管坏了", "水管")
+    assert "水管" in t2
+    # 否定/纠偏提取：「不是A是B」→ 取肯定目标 B
+    neg = A.extract_negation_target("不是漏水是跳闸")
+    assert neg and "跳闸" in neg
+    # 无纠偏结构则返回 None
+    assert A.extract_negation_target("回家水管漏水") in (None, "回家水管漏水")
+    # 方言词表已扩充 ≥50 条
+    assert len(A.DIALECT_MAP) >= 50
+    # 话题切换检测：方言输入不破坏口径（nlu_preprocess 两处一致）
+    assert A.nlu_preprocess("楼道闻到燃气味") == "楼道闻到燃气味" or "楼道" in A.nlu_preprocess("楼道闻到燃气味")

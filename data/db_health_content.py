@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 
 from data.db_core import get_db
 from data.db_notifications import log_activity
+from data.db_repair import _dec_phone, _enc_phone
 
 _log = logging.getLogger(__name__)
 
@@ -652,11 +653,11 @@ def submit_consult(user_id: int, name: str, phone: str, consult_type: str,
 
     with get_db() as conn:
         cur = conn.execute(
-            "INSERT INTO health_consults (user_id, name, phone, consult_type, content, "
-            "building, attachment_json, is_agent_report, agent_name, agent_phone, "
-            "agent_relation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '待回复')",
-            (user_id, name.strip(), phone, consult_type, content.strip(), building,
-             attachment_json, is_agent_report, agent_name, agent_phone, agent_relation),
+            "INSERT INTO health_consults (user_id, name, phone, phone_enc, consult_type, content, "
+            "building, attachment_json, is_agent_report, agent_name, agent_phone, agent_phone_enc, "
+            "agent_relation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '待回复')",
+            (user_id, name.strip(), "", _enc_phone(phone), consult_type, content.strip(), building,
+             attachment_json, is_agent_report, agent_name, "", _enc_phone(agent_phone), agent_relation),
         )
         consult_id = cur.lastrowid
         conn.commit()
@@ -918,7 +919,17 @@ def auto_close_stale_consults() -> list[int]:
 def get_consult(consult_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM health_consults WHERE id=?", (consult_id,)).fetchone()
-        return dict(row) if row else None
+        return _decrypt_consult_phone(dict(row)) if row else None
+
+
+def _decrypt_consult_phone(d: dict) -> dict:
+    """解密 health_consults 行的 phone/agent_phone（兼容未迁移明文）。"""
+    d = dict(d)
+    d["phone"] = _dec_phone(d.get("phone_enc") or "", d.get("phone") or "")
+    d["agent_phone"] = _dec_phone(d.get("agent_phone_enc") or "", d.get("agent_phone") or "")
+    if not d.get("phone_masked"):
+        d["phone_masked"] = mask_phone(d.get("phone") or "")
+    return d
 
 
 def list_consults(status: str | None = None, consult_type: str | None = None,
@@ -941,7 +952,7 @@ def list_consults(status: str | None = None, consult_type: str | None = None,
         rows = conn.execute(q, args).fetchall()
         out = []
         for r in rows:
-            d = dict(r)
+            d = _decrypt_consult_phone(dict(r))
             d["phone_masked"] = mask_phone(d.get("phone", ""))
             d["code"] = get_consult_code(d["id"])
             out.append(d)
@@ -957,7 +968,7 @@ def get_my_consults(user_id: int, limit: int = 50) -> list[dict]:
         ).fetchall()
         out = []
         for r in rows:
-            d = dict(r)
+            d = _decrypt_consult_phone(dict(r))
             d["code"] = get_consult_code(d["id"])
             out.append(d)
         return out

@@ -4,6 +4,18 @@
 from agent import web_agent as A
 from agent.roles.base import BaseAgent
 
+# 对健康有影响的预警类型（与 business_agents._WEATHER_HEALTH_TYPES 一致，供反向查询复核）
+_WEATHER_HEALTH_TYPES = ("高温", "寒潮", "暴雨", "台风", "大雾", "雷电", "重污染")
+
+# 症状 × 天气影响建议（行为指引，不诊断、不荐药，天然过 Verifier 健康规则集）
+_WEATHER_SYMPTOM_ADVICE = {
+    "头晕": "头晕可能与高温脱水或闷热缺氧有关，请先到阴凉处休息、补充水分，避免外出",
+    "头疼": "高温天气易引发头疼，请注意补水降温、避免正午外出",
+    "胸闷": "闷热低气压可能加重胸闷，请保持室内通风、减少活动，症状持续请及时就医",
+    "心慌": "高温天气可能加重心慌，请减少活动、保持情绪平稳，症状持续请及时就医",
+    "没力气": "高温天气易导致乏力，请注意休息补水、避免外出",
+}
+
 
 # ---------------------------------------------------------------------------
 # 天气守护员（自动运行；不自动执行应急措施）
@@ -55,6 +67,28 @@ class WeatherGuardianAgent(BaseAgent):
         """
         payload = msg.get("payload") or {}
         mtype = msg.get("type")
+        # P2 扩展1：健康顾问反向查询（老人不适 + 天气预警 → 评估天气对症状的影响）
+        if mtype == "task_request" and payload.get("event") == "health_weather_risk_query":
+            symptom = payload.get("symptom", "")
+            # 用最新预警复核（不信任上游缓存的 tags，保证数据一致）
+            try:
+                from data.db_weather import get_active_alerts
+                alerts = [a for a in get_active_alerts()
+                          if a.get("alert_type") in _WEATHER_HEALTH_TYPES]
+            except Exception:
+                alerts = []
+            if not alerts:
+                # 预警已失效：如实回执，reply 为空则不追加用户可见提示
+                return {"accepted": False, "event": "health_weather_risk_confirmed",
+                        "risk_level": "none", "symptom": symptom, "reply": ""}
+            top = alerts[0]
+            risk = "high" if top.get("level") in ("红色", "橙色") else "medium"
+            advice = _WEATHER_SYMPTOM_ADVICE.get(
+                symptom, "请注意防护、减少外出，症状持续或加重请及时就医")
+            return {"accepted": True, "event": "health_weather_risk_confirmed",
+                    "risk_level": risk, "symptom": symptom,
+                    "tags": payload.get("tags", ""),
+                    "reply": f"【天气守护员】当前{payload.get('tags','')}预警生效中：{advice}"}
         if mtype == "task_response" and payload.get("event") == "extreme_weather":
             # 仅健康顾问的确认触发升级（避免对通知管理员的确认重复升级）
             suggestion = payload.get("suggestion") or ""

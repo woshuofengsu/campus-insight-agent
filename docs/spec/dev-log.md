@@ -518,6 +518,36 @@
 - Playwright（移动视口 375px）：登录页卡片 343px 不溢出、无横向滚动；**29 路由全量扫描 0 报错 + 0 未注册组件**；居民/网格/老年三端首页正常渲染；老年 `.elderly-btn` 高度 72px ≥ 60px。
 - 后端全量 **440 passed, 1 skipped**（纯前端改动，无回归）。**提交**：本轮。
 
+## 二十五、P0/P1/P2 全面升级落地（数据安全收口 + 多智能体增强 + 远期演进预留）✅
+
+依据《升级方案》执行 P0（近期必须）+ P1（中期重要）+ P2（远期预留，可落地部分），覆盖数据安全、可观测、可演进、实时化。
+
+**P0 近期必须（数据安全 + 可验证）**
+- **P0-1 手机号加密遗漏面收口**：schema **v39** 加 `health_consults.phone_enc/agent_phone_enc`、`emergency_calls.target_phone_enc`；改写 `db_health_content`（submit_consult 加密落库 + 读取解密）、`db_elderly_care`（紧急联系人/紧急呼叫 CRUD 加密）、`db_repair`（派单留痕 detail 脱敏）、`seed`（防回滚明文）；新迁移脚本 `scripts/migrate_phone_encryption_v39.py`（幂等+回滚）；**清洗存量 2 条 activity_log 泄漏**（13900139000→139****9000，复核真实泄漏=0）；演示库明文手机号列全部为 0。
+- **P0-2 并发压测**：`scripts/benchmark_concurrency.py` 实测 **550 并发 100% 成功**，p95=1597ms。
+- **P0-3 自转率量化**：`db_agent.get_self_resolution_stats`（AI 对话自解决率 + 工单社区自办结率）+ 端点 `/api/web/agent/self-resolution` + grid 工作台卡片 + 测试。
+
+**P1 中期重要（真AI证据 + 安全 + 性能）**
+- **P1-1 LLM 自主协商**：`agent/llm_negotiator.py`——LLM 判断是否需跨角色联动、输出结构化决策、记账留痕；orchestrator `_dispatch` 接入；默认关（`LLM_ORCHESTRATION=1` 启用）。
+- **P1-2 安全响应头**：5 个头（X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-Policy/CSP）+ HSTS（https）。CSP `script-src 'self'` 附带拦截 Eruda 调试口。
+- **P1-3 性能索引**：schema **v40** 12 个高频索引（status/reported_at/assignee/satisfaction/agent_logs/dialogs/activity/health/emergency），`EXPLAIN` 由 SCAN 改为 `USING INDEX`。
+- **P1-4 红黑榜满意度下钻**：前端 Dashboard 榜单项点击 → 抽屉展示明细（后端 `get_satisfaction_drilldown` + API 早前已备，本轮接前端）。
+- **P1-5 NLU 方言扩充**：`DIALECT_MAP` 30→**65 条**（北京/上海/东北/四川/粤语），专项测试。
+- **P1-6 演示脚本**：`scripts/demo_collaboration.py` 一键双场景（健康⇄天气、报修→通知），录屏用，退出码 0。
+- **P1-8 覆盖率基线**：pytest-cov 核心三模块 **55%**（5652/12616 行）。
+- **P1-10 发布检查清单**：写入 `docs/mobile-deploy.md` §8（7 条上线前勾选）。
+
+**P2 远期预留（可落地部分）**
+- **P2-1 多租户演示级**：schema **v41** 给 `community_issues/proposals/notices` 加 `tenant_id`，回填 `config.DEFAULT_TENANT`（海淀区）；仅预留字段不改查询，支撑"数据模型可演进"。
+- **P2-2 舆情外部源框架**：`scripts/ingest_public_opinion.py`（SourceAdapter 接口 + MockSource 演示）→ `add_opinion` 自动分级入库 3 条（红/黄/橙）；真实外部源实现同接口即可接入。
+- **P2-4 WebSocket 实时通知**：`utils/ws_hub.py`（连接池+broadcast+notify_sync）+ `api_web` `/ws/notify` 端点（Bearer 认证 grid）+ `create_notification` 落库后广播 + 前端 grid/Notices 连接替代轮询；ws_hub 单元测试 3 项。
+
+**验证**
+- 后端全量 **456 passed, 1 skipped**（453 + ws_hub 3）；前端 `npm run build` 通过。
+- 演示库：schema v41、明文手机号列=0、索引 12、舆情入库 3 条。
+- **P2-3 PostgreSQL 迁移演练**：因本机 **Docker 不可用** 跳过（外部资源缺失，见 docs/scaling.md 演进路径）。
+- **提交**：本轮。
+
 
 
 1. **附件上云持久化**：当前为本地存储（`uploads/`，已真实保存）。上云会重置（Streamlit Cloud 文件系统临时），需外部存储（如云盘/对象存储）才稳定。

@@ -173,3 +173,12 @@ def agent_trace_chain(trace_id: str, request: Request):
         return _require_role(request, "grid")
     from data.db_agent import get_trace_chain
     return _ok(get_trace_chain(trace_id))
+
+
+@router.get("/self-resolution")
+def self_resolution(request: Request, days: int = 30):
+    """自转率统计（P0-3，负责人查看）：AI 对话自解决率 + 工单社区自办结率。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import get_self_resolution_stats
+    return _ok(get_self_resolution_stats(days))

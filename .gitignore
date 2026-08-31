@@ -9,11 +9,13 @@ dist/
 build/
 streamlit_errors.log
 *.log
+.coverage
 docs/superpowers/
 
 uploads/
 *.db
 *.db.bak
+*.db.bak*
 web/dist/
 web/node_modules/
 

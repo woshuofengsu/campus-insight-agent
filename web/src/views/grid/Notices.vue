@@ -1,6 +1,6 @@
 <script setup>
 // 通知管理：创建发布（含紧急/定时/附件）+ 列表（筛选/已读统计/导出）+ 下架/撤回/置顶 + 详情
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { notices, upload, exportApi } from '../../api'
 
@@ -38,11 +38,36 @@ async function load() {
 }
 onMounted(() => {
   load()
-  // 已发布 30 秒 / 紧急 10 秒自动刷新
+  // 已发布 30 秒 / 紧急 10 秒自动刷新（兜底；理想是 WebSocket 实时推送替代）
   setInterval(load, 30000)
   setInterval(() => {
     if (list.value.some((n) => n.is_urgent)) load()
   }, 10000)
+  connectWS()
+})
+
+// P2-4：WebSocket 实时通知——收到推送即刷新列表，替代/补充轮询
+let ws = null
+let wsRetry = null
+function connectWS() {
+  try {
+    const token = localStorage.getItem('ci_token') || ''
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    ws = new WebSocket(`${proto}://${location.host}/ws/notify`)
+    ws.onopen = () => { try { ws.send(JSON.stringify({ type: 'auth', token })) } catch { /* 忽略 */ } }
+    ws.onmessage = (e) => {
+      try {
+        const m = JSON.parse(e.data || '{}')
+        if (m.type === 'ready' || m.type === 'notify') load()
+      } catch { /* 忽略非 JSON */ }
+    }
+    ws.onclose = () => { wsRetry = setTimeout(connectWS, 5000) }  // 断线重连
+    ws.onerror = () => { try { ws.close() } catch { /* 忽略 */ } }
+  } catch { /* ws 不可用则靠轮询兜底 */ }
+}
+onUnmounted(() => {
+  if (wsRetry) clearTimeout(wsRetry)
+  if (ws) try { ws.close() } catch { /* 忽略 */ }
 })
 
 async function create() {

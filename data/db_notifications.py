@@ -24,7 +24,14 @@ def create_notification(user_id: int, type_: str, title: str,
             (user_id, type_, title, content, related_id),
         )
         conn.commit()
-        return cur.lastrowid
+        nid = cur.lastrowid
+    # P2-4：实时通知推送（仅当有在线 WebSocket 连接时触发，失败静默不阻断）
+    try:
+        from utils.ws_hub import notify_sync
+        notify_sync()
+    except Exception:
+        pass
+    return nid
 
 
 def broadcast_notification(type_: str, title: str,

@@ -638,6 +638,50 @@ def _m38_issue_phone_enc(conn):
     _add_column(conn, "community_issues", "assignee_phone_enc", "assignee_phone_enc TEXT DEFAULT ''")
 
 
+def _m39_phone_enc_more(conn):
+    """v39：health_consults + emergency_calls 手机号加密列（P0 收口遗漏面）。"""
+    _add_column(conn, "health_consults", "phone_enc", "phone_enc TEXT DEFAULT ''")
+    _add_column(conn, "health_consults", "agent_phone_enc", "agent_phone_enc TEXT DEFAULT ''")
+    _add_column(conn, "emergency_calls", "target_phone_enc", "target_phone_enc TEXT DEFAULT ''")
+
+
+def _m40_performance_indexes(conn):
+    """v40：高频查询索引（P1-3）。列名已对照真实表结构核实。可重复执行（IF NOT EXISTS）。"""
+    stmts = [
+        "CREATE INDEX IF NOT EXISTS idx_issues_status ON community_issues(status)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_reported ON community_issues(reported_at)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_assignee ON community_issues(assignee_name)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_satisfaction ON community_issues(satisfaction)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_logs_intent ON agent_logs(intent)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_logs_created ON agent_logs(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_dialogs_user ON agent_dialogs(user_id, role, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_activity_target ON activity_log(target_type, target_id)",
+        "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_health_consults_status ON health_consults(status)",
+        "CREATE INDEX IF NOT EXISTS idx_health_consults_user ON health_consults(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_emergency_calls_user ON emergency_calls(user_id)",
+    ]
+    for s in stmts:
+        conn.execute(s)
+    conn.commit()
+
+
+def _m41_tenant_column(conn):
+    """v41：多租户字段（P2-1 演示级）——给 3 张主表加 tenant_id，默认取 config.DEFAULT_TENANT。
+
+    仅预留字段（不改各查询函数），支撑"数据模型可演进"叙事；未来接多社区时
+    按写入方传入租户并加查询过滤。
+    """
+    import config
+    default_tenant = getattr(config, "DEFAULT_TENANT", "") or "default"
+    for table in ("community_issues", "proposals", "notices"):
+        _add_column(conn, table, "tenant_id", "tenant_id TEXT DEFAULT ''")
+        # 回填默认租户（对已存在且空的行）
+        conn.execute(f"UPDATE {table} SET tenant_id=? WHERE tenant_id='' OR tenant_id IS NULL",
+                     (default_tenant,))
+    conn.commit()
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -841,6 +885,9 @@ def init_db(db_path: str):
         (36, "phone_enc", _m36_phone_enc),
         (37, "trace_id", _m37_trace_id),
         (38, "issue_phone_enc", _m38_issue_phone_enc),
+        (39, "phone_enc_more", _m39_phone_enc_more),
+        (40, "performance_indexes", _m40_performance_indexes),
+        (41, "tenant_column", _m41_tenant_column),
     ]
     for version, name, fn in post:
         if version <= current:

@@ -38,6 +38,13 @@ def _enc_phone(phone: str) -> str:
         return ""
 
 
+def _mask_phone(phone: str) -> str:
+    """手机号脱敏（留痕/日志用）：138****8000。短号或空号原样返回。"""
+    if not phone or len(phone) < 7:
+        return phone or ""
+    return f"{phone[:3]}****{phone[-4:]}"
+
+
 def _dec_phone(enc: str, plain: str = "") -> str:
     """手机号解密（读取展示用）。优先解 enc；失败回退 plain（兼容未迁移历史数据）。"""
     if enc:
@@ -244,7 +251,7 @@ def dispatch_issue(issue_id: int, assignee_name: str, assignee_phone: str,
 
     # 改派（原维修人员存在且不同）：通知原人员取消任务 + 新人员接手（R42，失败自动重试一次 R43）
     is_reassign = bool(old_name) and old_name != assignee_name
-    detail = f"维修人员：{assignee_name} {assignee_phone}"
+    detail = f"维修人员：{assignee_name} {_mask_phone(assignee_phone)}"
     if is_reassign:
         _notify_worker(old_name, old_name, "取消任务", f"工单 #{issue_id}（{row['title'][:20]}）已改派他人，您无需再处理。", issue_id)
         _notify_worker(assignee_name, assignee_phone, "接手任务", f"工单 #{issue_id}（{row['title'][:20]}）已分派给您，请及时处理。", issue_id)

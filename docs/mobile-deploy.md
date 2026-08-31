@@ -204,3 +204,18 @@ iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) �
 | Token | 现 localStorage；正式版可选迁 httpOnly Cookie |
 | 手机号展示 | 已加密落库 + 前端脱敏（`138****8000`）；列表页抽查无明文 |
 | 语音隐私 | 转写文本入库、原始录音 7 天保留；隐私页补一句"语音识别由浏览器厂商处理" |
+
+---
+
+## 八、生产发布检查清单（P1-10，上线前逐条勾选）
+
+| # | 检查项 | 处置 | 状态 |
+|---|---|---|---|
+| 1 | `?debug=1` 的 Eruda 调试面板 | 已被 CSP `script-src 'self'` 自然拦截（P1-2 附带效果），无需删代码；确认生产不依赖调试 CDN | ✅ |
+| 2 | `.env` 不入库 | 已 `gitignore`（含 `.env`/`.env.bak`）；确认 `git status` 无 `.env` | ✅ |
+| 3 | `DEMO_MODE` | 生产设置 `false`（关闭演示免登录/演示按钮），仅保留 JWT 门禁 | ⬜ 上线时 |
+| 4 | `WEB_JWT_SECRET` / `CRYPTO_KEY` | 生产必配（无则拒绝启动 / 加密不可用），按 `docs/deploy-keys.md` 注入 | ⬜ 上线时 |
+| 5 | 安全响应头 | 生产 `curl -I` 核验 5 个头（P1-2） | ⬜ 上线时 |
+| 6 | 手机号明文 | 生产前 `SELECT COUNT(*)` 核验全库明文列 = 0（P0-1） | ⬜ 上线时 |
+| 7 | 压测 | `python scripts/benchmark_concurrency.py` 复核 550 并发 100%（P0-2） | ⬜ 上线时 |
+

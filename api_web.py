@@ -17,7 +17,7 @@ import logging
 import os
 import sys
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -145,6 +145,27 @@ async def _web_auth_middleware(request: Request, call_next):
     return resp
 
 
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    """安全响应头套件（P1-2）。
+
+    CSP 放宽 style（Naive UI 依赖 inline style）但 script 仅 'self'——
+    副作用：?debug=1 的 Eruda CDN 脚本会被拦截（见 P1-10 发布清单，可接受）。
+    """
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "same-origin"
+    resp.headers["Permissions-Policy"] = "geolocation=(), camera=(), payment=()"
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+    )
+    if request.url.scheme == "https":
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return resp
+
+
 def _user(request: Request) -> dict:
     return getattr(request.state, "user", {})
 
@@ -202,6 +223,44 @@ app.include_router(_weather_routes.router)
 
 
 _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "dist")
+
+
+@app.websocket("/ws/notify")
+async def ws_notify(websocket: WebSocket):
+    """WebSocket 实时通知（P2-4）：网格员端连接注册，创建通知时推送刷新信号。
+
+    认证：握手后先发一条 auth 请求，凭 Bearer token 校验 grid 角色；通过则注册。
+    演示/单机：内存连接池；多进程需换 Redis 发布订阅。
+    """
+    from utils.ws_hub import register, unregister
+    await websocket.accept()
+    try:
+        # 握手认证：客户端首条消息须为 {"type":"auth","token":"..."}
+        first = await websocket.receive_text()
+        import json as _json
+        try:
+            auth = _json.loads(first)
+            token = auth.get("token", "")
+            from api_routes.deps import verify_token
+            payload = verify_token(token) if token else None
+        except Exception:
+            payload = None
+        if not payload or payload.get("role") != "grid":
+            await websocket.close(code=4401)
+            return
+        await register(websocket)
+        await websocket.send_text('{"type":"ready"}')
+        # 保持连接，接收客户端心跳/内容（此处不消费业务消息）
+        while True:
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        await unregister(websocket)
 
 
 @app.get("/{full_path:path}")

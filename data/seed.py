@@ -29,15 +29,19 @@ def _seed_users():
         ("demo_elderly", "", "elderly", "海淀小区", "11号楼", "3单元301", "张大爷", "HD1103301", "13700137000"),
     ]
     with get_db() as conn:
+        try:
+            from data.db_repair import _enc_phone
+        except Exception:
+            _enc_phone = lambda p: p  # 兜底：加密不可用时写明文（不阻断 seed）
         for username, pw, role, community, building, unit, name, rid, phone in users:
             existing = conn.execute(
                 "SELECT id FROM user_profile WHERE username = ?", (username,)
             ).fetchone()
             if existing:
-                # 老库补手机号
+                # 老库补手机号（加密落库，防明文）
                 conn.execute(
-                    "UPDATE user_profile SET phone=? WHERE username=? AND (phone IS NULL OR phone='')",
-                    (phone, username),
+                    "UPDATE user_profile SET phone='', phone_enc=? WHERE username=? AND (phone_enc IS NULL OR phone_enc='')",
+                    (_enc_phone(phone), username),
                 )
                 continue
             pw_hash = ""
@@ -46,8 +50,8 @@ def _seed_users():
                 pw_hash = _hash_password(pw)
             conn.execute(
                 "INSERT INTO user_profile (username, password_hash, role, community, building, "
-                "unit, name, resident_id, phone, onboarding_done) VALUES (?,?,?,?,?,?,?,?,?,1)",
-                (username, pw_hash, role, community, building, unit, name, rid, phone),
+                "unit, name, resident_id, phone, phone_enc, onboarding_done) VALUES (?,?,?,?,?,?,?,?,?,?,1)",
+                (username, pw_hash, role, community, building, unit, name, rid, "", _enc_phone(phone)),
             )
         conn.commit()
 
