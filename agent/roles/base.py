@@ -35,7 +35,13 @@ class BaseAgent:
         """处理协商消息（task_request/notify/handoff）。返回响应 payload 或 None（不响应）。
 
         默认不响应；业务 Agent 按需覆盖（如健康顾问处理天气联动的健康提醒）。
+        P1-1：通用 llm_collaboration 事件默认响应，使 LLM 自主协商闭环（返回确认 + 协作提示）。
         """
+        payload = msg.get("payload") or {}
+        if payload.get("event") == "llm_collaboration":
+            reason = payload.get("reason", "")
+            return {"accepted": True,
+                    "reply": f"已协同处理：{reason}" if reason else "已协同处理"}
         return None
 
     # ---- 工具 ----
