@@ -1,0 +1,10 @@
+# 主服务（FastAPI + Vue3 三端）运行所需最小依赖集（WS9.3）。
+# 生产部署只装这份即可 `uvicorn api_web:app --port 8000`。
+# 注：agent/engine.py 等 LangChain 旧 LLM 链不在主服务启动路径（feature-gated），
+#     仅在开启相应 LLM 开关时才需要；因此不列入本文件。
+fastapi>=0.115.0,<1.0
+uvicorn>=0.30.0,<1.0
+python-dotenv>=1.0.0,<2.0
+requests>=2.28.0,<3.0
+cryptography>=42
+pydantic>=2.0.0,<3.0

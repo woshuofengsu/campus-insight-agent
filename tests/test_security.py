@@ -177,6 +177,107 @@ def test_me_export_masked(client):
     assert not re.search(r"(?<!\d)1[3-9]\d{9}(?!\d)", body) or "****" in body
 
 
+# ---------- WS0：演示登录门控 / 防爆破 ----------
+
+def test_demo_login_disabled_in_prod(monkeypatch, client):
+    """WS0.1：生产（DEMO_MODE=false）演示登录必须 403，且不返回 token。"""
+    monkeypatch.setattr("api_web.DEMO_MODE", False)
+    monkeypatch.setattr("config.DEMO_MODE", False)
+    for role in ("grid", "elderly", "resident"):
+        r = client.post("/api/web/auth/demo", json={"role": role})
+        assert r.status_code == 403, r.text
+        assert "token" not in (r.json().get("data") or {})
+
+
+def test_demo_login_enabled_in_demo_mode(client):
+    """默认演示模式下 demo 登录可用（回归：不破坏原有演示链路）。"""
+    r = client.post("/api/web/auth/demo", json={"role": "grid"})
+    assert r.status_code == 200 and r.json()["success"]
+    assert r.json()["data"]["token"]
+
+
+def _fresh_grid_user(username="guard_grid", password="GuardPass#123"):
+    from data.db_core import get_db
+    from data.db_user import create_user
+    with get_db() as conn:
+        conn.execute("DELETE FROM user_profile WHERE username=?", (username,))
+        conn.commit()
+    create_user(username, password=password, role="grid", name="防爆破测试")
+    # 重新触发锁定，清理可能的残留状态
+    from utils.login_guard import reset
+    reset(username, "testclient")
+    return username, password
+
+
+def test_login_guard_locks_after_failures(client):
+    """WS0.3：同一用户连续 5 次失败后，第 6 次即便密码正确也被拒；成功登录后清零。"""
+    username, password = _fresh_grid_user()
+    wrong = "WrongPass#000"
+    for _ in range(5):
+        r = client.post("/api/web/auth/login", json={"username": username, "password": wrong})
+        assert r.status_code == 400 and not r.json()["success"]
+    # 第 6 次：密码正确但仍被锁定
+    r = client.post("/api/web/auth/login", json={"username": username, "password": password})
+    assert r.status_code == 400 and "过多" in r.json()["message"]
+    # 成功登录后清零可再试
+    from utils.login_guard import reset
+    reset(username, "testclient")
+    r = client.post("/api/web/auth/login", json={"username": username, "password": password})
+    assert r.status_code == 200 and r.json()["success"]
+    from data.db_core import get_db
+    with get_db() as conn:
+        conn.execute("DELETE FROM user_profile WHERE username=?", (username,))
+        conn.commit()
+
+
+def test_login_guard_module_remaining():
+    """WS0.3：remaining 从阈值递减，锁定后为 0。"""
+    from utils.login_guard import remaining, record_fail, reset
+    reset("mod_user", "ip")
+    assert remaining("mod_user", "ip") == 5
+    record_fail("mod_user", "ip")
+    assert remaining("mod_user", "ip") == 4
+    for _ in range(4):
+        record_fail("mod_user", "ip")
+    assert remaining("mod_user", "ip") == 0
+    reset("mod_user", "ip")
+    assert remaining("mod_user", "ip") == 5
+
+
+# ---------- WS9.1：越权 / 伪造 / 篡改 JWT 负向测试 ----------
+
+def test_jwt_tampered_rejected(client):
+    """篡改签名 → token 失效（401）。"""
+    import api_routes.deps as d
+    good = d.make_token(1, "grid", "x")
+    bad = good[:-2] + "AB"
+    r = client.get("/api/web/auth/me", headers={"Authorization": f"Bearer {bad}"})
+    assert r.status_code == 401
+    assert d.verify_token(bad) is None
+
+
+def test_jwt_alg_none_rejected(client):
+    """伪造 alg:none 头（绕过签名校验）→ 拒绝（401）。"""
+    import base64, json
+    import api_routes.deps as d
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+    hdr = b64(json.dumps({"alg": "none", "typ": "JWT"}).encode())
+    payload = b64(json.dumps({"uid": 1, "role": "grid", "name": "x",
+                              "exp": 9999999999}).encode())
+    tok = f"{hdr}.{payload}."   # 无签名
+    assert d.verify_token(tok) is None
+    r = client.get("/api/web/auth/me", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 401
+
+
+def test_role_escalation_resident_to_grid_endpoint(client):
+    """居民 token 访问网格员专属端点 → 拒绝（1003 无权限）。"""
+    token = _login(client, "resident")
+    for path in ("/api/web/agent/llm-usage", "/api/web/agent/logs", "/api/web/agent/analytics"):
+        r = client.get(path, headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 400 and r.json()["code"] == 1003, f"{path}: {r.status_code}"
+
+
 def test_me_delete_anonymizes(client):
     """注销：个人字段匿名化 + 停用（用独立测试用户，不碰演示账号）。"""
     from data.db_core import get_db
