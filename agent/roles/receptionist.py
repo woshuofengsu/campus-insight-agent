@@ -112,9 +112,16 @@ class ReceptionistAgent(BaseAgent):
                                    actions=[{"type": "buttons", "options": ["报修", "提案", "政策问答", "查天气"]}],
                                    chain_note="先安抚再引导")
             else:
-                return self._reply(A.unknown_reply(role), intent="未知意图",
-                                   actions=[{"type": "buttons", "options": A.quick_entries(role)}],
-                                   chain_note="未识别意图，展示快捷入口")
+                # WS4：规则全未命中才花一次 LLM（默认关，RECEPTION_LLM_FALLBACK=1 启用）
+                from agent import intent_llm as A_llm
+                llm_intent = A_llm.llm_intent(text, role)
+                if llm_intent:
+                    intent = llm_intent
+                    ctx["state"]["intent_via"] = "llm"
+                else:
+                    return self._reply(A.unknown_reply(role), intent="未知意图",
+                                       actions=[{"type": "buttons", "options": A.quick_entries(role)}],
+                                       chain_note="未识别意图，展示快捷入口")
 
         # 接待员落意图到黑板，交 Orchestrator 路由
         self._write("user_input", text)
