@@ -6,5 +6,8 @@ python-dotenv>=1.0.0,<2.0
 altair>=5.0.0,<7.0
 pandas>=2.0.0,<4.0
 requests>=2.28.0,<3.0
+# 全量依赖（含 Streamlit 备线 app.py / 扣子 api.py / LangChain LLM 链）。
+# 若只跑主服务（FastAPI+Vue3），请装 requirements-web.txt（WS9.3）更精简。
 fastapi>=0.115.0,<1.0
 uvicorn>=0.30.0,<1.0
+cryptography>=42
