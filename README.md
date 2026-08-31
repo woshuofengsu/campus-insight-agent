@@ -38,70 +38,71 @@
 
 > ⚠️ **数据说明**：线上为演示环境，SQLite 数据库存储于临时文件系统，**应用重启/更新后数据会重置**（回到种子数据）。如需真实持久化请自部署（见 `docs/DEPLOY.md`）或接入 PostgreSQL。
 
-## 快速启动
-
-**推荐方式：双击 [`start.bat`](start.bat)**（自动杀旧进程、检查依赖、打开浏览器）
+## 前置依赖
 
 ```bash
-# 或手动：
-# 1. 安装依赖
+# 后端
 pip install -r requirements.txt
-
-# 2. 配置 API Key
+# 前端（Vue3，构建产物 web/dist/）
+cd web && npm ci && npm run build && cd ..
+# 配置密钥（.env，不进 git）
 cp .env.example .env
-# 编辑 .env 填入：
-#   DEEPSEEK_API_KEY=sk-xxx  （必填）
-#   HEFENG_API_KEY=xxx        （可选，天气 API）
-
-# 3. 启动应用（首次自动初始化数据库 + 种子数据）
-streamlit run app.py
-# 或双击 start.bat
+# .env 必配：DEEPSEEK_API_KEY（LLM）；生产必配：WEB_JWT_SECRET / CRYPTO_KEY
 ```
 
-**大屏演示模式**（无需数据库）：
+## 快速启动（主路线：FastAPI + Vue3）
+
+```bash
+# 启动主服务（Vue3 前端 + API，DEMO_MODE=true 可用演示账号）
+python -m uvicorn api_web:app --host 0.0.0.0 --port 8000
+# 浏览器访问 http://127.0.0.1:8000/login
+
+# 演示账号（DEMO_MODE=true）
+resident: demo_resident（无密码）
+grid:     demo_grid / demo123
+elderly:  demo_elderly（免登录）
 ```
-streamlit run app.py
-# 然后访问: http://localhost:8501/?demo=1&page=bigscreen
-```
+
+> Streamlit 备线（`app.py`，:8501）为旧版演示，**非主路线**，仅作参考。
 
 ## 🛠️ 技术栈
 
-Streamlit + LangChain + DeepSeek + SQLite + Altair，跑在 Streamlit Cloud 上。
-
 | 层 | 用了啥 |
 |----|------|
-| 界面 | Streamlit 多页面，居民/网格员双角色导航 |
-| Agent | LangChain Agent + 自定义 OODA 循环 |
-| 模型 | DeepSeek (deepseek-chat) |
-| 数据库 | SQLite WAL 模式，15 张表 |
-| 可视化 | Altair，自适应亮色/暗色模式 |
-| 天气 | 和风天气 API，挂了自动用模拟数据 |
+| 前端 | Vue3 + Vite + Naive UI，三端（居民/网格/老年）|
+| 后端 | FastAPI（`api_web.py`，:8000），JWT 鉴权 + WebSocket + 安全响应头 |
+| 多智能体 | 9 个声明式 Agent + 黑板消息队列 + 仲裁器/校验器（`agent/`）|
+| 模型 | DeepSeek（deepseek-chat），默认规则优先（降本）|
+| 数据库 | SQLite（schema v41，WAL），可演进 PostgreSQL |
+| 移动端 | 响应式/安全区/老年大字/语音（PWA 可选）|
 
 ## 📁 项目结构
 
 ```
 campus-insight-agent/
-├── app.py              # 入口，路由 + 全局样式
-├── agent/              # 治理工作流（OODA 循环、提示词、反射器）
-├── tools/              # 16 个工具函数（自动发现）
-├── perception/         # 感知模块（天气、热点监控）
-├── data/               # 数据库层
-├── ui/                 # 前端
-│   ├── pages/          #   居民端 9 页
-│   └── pages_grid/     #   网格员端 6 页
-├── tests/              # 测试
-└── docs/               # 比赛文档
+├── api_web.py              # FastAPI 主服务（JWT 中间件+安全头+WebSocket+SPA）
+├── api_routes/             # 16 个业务路由模块（auth/agent/issues/proposals/...）
+├── agent/                  # 多智能体（9 角色 + 黑板 + 编排 + 校验/仲裁）
+├── data/                   # 数据库层（db_core.py 含 schema v41 + 迁移注册）
+├── web/                    # Vue3 前端（src/views/{resident,grid,elderly}/）
+├── scripts/                # 迁移 / 压测 / 演示脚本
+├── tests/                  # pytest（457 项）
+├── docs/                   # 部署 / 移动端 / 开发日志
+├── api.py                  # 扣子插件入口（:18800，独立）
+└── app.py                  # Streamlit 备线（旧版，非主路线）
 ```
 
 ## 🧪 测试
 
 ```bash
-# 全量验证（309 项）
-python tests/test_verify_all.py
+# 后端全量（457 项，改后必跑，全绿才提交）
+python -m pytest tests/ -q
 
-# Ablation 评估（性能基准 + 组件对比）
-python tests/test_ablation.py
-python tests/test_ablation.py --output ablation_report.md
+# 并发压测（复现 550 并发零失败，需先起主服务）
+python scripts/benchmark_concurrency.py
+
+# 移动端/多智能体演示（录屏用）
+python scripts/demo_collaboration.py
 ```
 
 ## 📊 比赛材料
