@@ -62,9 +62,20 @@ _PHONE_RE = _re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 _IDCARD_RE = _re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")
 _GBK_GARBLE_RE = _re.compile(r"[锟斤拷]|[�]|烫烫烫|屯屯屯")
 
-# 健康禁忌：诊断词 / 药物推荐词 / 紧急症状词
-_HEALTH_DIAGNOSIS_WORDS = ("可能得了", "应该是得了", "确诊", "你这是", "你患了", "诊断为")
-_HEALTH_DRUG_WORDS = ("布洛芬", "阿莫西林", "头孢", "感冒灵", "连花清瘟", "建议服用")
+# 健康禁忌（WS5.2 精准化，降误杀）：不再整词拉黑药品名词，
+# 而是拦截"处方/诊断句式"——陈述"对X过敏/吃过X"不误杀，给出剂量/诊断命令才拦。
+# 处方指令：建议/应当/可以… + 服药动作 + 药物/剂量特征
+_HEALTH_DIAGNOSE_RE = _re.compile(
+    r"(?:可能得了|应该(?:是)?得了|确诊|你这是|你患了|诊断为|是得了|得了)\s*.{0,10}"
+    r"(?:病|炎|症|癌|综合征|感冒|流感|肺炎|慢性|高血压|糖尿病|过敏|中毒)"
+)
+_HEALTH_PRESCRIBE_RE = _re.compile(
+    r"(?:建议|应当|可以|不妨|最好|需要|请|遵医嘱|叮嘱|记得)\s*"
+    r"(?:每日|每天|一次)?\s*(?:服用|口服|吃|服|含服|滴|涂抹|吸入|打针)\s*.{0,10}"
+    r"(?:药|布洛芬|阿莫西林|头孢|感冒灵|连花清瘟|板蓝根|剂量|每日|每天|一次|片|粒|毫升|毫克|减半|停药|加量|增量)"
+)
+# 独立剂量/停药指令（无建议词也拦）：减量/停药/加量 属于明确的医嘱动作
+_HEALTH_DOSE_ACTION_RE = _re.compile(r"(?:减半|减量|停药|加量|增量|提高剂量|降低剂量)")
 _EMERGENCY_SYMPTOMS = ("胸痛", "呼吸困难", "意识不清", "大出血", "抽搐", "窒息")
 
 # 网格禁忌：代替审批 / 代替回复 / 发布紧急通知
@@ -111,18 +122,25 @@ class Verifier:
 
     # ---- 业务规则 ----
 
-    def _policy_checks(self, text: str) -> list:
+    def _policy_checks(self, text: str, cited_titles=None) -> list:
         out = []
+        # WS5.2：传入 cited_titles 集合时，要求回复引用标题 ∈ 集合（输出侧双保险，堵子串伪造）；
+        # 未传时维持原"无引用不回答"的字符串校验（规则路径不破坏）。
+        if cited_titles:
+            if not any(t and t in text for t in cited_titles):
+                out.append(_r("CitationOutOfRangeRule", "block", "引用不在知识库检索集合内"))
+            return out
         if self._enabled("CitationRequiredRule") and "参考：" not in text and "依据" not in text and "文号" not in text:
             out.append(_r("CitationRequiredRule", "block", "政策回答缺少引用（无引用不回答）"))
         return out
 
     def _health_checks(self, text: str) -> list:
         out = []
-        if self._enabled("NoDiagnosisRule") and any(w in text for w in _HEALTH_DIAGNOSIS_WORDS):
+        if self._enabled("NoDiagnosisRule") and _HEALTH_DIAGNOSE_RE.search(text):
             out.append(_r("NoDiagnosisRule", "block", "健康输出疑似诊断"))
-        if self._enabled("NoMedicationAdviceRule") and any(w in text for w in _HEALTH_DRUG_WORDS):
-            out.append(_r("NoMedicationAdviceRule", "block", "健康输出推荐药物"))
+        if self._enabled("NoMedicationAdviceRule") and (
+                _HEALTH_PRESCRIBE_RE.search(text) or _HEALTH_DOSE_ACTION_RE.search(text)):
+            out.append(_r("NoMedicationAdviceRule", "block", "健康输出含处方/剂量指令"))
         if self._enabled("EmergencySymptomTransferRule") and any(w in text for w in _EMERGENCY_SYMPTOMS) \
                 and "120" not in text and "就医" not in text:
             out.append(_r("EmergencySymptomTransferRule", "block", "紧急症状未提示就医"))
@@ -138,14 +156,17 @@ class Verifier:
 
     # ---- 主入口 ----
 
-    def verify(self, content: dict, biz_type: str = "general") -> dict:
-        """校验一轮 Agent 输出。返回 {verdict, violations, warnings, biz_type, timestamp}。"""
+    def verify(self, content: dict, biz_type: str = "general", cited_titles=None) -> dict:
+        """校验一轮 Agent 输出。返回 {verdict, violations, warnings, biz_type, timestamp}。
+
+        cited_titles：可选，政策回答允许引用的标题集合（WS5.2 输出侧引用校验）。
+        """
         text = (content.get("reply") or "") if isinstance(content, dict) else (content or "")
         biz_type = biz_type or "general"
         checks: list = self._general_checks(text)
 
         if biz_type in ("policy_expert", "policy"):
-            checks += self._policy_checks(text)
+            checks += self._policy_checks(text, cited_titles)
         elif biz_type in ("health_advisor", "health"):
             checks += self._health_checks(text)
         elif biz_type in ("grid_assistant", "grid"):

@@ -10,61 +10,35 @@ from agent.roles.base import BaseAgent
 def _llm_polish_health_suggestion(tags: str, base: str) -> str:
     """可选 LLM 润色健康协商建议（P1-3）。
 
-    仅在 LLM_NEGOTIATION=1 且配置了 key 时走真实 DeepSeek；产出强制过 Verifier（健康规则集），
-    BLOCK/WARN 一律回退规则文案（幻觉兜底）。任何异常一律回退规则文案。
+    仅在 LLM_NEGOTIATION=1 且配置了 key 时走真实 DeepSeek（WS2：统一走 agent.llm_client）；
+    产出强制过 Verifier（健康规则集），BLOCK/WARN 一律回退规则文案（幻觉兜底）。
+    任何异常/无 key/熔断一律回退规则文案。
     """
-    import json as _json
     import os
-    import time as _time
-    import urllib.request
 
     if os.getenv("LLM_NEGOTIATION", "0") != "1":
         return base
-    try:
-        from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-    except Exception:
-        return base
+    from config import DEEPSEEK_API_KEY
     if not DEEPSEEK_API_KEY:
         return base
-    start = _time.time()
-    try:
-        payload = {
-            "model": DEEPSEEK_MODEL or "deepseek-chat",
-            "messages": [
-                {"role": "system", "content":
-                 "你是社区健康顾问。根据天气预警标签，用一句不超过50字的口语化中文给出老年人"
-                 "防护建议。不做诊断、不推荐药物、紧急情况提示就医。"},
-                {"role": "user", "content": f"天气预警：{tags}。基础建议：{base}"},
-            ],
-            "max_tokens": 120,
-            "temperature": 0.3,
-        }
-        req = urllib.request.Request(
-            f"{(DEEPSEEK_BASE_URL or 'https://api.deepseek.com/v1').rstrip('/')}/chat/completions",
-            data=_json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                     "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            out = _json.loads(resp.read().decode("utf-8"))
-        text = (out.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
-        usage = out.get("usage", {})
-        try:
-            from data.db_llm_usage import record_usage
-            record_usage("协商润色", int(usage.get("prompt_tokens", 0)),
-                         int(usage.get("completion_tokens", 0)),
-                         duration_ms=int((_time.time() - start) * 1000),
-                         input_preview=f"{tags}/{base[:30]}")
-        except Exception:
-            pass
-        # 幻觉防线：健康规则集校验，不过则回退规则文案
-        from agent.verifier import Verifier
-        v = Verifier().verify({"reply": text}, biz_type="health")
-        if v["verdict"] == "pass":
-            return text
+    from agent.llm_client import chat
+    r = chat(
+        [{"role": "system", "content":
+          "你是社区健康顾问。根据天气预警标签，用一句不超过50字的口语化中文给出老年人"
+          "防护建议。不做诊断、不推荐药物、紧急情况提示就医。"},
+         {"role": "user", "content": f"天气预警：{tags}。基础建议：{base}"}],
+        module="健康润色", purpose=f"{tags}/{base[:40]}",
+        temperature=0.3, max_tokens=120, timeout=8,
+    )
+    if not r["ok"]:
         return base
-    except Exception:
-        return base
+    text = r["text"].strip()
+    # 幻觉防线：健康规则集校验，不过则回退规则文案
+    from agent.verifier import Verifier
+    v = Verifier().verify({"reply": text}, biz_type="health")
+    if v["verdict"] == "pass":
+        return text
+    return base
 
 
 def _state_key(uid):
@@ -412,15 +386,40 @@ class HealthAdvisorAgent(BaseAgent):
                     "tags": tags, "escalate": False}
         # P2 扩展1：天气守护员的风险评估回执（健康顾问发起反向查询的响应）
         if msg.get("type") == "task_response" and payload.get("event") == "health_weather_risk_confirmed":
-            # 接线 arbiter professional_first：天气评估认为无直接风险、但症状描述需谨慎时，
-            # 以健康顾问专业判断为准（给 professional_first 规则一个真实触发源，决策落 agent_logs）
-            if payload.get("risk_level") in ("none", "") and payload.get("symptom") in ("头晕", "胸闷", "心慌"):
+            # WS5：真实分歧 → 仲裁 → 改写最终文案（不只留痕，进入用户可见回复）
+            # 天气守护员评估"可正常活动/无直接风险"，但健康侧看到高危症状说明 → 应更保守。
+            # 触发条件：天气评估低风险 + 高危症状（头晕/胸闷/心慌），或安全类症状（胸痛/呼吸困难）。
+            symptom = payload.get("symptom") or ""
+            low_risk = payload.get("risk_level") in ("none", "")
+            high_risk_symptom = symptom in ("头晕", "胸闷", "心慌")
+            safety_symptom = any(w in symptom for w in ("胸痛", "呼吸困难", "抽搐", "大出血"))
+            if (low_risk and high_risk_symptom) or safety_symptom:
                 try:
                     from agent.arbiter import Arbiter
                     arb = Arbiter().arbitrate({
-                        "professional_domain": True, "agent": self.key,
-                        "reason": "天气评估无直接风险，但症状描述需保持谨慎建议"})
+                        "professional_domain": True,          # 专业判断以健康顾问为准
+                        "safety_risk": bool(safety_symptom),  # 涉人身安全 → safety_first(human)
+                        "agent": self.key,
+                        "conflict_summary": (
+                            "天气评估可正常活动/无直接风险，但健康侧判断症状需保守处理"
+                            if not safety_symptom else
+                            "天气评估无直接风险，但症状疑为紧急，需转人工确认"),
+                    })
                     self._write("last_arbitration", arb)
+                    decision = arb.get("decision")
+                    # 仲裁结果进入用户可见协作提示（不再丢弃）
+                    if decision == "human":
+                        collab = ("【仲裁·转人工】该症状可能与天气无关且建议进一步确认，"
+                                  "已升级人工/家属跟进，请及时就医。")
+                        need_human = True
+                    else:  # professional
+                        collab = ("【仲裁·专业优先】尽管天气评估可正常活动，结合您的症状，"
+                                  "健康侧建议以保守稳妥为主：减少外出、注意休息、早睡早起，"
+                                  "症状持续请及时就医。")
+                        need_human = False
+                    return {"accepted": True,
+                            "reply": collab, "need_human": need_human,
+                            "arbitration": decision}
                 except Exception:
                     pass
             return {"accepted": True}  # 无 reply：不重复合并文本，仅留执行链节点
