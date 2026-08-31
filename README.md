@@ -32,11 +32,11 @@
 
 ## 🌐 在线访问
 
-**Streamlit Cloud 部署：** [campus-insight-agent.streamlit.app](https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/)
+**主入口（FastAPI + Vue3）：** 自部署后用浏览器访问 `http://<服务器IP>:8000/login`（见下「快速启动」）。
 
-> 💡 免费版会休眠，评委检查前 5 分钟先访问一次预热即可。
+> 备用演示（旧链路，Streamlit `app.py`，:8501）不再作为主入口，仅存档参考。
 
-> ⚠️ **数据说明**：线上为演示环境，SQLite 数据库存储于临时文件系统，**应用重启/更新后数据会重置**（回到种子数据）。如需真实持久化请自部署（见 `docs/DEPLOY.md`）或接入 PostgreSQL。
+> ⚠️ **数据说明**：线上为演示环境，SQLite 数据库可在部署时挂载持久卷；`DEMO_MODE=true` 且 `DEMO_AUTO_WORKER=true` 时工单由闭环机器人推进，**仅用于演示流程，不代表真实治理成效**，生产务必关闭。
 
 ## 前置依赖
 
@@ -47,8 +47,12 @@ pip install -r requirements.txt
 cd web && npm ci && npm run build && cd ..
 # 配置密钥（.env，不进 git）
 cp .env.example .env
-# .env 必配：DEEPSEEK_API_KEY（LLM）；生产必配：WEB_JWT_SECRET / CRYPTO_KEY
+# .env 必配：DEEPSEEK_API_KEY（LLM）；生产必配：WEB_JWT_SECRET / CRYPTO_KEY / CORS_ORIGINS
 ```
+
+两套配置：
+- **`.env.demo`**（演示姿态，`DEMO_MODE=true`，LLM 开关 `LLM_ORCHESTRATION/POLICY_LLM_RAG/RECEPTION_LLM_FALLBACK=1`）：一键演示账号 + 规则/LLM 混合。
+- **`.env`**（生产姿态，`DEMO_MODE=false`，LLM 开关全为 0，强 JWT 密钥 + CORS 白名单）：关闭演示登录与 API 文档，走正式鉴权。
 
 ## 快速启动（主路线：FastAPI + Vue3）
 
@@ -85,8 +89,8 @@ campus-insight-agent/
 ├── agent/                  # 多智能体（9 角色 + 黑板 + 编排 + 校验/仲裁）
 ├── data/                   # 数据库层（db_core.py 含 schema v41 + 迁移注册）
 ├── web/                    # Vue3 前端（src/views/{resident,grid,elderly}/）
-├── scripts/                # 迁移 / 压测 / 演示脚本
-├── tests/                  # pytest（457 项）
+├── scripts/                # 迁移 / 压测 / 演示 / 数字一致性脚本
+├── tests/                  # pytest（用例数以 `python scripts/check_claims.py` 为准）
 ├── docs/                   # 部署 / 移动端 / 开发日志
 ├── api.py                  # 扣子插件入口（:18800，独立）
 └── app.py                  # Streamlit 备线（旧版，非主路线）
@@ -95,11 +99,14 @@ campus-insight-agent/
 ## 🧪 测试
 
 ```bash
-# 后端全量（457 项，改后必跑，全绿才提交）
+# 后端全量（改后必跑，全绿才提交；用例数见面板）
 python -m pytest tests/ -q
 
-# 并发压测（复现 550 并发零失败，需先起主服务）
-python scripts/benchmark_concurrency.py
+# 数字一致性自检（打印材料应填的事实数字）
+python scripts/check_claims.py
+
+# 业务混合压测（p50/p95/p99，需先起主服务）
+python scripts/benchmark_business.py
 
 # 移动端/多智能体演示（录屏用）
 python scripts/demo_collaboration.py
