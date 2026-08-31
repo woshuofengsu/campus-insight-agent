@@ -542,8 +542,13 @@
 - **P2-2 舆情外部源框架**：`scripts/ingest_public_opinion.py`（SourceAdapter 接口 + MockSource 演示）→ `add_opinion` 自动分级入库 3 条（红/黄/橙）；真实外部源实现同接口即可接入。
 - **P2-4 WebSocket 实时通知**：`utils/ws_hub.py`（连接池+broadcast+notify_sync）+ `api_web` `/ws/notify` 端点（Bearer 认证 grid）+ `create_notification` 落库后广播 + 前端 grid/Notices 连接替代轮询；ws_hub 单元测试 3 项。
 
+**P3 远期（可落地部分 + 用户排除项）**
+- **P3-1 分级路由**：`agent/llm_negotiator.py` 加 `route_grade()`——显式判定诉求走规则（0 成本）还是 LLM（固定词命中+意图明确→rule，模糊→llm），把现有"规则优先"策略显式化、可测试；grid 工作台加"降本统计"卡（LLM 费用/调用数/缓存命中）。单测通过。
+- **P3-2 商业模式**：用户明确**不做**。
+- **P3-3 多模态报修（拍照识别）**：**未做**——现有 DeepSeek key 不支持视觉，硬做会退化为文本编造（假功能），违背"更完美"初衷。
+
 **验证**
-- 后端全量 **456 passed, 1 skipped**（453 + ws_hub 3）；前端 `npm run build` 通过。
+- 后端全量 **457 passed, 1 skipped**（456 + route_grade 1）；前端 `npm run build` 通过。
 - 演示库：schema v41、明文手机号列=0、索引 12、舆情入库 3 条。
 - **P2-3 PostgreSQL 迁移演练**：因本机 **Docker 不可用** 跳过（外部资源缺失，见 docs/scaling.md 演进路径）。
 - **提交**：本轮。

@@ -892,3 +892,17 @@ def test_nlu_dialect():
     assert len(A.DIALECT_MAP) >= 50
     # 话题切换检测：方言输入不破坏口径（nlu_preprocess 两处一致）
     assert A.nlu_preprocess("楼道闻到燃气味") == "楼道闻到燃气味" or "楼道" in A.nlu_preprocess("楼道闻到燃气味")
+
+
+def test_route_grade():
+    """P3-1：分级路由判定——规则优先降本，明确诉求走规则，模糊走 LLM。"""
+    from agent.llm_negotiator import route_grade
+    # 明确业务词 + 意图 → 规则
+    r = route_grade("我家水管漏水", "repair")
+    assert r["grade"] == "rule" and "漏水" in r["rule_hits"]
+    # 无明确业务词 → LLM
+    r2 = route_grade("这个情况我有点纠结不知道咋弄", "")
+    assert r2["grade"] == "llm"
+    # 有词但意图未定 → 保守走 LLM
+    r3 = route_grade("漏水", "")
+    assert r3["grade"] == "llm"

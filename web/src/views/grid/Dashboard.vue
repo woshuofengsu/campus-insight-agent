@@ -12,6 +12,7 @@ const stats = ref({ total: 0, pending: 0, processing: 0, resolved: 0 })
 const urgent = ref([])
 const pendingProps = ref([])
 const selfRes = ref({ ai_self_resolution_rate: 0, issue_self_resolution_rate: 0, total_dialogs: 0, total_issues: 0 })
+const llm = ref({ calls: 0, cost_yuan: 0, cache_hits: 0 })
 const board = ref({ red_board: { satisfied_issues: [], good_workers: [], done_proposals: [] }, black_board: { dissatisfied_issues: [], slow_workers: [], sla_breaches: [] } })
 const drillOpen = ref(false)
 const drill = ref({ summary: { satisfied: 0, dissatisfied: 0, total: 0, rate: 0 }, items: [] })
@@ -46,6 +47,9 @@ onMounted(async () => {
   try {
     selfRes.value = (await agent.selfResolution()) || selfRes.value
   } catch { /* 自转率失败不阻塞 */ }
+  try {
+    llm.value = (await agent.llmUsage()) || llm.value
+  } catch { /* LLM 用量失败不阻塞 */ }
 })
 
 const cards = [
@@ -76,6 +80,23 @@ const cards = [
       <div class="card" style="text-align:center;margin:0;border-left:4px solid #059669;">
         <div style="font-size:1.8rem;font-weight:800;color:#059669;">{{ selfRes.issue_self_resolution_rate }}%</div>
         <div class="muted" style="font-size:0.85rem;">工单社区自办结率（{{ selfRes.done_issues || 0 }}/{{ selfRes.total_issues }}）</div>
+      </div>
+      <div class="card" style="text-align:center;margin:0;grid-column:span 2;border-left:4px solid #7c3aed;">
+        <div style="display:flex;justify-content:space-around;align-items:center;">
+          <div>
+            <div style="font-size:1.8rem;font-weight:800;color:#7c3aed;">{{ llm.cost_yuan }}</div>
+            <div class="muted" style="font-size:0.85rem;">LLM 费用（¥/近7天）</div>
+          </div>
+          <div>
+            <div style="font-size:1.8rem;font-weight:800;color:#7c3aed;">{{ llm.calls || llm.total_calls || 0 }}</div>
+            <div class="muted" style="font-size:0.85rem;">LLM 调用次数</div>
+          </div>
+          <div>
+            <div style="font-size:1.8rem;font-weight:800;color:#059669;">{{ llm.cache_hits }}</div>
+            <div class="muted" style="font-size:0.85rem;">缓存命中</div>
+          </div>
+        </div>
+        <div class="muted" style="font-size:0.8rem;margin-top:6px;">规则引擎优先 · LLM 按需（分级路由降本）</div>
       </div>
     </div>
 
