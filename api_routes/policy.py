@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _fail, _ok, _require_role, _user
 
 router = APIRouter(prefix="/api/web/qa", tags=["policy"])
 knowledge_router = APIRouter(prefix="/api/web/knowledge", tags=["policy"])
@@ -27,6 +27,7 @@ def web_qa_ask(req: AskQuestion, request: Request):
             "matched": True, "question_id": r.get("question_id"),
             "answer": r.get("auto_answer"), "score": r.get("score"),
             "title": (r.get("knowledge") or {}).get("title"),
+            "rag": r.get("rag", False),
         }, "已自动回答")
     # 未匹配/敏感/医疗 → 转人工提示
     return _ok({
@@ -42,7 +43,7 @@ class TransferHuman(BaseModel):
 
 @router.post("/{qid}/transfer")
 def web_qa_transfer(qid: int, req: TransferHuman, request: Request):
-    from data.db_policy import transfer_to_human, get_question
+    from data.db_policy import get_question, transfer_to_human
     u = _user(request)
     if qid > 0:
         q = get_question(qid)
@@ -51,10 +52,10 @@ def web_qa_transfer(qid: int, req: TransferHuman, request: Request):
         if u.get("role") != "grid" and q.get("user_id") != u.get("uid"):
             return _fail(1003, "无权限操作该提问")
     try:
-        ok_ = transfer_to_human(qid) if qid > 0 else transfer_to_human(
+        transfer_to_human(qid) if qid > 0 else transfer_to_human(
             user_id=u.get("uid"), question=req.question, source="居民端")
         return _ok({"question_id": qid}, "已转人工")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _fail(2001, f"转人工失败：{e}")
 
 
@@ -76,7 +77,7 @@ def web_qa_question_delete(qid: int, request: Request):
 
 @router.get("/questions")
 def web_qa_questions(request: Request, status: str = "", limit: int = 50):
-    from data.db_policy import get_questions, get_question_deadline_info
+    from data.db_policy import get_question_deadline_info, get_questions
     u = _user(request)
     if u.get("role") == "grid":
         rows = get_questions(status=status or None, limit=limit)
@@ -173,7 +174,7 @@ class KnowledgeAction(BaseModel):
 def web_knowledge_action(kid: int, req: KnowledgeAction, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
-    from data.db_policy import audit_knowledge, take_down_knowledge, withdraw_review, delete_knowledge
+    from data.db_policy import audit_knowledge, delete_knowledge, take_down_knowledge, withdraw_review
     from ui.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
     if req.action == "audit":
