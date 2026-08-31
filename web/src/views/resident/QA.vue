@@ -100,6 +100,7 @@ async function delQuestion(q) {
         <div v-if="result" class="card">
           <template v-if="result.matched">
             <div style="font-weight:700;color:#2E7D32;">✅ 已自动回答</div>
+            <div v-if="result.rag" class="muted" style="font-size:0.8rem;margin-top:2px;">🤖 AI 依据知识库生成 · 已校验引用</div>
             <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
           </template>
           <template v-else>

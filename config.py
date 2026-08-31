@@ -38,6 +38,12 @@ DEEPSEEK_API_KEY = _secret("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = _secret("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 DEEPSEEK_MODEL = _secret("DEEPSEEK_MODEL", "deepseek-chat")
 
+# WS3：政策弱命中→真 RAG 生成（默认关；.env.demo 设 POLICY_LLM_RAG=1 开启）。
+# 开启后仅基于检索到的已发布条目生成，且必须给出结构化引用编号，未通过校验即回退转人工。
+POLICY_LLM_RAG = _secret("POLICY_LLM_RAG", "0").lower() in ("1", "true", "yes")
+# WS4：接待员规则未命中→LLM 二级意图兜底（默认关）。
+RECEPTION_LLM_FALLBACK = _secret("RECEPTION_LLM_FALLBACK", "0").lower() in ("1", "true", "yes")
+
 # Agent 参数
 AGENT_MAX_ITERATIONS = 6
 AGENT_TIMEOUT = 20

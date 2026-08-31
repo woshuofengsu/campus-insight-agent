@@ -890,6 +890,39 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
                 "summary": summary, "q_type": q_type, "expired_hint": expired_hint}
     best = results[0]
     if best["score"] < _match_threshold:
+        # WS3：弱命中尝试真 RAG（开关关闭 / 无片段 / 引用校验失败 → 维持原转人工逻辑，行为不变）
+        rag_out = None
+        try:
+            from agent.policy_rag import generate
+            rag_out = generate(q, results)  # results 已按相关度排序
+        except Exception:  # noqa: BLE001
+            rag_out = None
+        if rag_out and rag_out.get("answer"):
+            # 引用标题用数据库真实行拼装（不信任模型复述），杜绝标题子串伪造
+            cited = results[rag_out["cited_index"] - 1]
+            auto_answer = rag_out["answer"]
+            if rag_out.get("cited_title"):
+                auto_answer += f"\n参考：{rag_out['cited_title']}"
+            try:
+                with get_db() as conn:
+                    cur = conn.execute(
+                        "INSERT INTO policy_questions (user_id,question,summary,q_type,source,status,"
+                        "auto_answer,cited_knowledge_id) VALUES (?,?,?,?,?,'已自动回答',?,?)",
+                        (user_id, q, summary, q_type, source, auto_answer, cited.get("id")))
+                    qid = cur.lastrowid
+                    conn.execute("UPDATE knowledge_base SET cite_count=cite_count+1 WHERE id=?",
+                                 (cited.get("id"),))
+                    conn.commit()
+                log_activity(actor, "RAG生成回答（已校验引用）", "policy_question", qid, summary,
+                             module=MODULE, after_value="已自动回答",
+                             detail=f"弱命中 best_score={best['score']} · 引用《{cited.get('title')}》")
+                return {"matched": True, "question_id": qid, "question": q, "summary": summary,
+                        "q_type": q_type, "auto_answer": auto_answer,
+                        "knowledge_id": cited.get("id"),
+                        "knowledge": _knowledge_view(cited), "score": best["score"],
+                        "rag": True, "text_view": auto_answer}
+            except Exception:  # noqa: BLE001
+                rag_out = None
         log_activity(actor, "自动回答失败", "policy_question", None, summary,
                      module=MODULE, after_value="匹配失败",
                      detail=f"{q_type} · 匹配度 {best['score']} 低于阈值 {_match_threshold} · {q[:50]}")
