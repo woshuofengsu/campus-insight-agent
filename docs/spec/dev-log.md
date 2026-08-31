@@ -563,3 +563,31 @@
 ---
 
 > 其余 10 个跨模块联动点均已实现（天气事件去重 / 检查清单匹配 / 紧急通知下架移除弹窗 / 老年草稿恢复 / SOS 状态刷新 / 用药审核期间原规则继续 / 暂停恢复对象 / 语音确认超时草稿 / 留痕模块来源 / 老年天气延迟提示）。
+
+---
+
+## 二十六、审计整改（WS0–WS10，2026-09）
+
+> 完整方案见 `docs/review/落地执行方案.md`，审计证据见 `docs/review/全面审计报告-资深评审.md`。
+> 原则：新 AI 行为默认开关关闭（保证规则主链路零变化）、数据层走 `_mN_` 迁移、手机号走 `_enc/_dec/_mask`、不动的 legacy（Streamlit app.py / 扣子 api.py / LangChain engine.py）明确标注。
+> **评审建议（锐评）已采纳**：WS3 RAG 防幻觉改用结构化 `cited_index`；WS5 Verifier 正则精准化（降误杀）；WS2 不迁 engine.py；WS9 只做 scoped lint + 评估，不强拆 data 层；排期锚定 P0。
+
+| 编号 | 主题 | 落地内容 | 测试证据 |
+|------|------|----------|----------|
+| WS0 | 安全止血 | 演示登录生产硬关（`auth.py` 门控 + `api_web` 中间件 403）；CORS 白名单化；生产关闭 API 文档；登录防爆破（`utils/login_guard.py`，5 次锁 5 分钟）；重复路由已清（`utils/routes.py` 递归收集）；`.gitignore` 乱码修复 | 新增 `test_demo_login_disabled_in_prod`、`test_login_guard_*`、`test_prod_config_*`、`test_route_uniqueness` |
+| WS1 | 材料对齐 | `scripts/check_claims.py` 数字自检（467 tests/v41/124 路由/9 角色/44 表）；README 更新（主入口 FastAPI+Vue、两套配置、去 Streamlit 主线、457→check_claims）；技术报告加"状态更正声明" | `check_claims.py` 实跑 |
+| WS2 | 统一 LLM 客户端 | `agent/llm_client.py`（熔断+超时+记账，成功/失败均留痕）；`llm_negotiator`/`business_agents._llm_polish` 迁入；不迁 LangChain 调用点（engine/planner/reflection/router/weekly_report） | `tests/test_llm_client.py`（离线 monkeypatch urlopen） |
+| WS3 | 政策真 RAG | `agent/policy_rag.py`：仅基于检索片段生成，LLM 返回 `{"answer","cited_index"}`，校验下标在检索集内，引用标题由 DB 真实行拼装；开关 `POLICY_LLM_RAG`（默认关）；弱命中才触发，无材料绝不生成；前端 resident/QA 显示"AI 依据知识库生成" | `tests/test_policy_rag.py`（含越界引用拒绝） |
+| WS4 | 接待员 LLM 兜底 | `agent/intent_llm.py` 白名单闭集（8 意图），规则未命中才触发；开关 `RECEPTION_LLM_FALLBACK`（默认关）；未知仍回 unknown | `tests/test_intent_llm.py` |
+| WS5 | 真仲裁 + Verifier 精准化 | 仲裁结果进入用户可见文案（健康↔天气分歧，`professional_first`/`safety_first→human` 改写 `reply`，`need_human` 升级）；Verifier 由"拉黑药名"改为拦截处方/诊断句式（对"对X过敏/吃过X"不误杀）+ `cited_titles` 输出侧引用校验 | `tests/test_arbitration_real.py`、`tests/test_verify_all.py`、`test_agent.py::test_verifier_health_rule` 回归 |
+| WS6 | 加密正名 | `utils/crypto.py` 真 **AES-256-GCM**（`g1$` 前缀，密钥 SHA-256 派生 32B）；旧 HMAC-CTR 收进 `_LegacyStream` 仅解密；`scripts/reencrypt_phones.py` 存量重加密（幂等 + 先备份）；`requirements.txt` 加 `cryptography>=42` | `tests/test_crypto_aes.py`（GCM 往返/篡改抛错/旧密文可读/重加密幂等） |
+| WS7 | 指标可信度 | `scripts/benchmark_business.py`（业务混合压测 p50/p95/p99/错误率/QPS，3 档并发）；golden 入 CI：`agent/eval/golden/{intent_rules,verifier_rules}.jsonl` + `tests/test_eval_golden_rules.py`（离线，进 CI，不触发 LLM）；NLU 移除过宽"能不能"（提案误识别修复） | `tests/test_eval_golden_rules.py` |
+| WS8 | 适老诚实化 | 老年端语音不支持显式降级提示 + 聚焦输入框；SOS 文案诚实化（已通知联系人+手动拨 120，不承诺自动依次呼叫）；`docs/review/演示保障清单.md` | 前端构建验证 |
+| WS9 | 工程卫生 | `tests/test_security.py` 加 JWT 篡改/alg:none/越权负向测试；`ruff.toml` scoped 静态检查（排除 legacy ui/app.py/api.py/engine.py，命中文档约定的 BLE001/S110/DTZ005/RUF001-3）；`requirements-web.txt`（最小运行集）；data 层拆分仅评估不入索引 | `tests/test_security.py`、`ruff check` scoped |
+| WS10 | 答辩材料 | `docs/competition/商业画布-一页.md`、`合规路线-一页.md`、`落地路径-一页.md`；三段录屏 + 20 问演练见方案 §10 | 文档 |
+
+**修复过程要点**
+- 顺带修复：`api_web._ensure_db` 改为按 DB 路径维度记忆（此前全局布尔，跨测试库会漏灌种子，`test_demo_login_enabled_in_demo_mode` 在整跑时偶发 400）。
+- 全量基线：`python -m pytest tests/ -q` = **492 passed, 1 skipped, 3 deselected**（新增负向测试与金标评测，全绿）。
+- 未动 legacy：`ui/`（1.3 万行 Streamlit）、`app.py`、`api.py`（扣子入口）、`agent/engine.py`（LangChain 旧链）；WS11 长远项（状态外置/PG/多租户/legacy 归档/服务端 ASR）不在本轮。
+
