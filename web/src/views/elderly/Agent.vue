@@ -13,6 +13,7 @@ const listening = ref(false)
 const remain = ref(60)
 const pendingText = ref(null) // 转写待确认
 const input = ref('')
+const inputEl = ref(null) // 文字输入框，语音降级时聚焦
 const busy = ref(false)
 let timer = null
 
@@ -30,7 +31,7 @@ function reasonMsg(reason) {
     'mic-denied': '麦克风权限未开启：请点浏览器地址栏的🔒，选择"麦克风"→允许',
     'https-required': '语音需要 HTTPS 访问，请用 Safari 或 Chrome 直接打开',
     network: '网络不稳，请再按一次说话',
-    unsupported: '当前浏览器不支持语音，请用下方文字输入',
+    unsupported: '当前浏览器不支持语音，已为您切换为大字文字输入，请直接打字',
   }
   return t[reason] || '没听清，请再说一次'
 }
@@ -49,6 +50,8 @@ async function startListen() {
     const msg = reasonMsg(r.reason)
     message.warning(msg)
     speak(msg)
+    // 语音不可用 → 聚焦文字输入框（明确降级，不静默）
+    if (r.reason === 'unsupported') inputEl.value?.focus()
   }
 }
 
@@ -148,7 +151,7 @@ function sendOption(o) {
 
     <!-- 文字输入 -->
     <div style="display:flex;gap:8px;margin-top:10px;">
-      <n-input v-model:value="input" type="textarea" :rows="2" placeholder="或直接打字告诉我（最多 200 字）" maxlength="200"
+      <n-input ref="inputEl" v-model:value="input" type="textarea" :rows="2" placeholder="或直接打字告诉我（最多 200 字）" maxlength="200"
                style="font-size:1.2rem;" @keyup.enter="send()" />
       <n-button type="primary" size="large" style="min-height:56px;" :loading="busy" @click="send()">发送</n-button>
     </div>

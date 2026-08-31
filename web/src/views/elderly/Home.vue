@@ -124,8 +124,10 @@ async function confirmSos() {
   try {
     const names = contacts.value.filter((c) => c.status === '审核通过').slice(0, 3).map((c) => c.name).join('、')
     await elderly.emergency()
-    speak(`紧急求助已发出${names ? `，将依次呼叫 ${names}` : ''}`, vol.value)
-    message.success(`紧急求助已发出${names ? `，将依次呼叫：${names}` : ''}`)
+    // 诚实化：H5 无法真实连续拨号，改为「已通知紧急联系人 + 可手动打 120」
+    const suffix = names ? `，已通知紧急联系人：${names}` : ''
+    speak(`紧急求助已发出${suffix}，需要时请点拨打120`, vol.value)
+    message.success(`紧急求助已发出${suffix}。手机无法自动连续呼叫，请点下方“拨打120”手动求助。`)
   } catch (e) {
     message.error(e.message || '触发失败')
   }
