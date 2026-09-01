@@ -17,6 +17,7 @@ init_db(config.DB_PATH)
 from data import db_care_proactive as cp  # noqa: E402
 from data.db_core import get_db  # noqa: E402
 from datetime import datetime, timedelta  # noqa: E402
+import pytest  # noqa: E402
 
 
 def _seed(uid, title, status, days_ago):
@@ -43,6 +44,25 @@ def test_followup_creates_notification():
     # 幂等：再跑一次，不重复创建（今日已回访）
     n2 = cp.run_followup(now=datetime.now())
     assert n2 == 0
+
+
+def test_followup_quiet_hour_suppressed_then_backfill():
+    """夜间（21:00–8:00）不生成回访；同日 9:00 正常生成（静默只在深夜抑制，不永久丢失）。"""
+    _seed(91003, "夜间办结", "已完成", 1)
+    base = datetime.now()
+    night = base.replace(hour=22, minute=0, second=0, microsecond=0)
+    n_night = cp.run_followup(now=night)
+    assert n_night == 0
+    with get_db() as conn:
+        c = conn.execute("SELECT COUNT(*) c FROM notifications WHERE user_id=91003").fetchone()["c"]
+        assert c == 0
+    # 9:00（同日）正常补发（已是昨日办结，静默过即错峰生成）
+    morning = base.replace(hour=9, minute=0, second=0, microsecond=0)
+    n_day = cp.run_followup(now=morning)
+    assert n_day >= 1
+    with get_db() as conn:
+        c = conn.execute("SELECT COUNT(*) c FROM notifications WHERE user_id=91003").fetchone()["c"]
+        assert c >= 1
 
 
 def test_followup_not_on_pending():

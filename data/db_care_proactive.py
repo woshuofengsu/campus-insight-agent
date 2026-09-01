@@ -25,8 +25,13 @@ def _is_quiet_hour(now: datetime | None = None) -> bool:
 
 
 def run_followup(now: datetime | None = None) -> int:
-    """昨日办结且未回访 → 给居民发一条回访通知。返回新增回访数。"""
+    """昨日办结且未回访 → 给居民发一条回访通知。返回新增回访数。
+
+    静默时段（21:00–8:00）不生成回访（7:00 前跑，等 8 点后 scheduler 下一分钟自然补发，不会漏）。
+    """
     now = now or datetime.now()
+    if _is_quiet_hour(now):  # M4：夜间静默，只生成待办不打扰；次日自动补发
+        return 0
     yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
     created = 0
     try:
