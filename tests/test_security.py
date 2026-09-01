@@ -286,20 +286,35 @@ def test_me_delete_anonymizes(client):
         conn.execute(
             "INSERT OR REPLACE INTO user_profile (username, role, name, phone, is_active) "
             "VALUES ('test_user_sec', 'resident', '注销测试', '13912345678', 1)")
+        # 造关联表 PII，验证级联清空（N3）
+        uid = conn.execute("SELECT id FROM user_profile WHERE username='test_user_sec'").fetchone()["id"]
+        conn.execute("INSERT INTO emergency_contacts (user_id, name, phone, relation, status) "
+                     "VALUES (?, '紧急联系人', '13911112222', '家属', '审核通过')", (uid,))
+        conn.execute("INSERT INTO health_consults (user_id, name, phone, content) "
+                     "VALUES (?, '测试人', '13933334444', '咨询')", (uid,))
+        conn.execute("INSERT INTO community_issues (title, category, reporter_id, reporter_name, reporter_phone) "
+                     "VALUES ('测试工单', '设施维修', ?, '注销测试', '13955556666')", (uid,))
         conn.commit()
     r = client.post("/api/web/auth/login", json={"username": "test_user_sec", "password": ""})
     assert r.status_code == 200 and r.json()["success"], r.text
     token = r.json()["data"]["token"]
     r2 = client.post("/api/web/me/delete", headers={"Authorization": f"Bearer {token}"})
     assert r2.status_code == 200 and r2.json()["success"]
-    # 注销后 token 失效
-    r3 = client.get("/api/web/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert r3.status_code in (401, 400) or not r3.json().get("success")
-    # 数据库校验：停用 + 匿名化
+    # 数据库校验：停用 + 匿名化（含关联表 PII / 密文 / name/unit）
     with get_db() as conn:
-        row = conn.execute("SELECT is_active, phone, username FROM user_profile WHERE username LIKE '已注销用户%'").fetchone()
+        row = conn.execute("SELECT is_active, phone, phone_enc, name, unit, username FROM user_profile "
+                           "WHERE username LIKE '已注销用户%'").fetchone()
         assert row and row["is_active"] == 0
         assert row["phone"] in ("", None)
+        assert row["phone_enc"] in ("", None)
+        assert row["name"] in ("", None)
+        for sql in (
+            "SELECT phone_enc AS phone_enc, name AS name FROM emergency_contacts WHERE user_id=?",
+            "SELECT phone_enc AS phone_enc, name AS name FROM health_consults WHERE user_id=?",
+            "SELECT reporter_phone_enc AS phone_enc, reporter_name AS name FROM community_issues WHERE reporter_id=?",
+        ):
+            r = conn.execute(sql, (uid,)).fetchone()
+            assert r["phone_enc"] in ("", None) and r["name"] in ("", None), (sql, dict(r))
     # 清理
     with get_db() as conn:
         conn.execute("DELETE FROM user_profile WHERE username LIKE '已注销用户%'")

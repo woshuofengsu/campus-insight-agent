@@ -1,4 +1,4 @@
-# api_routes/policy.py
+﻿# api_routes/policy.py
 """政策问答 / 知识库路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -147,7 +147,7 @@ def web_knowledge_create(req: KnowledgeCreate, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_policy import create_knowledge, submit_review
-    from ui.cache import invalidate_knowledge
+    from utils.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
     kid, err = create_knowledge(
         title=req.title, category=req.category, plain_interpretation=req.plain_interpretation,
@@ -175,7 +175,7 @@ def web_knowledge_action(kid: int, req: KnowledgeAction, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_policy import audit_knowledge, delete_knowledge, take_down_knowledge, withdraw_review
-    from ui.cache import invalidate_knowledge
+    from utils.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
     if req.action == "audit":
         # 发布人不能审核自己发布的内容，审核统一走「社区审核组」身份
@@ -209,7 +209,7 @@ def web_knowledge_new_version(kid: int, req: KnowledgeCreate, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_policy import create_new_version, submit_review
-    from ui.cache import invalidate_knowledge
+    from utils.cache import invalidate_knowledge
     actor = _user(request).get("name") or "负责人"
     nid, err = create_new_version(
         kid, title=req.title, category=req.category,

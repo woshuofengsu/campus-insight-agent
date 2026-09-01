@@ -1,4 +1,4 @@
-# api_routes/health.py
+﻿# api_routes/health.py
 """健康内容 / 健康咨询 / 天气联动路由模块（从 api_web.py 拆出，P2-04）。"""
 import json
 
@@ -28,7 +28,7 @@ class HealthArticleCreate(BaseModel):
 @router.post("/articles")
 def web_health_article_create(req: HealthArticleCreate, request: Request):
     from data.db_health_content import create_content, submit_for_review
-    from ui.cache import invalidate_health
+    from utils.cache import invalidate_health
     actor = _user(request).get("name") or "负责人"
     try:
         weather_links = json.loads(req.weather_link_json or "[]") if req.weather_link_json else []
@@ -62,7 +62,7 @@ def web_health_article_action(cid: int, req: HealthArticleAction, request: Reque
         review_content, take_down_content, withdraw_submission, delete_draft,
         set_pinned, is_disease_prevention_manager,
     )
-    from ui.cache import invalidate_health
+    from utils.cache import invalidate_health
     # 权限：内容审核仅疾病预防负责人（方案权限矩阵）
     if not is_disease_prevention_manager(_user(request)):
         return _fail(1003, "无权限：仅疾病预防负责人可管理健康内容")
@@ -198,7 +198,7 @@ class ConsultFeedback(BaseModel):
 @router.post("/consults/{cid}/feedback")
 def web_consult_feedback(cid: int, req: ConsultFeedback, request: Request):
     from data.db_health_content import feedback_consult
-    from ui.cache import invalidate_health
+    from utils.cache import invalidate_health
     u = _user(request)
     ok_, msg = feedback_consult(cid, u.get("uid"), req.solved, reason=req.reason)
     if not ok_:
@@ -216,7 +216,7 @@ class ConsultToggle(BaseModel):
 def web_consult_toggle(cid: int, req: ConsultToggle, request: Request):
     """咨询撤回/重新打开/关闭（居民本人）。"""
     from data.db_health_content import withdraw_consult, reopen_consult, close_consult
-    from ui.cache import invalidate_health
+    from utils.cache import invalidate_health
     u = _user(request)
     uid = u.get("uid")
     if req.action == "withdraw":
@@ -282,7 +282,7 @@ class ConsultCreate(BaseModel):
 @router.post("/consults")
 def web_consult_create(req: ConsultCreate, request: Request):
     from data.db_health_content import submit_consult, log_emergency_hint_shown
-    from ui.cache import invalidate_health
+    from utils.cache import invalidate_health
     u = _user(request)
     # 提交前紧急提示已展示（120 急救提示，留痕）
     try:
@@ -331,7 +331,7 @@ class ConsultReply(BaseModel):
 @router.post("/consults/{cid}/reply")
 def web_consult_reply(cid: int, req: ConsultReply, request: Request):
     from data.db_health_content import reply_consult, is_disease_prevention_manager
-    from ui.cache import invalidate_health
+    from utils.cache import invalidate_health
     # 权限：咨询处理人（疾病预防负责人自动成为处理人）
     if not is_disease_prevention_manager(_user(request)):
         return _fail(1003, "无权限：仅咨询处理人可回复")

@@ -207,10 +207,9 @@ def issue_draft_delete(did: int, request: Request):
 
 @router.get("/{issue_id}")
 def issue_detail(issue_id: int, request: Request):
-    from data.db_repair import get_issues, get_issue_timeline
+    from data.db_repair import get_issue, get_issue_timeline
     u = _user(request)
-    rows = get_issues(limit=1000)
-    row = next((r for r in rows if r["id"] == issue_id), None)
+    row = get_issue(issue_id)  # N9：直查单条，避免 limit=1000 内存找
     if not row:
         return _fail(1004, "工单不存在")
     # 权限：居民只能看自己的工单

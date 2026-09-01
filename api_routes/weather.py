@@ -1,4 +1,4 @@
-# api_routes/weather.py
+﻿# api_routes/weather.py
 """天气历史 / 社区概况 / 预报 / 检查任务路由（从 api_web.py 拆出）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -80,7 +80,7 @@ def web_weather_current(request: Request):
 
 @router.get("/alerts")
 def web_weather_alerts(request: Request):
-    from ui.cache import cached_active_alerts
+    from utils.cache import cached_active_alerts
     return _ok(cached_active_alerts())
 
 
@@ -94,7 +94,7 @@ class CheckTaskConfirm(BaseModel):
 def web_check_task_confirm(task_id: int, req: CheckTaskConfirm, request: Request):
     from data.db_weather import confirm_check_task, fill_overdue_task
     from data.db_weather import list_check_tasks
-    from ui.cache import invalidate_weather
+    from utils.cache import invalidate_weather
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     actor = _user(request).get("name") or "负责人"

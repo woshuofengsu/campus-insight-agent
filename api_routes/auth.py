@@ -176,9 +176,19 @@ def me_delete(request: Request):
     with get_db() as conn:
         conn.execute(
             "UPDATE user_profile SET is_active=0, username='已注销用户' || id, "
-            "phone='', community='', building='' WHERE id=? AND role != 'grid'",
+            "phone='', phone_enc='', name='', community='', building='', unit='' "
+            "WHERE id=? AND role != 'grid'",
             (uid,))
+        # N3：级联匿名化关联表 PII（保留 id / 统计 / 日志，仅清空可识别信息与密文）
+        conn.execute(
+            "UPDATE emergency_contacts SET name='', phone='', phone_enc='' WHERE user_id=?", (uid,))
+        conn.execute(
+            "UPDATE health_consults SET name='', phone='', phone_enc='', agent_name='', "
+            "agent_phone='', agent_phone_enc='' WHERE user_id=?", (uid,))
+        conn.execute(
+            "UPDATE community_issues SET reporter_name='', reporter_phone='', reporter_phone_enc='' "
+            "WHERE reporter_id=?", (uid,))
         conn.commit()
     log_activity(u.get("name") or "用户", "注销账号", module="安全",
-                 detail=f"用户 #{uid} 注销（匿名化个人字段，保留日志）")
-    return _ok({}, "账号已注销（个人数据已匿名化，日志按法规保留）")
+                 detail=f"用户 #{uid} 注销（匿名化个人字段与关联表 PII，保留日志）")
+    return _ok({}, "账号已注销（个人数据与关联表 PII 已匿名化，日志按法规保留）")

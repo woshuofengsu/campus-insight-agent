@@ -27,6 +27,29 @@ _FAIL_THRESHOLD = 3
 _OPEN_SECONDS = 60
 _DEFAULT_TIMEOUT = 6
 
+# N5：LLM 输入长度上限（防登录用户发超长文本刷输入 token）
+_MAX_SINGLE_MSG = 2000
+_MAX_TOTAL_MSGS = 20000
+
+
+def _clamp_messages(messages):
+    """截断超长消息：单条 ≤2000 字、总长 ≤20000 字（统一入口防线）。"""
+    total = 0
+    out = []
+    for m in messages:
+        if isinstance(m, dict) and isinstance(m.get("content"), str):
+            c = m["content"]
+            if len(c) > _MAX_SINGLE_MSG:
+                c = c[:_MAX_SINGLE_MSG]
+            total += len(c)
+            if total > _MAX_TOTAL_MSGS:
+                c = c[: max(0, _MAX_TOTAL_MSGS - (total - len(c)))]
+                total = _MAX_TOTAL_MSGS
+            out.append({"role": m.get("role", "user"), "content": c})
+        else:
+            out.append(m)
+    return out
+
 
 def chat(messages, *, module, purpose="", temperature=0.2, max_tokens=512,
          timeout=_DEFAULT_TIMEOUT, response_format=None, uid=None):
@@ -37,6 +60,7 @@ def chat(messages, *, module, purpose="", temperature=0.2, max_tokens=512,
     - 无 key：快速失败（ok=False, error='no_key'）。
     - 成功/失败均写 llm_usage（失败 token=0，module/purpose 可溯源）。
     """
+    messages = _clamp_messages(messages)  # N5：入口统一截断超长文本
     now = time.time()
     if not DEEPSEEK_API_KEY:  # 无 key 是永久条件，优先于瞬态熔断
         return {"ok": False, "error": "no_key", "text": "", "raw": None,

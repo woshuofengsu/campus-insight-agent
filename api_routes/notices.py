@@ -1,4 +1,4 @@
-# api_routes/notices.py
+﻿# api_routes/notices.py
 """通知路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -74,7 +74,7 @@ def web_notice_list(request: Request, limit: int = 100):
 @router.get("/manage")
 def web_notice_manage(request: Request, status: str = "", limit: int = 200):
     """负责人端通知管理列表（含已读统计）。"""
-    from ui.cache import cached_notices_with_stats
+    from utils.cache import cached_notices_with_stats
     _r = _require_role(request, "grid")
     if _r:
         return _r
@@ -95,7 +95,7 @@ def web_notice_action(nid: int, req: NoticeAction, request: Request):
         publish_notice, schedule_notice, withdraw_notice, take_down_notice,
         set_pinned, mark_notice_read, delete_notice,
     )
-    from ui.cache import invalidate_notices
+    from utils.cache import invalidate_notices
     u = _user(request)
     # 管理动作仅负责人；mark_read 允许居民/老年
     if req.action != "mark_read" and u.get("role") != "grid":
@@ -140,16 +140,16 @@ def web_notice_detail(nid: int, request: Request):
     n = get_notice(nid)
     if not n:
         return _fail(1004, "通知不存在")
-    # 范围过滤：居民/老年只能看本端可见通知
+    # 范围过滤：居民/老年只能看本端可见通知（N8：授权判断 fail-closed，校验异常即拒绝，不静默放行）
     if u.get("role") != "grid":
         try:
             from data.db_notice import get_visible_notices
             visible = get_visible_notices("elderly" if u.get("role") == "elderly" else "resident",
                                           u.get("uid"), limit=500)
-            if not any(v.get("id") == nid for v in visible):
-                return _fail(1003, "无权限查看该通知")
         except Exception:
-            pass
+            return _fail(1003, "无权查看该通知")  # fail-closed：校验失败 → 拒绝
+        if not any(v.get("id") == nid for v in visible):
+            return _fail(1003, "无权限查看该通知")
         n.pop("publisher", None)
         n.pop("scope_target_json", None)
     out = dict(n)

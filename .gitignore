@@ -1,5 +1,7 @@
 .env
 .env.bak
+.env.demo
+.env.demo.bak
 __pycache__/
 .pytest_cache/
 *.pyc

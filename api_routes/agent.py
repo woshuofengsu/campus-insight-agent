@@ -1,5 +1,7 @@
 # api_routes/agent.py
 """Agent 统一入口 + 留痕/处理包/用量/分析路由（从 api_web.py 拆出，P2-04）。"""
+import time
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
@@ -8,6 +10,22 @@ from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid
 router = APIRouter(prefix="/api/web/agent", tags=["agent"])
 
 _MAX_AGENT_SESSIONS = 500
+
+# N5：Agent 对话每用户限流（内存版滑动窗口；接口可为后续 Redis 实现复用）
+_CHAT_LIMIT = 60  # 每分钟最多 60 次
+_RATE_WINDOW = 60
+_chat_rate: dict[str, list] = {}
+
+
+def _rate_limited(key: str) -> bool:
+    now = time.time()
+    bucket = _chat_rate.setdefault(key, [])
+    while bucket and now - bucket[0] > _RATE_WINDOW:
+        bucket.pop(0)
+    if len(bucket) >= _CHAT_LIMIT:
+        return True
+    bucket.append(now)
+    return False
 
 
 def _get_orchestrator(request: Request, key: str):
@@ -35,6 +53,8 @@ def agent_chat(req: AgentChat, request: Request):
     role = u.get("role")
     if role not in ("resident", "grid"):
         return _fail(1003, "当前角色暂不支持 Agent 对话")
+    if _rate_limited(f"chat:{u.get('uid')}"):  # N5 限流
+        return _fail(1002, "操作过于频繁，请稍后再试")
     try:
         key = f"{role}:{u.get('uid')}"
         orch = _get_orchestrator(request, key)
@@ -50,6 +70,8 @@ def agent_elderly_chat(req: AgentChat, request: Request):
     role = u.get("role")
     if role not in ("elderly", "resident"):
         return _fail(1003, "无权限")
+    if _rate_limited(f"chat:{u.get('uid')}"):  # N5 限流
+        return _fail(1002, "操作过于频繁，请稍后再试")
     try:
         uid = _resolve_elder_uid(request) or u.get("uid")
         key = f"elderly:{uid}"

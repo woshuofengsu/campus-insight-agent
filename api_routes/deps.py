@@ -16,17 +16,21 @@ _log = logging.getLogger(__name__)
 # ---------------- JWT（stdlib HMAC HS256，零第三方依赖） ----------------
 
 def _load_secret() -> str:
-    """加载 JWT 密钥。生产（DEMO_MODE=false）必须配置 WEB_JWT_SECRET，否则拒绝启动；
-    演示模式（默认开）用固定兜底值并打告警（仅供比赛演示，严禁生产）。"""
+    """加载 JWT 密钥（N2：secure-by-default）。
+
+    未配 WEB_JWT_SECRET 时，仅当**显式** DEMO_MODE=true（环境变量里真的写了 true/1/yes）才放行
+    演示兜底密钥；否则一律拒绝启动——杜绝"默认 true + 忘配密钥 → 用公开密钥被伪造 JWT"。
+    """
     secret = os.getenv("WEB_JWT_SECRET", "").strip()
     if secret:
         return secret
-    demo = os.getenv("DEMO_MODE", "true").strip().lower() not in ("false", "0", "no")
+    demo = os.getenv("DEMO_MODE", "").strip().lower() in ("1", "true", "yes")
     if demo:
-        _log.warning("WEB_JWT_SECRET 未配置，使用演示兜底密钥（严禁生产环境）")
+        _log.warning("WEB_JWT_SECRET 未配置，使用演示兜底密钥（仅供显式 DEMO_MODE=true 的本机演示，严禁生产）")
         return "demo-only-insecure-jwt-secret"
     raise RuntimeError(
-        "WEB_JWT_SECRET 未配置且 DEMO_MODE=false：生产环境必须配置 JWT 密钥，拒绝启动。"
+        "WEB_JWT_SECRET 未配置且未显式开启 DEMO_MODE=true：安全默认要求配置 JWT 密钥，拒绝启动"
+        "（本机/演示请在 .env 设 WEB_JWT_SECRET，或用 .env.demo 显式 DEMO_MODE=true）。"
     )
 
 

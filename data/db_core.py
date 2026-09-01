@@ -908,6 +908,10 @@ def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(_DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
+    # N4：写并发时避免"database is locked"立刻失败（WAL 下两写碰撞让输家等待而不是抛错）；
+    #      synchronous=NORMAL 为 WAL 推荐策略（fsync 次数减少，性能与安全平衡）
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
 

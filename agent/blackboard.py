@@ -81,6 +81,9 @@ class Blackboard:
     # ---- 历史 ----
 
     def _hist(self, action: str, key: str, agent: str, detail: Any = None) -> None:
+        # N7：history 上限 500 条，避免长会话无限增长
+        if len(self.history) >= 500:
+            self.history.pop(0)
         self.history.append({
             "action": action,
             "key": key,
