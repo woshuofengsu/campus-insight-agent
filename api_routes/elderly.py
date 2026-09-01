@@ -1,4 +1,4 @@
-# api_routes/elderly.py
+﻿# api_routes/elderly.py
 """老年端本体 + 老年关怀管理路由模块（从 api_web.py 拆出，P2-04）。
 
 - router（prefix=/api/web/elderly）：老年端本体端点（含免登录 elder_id 解析）。
@@ -8,6 +8,9 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid
+
+import logging
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/elderly", tags=["elderly"])
 manage_router = APIRouter(prefix="/api/web/elderly/manage", tags=["elderly"])
@@ -24,8 +27,8 @@ class ContactAudit(BaseModel):
 
 
 class ContactCreate(BaseModel):
-    name: str = Field(..., min_length=1)
-    phone: str = Field(..., min_length=11)
+    name: str = Field(..., min_length=1, max_length=64)
+    phone: str = Field(..., min_length=11, max_length=20)
     relation: str = Field(default="家属")
 
 
@@ -44,13 +47,13 @@ class ContactCall(BaseModel):
 
 
 class VoiceReport(BaseModel):
-    text: str = Field(..., min_length=2)
+    text: str = Field(..., min_length=2, max_length=500)
     urgency: str = Field(default="一般")
     issue_type: str = Field(default="室内")
 
 
 class MedicationCreate(BaseModel):
-    drug_name: str = Field(..., min_length=1)
+    drug_name: str = Field(..., min_length=1, max_length=50)
     dosage: str = Field(default="")
     times: str = Field(default="08:00")
     repeat_rule: str = Field(default="每天")
@@ -318,7 +321,8 @@ def web_elderly_contact(req: ContactCall, request: Request):
                            "拨出", status="已结束", actor=u.get("name") or "老人")
         return _ok({"dialed": req.target_name or req.target_phone}, "已记录拨打")
     except Exception as e:  # noqa: BLE001
-        return _fail(2001, f"拨打记录失败：{e}")
+        _log.warning("拨打记录异常：%s", e)
+        return _fail(2001, "拨打记录失败，请稍后再试")
 
 
 # ---------------- 负责人端老年关怀管理 ----------------

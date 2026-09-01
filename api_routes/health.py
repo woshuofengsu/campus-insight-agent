@@ -270,7 +270,7 @@ class ConsultCreate(BaseModel):
     name: str = Field(default="")
     phone: str = Field(default="")
     consult_type: str = Field(default="健康知识")
-    content: str = Field(..., min_length=5)
+    content: str = Field(..., min_length=5, max_length=2000)
     building: str = Field(default="")
     attachment_json: str = Field(default="[]")
     is_agent_report: int = Field(default=0)
@@ -322,7 +322,7 @@ def web_consult_list(request: Request, status: str = "", consult_type: str = "",
 
 
 class ConsultReply(BaseModel):
-    reply: str = Field(..., min_length=1)
+    reply: str = Field(..., min_length=1, max_length=2000)
     doctor_guide: str = Field(default="")
     need_offline: bool = Field(default=False)
     offline_confirmed: bool = Field(default=False)

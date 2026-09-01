@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role
 
+import logging
+_log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/web/notices", tags=["notices"])
 
 
@@ -12,7 +15,7 @@ class NoticeCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=50)
     notice_type: str = Field(..., pattern="^(社区公告|活动通知|停水停电通知|政策通知|温馨提示|紧急通知|其他)$")
     publish_scope: str = Field(default="全体居民", pattern="^(全体居民|指定小区|指定楼栋|仅老年端)$")
-    body: str = Field(..., min_length=1)
+    body: str = Field(..., min_length=1, max_length=3000)
     elderly_summary: str = Field(default="")
     is_urgent: int = Field(default=0)
     is_pinned: int = Field(default=0)
@@ -57,6 +60,7 @@ def web_notice_create(req: NoticeCreate, request: Request):
 
 @router.get("")
 def web_notice_list(request: Request, limit: int = 100):
+    limit = min(limit, 500)
     from data.db_notice import get_visible_notices
     u = _user(request)
     role = u.get("role")
@@ -73,6 +77,7 @@ def web_notice_list(request: Request, limit: int = 100):
 
 @router.get("/manage")
 def web_notice_manage(request: Request, status: str = "", limit: int = 200):
+    limit = min(limit, 500)
     """负责人端通知管理列表（含已读统计）。"""
     from utils.cache import cached_notices_with_stats
     _r = _require_role(request, "grid")
@@ -126,7 +131,8 @@ def web_notice_action(nid: int, req: NoticeAction, request: Request):
         else:
             return _fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001
-        return _fail(2001, f"操作失败：{e}")
+        _log.warning("通知操作异常：%s", e)
+        return _fail(2001, "操作失败，请稍后再试")
     if not ok_:
         return _fail(2001, msg or "操作被拒绝")
     invalidate_notices()

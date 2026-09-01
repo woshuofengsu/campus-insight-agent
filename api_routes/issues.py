@@ -1,15 +1,18 @@
-# api_routes/issues.py
+﻿# api_routes/issues.py
 """报修工单路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role
 
+import logging
+_log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/web/issues", tags=["issues"])
 
 
 class IssueCreate(BaseModel):
-    title: str = Field(..., min_length=2)
+    title: str = Field(..., min_length=2, max_length=200)
     category: str = Field(default="公共设施")
     issue_type: str = Field(default="室内", pattern="^(室内|室外)$")
     location: str = Field(default="")
@@ -139,6 +142,7 @@ def issue_create(req: IssueCreate, request: Request):
 def issue_list(request: Request, status: str = "", category: str = "",
                urgency: str = "", issue_type: str = "", keyword: str = "",
                limit: int = 200):
+    limit = min(limit, 500)
     from data.db_repair import get_issues
     u = _user(request)
     if u.get("role") == "grid":
@@ -293,7 +297,8 @@ def issue_action(issue_id: int, req: IssueAction, request: Request):
         else:
             return _fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001
-        return _fail(2001, f"操作失败：{e}")
+        _log.warning("工单操作异常：%s", e)
+        return _fail(2001, "操作失败，请稍后再试")
     if not ok_:
         return _fail(2001, msg or "操作被拒绝")
     return _ok({"issue_id": issue_id}, msg or "操作成功")

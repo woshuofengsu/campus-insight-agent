@@ -11,10 +11,15 @@ from collections import defaultdict, deque
 
 _LOCK = threading.Lock()
 _FAILS: dict[str, deque] = defaultdict(deque)
+# N._USER：用户名级全局失败桶（跨 IP 合并），防"轮换 IP 绕过单 IP 限"
+_USER_FAILS: dict[str, deque] = defaultdict(deque)
 
 # 阈值与锁定时长（秒）
 _MAX_FAILS = 5
 _LOCK_SECONDS = 300
+# 用户名级硬限：任一用户名在窗口内累计失败达此值（不区分 IP）即整体锁定
+_MAX_USER_FAILS = 20
+_USER_LOCK_SECONDS = 600
 
 
 def _key(username: str, ip: str) -> str:
@@ -22,9 +27,16 @@ def _key(username: str, ip: str) -> str:
 
 
 def check(username: str, ip: str) -> bool:
-    """是否被锁定。返回 True 表示已锁，应直接拒绝登录。"""
+    """是否被锁定。返回 True 表示已锁，应直接拒绝登录。IP 级或用户名级任一命中即锁。"""
     now = time.time()
     with _LOCK:
+        # 用户名级全局（防轮换 IP）
+        udq = _USER_FAILS.get(username)
+        if udq:
+            while udq and now - udq[0] > _USER_LOCK_SECONDS:
+                udq.popleft()
+            if len(udq) >= _MAX_USER_FAILS:
+                return True
         dq = _FAILS.get(_key(username, ip))
         if not dq:
             return False
@@ -35,20 +47,25 @@ def check(username: str, ip: str) -> bool:
 
 
 def record_fail(username: str, ip: str):
-    """记录一次失败。返回当前累计失败次数。"""
+    """记录一次失败（IP 级 + 用户名级同时记）。返回当前 IP 级累计失败次数。"""
     now = time.time()
     with _LOCK:
         dq = _FAILS[_key(username, ip)]
         while dq and now - dq[0] > _LOCK_SECONDS:
             dq.popleft()
         dq.append(now)
+        udq = _USER_FAILS[username]
+        while udq and now - udq[0] > _USER_LOCK_SECONDS:
+            udq.popleft()
+        udq.append(now)
         return len(dq)
 
 
 def reset(username: str, ip: str):
-    """登录成功后清零。"""
+    """登录成功后清零（IP 级与用户名级一并清）。"""
     with _LOCK:
         _FAILS.pop(_key(username, ip), None)
+        _USER_FAILS.pop(username, None)
 
 
 def remaining(username: str, ip: str) -> int:

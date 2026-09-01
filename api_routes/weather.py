@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/web/weather", tags=["weather"])
 
 @router.get("/history")
 def web_weather_history(request: Request, status: str = "", limit: int = 200):
+    limit = min(limit, 500)
     """负责人端天气检查任务历史。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")

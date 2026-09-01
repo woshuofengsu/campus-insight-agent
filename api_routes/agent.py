@@ -1,11 +1,14 @@
 ﻿# api_routes/agent.py
 """Agent 统一入口 + 留痕/处理包/用量/分析路由（从 api_web.py 拆出，P2-04）。"""
+import logging
 import time
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/agent", tags=["agent"])
 
@@ -60,7 +63,8 @@ def agent_chat(req: AgentChat, request: Request):
         orch = _get_orchestrator(request, key)
         return _ok(orch.run(role, u.get("uid"), u.get("name") or "居民", req.text))
     except Exception as e:  # noqa: BLE001
-        return _fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
+        _log.warning("对话异常：%s", e)
+        return _fail(2001, "服务暂时不可用，请稍后再试")
 
 
 @router.post("/elderly/chat")
@@ -78,7 +82,8 @@ def agent_elderly_chat(req: AgentChat, request: Request):
         orch = _get_orchestrator(request, key)
         return _ok(orch.run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid))
     except Exception as e:  # noqa: BLE001
-        return _fail(2001, f"服务暂时不可用，请稍后再试（{e}）")
+        _log.warning("老年端对话异常：%s", e)
+        return _fail(2001, "服务暂时不可用，请稍后再试")
 
 
 @router.get("/history")
@@ -111,6 +116,7 @@ def agent_history_clear(request: Request):
 @router.get("/logs")
 def agent_logs(request: Request, role: str = "", intent: str = "",
                status: str = "", keyword: str = "", limit: int = 200):
+    limit = min(limit, 500)
     """负责人查 Agent 留痕。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
@@ -121,6 +127,7 @@ def agent_logs(request: Request, role: str = "", intent: str = "",
 
 @router.get("/handoffs")
 def agent_handoffs(request: Request, status: str = "", limit: int = 50):
+    limit = min(limit, 500)
     """负责人端人工处理包列表（无缝转人工：AI 已整理上下文，可直接处理）。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")

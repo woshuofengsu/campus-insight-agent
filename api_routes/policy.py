@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 
 from api_routes.deps import _fail, _ok, _require_role, _user
 
+import logging
+_log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/web/qa", tags=["policy"])
 knowledge_router = APIRouter(prefix="/api/web/knowledge", tags=["policy"])
 
@@ -56,7 +59,8 @@ def web_qa_transfer(qid: int, req: TransferHuman, request: Request):
             user_id=u.get("uid"), question=req.question, source="居民端")
         return _ok({"question_id": qid}, "已转人工")
     except Exception as e:
-        return _fail(2001, f"转人工失败：{e}")
+        _log.warning("转人工异常：%s", e)
+        return _fail(2001, "转人工失败，请稍后再试")
 
 
 @router.delete("/questions/{qid}")
@@ -77,6 +81,7 @@ def web_qa_question_delete(qid: int, request: Request):
 
 @router.get("/questions")
 def web_qa_questions(request: Request, status: str = "", limit: int = 50):
+    limit = min(limit, 500)
     from data.db_policy import get_question_deadline_info, get_questions
     u = _user(request)
     if u.get("role") == "grid":
@@ -105,6 +110,7 @@ def web_qa_questions(request: Request, status: str = "", limit: int = 50):
 
 @knowledge_router.get("")
 def web_knowledge_list(request: Request, category: str = "", limit: int = 50):
+    limit = min(limit, 500)
     from data.db_policy import get_knowledge_list
     u = _user(request)
     status = None if u.get("role") == "grid" else "已发布"
@@ -131,7 +137,7 @@ def web_qa_high_freq(request: Request, limit: int = 10):
 class KnowledgeCreate(BaseModel):
     title: str = Field(..., min_length=2)
     category: str = Field(default="社保医保")
-    plain_interpretation: str = Field(..., min_length=2)
+    plain_interpretation: str = Field(..., min_length=2, max_length=2000)
     content: str = Field(default="")
     summary: str = Field(default="")
     source: str = Field(default="社区整理")
@@ -229,7 +235,7 @@ def web_knowledge_new_version(kid: int, req: KnowledgeCreate, request: Request):
 # ---- 提问人工回复 / 居民反馈 ----
 
 class QaReply(BaseModel):
-    reply: str = Field(..., min_length=1)
+    reply: str = Field(..., min_length=1, max_length=2000)
 
 
 @router.post("/questions/{qid}/reply")

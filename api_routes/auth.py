@@ -9,7 +9,7 @@ router = APIRouter(tags=["auth"])
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(default="")
 
 
@@ -19,7 +19,7 @@ class DemoLoginRequest(BaseModel):
 
 class ChangePassword(BaseModel):
     old_password: str = Field(default="")
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=8, max_length=64)
 
 
 def _user_payload(u: dict) -> dict:

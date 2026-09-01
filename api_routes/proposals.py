@@ -1,16 +1,19 @@
-# api_routes/proposals.py
+﻿# api_routes/proposals.py
 """提案路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role
 
+import logging
+_log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/web/proposals", tags=["proposals"])
 
 
 class ProposalCreate(BaseModel):
     title: str = Field(..., min_length=2)
-    description: str = Field(..., min_length=5)
+    description: str = Field(..., min_length=5, max_length=5000)
     category: str = Field(default="其他")
     is_public: int = Field(default=1)
     reporter_name: str = Field(default="")
@@ -111,6 +114,7 @@ def proposal_draft_delete(did: int, request: Request):
 
 @router.get("")
 def proposal_list(request: Request, status: str = "", limit: int = 300):
+    limit = min(limit, 500)
     from data.db_proposal import get_proposals, get_proposal_vote_stats, has_voted
     u = _user(request)
     rows = get_proposals(status=status or None, limit=limit)
@@ -299,7 +303,8 @@ def proposal_action(pid: int, req: ProposalAction, request: Request):
         else:
             return _fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001
-        return _fail(2001, f"操作失败：{e}")
+        _log.warning("提案操作异常：%s", e)
+        return _fail(2001, "操作失败，请稍后再试")
     if not ok_:
         return _fail(2001, msg or "操作被拒绝")
     return _ok({"proposal_id": pid}, msg or "操作成功")

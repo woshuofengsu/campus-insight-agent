@@ -27,6 +27,7 @@ def web_opinion_create(req: OpinionCreate, request: Request):
 
 @router.get("")
 def web_opinion_list(request: Request, level: str = "", status: str = "", limit: int = 100):
+    limit = min(limit, 500)
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_opinion import list_opinions

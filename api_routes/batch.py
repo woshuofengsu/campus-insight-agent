@@ -1,4 +1,4 @@
-# api_routes/batch.py
+﻿# api_routes/batch.py
 """批量操作路由模块（P2-E2-01）：批量派单 / 批量关闭 / 批量回复。
 
 负责人专用；逐条调用既有数据层函数，返回每条的成败明细（不中断整体）。
@@ -7,6 +7,9 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role
+
+import logging
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/batch", tags=["batch"])
 
@@ -24,7 +27,7 @@ class BatchClose(BaseModel):
 
 class BatchReply(BaseModel):
     question_ids: list[int] = Field(..., min_length=1, max_length=50)
-    reply: str = Field(..., min_length=1)
+    reply: str = Field(..., min_length=1, max_length=500)
 
 
 def _run_batch(ids, fn, actor):
@@ -34,7 +37,8 @@ def _run_batch(ids, fn, actor):
         try:
             ok_, msg = fn(iid, actor)
         except Exception as e:  # noqa: BLE001
-            ok_, msg = False, f"异常：{e}"
+            _log.warning("批量操作异常：%s", e)
+            ok_, msg = False, "操作失败"
         results.append({"id": iid, "ok": bool(ok_), "msg": msg or "ok"})
         if ok_:
             ok_n += 1

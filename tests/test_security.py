@@ -244,6 +244,20 @@ def test_login_guard_module_remaining():
     assert remaining("mod_user", "ip") == 5
 
 
+def test_login_guard_blocks_ip_rotation():
+    """用户名级全局硬限：换 IP 累计到阈值后，就算换新 IP 也被锁（防轮换 IP 绕过）。"""
+    from utils.login_guard import check, record_fail, reset
+    reset("rot_user", "ip1")
+    # 单个 IP 分散失败，未达单 IP 上限（5），但用户名级累计到阈值 → 换新 IP 仍被锁
+    ips = [f"ip{i}" for i in range(1, 8)]
+    for k in range(20):
+        ip = ips[k % len(ips)]
+        record_fail("rot_user", ip)
+    assert check("rot_user", "some_new_ip") is True
+    reset("rot_user", "ip1")
+    assert check("rot_user", "some_new_ip") is False
+
+
 # ---------- WS9.1：越权 / 伪造 / 篡改 JWT 负向测试 ----------
 
 def test_jwt_tampered_rejected(client):
