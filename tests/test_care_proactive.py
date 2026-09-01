@@ -33,16 +33,17 @@ def _seed(uid, title, status, days_ago):
 
 
 def test_followup_creates_notification():
-    """昨日办结的工单 → 回访通知。今日重复运行幂等。"""
+    """昨日办结的工单 → 回访通知。今日重复运行幂等。用固定白天时刻，避免夜间静默误判。"""
     _seed(91001, "自来水管道维修", "已完成", 1)
-    n1 = cp.run_followup(now=datetime.now())
+    day = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
+    n1 = cp.run_followup(now=day)
     assert n1 >= 1
     with get_db() as conn:
         row = conn.execute(
             "SELECT COUNT(*) c FROM notifications WHERE user_id=91001 AND type='followup'").fetchone()
         assert row["c"] >= 1
     # 幂等：再跑一次，不重复创建（今日已回访）
-    n2 = cp.run_followup(now=datetime.now())
+    n2 = cp.run_followup(now=day)
     assert n2 == 0
 
 
@@ -68,7 +69,8 @@ def test_followup_quiet_hour_suppressed_then_backfill():
 def test_followup_not_on_pending():
     """未办结/非昨日的不产生回访。"""
     _seed(91002, "还在处理", "处理中", 1)
-    before = cp.run_followup(now=datetime.now())
+    day = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
+    before = cp.run_followup(now=day)
     with get_db() as conn:
         row = conn.execute(
             "SELECT COUNT(*) c FROM notifications WHERE user_id=91002").fetchone()
