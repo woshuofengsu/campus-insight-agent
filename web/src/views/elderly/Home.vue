@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 // 老年端首页：大字天气(可播放) + 两行三列大按钮 + 用药/通知摘要 + 长按紧急求助 + 联系家属/社区拨打 + 语音帮助
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
@@ -14,7 +14,10 @@ const { speak } = useSpeech()
 
 const home = ref(null)
 const vol = ref(1.0)
+const rate = ref(0.9) // M1 语速（老人档慢一点）
 const volLabels = { 低: 0.5, 中: 1.0, 高: 1.5 }
+const greetText = ref('')
+const careLine = ref('')
 const urgentNotice = ref(null)
 // 紧急求助（长按 3 秒 → 确认 → 10 秒超时自动取消）
 const sosConfirm = ref(false)
@@ -27,7 +30,14 @@ const callContact = ref(null)
 const contacts = ref([])
 
 onMounted(async () => {
-  try { home.value = await elderly.home() } catch { /* 忽略 */ }
+  try {
+    home.value = await elderly.home()
+    // M1：时段问候 + 今日一句关怀 + 语速
+    rate.value = home.value?.speech_rate || 0.9
+    greetText.value = home.value?.greeting ? `${home.value.greeting}，${home.value.name || '您好'}` : ''
+    careLine.value = home.value?.care_line || ''
+    if (careLine.value) speak(greetText.value ? `${greetText.value}。${careLine.value}` : careLine.value, vol.value, rate.value)
+  } catch { /* 忽略 */ }
   try { contacts.value = (await elderly.contacts()) || [] } catch { /* 忽略 */ }
   // 紧急通知主动弹窗 + 语音（重复两次）
   try {
@@ -36,16 +46,16 @@ onMounted(async () => {
     if (urgent) {
       urgentNotice.value = urgent
       const txt = `紧急通知：${urgent.elderly_summary || urgent.title}`
-      speak(txt, vol.value)
-      setTimeout(() => speak(txt, vol.value), 3500)
+      speak(txt, vol.value, rate.value)
+      setTimeout(() => speak(txt, vol.value, rate.value), 3500)
     }
   } catch { /* 忽略 */ }
-  if (home.value?.due_medications > 0) {
-    speak(`您有 ${home.value.due_medications} 条用药提醒，请注意。`, vol.value)
+  if (home.value?.due_medications > 0 && !careLine.value) {
+    speak(`今天有 ${home.value.due_medications} 次药要吃，我会到点提醒您。`, vol.value, rate.value)
   }
-  if (home.value?.weather?.alert_tags?.length) {
+  if (home.value?.weather?.alert_tags?.length && !careLine.value) {
     const tags = home.value.weather.alert_tags.map((a) => `${a.type}${a.level}`).join('、')
-    speak(`注意！当前有极端天气预警：${tags}，请尽量减少外出。`, vol.value)
+    speak(`注意！当前有极端天气预警：${tags}，请尽量减少外出。`, vol.value, rate.value)
   }
 })
 
@@ -74,16 +84,16 @@ function playWeather() {
   if (!wt) return
   const tags = (wt.alert_tags || []).map((a) => `${a.type}${a.level}预警`).join('，')
   const txt = `当前天气${wt.condition || ''}，气温${wt.temp_low || ''}度到${wt.temp_high || ''}度${tags ? '，' + tags : ''}。${wt.advice || ''}`
-  speak(txt, vol.value)
+  speak(txt, vol.value, rate.value)
 }
 
 function voiceHelp() {
-  speak('您好，我是社区智能助手。您可以点击天气、通知、报修、联系社区、联系人、用药提醒按钮，也可以长按红色紧急求助按钮联系社区。', vol.value)
+  speak('您好，我是社区智能助手。您可以点击天气、通知、报修、联系社区、联系人、用药提醒按钮，也可以长按红色紧急求助按钮联系社区。', vol.value, rate.value)
 }
 
 function callCommunity() {
   const phone = home.value?.community_phone || '62319876'
-  speak(`正在呼叫社区服务中心，电话 ${phone}`, vol.value)
+  speak(`正在呼叫社区服务中心，电话 ${phone}`, vol.value, rate.value)
   message.info(`正在呼叫社区服务中心：${phone}`)
   try {
     elderly.contactCall({ target_name: '社区服务中心', target_phone: phone })
@@ -104,7 +114,7 @@ function pressStart() {
         clearInterval(sosTimer)
         sosConfirm.value = false
         message.info('10 秒未确认，求助已自动取消')
-        speak('求助已取消', vol.value)
+        speak('求助已取消', vol.value, rate.value)
       }
     }, 1000)
   }, 3000)
@@ -126,7 +136,7 @@ async function confirmSos() {
     await elderly.emergency()
     // 诚实化：H5 无法真实连续拨号，改为「已通知紧急联系人 + 可手动打 120」
     const suffix = names ? `，已通知紧急联系人：${names}` : ''
-    speak(`紧急求助已发出${suffix}，需要时请点拨打120`, vol.value)
+    speak(`紧急求助已发出${suffix}，需要时请点拨打120`, vol.value, rate.value)
     message.success(`紧急求助已发出${suffix}。手机无法自动连续呼叫，请点下方“拨打120”手动求助。`)
   } catch (e) {
     message.error(e.message || '触发失败')
@@ -150,7 +160,7 @@ async function confirmCall() {
   try {
     await elderly.contactCall({ target_name: callContact.value.name, target_phone: callContact.value.phone })
     message.success(`正在呼叫 ${callContact.value.name}（${callContact.value.phone}）`)
-    speak(`正在呼叫${callContact.value.name}`, vol.value)
+    speak(`正在呼叫${callContact.value.name}`, vol.value, rate.value)
   } catch (e) {
     message.error(e.message)
   }
@@ -164,13 +174,17 @@ function cancelCall() {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">你好，{{ home?.name || '大爷/阿姨' }}</div>
+    <!-- M1：时段问候 + 今日关怀 -->
+    <div class="elderly-title">{{ greetText || ('你好，' + (home?.name || '大爷/阿姨')) }}</div>
+    <div v-if="careLine" class="card" style="background:#fff7ed;border:1px solid var(--border);text-align:center;font-size:1.25rem;margin-bottom:10px;">
+      {{ careLine }}
+    </div>
 
     <!-- 音量设置（语音按老人设置音量） -->
     <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px;">
       <span style="font-size:1.1rem;">🔊 音量：</span>
       <n-button-group size="large">
-        <n-button v-for="(v, k) in volLabels" :key="k" :type="vol === v ? 'primary' : 'default'" @click="vol = v; speak('音量已设置', v)">{{ k }}</n-button>
+        <n-button v-for="(v, k) in volLabels" :key="k" :type="vol === v ? 'primary' : 'default'" @click="vol = v; speak('音量已设置', v, rate)">{{ k }}</n-button>
       </n-button-group>
     </div>
 

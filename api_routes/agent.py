@@ -1,4 +1,4 @@
-# api_routes/agent.py
+﻿# api_routes/agent.py
 """Agent 统一入口 + 留痕/处理包/用量/分析路由（从 api_web.py 拆出，P2-04）。"""
 import time
 
@@ -54,7 +54,7 @@ def agent_chat(req: AgentChat, request: Request):
     if role not in ("resident", "grid"):
         return _fail(1003, "当前角色暂不支持 Agent 对话")
     if _rate_limited(f"chat:{u.get('uid')}"):  # N5 限流
-        return _fail(1002, "操作过于频繁，请稍后再试")
+        return _fail(1002, "您说得有点快，我喘口气，稍等几秒再说")
     try:
         key = f"{role}:{u.get('uid')}"
         orch = _get_orchestrator(request, key)
@@ -71,7 +71,7 @@ def agent_elderly_chat(req: AgentChat, request: Request):
     if role not in ("elderly", "resident"):
         return _fail(1003, "无权限")
     if _rate_limited(f"chat:{u.get('uid')}"):  # N5 限流
-        return _fail(1002, "操作过于频繁，请稍后再试")
+        return _fail(1002, "您说得有点快，我喘口气，稍等几秒再说")
     try:
         uid = _resolve_elder_uid(request) or u.get("uid")
         key = f"elderly:{uid}"

@@ -147,12 +147,17 @@ def issue_list(request: Request, status: str = "", category: str = "",
                           keyword=keyword or None, limit=limit)
     else:
         rows = get_issues(reporter_id=u.get("uid"), status=status or None, limit=limit)
-    # 非负责人：手机号脱敏
+    # 非负责人：手机号脱敏；M2：状态人话化
+    try:
+        from agent.tone import human_status
+    except Exception:
+        human_status = lambda s: s
     out = []
     for r in rows:
         v = _issue_view(r)
         if u.get("role") != "grid":
             v = _mask_phone(v)
+        v["status_human"] = human_status(v.get("status") or "")
         out.append(v)
     return _ok(out)
 
@@ -182,7 +187,7 @@ def issue_draft_save(req: IssueDraft, request: Request):
     from data.db_repair import create_draft
     u = _user(request)
     if not req.title:
-        return _fail(1001, "请至少填写问题描述")
+        return _fail(1001, "还差一点点：再跟我说说哪儿坏了，我好帮您找对人")
     create_draft(
         u.get("uid"), title=req.title, category="", issue_type=req.issue_type,
         location=req.location, description=req.description or req.title,
@@ -218,6 +223,11 @@ def issue_detail(issue_id: int, request: Request):
     detail = _issue_view(row)
     if u.get("role") != "grid":
         detail = _mask_phone(detail)
+    try:  # M2：工单状态人话化
+        from agent.tone import human_status
+        detail["status_human"] = human_status(detail.get("status") or "")
+    except Exception:
+        detail["status_human"] = detail.get("status", "")
     detail["timeline"] = [dict(t) for t in get_issue_timeline(issue_id)]
     return _ok(detail)
 

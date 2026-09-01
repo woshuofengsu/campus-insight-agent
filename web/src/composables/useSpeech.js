@@ -58,8 +58,8 @@ export function useSpeech() {
     })
   }
 
-  // —— 语音合成（朗读，音量可调，失败重试 3 次）——
-  function speak(text, volume = 1.0) {
+  // —— 语音合成（朗读，音量可调；老人档可调慢语速，失败重试 3 次）——
+  function speak(text, volume = 1.0, rate = 1.0) {
     return new Promise((resolve) => {
       if (!('speechSynthesis' in window) || !text) return resolve(false)
       let tries = 0
@@ -67,7 +67,7 @@ export function useSpeech() {
         tries++
         const u = new SpeechSynthesisUtterance(text)
         u.lang = 'zh-CN'
-        u.rate = 0.9
+        u.rate = rate
         u.volume = volume
         u.onend = () => resolve(true)
         u.onerror = () => {

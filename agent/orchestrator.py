@@ -556,6 +556,27 @@ class Orchestrator:
                     delete_draft(uid, _draft_type_of(key))
         except Exception as e:  # noqa: BLE001
             _log.warning("草稿落库失败：%s", e)
+        # M2：关怀前置 —— 情绪安抚句 + 场景共情句（会话级去重），统一在此拼进最终回复
+        try:
+            from agent import tone
+            st = ctx.get("state") or {}
+            comfort = st.pop("emotion_comfort", "")
+            scene = None
+            if status == "成功" and intent in ("repair_dispatch", "proposal_collab"):
+                scene = "repair_ok"
+            elif intent == "handoff" or status in ("needs_human", "transferred_to_human"):
+                scene = "sos"
+            elif status == "失败":
+                scene = "fail"
+            used = self.bb.read("empathized") or set()
+            line = tone.pick(scene, used) if scene else ""
+            if used:
+                self.bb.write("empathized", used, "orchestrator")
+            prefix = " ".join([c for c in (comfort, line) if c])
+            if prefix and reply:
+                reply = f"{prefix}\n{reply}"
+        except Exception:
+            pass
         # 会话落库：state 持久化（重启不丢）
         try:
             from data import db_agent

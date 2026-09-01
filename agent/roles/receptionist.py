@@ -2,6 +2,7 @@
 """社区接待员：统一入口。意图识别、纠错确认、情绪安抚、礼貌回复、帮助/自我介绍、路由。
 """
 from agent import web_agent as A
+from agent import tone as A_intent_tone
 from agent.roles.base import BaseAgent
 
 # 中文意图 → 路由 key（与 roles/config.py ROUTE_MAP 对应）
@@ -122,6 +123,13 @@ class ReceptionistAgent(BaseAgent):
                     return self._reply(A.unknown_reply(role), intent="未知意图",
                                        actions=[{"type": "buttons", "options": A.quick_entries(role)}],
                                        chain_note="未识别意图，展示快捷入口")
+
+        # M2：情绪先安抚 —— 命中则把安抚句种到 state，由 orchestrator._finish 统一前置（会话级一次）
+        em_tag, em_comfort = A_intent_tone.detect_emotion(text)
+        if em_comfort:
+            ctx["state"]["emotion"] = em_tag
+            ctx["state"]["emotion_comfort"] = em_comfort
+            self._write("emotion", em_tag)  # 黑板留痕（执行链/审计可见）
 
         # 接待员落意图到黑板，交 Orchestrator 路由
         self._write("user_input", text)

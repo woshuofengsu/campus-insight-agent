@@ -682,6 +682,25 @@ def _m41_tenant_column(conn):
     conn.commit()
 
 
+def _m42_medication_intake(conn):
+    """M3/v42：用药打卡记录（人情味闭环：我吃了 / 稍后提醒 + 连续天数）。
+
+    幂等（IF NOT EXISTS）；intake_date 为本地日期，UNIQUE 挡住同一天同一提醒重复打卡。
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS medication_intake_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            reminder_id INTEGER NOT NULL,
+            intake_date TEXT NOT NULL,            -- 本地日期 YYYY-MM-DD
+            taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            action TEXT DEFAULT 'taken',          -- taken / snooze
+            UNIQUE(user_id, reminder_id, intake_date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_intake_user ON medication_intake_log(user_id, taken_at);
+    """)
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -888,6 +907,7 @@ def init_db(db_path: str):
         (39, "phone_enc_more", _m39_phone_enc_more),
         (40, "performance_indexes", _m40_performance_indexes),
         (41, "tenant_column", _m41_tenant_column),
+        (42, "medication_intake", _m42_medication_intake),
     ]
     for version, name, fn in post:
         if version <= current:

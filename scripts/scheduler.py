@@ -138,6 +138,7 @@ def run_all() -> dict:
     results["draft_cleaned"] = _safe("草稿清理", lambda: _rep.clean_issue_drafts(days=7))
     results["agent_draft_cleaned"] = _safe("Agent草稿清理", lambda: _draft_clean())
     results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
+    results["proactive_followup"] = _safe("主动关怀-办结回访", lambda: _proactive_care())
     return results
 
 
@@ -149,6 +150,15 @@ def _draft_clean() -> int:
         n = clean_drafts(days=7)
         clean_sessions(days=30)
         return n
+    except Exception:
+        return 0
+
+
+def _proactive_care() -> int:
+    """M4：主动关怀——办结回访（含静默时段仅生成待办不打扰）。"""
+    try:
+        from data.db_care_proactive import run_proactive_care
+        return run_proactive_care().get("followup", 0)
     except Exception:
         return 0
 

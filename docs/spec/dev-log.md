@@ -599,3 +599,10 @@
 - **H5 材料同步**：技术报告更正表改为 **495 passed**；加密行由"可平滑替换 AES-256-GCM"改为"**已落地真 AES-256-GCM（`g1$` 前缀 + 重加密可轮换）**"。
 - **死代码联动**：清掉 `db_agent.get_self_resolution_stats` 与 `tests/test_agent.py::test_self_resolution_stats` 各一条被覆盖的死定义（现仅 days=30 的 alive 版）；`agent/orchestrator.py` 移除 `__init__` 内冗余 import；`db_proposal.py` 补 `logging/_log`（F821）；`scripts/scheduler.py` 上移 `_scheduler` 声明（F823）；`web/src/views/Screen.vue` 改读 `ai_self_resolution_rate`（原读死版字段恒为 `--`）。
 
+**人情味优化（M1–M4，规则优先零 LLM，2026-09）** —— 方案见 `docs/spec/人情味优化方案.md`，按项目实际微调：
+- **M1 关怀内核**：新增 `agent/tone.py`（`greeting` 分时段 / `detect_emotion` / `pick` 会话去重 / `human_status` / `care_line` 优先级）+ `web/src/utils/warm.js` 前端镜像；`elderly/home` 返回 `greeting/display_name/care_line/speech_rate`（`preferences` 存称呼/语速，零迁移）；`useSpeech.speak(text, volume, rate)` 加语速；命令式文案人话化（issues/"操作过于频繁"）。
+- **M2 情绪安抚+共情**：`receptionist` 命中情绪词 → 把安抚句种进 state；`orchestrator._finish` 统一前置「安抚句 + 场景共情句（报修成功/sos/失败），黑板 `empathized` 会话级去重」；工单详情/列表补 `status_human`。
+- **M3 用药打卡闭环**：v42 迁移 `medication_intake_log`（`intake_date` 列 + UNIQUE 防同日重复）；`db_elderly_care.mark_intake/get_intake_streak/get_today_intake`；`/elderly/medications/{rid}/toggle` 支持 `taken/snooze` 返回连续天数；`Medication.vue` 加「✅ 我吃了 / ⏰ 10 分钟后再说」。
+- **M4 主动关怀**：新增 `data/db_care_proactive.py`（办结 24h 回访 + 久未活跃），挂 `scheduler.run_all`（`_safe` 包裹不阻塞）；`elderly/manage/inactive` 供网格员端关怀提示。
+- 测试：新增 `tests/test_tone.py`、`tests/test_medication_intake.py`、`tests/test_care_proactive.py`；全量 **511 passed, 1 skipped, 3 deselected**；主库已迁 v42；`ruff check .`=0；前端 `npm run build` 通过。
+

@@ -37,6 +37,17 @@ async function toggle(m, action) {
   }
 }
 
+// M3：用药打卡（我吃了 / 10 分钟后再说）
+async function take(m, action) {
+  try {
+    const r = await elderly.toggleMedication(m.id, action)
+    message.success((r && r.data && r.data.message) || (action === 'taken' ? '好样的，记下啦' : '10 分钟后我再提醒您'))
+    load()
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
 // 修改并重新提交审核（审核期间原规则继续播报）
 const editTarget = ref(null)
 function startEdit(m) {
@@ -72,6 +83,8 @@ async function saveEdit() {
         <b>{{ m.drug_name }} <span class="muted" v-if="m.dosage">（{{ m.dosage }}）</span></b>
         <div>
           <n-tag size="large" :type="m.status === '审核通过' ? 'success' : m.status === '已暂停' ? 'default' : 'warning'">{{ m.status }}</n-tag>
+          <n-button v-if="m.status === '审核通过'" size="small" type="success" style="margin-left:8px;" @click="take(m, 'taken')">✅ 我吃了</n-button>
+          <n-button v-if="m.status === '审核通过'" size="small" style="margin-left:8px;" @click="take(m, 'snooze')">⏰ 10 分钟后再说</n-button>
           <n-button v-if="m.status === '审核通过'" size="small" style="margin-left:8px;" @click="toggle(m, 'pause')">⏸️ 暂停</n-button>
           <n-button v-if="m.status === '已暂停'" size="small" type="primary" style="margin-left:8px;" @click="toggle(m, 'resume')">▶️ 恢复</n-button>
           <n-button v-if="['审核通过', '已暂停', '审核不通过'].includes(m.status)" size="small" style="margin-left:8px;" @click="startEdit(m)">✏️ 修改</n-button>

@@ -17,6 +17,7 @@
 """
 import json
 import re
+import sqlite3
 from datetime import date, datetime
 
 from data.db_core import get_db
@@ -625,6 +626,63 @@ def _medication_row_to_dict(row, has_pending: bool = False) -> dict:
         d["times"] = []
     d["pending"] = bool(has_pending)
     return d
+
+
+# =====================================================================
+# M3：用药打卡闭环（medication_intake_log / v42）
+# =====================================================================
+
+def mark_intake(user_id: int, reminder_id: int, action: str = "taken") -> tuple[bool, str, int]:
+    """记录一次用药打卡（taken/snooze）。当天重复 taken 幂等（UNIQUE 按 intake_date 挡）。
+    返回 (ok, 文案, streak)。"""
+    from datetime import date
+    today = date.today().isoformat()
+    with get_db() as conn:
+        if action not in ("taken", "snooze"):
+            return False, "不支持的操作", 0
+        try:
+            conn.execute(
+                "INSERT INTO medication_intake_log (user_id, reminder_id, intake_date, action) "
+                "VALUES (?,?,?,?)",
+                (user_id, reminder_id, today, action))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            return False, "今天已经记过啦，真棒！", get_intake_streak(user_id)
+    streak = get_intake_streak(user_id)
+    return True, "好样的，记下啦", streak
+
+
+def get_today_intake(user_id: int) -> list[dict]:
+    """今日已打卡记录。"""
+    from datetime import date
+    today = date.today().isoformat()
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT reminder_id, action FROM medication_intake_log "
+            "WHERE user_id=? AND intake_date=?", (user_id, today)).fetchall()
+        return [{"reminder_id": r["reminder_id"], "action": r["action"]} for r in rows]
+
+
+def get_intake_streak(user_id: int) -> int:
+    """连续打卡天数：从最近一次 taken 往前连续的天数。"""
+    from datetime import date, timedelta
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT intake_date d FROM medication_intake_log "
+            "WHERE user_id=? AND action='taken' ORDER BY d DESC", (user_id,)).fetchall()
+    if not rows:
+        return 0
+    have = {r["d"] for r in rows}
+    try:
+        d = date.fromisoformat(rows[0]["d"])
+    except Exception:
+        return 0
+    streak = 0
+    while d.isoformat() in have:
+        streak += 1
+        d -= timedelta(days=1)
+    return streak
 
 
 def get_medication_reminder(reminder_id: int) -> dict | None:

@@ -35,7 +35,7 @@ class SosAction(BaseModel):
 
 
 class MedicationToggle(BaseModel):
-    action: str = Field(..., pattern="^(pause|resume)$")
+    action: str = Field(..., pattern="^(pause|resume|taken|snooze)$")
 
 
 class ContactCall(BaseModel):
@@ -77,12 +77,14 @@ def _correct_report_text(text: str) -> str:
 
 @router.get("/home")
 def web_elderly_home(request: Request):
-    """老年端首页聚合：未读通知 / 天气摘要 / 用药状态 / 最近求助。"""
+    """老年端首页聚合：未读通知 / 天气摘要 / 用药状态 / 最近求助 + 人情味字段（M1）。"""
     from data.db_elderly_care import COMMUNITY_PHONE as _COMMUNITY_PHONE
     from data.db_elderly import get_profile
     from data.db_notice import get_notice_unread_count
     from data.db_elderly_care import get_latest_sos
     from data.db_weather import get_simplified_weather
+    from datetime import datetime
+    from agent import tone
     u = _user(request)
     uid = _resolve_elder_uid(request) or u.get("uid")
     elderly = get_profile(uid) or {}
@@ -93,13 +95,45 @@ def web_elderly_home(request: Request):
         due = len(get_due_medications(uid))
     except Exception:
         pass
+    weather = get_simplified_weather("")
+    # M1：称呼（优先 preferences.display_name，再退回 name）；语速（preferences.speech_rate）
+    prefs = {}
+    try:
+        from data.db_user import get_user_by_id
+        up = get_user_by_id(uid) or {}
+        raw = up.get("preferences")
+        if isinstance(raw, str) and raw.strip():
+            import json
+            prefs = json.loads(raw)
+    except Exception:
+        prefs = {}
+    display_name = (prefs or {}).get("display_name") or u.get("name") or "大爷/阿姨"
+    speech_rate = float((prefs or {}).get("speech_rate") or 0.9)
+    # M1：今日一句关怀（天气 > 用药 > 久未活跃；久未活跃由最近活动时间推算，不新增列）
+    days_inactive = 0
+    try:
+        from data.db_core import get_db
+        with get_db() as conn:
+            last = conn.execute(
+                "SELECT MAX(created_at) m FROM ("
+                "SELECT created_at FROM agent_dialogs WHERE user_id=? "
+                "UNION ALL SELECT created_at FROM community_issues WHERE reporter_id=?)",
+                (uid, uid)).fetchone()["m"]
+            if last:
+                days_inactive = (datetime.now() - datetime.fromisoformat(str(last).replace(" ", "T"))).days
+    except Exception:
+        days_inactive = 0
+    care_line = tone.care_line(weather=weather, due_meds=due, days_inactive=days_inactive)
     return _ok({
-        "name": u.get("name") or "大爷/阿姨",
+        "name": display_name,
+        "greeting": tone.greeting(datetime.now().hour),
+        "care_line": care_line,
+        "speech_rate": speech_rate,
         "unread_notices": get_notice_unread_count("elderly", uid),
         "due_medications": due,
         "latest_sos": get_latest_sos(uid) if uid else None,
         "bp": (health.get("blood_pressure") or [{}])[-1] if health.get("blood_pressure") else {},
-        "weather": get_simplified_weather(""),
+        "weather": weather,
         "community_phone": _COMMUNITY_PHONE,
     })
 
@@ -255,8 +289,16 @@ def web_sos_action(call_id: int, req: SosAction, request: Request):
 
 @router.post("/medications/{rid}/toggle")
 def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
-    from data.db_elderly_care import pause_medication, resume_medication
+    from data.db_elderly_care import pause_medication, resume_medication, mark_intake
+    from agent.tone import human_status  # noqa: F401
     actor = _user(request).get("name") or "老人"
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    if req.action == "taken" or req.action == "snooze":
+        ok_, msg, streak = mark_intake(uid, rid, action=req.action)
+        encourage = f"连续 {streak} 天按时吃药，真棒！" if streak >= 3 else msg
+        if not ok_:
+            return _ok({"reminder_id": rid, "streak": streak, "already": True}, msg)  # 重复打卡幂等
+        return _ok({"reminder_id": rid, "streak": streak}, encourage)
     if req.action == "pause":
         ok_, msg = pause_medication(rid, actor=actor)
     else:
@@ -328,6 +370,18 @@ def web_manage_contact_audit(cid: int, req: ContactAudit, request: Request):
     if not ok_:
         return _fail(2001, msg)
     return _ok({"contact_id": cid}, "审核完成")
+
+
+@manage_router.get("/inactive")
+def web_manage_inactive(request: Request, days: int = 5, limit: int = 20):
+    """负责人端：久未活跃老人（M4 关怀提示，给网格员抓手）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    try:
+        from data.db_care_proactive import list_inactive_elderly
+        return _ok(list_inactive_elderly(days=days, limit=limit))
+    except Exception as e:  # noqa: BLE001
+        return _fail(2001, "查询失败，请重试")
 
 
 @manage_router.get("/sos")
