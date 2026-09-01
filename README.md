@@ -51,8 +51,9 @@ cp .env.example .env
 ```
 
 两套配置：
-- **`.env.demo`**（演示姿态，`DEMO_MODE=true`，LLM 开关 `LLM_ORCHESTRATION/POLICY_LLM_RAG/RECEPTION_LLM_FALLBACK=1`）：一键演示账号 + 规则/LLM 混合。
+- **`.env.demo`**（演示姿态，`DEMO_MODE=true`，LLM 开关 `LLM_ORCHESTRATION/POLICY_LLM_RAG/RECEPTION_LLM_FALLBACK=1`）：一键演示账号 + 规则/LLM 混合。**注意：用前必须填入真实 `DEEPSEEK_API_KEY` 并 `cp .env.demo .env`，否则 LLM 开关虽为 1 但无 key 仍会回落规则链路。**
 - **`.env`**（生产姿态，`DEMO_MODE=false`，LLM 开关全为 0，强 JWT 密钥 + CORS 白名单）：关闭演示登录与 API 文档，走正式鉴权。
+- 演示前准备与两套姿态的切换步骤见 [`docs/review/演示保障清单.md`](docs/review/演示保障清单.md)（第二节"演示前 10 分钟"）。
 
 ## 快速启动（主路线：FastAPI + Vue3）
 
