@@ -21,8 +21,11 @@ schema v18 之外、本模块补齐的列（幂等 ALTER，只加不删，见 _E
 - feedback_reason    不满意原因
 - satisfaction       满意/不满意（用于导出与列表展示）
 """
+import logging
 import re
 import sqlite3
+
+_log = logging.getLogger(__name__)
 from datetime import datetime
 
 from data.db_core import get_db

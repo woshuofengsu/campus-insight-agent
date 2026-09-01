@@ -155,55 +155,6 @@ def get_trace_chain(trace_id: str, limit: int = 50) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 自转率统计（P3-B5-01：量化 AI 直答 vs 转人工）
-# ---------------------------------------------------------------------------
-
-def get_self_resolution_stats(days: int = 7) -> dict:
-    """Agent 自转率统计（近 days 天，按 agent_logs + agent_handoffs 聚合）。
-
-    口径：
-      - 总对话 = agent_logs 轮数（去掉取消/退出等非业务输入按 intent 空计为杂项）
-      - AI 自转 = status=成功 且非转人工意图（报修/提案/政策/天气/通知/健康/网格 等闭环）
-      - 转人工 = agent_handoffs 新建处理包数
-      - 拦截/失败 = 注入拦截 + 状态失败
-      - 自转率 = AI自转 / (总对话 - 杂项)（取整百分比）
-    """
-    with get_db() as conn:
-        total = conn.execute(
-            "SELECT COUNT(*) c FROM agent_logs "
-            "WHERE created_at >= datetime('now', ?)", (f"-{days} days",)).fetchone()["c"]
-        ai_ok = conn.execute(
-            "SELECT COUNT(*) c FROM agent_logs "
-            "WHERE status='成功' AND created_at >= datetime('now', ?)",
-            (f"-{days} days",)).fetchone()["c"]
-        blocked = conn.execute(
-            "SELECT COUNT(*) c FROM agent_logs "
-            "WHERE (status IN ('拦截','失败') OR error != '') "
-            "AND created_at >= datetime('now', ?)", (f"-{days} days",)).fetchone()["c"]
-        handoffs = conn.execute(
-            "SELECT COUNT(*) c FROM agent_handoffs "
-            "WHERE created_at >= datetime('now', ?)", (f"-{days} days",)).fetchone()["c"]
-        # 按意图分布（top 10，用于看板展示）
-        rows = conn.execute(
-            "SELECT intent, COUNT(*) c FROM agent_logs "
-            "WHERE created_at >= datetime('now', ?) AND intent != '' "
-            "GROUP BY intent ORDER BY c DESC LIMIT 10", (f"-{days} days",)).fetchall()
-        by_intent = [{"intent": r["intent"], "count": r["c"]} for r in rows]
-    # 有效业务轮 = 总轮 - 空意图杂项（未知意图/纠错确认/礼貌等不算业务闭环分母，但保留展示）
-    denominator = ai_ok + blocked + handoffs
-    rate = round(ai_ok * 100 / denominator) if denominator else 0
-    return {
-        "days": days,
-        "total_turns": total,
-        "ai_resolved": ai_ok,
-        "transferred": handoffs,
-        "blocked_or_failed": blocked,
-        "self_resolution_rate": rate,
-        "by_intent": by_intent,
-    }
-
-
-# ---------------------------------------------------------------------------
 # Agent 会话落库（v31：重启不丢、多实例不串线）
 # ---------------------------------------------------------------------------
 

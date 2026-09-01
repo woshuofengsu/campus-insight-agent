@@ -36,8 +36,6 @@ class Orchestrator:
     """多 Agent 编排器（每用户会话一个实例，黑板带 session_id）。"""
 
     def __init__(self, session_id: str | None = None):
-        from agent.blackboard import Blackboard
-        from agent.roles import create_agents
         self.bb = Blackboard(session_id=session_id)
         self.agents = create_agents(self.bb)
         from agent.arbiter import Arbiter

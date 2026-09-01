@@ -588,6 +588,14 @@
 
 **修复过程要点**
 - 顺带修复：`api_web._ensure_db` 改为按 DB 路径维度记忆（此前全局布尔，跨测试库会漏灌种子，`test_demo_login_enabled_in_demo_mode` 在整跑时偶发 400）。
-- 全量基线：`python -m pytest tests/ -q` = **492 passed, 1 skipped, 3 deselected**（新增负向测试与金标评测，全绿）。
+- 全量基线：`python -m pytest tests/ -q` = **495 passed, 1 skipped, 3 deselected**（新增负向测试与金标评测，全绿）。
 - 未动 legacy：`ui/`（1.3 万行 Streamlit）、`app.py`、`api.py`（扣子入口）、`agent/engine.py`（LangChain 旧链）；WS11 长远项（状态外置/PG/多租户/legacy 归档/服务端 ASR）不在本轮。
+
+**复审（H1–H5）定版修复（2026-09 二轮评审后）**
+- **H1 演示闭环**：新增 `.env.demo`（演示姿态：`LLM_ORCHESTRATION/POLICY_LLM_RAG/RECEPTION_LLM_FALLBACK=1`、`DEMO_MODE=true`、`DEMO_AUTO_WORKER=true`，key 占位待填），确保答辩前排程链路可真正演示；生产仍回正式 `.env`。
+- **H2 ruff 闭环**：`ruff.toml` 收敛为「CI 可强制、聚焦真实 Bug（F+B）」的门禁（排除 legacy；死代码/风格类 F401/F841/F541 + 既定惯例 BLE001/S110/DTZ/RUF* + 已确认无碍的 B007/B013/B017/B905 明确豁免）；`ruff check .` = **All checks passed（0 错误）**；**已接入 ci.yml / test.yml**（`pip install ruff` + `python -m ruff check .`）。
+- **H3 全库 GCM**：跑 `scripts/reencrypt_phones.py` 对主库 `data/community_insight.db` 重加密：**376 条手机号密文全部转为 `g1$`（AES-256-GCM），0 失败**（先备份 `*.bak.*`，解密验证通过）→ 材料可如实写"全库 GCM"。
+- **H4 逻辑与文案**：`agent/policy_rag.py` 修复下标布尔条件（兼容 int 与数字字符串 `"2"`，拒 bool/None）；老年端 SOS 确认弹窗文案由"将依次呼叫"改为"向已审核联系人发送求助提醒，用时请点拨打120"，与结果页一致。
+- **H5 材料同步**：技术报告更正表改为 **495 passed**；加密行由"可平滑替换 AES-256-GCM"改为"**已落地真 AES-256-GCM（`g1$` 前缀 + 重加密可轮换）**"。
+- **死代码联动**：清掉 `db_agent.get_self_resolution_stats` 与 `tests/test_agent.py::test_self_resolution_stats` 各一条被覆盖的死定义（现仅 days=30 的 alive 版）；`agent/orchestrator.py` 移除 `__init__` 内冗余 import；`db_proposal.py` 补 `logging/_log`（F821）；`scripts/scheduler.py` 上移 `_scheduler` 声明（F823）；`web/src/views/Screen.vue` 改读 `ai_self_resolution_rate`（原读死版字段恒为 `--`）。
 

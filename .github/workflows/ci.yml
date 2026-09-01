@@ -20,6 +20,10 @@ jobs:
       - name: Install backend deps
         run: |
           pip install -r requirements.txt 2>/dev/null || pip install fastapi uvicorn pydantic pytest langchain-openai langchain langchain-classic
+          pip install ruff
+
+      - name: Lint (ruff, bug-catching set)
+        run: python -m ruff check .
 
       - name: Run backend tests
         run: python -m pytest tests/ -q

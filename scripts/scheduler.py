@@ -181,20 +181,18 @@ class Scheduler:
 
 # 进程级单例标记（Streamlit 多 session 共享全局，防止重复启动线程）
 _started = False
+_scheduler: Scheduler | None = None
 
 
 def ensure_scheduler_started(interval: int = 60) -> Scheduler:
     """确保调度器已启动（进程内只启动一次）。"""
-    global _started
+    global _started, _scheduler
     if _started:
         return _scheduler
     _scheduler = Scheduler(interval=interval)
     _scheduler.start()
     _started = True
     return _scheduler
-
-
-_scheduler: Scheduler | None = None
 
 
 def main() -> None:

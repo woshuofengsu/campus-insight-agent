@@ -58,9 +58,13 @@ def generate(question, results):
         return None
     ans = (obj.get("answer") or "").strip()
     idx = obj.get("cited_index")
-    if not ans or (not isinstance(idx, int) and str(idx).isdigit()):
+    # H4 修复：兼容 int 与数字字符串下标（如 "2"），拒绝 bool/None/非法值
+    if not ans or isinstance(idx, bool):
         return None
-    idx = int(idx)
+    try:
+        idx = int(idx)
+    except (TypeError, ValueError):
+        return None
     if idx < 1 or idx > len(results[:_MAX_CTX]):
         return None  # 引用下标越界 → 弃用（防伪造）
     cited = results[idx - 1]

@@ -18,7 +18,7 @@ async function load() {
       pending: all.filter((i) => ['待审核', '已审核待派单', '处理中'].includes(i.status)).length,
       props: ps.filter((p) => p.status === '公示中').length,
       alerts: alerts.length,
-      selfRate: sr.self_resolution_rate ?? '--',
+      selfRate: sr.ai_self_resolution_rate ?? '--',
       temp: w?.temp_high || '--',
     }
   } catch { /* 大屏失败不阻塞 */ }

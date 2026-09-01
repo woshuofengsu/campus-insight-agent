@@ -251,7 +251,7 @@ function cancelCall() {
 
     <!-- 紧急求助确认弹窗 -->
     <n-modal v-model:show="sosConfirm" preset="dialog" type="error" title="确认紧急求助？"
-             :content="`将依次呼叫：${contacts.filter(c => c.status === '审核通过').slice(0, 3).map(c => c.name).join('、') || '暂无紧急联系人'}`"
+             :content="`将向已审核的紧急联系人（${contacts.filter(c => c.status === '审核通过').slice(0, 3).map(c => c.name).join('、') || '暂无'}）发送求助提醒，用时请点下方拨打120`"
              positive-text="确认求助" negative-text="取消"
              @positive-click="confirmSos" @negative-click="sosConfirm = false">
       <template #default>
