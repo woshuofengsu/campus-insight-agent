@@ -633,13 +633,19 @@ def _medication_row_to_dict(row, has_pending: bool = False) -> dict:
 # =====================================================================
 
 def mark_intake(user_id: int, reminder_id: int, action: str = "taken") -> tuple[bool, str, int]:
-    """记录一次用药打卡（taken/snooze）。当天重复 taken 幂等（UNIQUE 按 intake_date 挡）。
-    返回 (ok, 文案, streak)。"""
+    """记录一次用药打卡。
+
+    - taken：落库并按（user_id, reminder_id, intake_date）UNIQUE 做"同日一次"去重；重复 → 幂等提示。
+    - snooze：只是"稍后提醒"，不落库（不占当天 taken 名额，前端 setTimeout 复播）。
+    返回 (ok, 文案, streak)。
+    """
     from datetime import date
     today = date.today().isoformat()
+    if action not in ("taken", "snooze"):
+        return False, "不支持的操作", 0
+    if action == "snooze":
+        return True, "10 分钟后我再提醒您", get_intake_streak(user_id)
     with get_db() as conn:
-        if action not in ("taken", "snooze"):
-            return False, "不支持的操作", 0
         try:
             conn.execute(
                 "INSERT INTO medication_intake_log (user_id, reminder_id, intake_date, action) "

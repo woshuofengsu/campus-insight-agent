@@ -42,6 +42,18 @@ def test_mark_intake_and_streak():
     assert not ok2 and s2 >= 1
 
 
+def test_snooze_does_not_block_taken():
+    """snooze 不占当天名额：先 snooze 再 taken 应成功；taken 重复才幂等。"""
+    _reminder(90004, 90014)
+    ok_snooze, msg, _ = ec.mark_intake(90004, 90014, action="snooze")
+    assert ok_snooze
+    ok_taken, msg2, s = ec.mark_intake(90004, 90014, action="taken")
+    assert ok_taken and s >= 1, msg2
+    # 同一天再 taken → 幂等挡住
+    ok_taken2, msg3, _ = ec.mark_intake(90004, 90014, action="taken")
+    assert not ok_taken2
+
+
 def test_streak_across_days():
     # 直接插 3 天连续（含今天），验证连续计数
     from datetime import date, timedelta
