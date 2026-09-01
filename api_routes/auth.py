@@ -188,6 +188,10 @@ def me_delete(request: Request):
         conn.execute(
             "UPDATE community_issues SET reporter_name='', reporter_phone='', reporter_phone_enc='' "
             "WHERE reporter_id=?", (uid,))
+        # R1：提案表 PII 也级联清空（保留 id/统计；is_agent_report 的第三方 agent_* 一并清）
+        conn.execute(
+            "UPDATE proposals SET reporter_name='', reporter_phone='', agent_name='', agent_phone='' "
+            "WHERE reporter_id=?", (uid,))
         conn.commit()
     log_activity(u.get("name") or "用户", "注销账号", module="安全",
                  detail=f"用户 #{uid} 注销（匿名化个人字段与关联表 PII，保留日志）")

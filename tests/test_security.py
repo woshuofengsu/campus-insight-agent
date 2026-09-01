@@ -294,6 +294,8 @@ def test_me_delete_anonymizes(client):
                      "VALUES (?, '测试人', '13933334444', '咨询')", (uid,))
         conn.execute("INSERT INTO community_issues (title, category, reporter_id, reporter_name, reporter_phone) "
                      "VALUES ('测试工单', '设施维修', ?, '注销测试', '13955556666')", (uid,))
+        conn.execute("INSERT INTO proposals (title, description, category, reporter_id, reporter_name, "
+                     "reporter_phone) VALUES ('测试提案', '描述', '其他', ?, '注销测试', '13977778888')", (uid,))
         conn.commit()
     r = client.post("/api/web/auth/login", json={"username": "test_user_sec", "password": ""})
     assert r.status_code == 200 and r.json()["success"], r.text
@@ -312,6 +314,7 @@ def test_me_delete_anonymizes(client):
             "SELECT phone_enc AS phone_enc, name AS name FROM emergency_contacts WHERE user_id=?",
             "SELECT phone_enc AS phone_enc, name AS name FROM health_consults WHERE user_id=?",
             "SELECT reporter_phone_enc AS phone_enc, reporter_name AS name FROM community_issues WHERE reporter_id=?",
+            "SELECT reporter_phone AS phone_enc, reporter_name AS name FROM proposals WHERE reporter_id=?",
         ):
             r = conn.execute(sql, (uid,)).fetchone()
             assert r["phone_enc"] in ("", None) and r["name"] in ("", None), (sql, dict(r))
