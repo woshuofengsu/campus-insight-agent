@@ -78,20 +78,24 @@ body {
 
 `focusin` 后 300ms 把聚焦元素 `scrollIntoView({block:'center'})`；visualViewport 兜底 iOS 键盘收起归位。CSS：`html { scroll-padding-bottom:120px; }`。
 
-### 3.2 语音降级（`useSpeech.js` + `Agent.vue`）
+### 3.2 语音降级 + 语速（`useSpeech.js` + `Agent.vue`）
 
-`onerror` 细分 reason，UI 按 reason 显示大字号引导：
+`onerror` 细分 reason，UI 按 reason 显示大字号引导；**`unsupported` 时会显式降级并自动聚焦文字输入框**（不再静默）：
 
 | reason | 来源 | UI 文案 |
 |---|---|---|
-| `unsupported` | 环境无 Web Speech | 当前浏览器不支持语音，请用文字输入 |
+| `unsupported` | 环境无 Web Speech | 当前浏览器不支持语音，已为您切换为大字文字输入，请直接打字（并聚焦输入框） |
 | `mic-denied` | 权限被拒 | 请点地址栏🔒→麦克风→允许 |
 | `https-required` | 非安全上下文 | 语音需 HTTPS，请用 Safari/Chrome 直接打开 |
 | `network` | 网络错误 | 网络不稳，请再按一次 |
 
-### 3.3 长按防误触（`Home.vue` + `mobile.css`）
+**M1 语速可调**：`useSpeech.speak(text, volume, rate)` 新增 `rate`（老人档 0.9），老年端首页音量旁加"语速：慢/正常"，选择写入 `user_profile.preferences.speech_rate`；`elderly/home` 返回 `speech_rate`。
+
+### 3.3 长按防误触 + SOS 诚实化（`Home.vue` + `mobile.css`）
 
 SOS 长按按钮加 `data-longpress`，CSS `.elderly-btn,[data-longpress]{-webkit-touch-callout:none}` 防系统菜单。长按 3 秒逻辑已有（`pressStart`/`pressCancel`，3000ms）。
+
+**M 系列合规话术（移动端一致）**：SOS 触发后**不承诺自动连续拨号**——H5 无法系统级连续呼叫。改为"已向已审核紧急联系人发送求助提醒 + 留痕 + 显眼的一键拨打120"；确认弹窗的"将依次呼叫"已改"将向已审核联系人（…）发送求助提醒，用时请点拨打120"。触发后第一句是安抚（`tone.pick("sos")`）。
 
 ### 3.4 网格员端手机可看（`PortalLayout.vue`）
 
@@ -106,6 +110,12 @@ SOS 长按按钮加 `data-longpress`，CSS `.elderly-btn,[data-longpress]{-webki
   .elderly-rotate-mask { display: flex; }
 }
 ```
+
+### 3.6 聊天 UX 与人情味（近期优化，移动端同样受益）
+
+- **AgentChat（居民/网格共用）**：消息区改为**固定高度 `min(380px,55vh)` + `flex column` + 首条 `margin-top:auto`**（短对话贴底、长对话可正常滚动；用 `margin-top:auto` 而非 `justify-content:flex-end`，后者会导致溢出内容滚不上去）；**多智能体执行链默认收起为一行开关**（`🤖 多智能体执行链（N 步）▾ 展开`），点击才展开，避免长链占屏。
+- **agent/chat 每用户限流**（N5，60 次/分）：超限返回"您说得有点快，我喘口气，稍等几秒再说"，前端 `warm.js friendlyError` 人话化，不显示裸状态码。
+- **老年端人情味**（M1–M4）：`elderly/home` 返回 `greeting/display_name/care_line/speech_rate`，首页显示分时段问候 + 今日一句关怀并语音播报（21:00–8:00 静默不播）；用药提醒加"✅ 我吃了 / ⏰ 10 分钟后再说"（v42 打卡，连续 N 天鼓励）；工单 `status_human` 人话时间轴；办结 24h 回访通知、久未上线提醒网格员问候。
 
 ---
 
@@ -165,7 +175,9 @@ location ~ ^/(api|web)/ { proxy_pass http://127.0.0.1:8000; }
 python -m uvicorn api_web:app --host 0.0.0.0 --port 8000
 ```
 
-**硬限制**：非 HTTPS 非 localhost 时 iOS/Android 均禁用麦克风与语音识别 → 自动降级文字输入。仅安卓演示机可用 `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 免。iOS 在此环境只演示文字链路。
+**硬限制**：非 HTTPS 非 localhost 时 iOS/Android 均禁用麦克风与语音识别 → 自动降级文字输入（会显式提示并聚焦输入框）。仅安卓演示机可用 `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 免。iOS 在此环境只演示文字链路。
+
+> **两套姿态**：演示 `Copy-Item .env.demo.example .env.demo`（填真 `DEEPSEEK_API_KEY`）再 `Copy-Item .env.demo .env`（LLM 开关=1：自主协商/政策 RAG/意图兜底）；兜底/断网用 LLM 全 0 的 `.env`（规则全链路不依赖 LLM）。语音与规则链路无需 LLM。前端已构建（`web/dist`），起服务即访问。
 
 ### 5.3 公网自签证书（临时）
 
@@ -189,8 +201,9 @@ iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) �
 
 ### 6.4 老年端专项（重点，从未真机）
 
-字号实测 ≥20px / 按钮 ≥60px / 对比度 WCAG AA / 长按 SOS 防系统菜单 / HTTPS 下语音转文字+朗读 / 降级走文字 / 横屏提示 / 连点防误触 / 朗读音量可调。
+字号实测 ≥20px / 按钮 ≥60px / 对比度 WCAG AA / 长按 SOS 防系统菜单 / HTTPS 下语音转文字+朗读 / 降级走文字并聚焦输入框 / 横屏提示 / 连点防误触 / 朗读音量与**语速（慢/正常）**可调。
 
+> **新增（M1–M4）必测**：①首页分时段问候 + 今日一句关怀（语音播报；**21:00–8:00 静默不播**，只静默卡片）；②用药"✅ 我吃了 / ⏰ 10 分钟后再说"打卡 + 连续 N 天鼓励（同一天重复 taken 幂等）；③SOS 确认弹窗文案为"发送求助提醒 + 用时请拨120"（非"自动依次呼叫"）；④情绪词先安抚（如"漏水一地，急死了"→先安抚再走报修）。
 > **补充必须项（review 三刀之一）**：微信内置浏览器内自动朗读（`speechSynthesis`）可能静默失败——列为必测项，iOS 微信若失败则确保不阻塞、按钮态正确复位。
 
 ---
@@ -200,9 +213,13 @@ iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) �
 | 项 | 要求 |
 |---|---|
 | 传输 | 生产仅 443，80 强制 301；语音 API 受此约束 |
-| JWT 密钥 | 按 `docs/deploy-keys.md` 注入，生产无密钥拒绝启动（已实现） |
+| JWT 密钥 | **secure-by-default**：未配 `WEB_JWT_SECRET` 且未显式 `DEMO_MODE=true` 直接拒启（近期收紧）；按 `docs/deploy-keys.md` 注入 |
+| 演示登录 | 生产（`DEMO_MODE=false`）`/api/web/auth/demo` 中间件层 403，杜绝无密领 JWT；API 文档生产关闭 |
 | Token | 现 localStorage；正式版可选迁 httpOnly Cookie |
-| 手机号展示 | 已加密落库 + 前端脱敏（`138****8000`）；列表页抽查无明文 |
+| 手机号展示 | 真 **AES-256-GCM**（全库 `g1$`，旧密文兼容）+ 前端脱敏（`138****8000`）；列表页抽查无明文 |
+| 登录防爆破 | IP 级（5 次/5 分钟）+ **用户名级全局硬限**（防轮换 IP） |
+| 上传 | 文件夹白名单 + realpath 归属校验 + 扩展名白名单（图片/PDF，分块读限 5MB）——防路径穿越/恶意文件 |
+| 注销 | PIPL 级联匿名化（user_profile + 紧急联系人 + 健康咨询 + 工单 + 提案 的 PII/密文全清） |
 | 语音隐私 | 转写文本入库、原始录音 7 天保留；隐私页补一句"语音识别由浏览器厂商处理" |
 
 ---
@@ -216,6 +233,7 @@ iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) �
 | 3 | `DEMO_MODE` | 生产设置 `false`（关闭演示免登录/演示按钮），仅保留 JWT 门禁 | ⬜ 上线时 |
 | 4 | `WEB_JWT_SECRET` / `CRYPTO_KEY` | 生产必配（无则拒绝启动 / 加密不可用），按 `docs/deploy-keys.md` 注入 | ⬜ 上线时 |
 | 5 | 安全响应头 | 生产 `curl -I` 核验 5 个头（P1-2） | ⬜ 上线时 |
-| 6 | 手机号明文 | 生产前 `SELECT COUNT(*)` 核验全库明文列 = 0（P0-1） | ⬜ 上线时 |
-| 7 | 压测 | `python scripts/benchmark_concurrency.py` 复核 550 并发 100%（P0-2） | ⬜ 上线时 |
+| 6 | 手机号明文 | 生产前 `SELECT COUNT(*)` 核验全库明文列 = 0；全库密文为 `g1$`（AES-256-GCM） | ⬜ 上线时 |
+| 7 | 压测 | `python scripts/benchmark_business.py` 业务混合压测（p50/p95/p99、错误率、QPS）；`benchmark_concurrency.py` 复验 550 并发 | ⬜ 上线时 |
+| 8 | 数字一致性 | `python scripts/check_claims.py`（测试数/schema v42/路由/角色/表数），材料数字与其一致 | ⬜ 每次发材料前 |
 

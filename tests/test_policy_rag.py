@@ -18,6 +18,24 @@ init_db(config.DB_PATH)
 
 
 @pytest.fixture(autouse=True)
+def _isolated_db():
+    """每个用例独立临时库（真正隔离）。
+
+    背景：本模块原先只在 import 时 init_db(config.DB_PATH)，但其它测试文件的
+    TestClient lifespan 会调用 init_db(config.DB_PATH)+seed_all()，把演示知识
+    灌进同一个库；检索候选变多后「弱命中」边界断言即失效（U1 同义词扩展进一步放大）。
+    这里按项目 _fresh_db 规范把 db_core 全局指向本用例专属空库，保证断言只受本用例数据影响。
+    """
+    import data.db_core as db_core
+    orig = db_core._DB_PATH
+    tmp = tempfile.mkdtemp(prefix="polrag_case_")
+    db_core._DB_PATH = ""
+    db_core.init_db(os.path.join(tmp, "pol_case.db"))
+    yield
+    db_core._DB_PATH = orig
+
+
+@pytest.fixture(autouse=True)
 def _restore_threshold():
     """测试内 set_match_threshold(999) 会影响模块级全局，测试后还原，避免污染其它用例。"""
     import data.db_policy as dp

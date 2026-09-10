@@ -33,6 +33,9 @@ jobs:
           python scripts/llm_eval.py
           if [ -n "$DEEPSEEK_API_KEY" ]; then python scripts/llm_eval.py --provider llm; fi
 
+      - name: Run RAG retrieval eval (U1 混合检索)
+        run: python scripts/rag_eval.py
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

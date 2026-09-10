@@ -606,3 +606,21 @@
 - **M4 主动关怀**：新增 `data/db_care_proactive.py`（办结 24h 回访 + 久未活跃），挂 `scheduler.run_all`（`_safe` 包裹不阻塞）；`elderly/manage/inactive` 供网格员端关怀提示。
 - 测试：新增 `tests/test_tone.py`、`tests/test_medication_intake.py`、`tests/test_care_proactive.py`；全量 **511 passed, 1 skipped, 3 deselected**；主库已迁 v42；`ruff check .`=0；前端 `npm run build` 通过。
 
+
+## 二十七、竞品对标升级 U1：RAG 混合检索（语义向量 + 词法 + RRF 融合）✅
+
+**背景**：对标作品 `AI-Customer-Service-Companion`（银行客服陪练，ChromaDB 语义向量）后确认——我方**并非没有 RAG**（`agent/rag.py` 已有 n-gram TF-IDF + 余弦 + SQLite 向量缓存 + LIKE 降级，且已接入 `policy_rag.py`），真正缺口是**语义向量**（同义词召回弱）。
+
+**U1 落地**：
+- `utils/embedding.py`（新增）：Provider 抽象（`none`/`bailian` 百炼 text-embedding-v3/`zhipu` 智谱 embedding-3）+ 查询向量进程内缓存 + **失败降级**（无 key/网络/额度异常一律返回 None，绝不抛异常）。配置项 `EMBEDDING_PROVIDER`（默认 `none`）。
+- `utils/text.py`：新增 `QUERY_SYNONYMS`（社区治理领域 28 组同义词）+ `expand_query()`——「老楼装电梯」→ 追加「增设电梯/加装电梯」等政策书面语。放 utils 供 data/agent 两层共用，避免循环导入。
+- `agent/rag.py`：`search_hybrid()` = 词法（同义词扩展）+ 语义（余弦）× → **RRF(k=60) 融合**；相关性下限 `_SPARSE_MIN=0.05`/`_DENSE_MIN=0.15`（保留升级前阈值语义，避免无关条目被排名后返回）；`build_dense_index()` 落 SQLite（`kb_embeddings` 惰性补列 dense_json/dim/provider）；`get_rag_context`/`rag_search` 切到混合检索。
+- `data/db_policy.py`：`_score_entry` 关键词与余弦均用扩展后查询；新增 `_dense_boost()` 语义加分（最高 +3，**不改词法主序，仅在相近时纠偏**）；`retrieval` 字段标记 `lexical`/`hybrid`。
+- `scripts/rag_eval.py`（新增）：命中率量化（阈值：无 provider ≥70%、有 provider ≥85%）；`tests/llm_eval/rag_golden.jsonl` 20 条口语→政策 golden。
+- 测试 `tests/test_rag_hybrid.py` 11 项（同义词扩展/词法降级/无结果回退/注入假向量验证融合/embedding 失败降级/缓存命中/评测脚本）。
+
+**实测（当前配置 provider=none）**：命中率 **70.0%**（20 条 top-3）；失败项集中在知识库缺失主题（公租房/生育/公积金/残疾人/高龄津贴/医保）→ 直接印证 U2 语料扩充的必要性。
+
+**顺带修复测试隔离缺陷**：`tests/test_policy_rag.py` 原仅在 import 时 init_db，其它测试文件的 TestClient lifespan 会 `init_db+seed_all` 灌入演示知识到同一库，导致「弱命中」边界断言在组合运行时失效（U1 同义词扩展放大该效应）。按项目 `_fresh_db` 规范新增 autouse `_isolated_db` fixture（每用例独立空库）。
+
+**验证**：全量 pytest **525 passed / 1 skipped**；`ruff check .` = 0。**提交**：本轮 U1。

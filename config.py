@@ -44,6 +44,15 @@ POLICY_LLM_RAG = _secret("POLICY_LLM_RAG", "0").lower() in ("1", "true", "yes")
 # WS4：接待员规则未命中→LLM 二级意图兜底（默认关）。
 RECEPTION_LLM_FALLBACK = _secret("RECEPTION_LLM_FALLBACK", "0").lower() in ("1", "true", "yes")
 
+# U1：RAG 语义向量（混合检索）。默认 none = 纯词法（行为与升级前一致，零风险）。
+#   bailian → 阿里云百炼 text-embedding-v3（DASHSCOPE_API_KEY）
+#   zhipu   → 智谱 embedding-3（ZHIPU_API_KEY）
+# 未配 key / 调用失败自动回退词法检索，不中断业务。
+EMBEDDING_PROVIDER = _secret("EMBEDDING_PROVIDER", "none").lower()
+EMBEDDING_MODEL = _secret("EMBEDDING_MODEL", "")
+DASHSCOPE_API_KEY = _secret("DASHSCOPE_API_KEY", "")
+ZHIPU_API_KEY = _secret("ZHIPU_API_KEY", "")
+
 # Agent 参数
 AGENT_MAX_ITERATIONS = 6
 AGENT_TIMEOUT = 20

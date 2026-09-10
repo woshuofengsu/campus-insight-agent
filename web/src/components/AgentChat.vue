@@ -67,6 +67,7 @@ async function send(text, fromQuick = false) {
       related_id: r.related_id,
       corrected: r.corrected,
       chain: r.execution_chain || [],
+      chainOpen: false,   // 执行链默认收起，点开关才展开（避免一长列影响观感）
     }
     msgs.value.push(m)
     // 追问按钮自动出现在下一条消息（quick 选项）
@@ -188,14 +189,19 @@ async function clearAll() {
               <n-tag size="tiny" type="info">{{ m.intent }}</n-tag>
               <n-tag size="tiny" :type="m.status === '成功' ? 'success' : m.status === '需确认' || m.status === '追问' ? 'warning' : m.status === '拦截' || m.status === 'transferred_to_human' ? 'error' : 'default'">{{ m.status }}</n-tag>
             </div>
-            <!-- 多 Agent 执行链（含校验/协商/仲裁节点） -->
-            <div v-if="m.chain && m.chain.length" style="margin-top:8px;border:1px dashed var(--border);border-radius:8px;padding:8px;background:var(--bg);">
-              <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px;">🤖 多智能体执行链（{{ m.chain.length }} 步）</div>
-              <div v-for="(c, ci) in m.chain" :key="ci" style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:0.78rem;"
-                   :style="{ color: chainColor(c) }">
-                <span>{{ c.icon }}</span>
-                <span style="font-weight:600;">{{ c.name }}</span>
-                <span class="muted">：{{ c.action }} {{ c.note ? '· ' + c.note : '' }}</span>
+            <!-- 多 Agent 执行链（默认收起，点开才展开，避免一长列影响观感） -->
+            <div v-if="m.chain && m.chain.length" style="margin-top:8px;">
+              <n-button size="tiny" text @click="m.chainOpen = !m.chainOpen"
+                        style="font-size:0.78rem;color:var(--muted);">
+                🤖 多智能体执行链（{{ m.chain.length }} 步）{{ m.chainOpen ? '▴ 收起' : '▾ 展开' }}
+              </n-button>
+              <div v-if="m.chainOpen" style="margin-top:6px;border:1px dashed var(--border);border-radius:8px;padding:8px;background:var(--bg);">
+                <div v-for="(c, ci) in m.chain" :key="ci" style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:0.78rem;"
+                     :style="{ color: chainColor(c) }">
+                  <span>{{ c.icon }}</span>
+                  <span style="font-weight:600;">{{ c.name }}</span>
+                  <span class="muted">：{{ c.action }} {{ c.note ? '· ' + c.note : '' }}</span>
+                </div>
               </div>
             </div>
             <!-- 动作按钮 -->
@@ -237,8 +243,10 @@ async function clearAll() {
 .agent-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px;
   border-bottom: 1px solid var(--border); }
 .agent-history { padding: 8px 12px; border-bottom: 1px solid var(--border); max-height: 140px; overflow-y: auto; }
-.agent-body { padding: 12px; overflow-y: auto; flex: 1; min-height: 240px; max-height: 420px;
+.agent-body { padding: 12px; overflow-y: auto; height: min(380px, 55vh);  /* 固定高度：对话增长不再撑高页面，避免"回复时页面往上跳" */
+  display: flex; flex-direction: column;   /* 短对话贴底但不破坏滚动（勿用 justify-content:flex-end，会导致溢出内容滚不上去） */
   background: var(--bg, #f5f7f5); }
+.agent-body > .agent-msg:first-child { margin-top: auto; }  /* 内容不足时把消息压到底部（贴近输入框），溢出时恢复正常滚动 */
 .agent-msg { display: flex; margin-bottom: 10px; }
 .agent-msg.bot { justify-content: flex-start; }
 .agent-msg.user { justify-content: flex-end; }

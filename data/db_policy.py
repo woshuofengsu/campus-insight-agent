@@ -19,6 +19,7 @@
 全部关键操作走 log_activity 留痕（module="政策问答"）。
 """
 import json
+import logging
 import math
 import re
 from datetime import datetime, timedelta
@@ -27,6 +28,7 @@ from data.db_core import get_db
 from data.db_notifications import log_activity
 
 MODULE = "政策问答"
+_log = logging.getLogger(__name__)
 
 # 知识库分类（5 大类）
 POLICY_CATEGORIES = ["社保医保", "养老服务", "住房保障", "办事指引", "社区规定"]
@@ -207,7 +209,11 @@ def _score_entry(question: str, entry: dict) -> tuple[float, list[str]]:
     """单条知识条目与提问的匹配度。
 
     关键词命中 +2/个、标题整句命中 +3、n-gram 余弦相似度折算最高 +5。
+    U1：关键词与余弦均使用「同义词扩展后」的查询（口语→政策书面语），
+    例如「老楼装电梯」可召回标题含「增设电梯」的条目。
     """
+    from utils.text import expand_query
+    q_expanded = expand_query(question or "")
     title = entry.get("title") or ""
     text = " ".join([
         title,
@@ -216,13 +222,50 @@ def _score_entry(question: str, entry: dict) -> tuple[float, list[str]]:
         entry.get("summary") or "",
     ])
     score = 0.0
+    # 关键词命中：原问题或扩展后问题命中均计（扩展提升召回，不降低原命中权重）
     kw_hits = [k for k in split_keywords(entry.get("keywords"))
-               if len(k) >= 2 and k in (question or "")]
+               if len(k) >= 2 and (k in (question or "") or k in q_expanded)]
     score += 2.0 * len(kw_hits)
-    if title and title in (question or ""):
+    if title and (title in (question or "") or title in q_expanded):
         score += 3.0
-    score += 5.0 * _cosine(_tf(_text_ngrams(question or "")), _tf(_text_ngrams(text)))
+    score += 5.0 * _cosine(_tf(_text_ngrams(q_expanded)), _tf(_text_ngrams(text)))
     return round(score, 4), kw_hits
+
+
+def _dense_boost(query: str, entries: list[dict]) -> dict[int, float]:
+    """U1：语义向量重排分（{kb_id: cosine}）。provider 未启用/无向量 → 返回空 dict。
+
+    设计为「加分项」：不改动原词法分数体系，仅在可用时叠加语义相似度，
+    保证 provider=none 时行为与升级前完全一致（零风险）。
+    """
+    try:
+        from utils import embedding as E
+        if not E.is_enabled():
+            return {}
+        qv = E.embed_query(query)
+        if not qv:
+            return {}
+        ids = [e.get("id") for e in entries if e.get("id")]
+        if not ids:
+            return {}
+        with get_db() as conn:
+            rows = conn.execute(
+                f"SELECT kb_id, dense_json FROM kb_embeddings "
+                f"WHERE kb_id IN ({','.join('?' * len(ids))})", tuple(ids)).fetchall()
+        import json as _json
+        out: dict[int, float] = {}
+        for r in rows:
+            raw = r["dense_json"]
+            if not raw:
+                continue
+            try:
+                out[r["kb_id"]] = E.cosine(qv, _json.loads(raw))
+            except Exception:
+                continue
+        return out
+    except Exception:
+        _log.debug("语义重排失败（已忽略，继续用词法分）", exc_info=True)
+        return {}
 
 
 def _is_effective(entry: dict) -> bool:
@@ -239,10 +282,15 @@ def _is_effective(entry: dict) -> bool:
 
 def search_published_knowledge(query: str, top_k: int = 5,
                                category: str | None = None) -> list[dict]:
-    """只检索「已发布且未失效」的条目，按匹配度降序返回（带 score 字段）。"""
+    """只检索「已发布且未失效」的条目，按匹配度降序返回（带 score 字段）。
+
+    U1 混合检索：词法分（同义词扩展）+ 语义余弦加分（provider 可用时），
+    provider=none / 无向量 / 调用失败 → 纯词法，行为与升级前一致。
+    """
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM knowledge_base").fetchall()
     scored: list[tuple[dict, float]] = []
+    candidates: list[dict] = []
     for r in rows:
         e = dict(r)
         if e.get("audit_status") != "已发布":
@@ -251,13 +299,21 @@ def search_published_knowledge(query: str, top_k: int = 5,
             continue
         if not _is_effective(e):
             continue
+        candidates.append(e)
+    dense = _dense_boost(query, candidates) if candidates else {}
+    for e in candidates:
         s, _ = _score_entry(query, e)
+        # 语义加分：余弦 ∈ [-1,1] → 折算最高 +3（不改变词法主序，仅在相近时纠偏）
+        d = dense.get(e.get("id"))
+        if d is not None:
+            s += 3.0 * max(0.0, d)
         if s > 0:
             scored.append((e, s))
     scored.sort(key=lambda x: -x[1])
     out = []
     for e, s in scored[:top_k]:
         e["score"] = round(s, 4)
+        e["retrieval"] = "hybrid" if dense else "lexical"
         out.append(e)
     return out
 
