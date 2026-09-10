@@ -16,17 +16,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 def _init_test_db(name: str) -> str:
+    """建测试库；**先清理同名残留**（含 WAL/SHM），保证重复运行/中断后可重入。"""
     db_path = os.path.join(os.path.dirname(__file__), f"_test_semantics_{name}.db")
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            os.unlink(db_path + suffix)
+        except OSError:
+            pass
     from data.database import init_db
     init_db(db_path)
     return db_path
 
 
 def _cleanup_test_db(db_path: str):
-    try:
-        os.unlink(db_path)
-    except Exception:
-        pass
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            os.unlink(db_path + suffix)
+        except OSError:
+            pass
 
 
 def _utc_hours_ago(hours: float) -> str:

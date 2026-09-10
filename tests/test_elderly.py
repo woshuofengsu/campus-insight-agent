@@ -12,16 +12,23 @@ from data.db_user import create_user
 
 
 def _init_test_db(name: str) -> str:
+    """建测试库；**先清理同名残留**，保证重复运行/中断后可重入（幂等）。"""
     db_path = os.path.join(os.path.dirname(__file__), f"_test_elderly_{name}.db")
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            os.unlink(db_path + suffix)
+        except OSError:
+            pass
     init_db(db_path)
     return db_path
 
 
 def _cleanup(db_path: str):
-    try:
-        os.unlink(db_path)
-    except Exception:
-        pass
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            os.unlink(db_path + suffix)
+        except OSError:
+            pass
 
 
 class TestElderlyProfile(unittest.TestCase):

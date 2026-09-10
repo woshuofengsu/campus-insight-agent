@@ -202,6 +202,28 @@ def test_embedding_cache_hit(monkeypatch):
 
 # ---------- 评测脚本 ----------
 
+def test_enrich_keywords_adds_colloquial_short_terms():
+    """U2：导入时关键词富化——正文含「基本医疗保险」应补出「医保」等口语短词。"""
+    import importlib.util
+    import os as _os
+    spec = importlib.util.spec_from_file_location(
+        "imp_kb", _os.path.join(_os.getcwd(), "scripts", "import_kb_corpus.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    entry = {
+        "title": "北京市城乡居民基本医疗保险参保缴费有关问题的通知",
+        "body": "参加基本医疗保险的居民按规定缴纳医疗保险费，享受医疗费用报销待遇。",
+        "plain_interpretation": "居民参保后看病可以报销。",
+        "keywords": "居民医保,参保缴费",
+    }
+    out = m.enrich_keywords(entry)
+    kws = [k.strip() for k in out.split(",")]
+    assert "医保" in kws, f"应补出口语短词「医保」，实际：{kws}"
+    assert len(kws) <= 5, f"关键词不得超过 5 个：{kws}"
+    # 原有长词保留（不丢原始语义）
+    assert any(k in kws for k in ("居民医保", "参保缴费"))
+
+
 def test_rag_eval_runs(fresh_db):
     """rag_eval 能跑通并返回命中率（golden 集非空）。"""
     from scripts.rag_eval import load_golden, run

@@ -276,6 +276,42 @@ def existing_index(db_path: str = "") -> dict[tuple[str, str], dict]:
 
 # ---------------------------------------------------------------- 导入流程
 
+def enrich_keywords(entry: dict, limit: int = 5) -> str:
+    """关键词富化：把居民「口语短词」补进关键词（U2 检索召回关键）。
+
+    背景：检索的关键词命中是**单向**的（关键词必须是提问的子串），而语料关键词常写
+    「居民医保」「基本医疗保险」这类长词——居民问「医保怎么报销」时无法命中。
+    这里用 utils/text.QUERY_SYNONYMS 反向补全：若条目正文出现某同义词组的任一词，
+    就把该组的**口语 key**（如「医保」）加为关键词。
+
+    规则：保留语料原有顺序，口语短词优先插入；总数不超过 limit（db_policy 校验上限 5）。
+    """
+    from utils.text import QUERY_SYNONYMS
+    text = " ".join([
+        entry.get("title") or "", entry.get("body") or "",
+        entry.get("plain_interpretation") or "", entry.get("keywords") or "",
+    ])
+    kws = split_kw(entry.get("keywords") or "")
+    short: list[str] = []
+    for key, syns in QUERY_SYNONYMS.items():
+        if key in kws:
+            continue
+        # 正文命中该组任一同义词（或 key 本身）→ 补 key
+        if any(s in text for s in syns) or key in text:
+            short.append(key)
+    # 短词优先（≤3 字优先，更可能成为提问子串），其余按长度升序
+    short.sort(key=lambda w: (len(w) > 3, len(w)))
+    merged = short + kws
+    seen, out = set(), []
+    for w in merged:
+        if w and w not in seen and len(w) >= 2:
+            seen.add(w)
+            out.append(w)
+        if len(out) >= limit:
+            break
+    return ",".join(out)
+
+
 def import_entry(entry: dict, existing: dict | None, do_update: bool) -> tuple[str, str]:
     """导入单条。返回 (结果, 说明)。结果 ∈ {created, updated, skipped, failed}。"""
     from data.db_policy import (audit_knowledge, create_knowledge, create_new_version,
@@ -288,7 +324,7 @@ def import_entry(entry: dict, existing: dict | None, do_update: bool) -> tuple[s
         category=cat,
         plain_interpretation=(entry.get("plain_interpretation") or "").strip(),
         source=build_source(entry),
-        keywords=(entry.get("keywords") or "").strip(),
+        keywords=entry.get("_enriched_keywords") or enrich_keywords(entry),
         effective_date=(entry.get("effective_date") or "").strip(),
         content=build_content(entry),
         summary=build_summary(entry),
