@@ -1,4 +1,4 @@
-﻿# api_routes/policy.py
+# api_routes/policy.py
 """政策问答 / 知识库路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -25,6 +25,17 @@ def web_qa_ask(req: AskQuestion, request: Request):
     from data.db_policy import ask_question
     u = _user(request)
     r = ask_question(u.get("uid"), req.question, source=req.source, category=req.category or None)
+    # U3：记录每次检索尝试（含未命中）→ 知识库健康度可量化
+    try:
+        from data.db_kb_metrics import log_kb_query
+        _k = r.get("knowledge") or {}
+        log_kb_query(u.get("uid"), req.question, bool(r.get("matched")),
+                     reason=r.get("reason") or ("ok" if r.get("matched") else ""),
+                     top_score=r.get("score") or 0.0, top_kb_id=_k.get("id"),
+                     retrieval=_k.get("retrieval") or "",
+                     role=u.get("role") or "resident")
+    except Exception:
+        pass
     if r.get("matched"):
         return _ok({
             "matched": True, "question_id": r.get("question_id"),

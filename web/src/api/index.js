@@ -188,6 +188,7 @@ export const agent = {
   resolveHandoff: (id) => api.post(`/agent/handoffs/${id}/resolve`),
   llmUsage: (params) => api.get('/agent/llm-usage', { params }),
   selfResolution: (params) => api.get('/agent/self-resolution', { params }),
+  kbHealth: (params) => api.get('/agent/kb-health', { params }),
   board: (params) => api.get('/agent/board', { params }),
   satisfactionDrilldown: (params) => api.get('/agent/satisfaction-drilldown', { params }),
   analytics: (params) => api.get('/agent/analytics', { params }),

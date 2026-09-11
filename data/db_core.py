@@ -701,6 +701,31 @@ def _m42_medication_intake(conn):
     """)
 
 
+def _m43_kb_query_log(conn):
+    """U3/v43：知识库查询日志（RAG 可观测：命中率 / 零命中问题 / 检索路线）。
+
+    与 policy_questions 的区别：policy_questions 只记录已成立的问题（匹配失败不落库），
+    本表**记录每一次检索尝试**（含未命中），才能算真实命中率与「零命中问题 top」。
+    幂等（IF NOT EXISTS）；无 PII（只存问题文本与检索元数据，不存用户手机号等）。
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS kb_query_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            role TEXT DEFAULT 'resident',
+            question TEXT DEFAULT '',
+            matched INTEGER DEFAULT 0,          -- 是否达到自动回答阈值
+            reason TEXT DEFAULT '',             -- low_score / no_knowledge / manual / ok
+            top_score REAL DEFAULT 0,           -- 最佳匹配分
+            top_kb_id INTEGER,                  -- 最佳匹配条目 id
+            retrieval TEXT DEFAULT '',          -- lexical / hybrid
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_kbq_created ON kb_query_log(created_at);
+        CREATE INDEX IF NOT EXISTS idx_kbq_matched ON kb_query_log(matched, created_at);
+    """)
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -908,6 +933,7 @@ def init_db(db_path: str):
         (40, "performance_indexes", _m40_performance_indexes),
         (41, "tenant_column", _m41_tenant_column),
         (42, "medication_intake", _m42_medication_intake),
+        (43, "kb_query_log", _m43_kb_query_log),
     ]
     for version, name, fn in post:
         if version <= current:

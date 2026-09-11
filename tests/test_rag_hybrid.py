@@ -28,6 +28,17 @@ def fresh_db():
     db_core._DB_PATH = orig
 
 
+@pytest.fixture(autouse=True)
+def _no_embedding_by_default(monkeypatch):
+    """单测默认关闭语义向量：不依赖外部 API（不产生费用/不依赖网络）。
+
+    需要验证融合路径的用例会显式 monkeypatch `is_enabled`/`embed_query` 为假实现。
+    """
+    from utils import embedding as E
+    monkeypatch.setattr(E, "get_provider", lambda: "none")
+    monkeypatch.setattr(E, "get_api_key", lambda: "")
+
+
 def _seed_knowledge():
     """造两条已发布条目：一条讲「增设电梯」，一条讲「垃圾分类」。
 
@@ -76,13 +87,19 @@ def test_synonym_expansion_improves_recall(fresh_db):
     assert "电梯" in (results[0]["title"] or "")
 
 
-# ---------- 混合检索（provider 默认关闭 → 纯词法，行为与升级前一致） ----------
+# ---------- 混合检索（语义不可用时 → 纯词法，行为与升级前一致） ----------
 
-def test_search_hybrid_lexical_by_default(fresh_db):
+def test_search_hybrid_lexical_by_default(fresh_db, monkeypatch):
+    """语义不可用时（无 provider/无 key）纯词法路径必须照常工作（降级即设计）。
+
+    不依赖环境默认值——显式关闭 provider，避免本机配了 EMBEDDING_PROVIDER 时误判。
+    """
     _seed_knowledge()
+    from utils import embedding as E
+    monkeypatch.setattr(E, "get_provider", lambda: "none")
+    monkeypatch.setattr(E, "get_api_key", lambda: "")
+    assert E.is_enabled() is False
     from agent.rag import search_hybrid
-    from utils.embedding import is_enabled
-    assert is_enabled() is False, "默认应为 none（无 provider 无 key）"
     results = search_hybrid("垃圾分类怎么投", top_k=3)
     assert results, "词法路径应有结果"
     assert results[0]["source_route"] == "sparse"

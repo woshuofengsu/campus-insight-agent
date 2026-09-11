@@ -650,3 +650,26 @@
 **安全/合规**：导入前已备份生产库（`data/community_insight.db.bak_*`，`.db.bak` 已 gitignore）；语料不含个人信息；来源可溯源；未收录存疑文号项。
 
 **验证**：全量 pytest 待复跑；`ruff check .` = 0。**提交**：本轮 U2。
+
+## 二十九、竞品对标升级 U3：知识库健康度（RAG 可观测）+ 百炼语义向量实装 ✅
+
+**U1 语义向量正式启用（阿里云百炼）**：
+- `.env` 配置 `EMBEDDING_PROVIDER=bailian` + `EMBEDDING_MODEL=text-embedding-v3` + `DASHSCOPE_API_KEY`（key 不入库，`.env` 已 gitignore）。
+- 实测该 key 具备 embedding 权限：text-embedding-v3/v4 = 1024 维、v2 = 1536 维。
+- `build_dense_index()`：59 条知识库条目 × 1024 维向量落 SQLite（`kb_embeddings.dense_json`）。
+- **纯词法 vs 混合检索对比（27 条 golden，含 7 条语义难例）**：
+  - 纯词法（`--no-embedding`）：24/27 = **88.9%**
+  - 混合检索（bailian/text-embedding-v3）：27/27 = **100%**
+  - 典型纠正：「看病花光了积蓄怎么办」词法误召回「加装电梯」→ 混合召回「医保个人账户共济」；「穷人租不起房」词法无结果 → 混合召回「市场租房补贴」；「老楼上下楼不方便」词法给「养老助餐」→ 混合给「加装电梯指导意见」。
+- `scripts/rag_eval.py` 新增 `--no-embedding` 对比开关；golden 集扩到 27 条（20 常规 + 7 语义难例）。
+
+**U3 知识库健康度（可量化、可证伪）**：
+- **schema v43** `kb_query_log`：记录**每一次检索尝试**（含未命中）——`policy_questions` 只记已成立的问题，无法算真实命中率与「零命中问题」。
+- `data/db_kb_metrics.py`：`get_kb_health(days)` 输出查询数/命中数/**命中率**/平均分/**检索路线分布（lexical vs hybrid）**/**零命中问题 top N**/语料规模/分类分布/90 天内到期数/embedding 配置；`log_kb_query()` 记录（异常只记日志，绝不影响业务）；`clean_kb_query_log(days=90)`。
+- `api_routes/policy.py` Web 问答端点接入 `log_kb_query`（命中与未命中都记）。
+- 端点 `GET /api/web/agent/kb-health`（grid 专属）。
+- 调度器新增 `kb_query_cleaned` 自动任务（90 天保留）。
+- 前端：治理大屏新增「知识库命中率」「政策语料」卡（共 7 卡，栅格改 auto-fit 自适应）；`api/index.js` 加 `agent.kbHealth`。
+- 测试 `tests/test_kb_metrics.py` 5 项（日志与命中率/零命中 top/空库安全/语料规模/端点权限）；`tests/test_rag_hybrid.py` 补 autouse fixture **默认关闭语义向量**（单测不依赖外部 API、不产生费用），并把「默认 provider=none」断言改为显式关闭（原断言耦合环境，配置真 key 后误报）。
+
+**验证**：全量 pytest 待复跑（上一轮 525 passed + 本轮 U3 新增 5 项）；`ruff check .` = 0；`npm run build` 通过。**提交**：本轮 U3。

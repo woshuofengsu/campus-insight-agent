@@ -39,10 +39,14 @@ def load_golden(path: str = GOLDEN) -> list[dict]:
     return cases
 
 
-def run(topk: int = 3, verbose: bool = False) -> dict:
+def run(topk: int = 3, verbose: bool = False, no_embedding: bool = False) -> dict:
     from config import DB_PATH
     from data.db_core import init_db
     init_db(DB_PATH)
+    if no_embedding:
+        # 对比基线：强制关闭语义向量 → 只走词法（+同义词扩展），用于量化语义增益
+        import utils.embedding as E
+        E.is_enabled = lambda: False
     from data.db_policy import search_published_knowledge
     from utils.embedding import describe
 
@@ -74,25 +78,36 @@ def main():
     ap.add_argument("--topk", type=int, default=3)
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--json", action="store_true")
+    # 对比基线：强制关闭语义向量（量化「混合检索」相对「纯词法」的增益）
+    ap.add_argument("--no-embedding", action="store_true",
+                    help="强制纯词法（关闭语义向量），用于对比实验")
     # 阈值：无 provider 走纯词法（含同义词扩展）基线较低；有 provider 要求更高
     ap.add_argument("--threshold", type=float, default=None)
     args = ap.parse_args()
 
-    r = run(topk=args.topk, verbose=args.verbose)
+    r = run(topk=args.topk, verbose=args.verbose, no_embedding=args.no_embedding)
     emb = r["embedding"]
     threshold = args.threshold
-    if threshold is None:
+    if threshold is None and not args.no_embedding:
         threshold = 85.0 if emb.get("enabled") else 70.0
 
     if args.json:
         print(json.dumps(r, ensure_ascii=False, indent=2))
     else:
-        mode = f"混合检索（{emb['provider']}/{emb['model']}）" if emb.get("enabled") else "纯词法（同义词扩展）"
+        if args.no_embedding:
+            mode = "纯词法（同义词扩展，语义向量已强制关闭）"
+        else:
+            mode = f"混合检索（{emb['provider']}/{emb['model']}）" if emb.get("enabled") else "纯词法（同义词扩展）"
         print("=== RAG 检索命中率评测（U1）===")
         print(f"模式：{mode} | 用例 {r['cases']} 条 | top-{r['topk']} 命中 {r['hits']} 条 → 命中率 {r['hit_rate']}%")
-        print(f"阈值：{threshold}% → {'✅ 达标' if r['hit_rate'] >= threshold else '❌ 未达标'}")
-        if not emb.get("enabled"):
-            print("提示：配置 EMBEDDING_PROVIDER=bailian + DASHSCOPE_API_KEY 可启用语义向量，命中率进一步提升。")
+        if args.no_embedding:
+            print("（对比基线：不加 --no-embedding 即混合检索模式，可量化语义向量增益）")
+        else:
+            print(f"阈值：{threshold}% → {'✅ 达标' if r['hit_rate'] >= threshold else '❌ 未达标'}")
+            if not emb.get("enabled"):
+                print("提示：配置 EMBEDDING_PROVIDER=bailian + DASHSCOPE_API_KEY 可启用语义向量，命中率进一步提升。")
+    if args.no_embedding:
+        sys.exit(0)
     sys.exit(0 if r["hit_rate"] >= threshold else 1)
 
 

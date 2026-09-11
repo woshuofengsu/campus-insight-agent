@@ -3,7 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { issues, proposals, weather, agent } from '../api'
 
-const data = ref({ issues: 0, pending: 0, props: 0, alerts: 0, selfRate: '--', temp: '--' })
+const data = ref({ issues: 0, pending: 0, props: 0, alerts: 0, selfRate: '--', temp: '--', kbRate: '--', kbCount: 0 })
 const tick = ref(0)
 
 async function load() {
@@ -13,6 +13,7 @@ async function load() {
     const alerts = (await weather.alerts()) || []
     const w = await weather.current()
     const sr = (await agent.selfResolution()) || {}
+    const kb = (await agent.kbHealth()) || {}
     data.value = {
       issues: all.length,
       pending: all.filter((i) => ['待审核', '已审核待派单', '处理中'].includes(i.status)).length,
@@ -20,6 +21,8 @@ async function load() {
       alerts: alerts.length,
       selfRate: sr.ai_self_resolution_rate ?? '--',
       temp: w?.temp_high || '--',
+      kbRate: kb.queries ? kb.hit_rate : '--',
+      kbCount: kb.kb_published || 0,
     }
   } catch { /* 大屏失败不阻塞 */ }
 }
@@ -35,6 +38,8 @@ const cards = [
   { label: '公示提案', value: () => data.value.props, color: '#81c784', icon: '💡' },
   { label: '天气预警', value: () => data.value.alerts, color: '#e57373', icon: '⚠️' },
   { label: 'AI 自转率', value: () => (data.value.selfRate === '--' ? '--' : data.value.selfRate + '%'), color: '#ba68c8', icon: '🤖' },
+  { label: '知识库命中率', value: () => (data.value.kbRate === '--' ? '--' : data.value.kbRate + '%'), color: '#4dd0e1', icon: '📚' },
+  { label: '政策语料', value: () => data.value.kbCount || '--', color: '#ffd54f', icon: '📄' },
 ]
 </script>
 
@@ -49,7 +54,7 @@ const cards = [
     </div>
 
     <!-- 核心指标 -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:24px;flex:1;align-content:center;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;flex:1;align-content:center;">
       <div v-for="c in cards" :key="c.label" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:30px 16px;text-align:center;">
         <div style="font-size:2.6rem;">{{ c.icon }}</div>
         <div style="font-size:3rem;font-weight:800;" :style="{ color: c.color }">{{ c.value() }}</div>

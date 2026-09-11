@@ -1,4 +1,4 @@
-﻿# api_routes/agent.py
+# api_routes/agent.py
 """Agent 统一入口 + 留痕/处理包/用量/分析路由（从 api_web.py 拆出，P2-04）。"""
 import logging
 import time
@@ -193,6 +193,15 @@ def agent_analytics(request: Request, days: int = 7):
     return _ok({"clusters": get_issue_clusters(days=days),
                 "trend": get_weekly_trend(days=days),
                 "brief": build_data_brief()})
+
+
+@router.get("/kb-health")
+def agent_kb_health(request: Request, days: int = 7, top_n: int = 10):
+    """知识库健康度（U3）：命中率 / 零命中问题 top / 检索路线 / 语料规模（grid 专属）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_kb_metrics import get_kb_health
+    return _ok(get_kb_health(days=days, top_n=top_n))
 
 
 @router.get("/traces/{trace_id}")
