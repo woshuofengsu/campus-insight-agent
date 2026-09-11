@@ -1513,4 +1513,6 @@ def _knowledge_view(e: dict) -> dict:
         "audit_status": e.get("audit_status") or "", "audit_opinion": e.get("audit_opinion") or "",
         "keywords": e.get("keywords") or "", "cite_count": e.get("cite_count") or 0,
         "is_community": (e.get("source") or "").strip() == SELF_MADE_SOURCE,
+        # U1/U3：检索路线（lexical / hybrid），供知识库健康度统计「混合检索占比」
+        "retrieval": e.get("retrieval") or "",
     }
