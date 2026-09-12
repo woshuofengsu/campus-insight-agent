@@ -2,7 +2,7 @@
 // 政策问答管理：知识库维护（创建/审核/下架）+ 提问处理（回复）+ 统计与阈值
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { knowledge, qa } from '../../api'
+import { knowledge, qa, agent } from '../../api'
 
 const message = useMessage()
 const kb = ref([])
@@ -129,6 +129,24 @@ async function showVersions(k) {
     message.error(e.message)
   }
 }
+
+// U6 知识图谱：实体关联查询（如「3号楼 电梯」→ 相关工单/政策/关联实体）
+const kgQuery = ref('')
+const kgResult = ref(null)
+const kgLoading = ref(false)
+async function kgSearch() {
+  const q = kgQuery.value.trim()
+  if (!q) return message.warning('请输入实体，如「3号楼」「电梯」「加装电梯」')
+  kgLoading.value = true
+  try {
+    kgResult.value = await agent.kgEntity(q)
+  } catch (e) {
+    message.error(e.message)
+    kgResult.value = null
+  } finally {
+    kgLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -237,6 +255,65 @@ async function showVersions(k) {
           </div>
         </div>
         <n-empty v-if="questions.length === 0" description="暂无提问" />
+      </n-tab-pane>
+
+      <n-tab-pane name="kg" tab="知识图谱">
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:700;margin-bottom:6px;">🕸️ 实体关联查询</div>
+          <div class="muted" style="font-size:0.85rem;margin-bottom:10px;">
+            按实体反查业务对象：「3号楼」→ 该楼栋历史工单与相关设施；「电梯」「加装电梯」→ 相关工单 + 政策。
+            支持复合查询（如「3号楼 电梯」= 同时提及两者的工单）。
+          </div>
+          <div style="display:flex;gap:8px;">
+            <n-input v-model:value="kgQuery" placeholder="输入实体，如 3号楼 / 电梯 / 加装电梯 / 老人"
+                     @keyup.enter="kgSearch" clearable />
+            <n-button type="primary" :loading="kgLoading" @click="kgSearch">查询</n-button>
+          </div>
+        </div>
+
+        <div v-if="kgResult && !kgResult.found" class="card">
+          <div class="muted">{{ kgResult.hint || '图谱中未收录该实体' }}
+            <span v-if="kgResult.graph_entities">（当前图谱含 {{ kgResult.graph_entities }} 个实体）</span>
+          </div>
+        </div>
+
+        <template v-if="kgResult && kgResult.found">
+          <div class="card" style="margin-bottom:12px;">
+            <div style="font-size:0.9rem;">
+              命中实体：<b v-for="e in kgResult.entities" :key="e.id" style="margin-right:8px;">
+                {{ e.name }}<span class="muted">（{{ e.etype }}）</span></b>
+              <span class="muted">· 匹配方式 {{ kgResult.match_mode }}</span>
+            </div>
+            <div v-if="kgResult.summary" class="muted" style="font-size:0.85rem;margin-top:6px;">{{ kgResult.summary }}</div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;" v-if="kgResult.related_issues && kgResult.related_issues.length">
+            <div style="font-weight:700;margin-bottom:8px;">🔧 关联工单（{{ kgResult.related_issues.length }}）</div>
+            <div v-for="it in kgResult.related_issues.slice(0, 8)" :key="'i' + it.id"
+                 style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
+              #{{ it.id }} {{ it.title }}
+              <span class="muted">（{{ it.status || '' }} · {{ it.location || '' }}）</span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;" v-if="kgResult.related_knowledge && kgResult.related_knowledge.length">
+            <div style="font-weight:700;margin-bottom:8px;">📄 关联政策（{{ kgResult.related_knowledge.length }}）</div>
+            <div v-for="k in kgResult.related_knowledge.slice(0, 8)" :key="'k' + k.id"
+                 style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
+              {{ k.title }} <span class="muted">（{{ k.category || '' }}）</span>
+            </div>
+          </div>
+
+          <div class="card" v-if="kgResult.related_entities && kgResult.related_entities.length">
+            <div style="font-weight:700;margin-bottom:8px;">🔗 关联实体</div>
+            <div style="font-size:0.9rem;">
+              <span v-for="re in kgResult.related_entities.slice(0, 15)" :key="re.name"
+                    class="status-pill" style="background:#eef2ff;color:#4f46e5;margin:0 6px 6px 0;display:inline-block;">
+                {{ re.name }}<span class="muted"> · {{ re.rel }}</span>
+              </span>
+            </div>
+          </div>
+        </template>
       </n-tab-pane>
 
       <n-tab-pane name="stats" tab="统计与阈值">

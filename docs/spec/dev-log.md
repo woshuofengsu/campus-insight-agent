@@ -724,3 +724,28 @@
 **顺带修正测试耦合**：`test_demo_preflight` 原先断言「仓库前端已构建」（环境状态相关，源码改动未 build 即误报），改为断言**行为契约**（未通过时必须给出 `npm run build` 指令）。
 
 **验证**：全量 pytest **542 passed / 1 skipped**（新增 U4 五项）；`ruff check .` = 0；`npm run build` 通过；`demo_preflight --fast` **7/7**。**提交**：本轮。
+
+## 三十三、竞品对标升级 U6：轻量知识图谱（能查出东西，不做摆设）✅
+
+**借鉴来源**：对标作品的知识图谱能力。**止损原则**：只做「能查」的链路，纯可视化一律不做（评审会追问「图谱解决了什么」）。
+
+- **schema v45（`_m45_knowledge_graph`）**：三表 `kg_entity`（name UNIQUE/etype/community/attrs_json）/ `kg_relation`（src/rel/dst/weight/source，UNIQUE 三元组）/ `kg_mention`（实体↔业务对象），etype ∈ {building, facility, topic, group, category}，rel ∈ {located_in, has_facility, applies_to, mentions, related_issue}。**只存实体名与业务对象 id，不存原文、不含手机号**。
+- **`data/db_kg.py`（505 行，纯规则抽取，零 LLM）**：
+  - 楼栋：正则 + 中文数字归一（`四号楼`→`4号楼`，`二楼` 不误判）
+  - 设施 12 类 / 人群 8 类 / 政策事项 8 类同义归一；工单类别直接取结构化字段（不猜）
+  - **最长匹配优先 + 区间不重叠**（`加装电梯` 不再多出设施「电梯」；`独居老人` 不再多出「老人」）
+  - 关系生成：楼栋×设施→`has_facility`；人群×楼栋→`located_in`；事项×人群→`applies_to`；实体→工单类别→`related_issue`；跨类型→`mentions`
+  - **幂等**：实体 upsert（id 稳定）+ 关系/引用先清后写，重建即全量覆盖（删源后无悬挂边）
+- **核心能力 `query_entity(name)`**：按实体反查业务对象，支持**复合查询取交集**（「3号楼电梯」= 同时提及两者的工单），查不到时**如实 `found=False` + hint**，不用全文检索伪装成图查询结果。
+- **端点**（grid 专属）：`GET /agent/kg/entity`、`GET /agent/kg/stats`、`POST /agent/kg/rebuild`。
+- **前端消费点**：负责人端政策问答页新增「知识图谱」标签页——实体查询框 + 命中实体/关联工单/关联政策/关联实体四段展示（`api/index.js` 加 `agent.kgEntity`/`kgStats`）。
+
+**实测（生产库，可证伪）**：
+- 建图：**88 实体 / 199 关系 / 760 提及**；类型分布 building 54、facility 12、category 9、topic 7、group 6
+- **工单覆盖率 96.0%（216/225）**——即绝大多数工单都能通过实体被检索到
+- `query_entity("电梯")` → **5 条历史工单 + 7 条政策 + 10 个关联实体**（摘要：「电梯」关联 5 条历史工单、7 条政策、1 条提案、10 个关联实体）
+- Top 实体：公共设施、路灯、老人、设施维修、楼道、安全隐患、电梯、3号楼
+
+**测试**：`tests/test_kg.py` 10 项（抽取/幂等/反查/复合交集/统计/端点权限）全绿。
+
+**验证**：全量 pytest **553 passed / 1 skipped**；`ruff check .` = 0；`npm run build` 通过；live 端点实测通过。**提交**：本轮。
