@@ -1,4 +1,4 @@
-﻿# api_routes/proposals.py
+# api_routes/proposals.py
 """提案路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from api_routes.deps import _ok, _fail, _user, _require_role
 
 import logging
+from utils.timeutil import utcnow
 _log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/proposals", tags=["proposals"])
@@ -138,7 +139,7 @@ def proposal_list(request: Request, status: str = "", limit: int = 300):
             try:
                 from datetime import datetime
                 end = datetime.strptime(str(p["voting_ended_at"])[:19], "%Y-%m-%d %H:%M:%S")
-                remaining = max(0, (end - datetime.utcnow()).days + 1)
+                remaining = max(0, (end - utcnow()).days + 1)
             except (ValueError, TypeError):
                 remaining = None
         out.append({

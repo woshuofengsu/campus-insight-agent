@@ -11,7 +11,7 @@
   weather_check_tasks.status 待检查 → 已确认 | 超时未确认（保留标记可补填）
 
 约定：
-  - 时间统一按 SQLite CURRENT_TIMESTAMP（UTC）口径，内部用 datetime.utcnow() 计算。
+  - 时间统一按 SQLite CURRENT_TIMESTAMP（UTC）口径，内部用 utcnow() 计算。
   - 所有关键操作（预警检测、提醒分发、缓存降级、超时升级、检查处理等）都走
     log_activity 留痕，module="天气"。
   - 居民查看天气仅记系统访问日志（record_weather_view），不进入业务留痕。
@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 
 from data.db_core import get_db
 from data.db_notifications import log_activity
+from utils.timeutil import utcnow
 
 _log = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ _ORANGE_CONDITIONS = ("大暴雨", "台风", "暴雨")
 # ---------- 小工具 ----------
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return utcnow()
 
 
 def _fmt(dt: datetime) -> str:

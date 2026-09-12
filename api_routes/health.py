@@ -1,4 +1,4 @@
-﻿# api_routes/health.py
+# api_routes/health.py
 """健康内容 / 健康咨询 / 天气联动路由模块（从 api_web.py 拆出，P2-04）。"""
 import json
 

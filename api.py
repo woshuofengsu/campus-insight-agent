@@ -30,6 +30,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # 数据库懒初始化，保证不管走哪条路径都不会漏
 
 _log = logging.getLogger(__name__)
+
+
+def _server_error(e: Exception) -> HTTPException:
+    """统一的 500 响应（第七轮复审 P3-G）。
+
+    原始异常只写服务端日志（含 traceback），**不回给客户端** —— 避免把内部文件路径、
+    SQL 片段、依赖栈信息透出给插件调用方。主服务 api_web 本来就是这么做的，这里对齐。
+    """
+    _log.exception("插件入口内部错误：%s", type(e).__name__)
+    return HTTPException(status_code=500, detail="服务繁忙，请稍后再试")
+
+
 _auth_warned = False
 
 
@@ -188,7 +200,7 @@ def get_weather():
             "forecast": days if days else [],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 社区脉搏
@@ -263,7 +275,7 @@ def get_community_pulse():
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 工单
@@ -302,7 +314,7 @@ def list_issues(
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.get("/api/issues/stats", tags=["工单"])
@@ -320,7 +332,7 @@ def get_issue_stats():
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.post("/api/issues", tags=["工单"])
@@ -362,7 +374,7 @@ def report_issue(req: ReportIssueRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 提案
@@ -398,7 +410,7 @@ def list_proposals(
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.post("/api/proposals", tags=["提案"])
@@ -431,7 +443,7 @@ def create_proposal(req: CreateProposalRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.post("/api/proposals/{proposal_id}/support", tags=["提案"])
@@ -456,7 +468,7 @@ def support_proposal(proposal_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 议题
@@ -483,7 +495,7 @@ def list_topics(limit: int = Query(10, ge=1, le=50)):
             })
         return {"success": True, "total": len(result), "topics": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.get("/api/topics/{topic_id}", tags=["议题"])
@@ -518,7 +530,7 @@ def get_topic_detail(topic_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.post("/api/topics/{topic_id}/opinions", tags=["议题"])
@@ -544,7 +556,7 @@ def express_opinion(topic_id: int, req: ExpressOpinionRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 治理
@@ -570,7 +582,7 @@ def get_governance_health():
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.get("/api/governance/audit", tags=["治理"])
@@ -623,7 +635,7 @@ def get_governance_audit():
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # AI 对话——核心端点
@@ -697,9 +709,10 @@ def agent_chat(req: ChatRequest):
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        # 参数类错误可以原文返回（是给人看的），但只保留 message，不带栈
+        raise HTTPException(status_code=503, detail=str(e)[:120])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 @app.post("/api/chat/offline", tags=["智能对话"])
@@ -725,7 +738,7 @@ def agent_chat_offline(req: ChatRequest):
             "data": {"reply": response, "mode": "offline"},
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 反馈
@@ -745,7 +758,7 @@ def get_feedback(topic: Optional[str] = Query(None)):
             items = [i for i in items if topic in i.get("topic", "")]
         return {"success": True, "total": len(items), "items": items}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _server_error(e)
 
 
 # 导出 OpenAPI（扣子插件要用）

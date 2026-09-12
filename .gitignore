@@ -27,3 +27,5 @@ web/node_modules/
 # 部署机密：HTTPS 证书/密钥放入 nginx/certs/（勿提交），详见 docs/deploy-https.md
 
 .shots/
+
+.recordings/

@@ -43,6 +43,12 @@ def _seed_users():
                     "UPDATE user_profile SET phone='', phone_enc=? WHERE username=? AND (phone_enc IS NULL OR phone_enc='')",
                     (_enc_phone(phone), username),
                 )
+                # 已有密文却残留明文（历史迁移漏网/回滚）→ 一并清掉明文列（第七轮复审：实测 4 条 demo 账号）
+                conn.execute(
+                    "UPDATE user_profile SET phone='' WHERE username=? AND length(COALESCE(phone,''))>0 "
+                    "AND length(COALESCE(phone_enc,''))>0",
+                    (username,),
+                )
                 continue
             pw_hash = ""
             if pw:

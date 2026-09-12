@@ -13,13 +13,12 @@
 - 任何统计/排名/导出只聚合 proposal_votes，绝不 JOIN 两张表；
 - 留痕只记「有居民评分」，不记个体、不记分数。
 
-schema v18 之外、本模块补齐的列（幂等 ALTER，只加不删，见 _EXTRA_COLS）：
-- audited_at         审核通过时间（7 天确认窗口起点）
-- community_building 所属小区/楼栋（选填）
-- resolved_at        执行完成时间（7 天反馈窗口起点）
-- feedback_at        满意度反馈时间
-- feedback_reason    不满意原因
-- satisfaction       满意/不满意（用于导出与列表展示）
+补列（audited_at / community_building / resolved_at / feedback_at / feedback_reason /
+satisfaction）由 db_core 迁移链保证：`_m20_proposal_extra_cols`（列）+ `_m46`（手机号加密列）。
+**本模块不再做运行时 ALTER**（复审 P3-D：运行时补列会让「全新建库」与「存量升级」走两条路径）。
+
+手机号加密（复审 P2-A）：`reporter_phone` / `agent_phone` 明文列一律写空串，
+真号只进 `*_phone_enc`（AES-256-GCM，`g1$` 前缀），读取时解密回明文供展示层脱敏。
 """
 import logging
 import re
@@ -30,6 +29,10 @@ from datetime import datetime
 
 from data.db_core import get_db
 from data.db_notifications import log_activity, notify_proposal_status_change
+# 手机号加解密：与工单表（db_repair）用**同一实现**，避免两套 crypto 调用与两套降级逻辑
+# （复审 P2-A：提案表此前完全没走加密，明文列直接落库，生产库实测 181 条）
+from data.db_repair import _dec_phone, _enc_phone
+from utils.timeutil import utcnow
 
 MODULE = "提案"
 
@@ -66,38 +69,13 @@ MAX_REOPEN = 2                  # 最多重新执行次数
 
 _PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 
-# schema v18 之外本模块补齐的列（幂等）
-_EXTRA_COLS = [
-    ("audited_at", "TIMESTAMP"),
-    ("community_building", "TEXT DEFAULT ''"),
-    ("resolved_at", "TIMESTAMP"),
-    ("feedback_at", "TIMESTAMP"),
-    ("feedback_reason", "TEXT DEFAULT ''"),
-    ("satisfaction", "TEXT DEFAULT ''"),
-]
-_extra_checked = False
-
-
-def _ensure_schema(conn) -> None:
-    """给 proposals 补本模块需要的列（幂等，只加不删）。"""
-    global _extra_checked
-    if _extra_checked:
-        return
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(proposals)")}
-    for name, decl in _EXTRA_COLS:
-        if name not in cols:
-            conn.execute(f"ALTER TABLE proposals ADD COLUMN {name} {decl}")
-    conn.commit()
-    _extra_checked = True
-
-
 def _validate_phone(phone: str) -> bool:
     return bool(_PHONE_RE.match((phone or "").strip()))
 
 
 def _now_str() -> str:
     """当前 UTC 时间，与 SQLite CURRENT_TIMESTAMP 同格式（比较用）。"""
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    return utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _parse_ts(ts: str) -> datetime:
@@ -143,6 +121,15 @@ def mask_phone(phone: str) -> str:
     return "****"
 
 
+def _decrypt_row_phones(r: dict) -> dict:
+    """把提案行的 `*_phone_enc` 解密回明文字段（展示层继续用 mask_phone 脱敏）。"""
+    if not isinstance(r, dict):
+        return r
+    r["reporter_phone"] = _dec_phone(r.get("reporter_phone_enc", ""), r.get("reporter_phone", ""))
+    r["agent_phone"] = _dec_phone(r.get("agent_phone_enc", ""), r.get("agent_phone", ""))
+    return r
+
+
 # ---------------------------------------------------------------------------
 # 草稿
 # ---------------------------------------------------------------------------
@@ -154,29 +141,29 @@ def save_draft(user_id: int, title: str = "", description: str = "",
                agent_phone: str = "", agent_relation: str = "") -> int:
     """保存/更新提案草稿（每人一份，7 天有效）。返回草稿 ID。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         existing = conn.execute(
             "SELECT id FROM proposal_drafts WHERE user_id=?", (user_id,)
         ).fetchone()
         if existing:
             conn.execute(
                 "UPDATE proposal_drafts SET title=?, description=?, category=?, is_public=?, "
-                "reporter_name=?, reporter_phone=?, attachment_public=?, is_agent_report=?, "
-                "agent_name=?, agent_phone=?, agent_relation=?, updated_at=CURRENT_TIMESTAMP "
-                "WHERE id=?",
-                (title, description, category, is_public, reporter_name, reporter_phone,
-                 attachment_public, is_agent_report, agent_name, agent_phone, agent_relation,
-                 existing["id"]),
+                "reporter_name=?, reporter_phone='', reporter_phone_enc=?, attachment_public=?, "
+                "is_agent_report=?, agent_name=?, agent_phone='', agent_phone_enc=?, "
+                "agent_relation=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (title, description, category, is_public, reporter_name, _enc_phone(reporter_phone),
+                 attachment_public, is_agent_report, agent_name, _enc_phone(agent_phone),
+                 agent_relation, existing["id"]),
             )
             conn.commit()
             return existing["id"]
         cur = conn.execute(
             "INSERT INTO proposal_drafts (user_id, title, description, category, is_public, "
-            "reporter_name, reporter_phone, attachment_public, is_agent_report, "
-            "agent_name, agent_phone, agent_relation) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (user_id, title, description, category, is_public, reporter_name,
-             reporter_phone, attachment_public, is_agent_report, agent_name,
-             agent_phone, agent_relation),
+            "reporter_name, reporter_phone, reporter_phone_enc, attachment_public, is_agent_report, "
+            "agent_name, agent_phone, agent_phone_enc, agent_relation) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (user_id, title, description, category, is_public, reporter_name, "",
+             _enc_phone(reporter_phone), attachment_public, is_agent_report, agent_name, "",
+             _enc_phone(agent_phone), agent_relation),
         )
         conn.commit()
         return cur.lastrowid
@@ -185,7 +172,6 @@ def save_draft(user_id: int, title: str = "", description: str = "",
 def get_drafts(user_id: int) -> list[dict]:
     """查当前用户草稿（顺带清掉超过 7 天的过期草稿）。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         conn.execute(
             "DELETE FROM proposal_drafts WHERE user_id=? AND "
             "updated_at < datetime('now', '-7 days')", (user_id,)
@@ -195,7 +181,7 @@ def get_drafts(user_id: int) -> list[dict]:
             "SELECT * FROM proposal_drafts WHERE user_id=? ORDER BY updated_at DESC",
             (user_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 def get_draft(draft_id: int, user_id: int | None = None) -> dict | None:
@@ -209,7 +195,7 @@ def get_draft(draft_id: int, user_id: int | None = None) -> dict | None:
             row = conn.execute(
                 "SELECT * FROM proposal_drafts WHERE id=?", (draft_id,)
             ).fetchone()
-        return dict(row) if row else None
+        return _decrypt_row_phones(dict(row)) if row else None
 
 
 def delete_draft(draft_id: int) -> None:
@@ -263,16 +249,17 @@ def submit_proposal(title: str, description: str, category: str,
         reporter_id = _resolve_current_user_id()
 
     with get_db() as conn:
-        _ensure_schema(conn)
+        # 手机号加密落库（P2-A）：明文列写空串，真号只进 *_phone_enc（与工单表同一约定）
         cur = conn.execute(
             "INSERT INTO proposals (title, description, category, author, supporter_count, "
             "status, is_public, audit_status, attachment_public, reporter_id, reporter_name, "
-            "reporter_phone, is_agent_report, agent_name, agent_phone, agent_relation, "
-            "community_building, attachment) VALUES (?,?,?,?,0,'待审核',?,'待审核',?,?,?,?,?,?,?,?,?,?)",
+            "reporter_phone, reporter_phone_enc, is_agent_report, agent_name, agent_phone, "
+            "agent_phone_enc, agent_relation, community_building, attachment) "
+            "VALUES (?,?,?,?,0,'待审核',?,'待审核',?,?,?,'',?,?,?,'',?,?,?,?)",
             (title, description, category, author or reporter_name, is_public,
-             attachment_public, reporter_id, reporter_name, reporter_phone,
-             is_agent_report, agent_name, agent_phone, agent_relation, community_building,
-             attachment),
+             attachment_public, reporter_id, reporter_name, _enc_phone(reporter_phone),
+             is_agent_report, agent_name, _enc_phone(agent_phone), agent_relation,
+             community_building, attachment),
         )
         pid = cur.lastrowid
         if draft_id:
@@ -291,7 +278,6 @@ def resubmit_proposal(pid: int, title: str = "", description: str = "",
                       actor: str = "居民") -> tuple[bool, str]:
     """被退回 / 已撤回的提案修改后重新提交，回到「待审核」重新审核。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, description, category, is_public, community_building, "
             "attachment_public FROM proposals WHERE id=?", (pid,)
@@ -346,7 +332,6 @@ def audit_proposal(pid: int, approve: bool, opinion: str = "",
       True / None → 维持提案人选择。
     """
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, attachment_public, audit_opinion, auditor "
             "FROM proposals WHERE id=?",
@@ -398,7 +383,6 @@ def confirm_visibility(pid: int, is_public: int, actor: str = "居民") -> tuple
     if is_public not in (0, 1):
         return False, "请选择公开或私有。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, is_public FROM proposals WHERE id=?", (pid,)
         ).fetchone()
@@ -435,7 +419,6 @@ def change_visibility(pid: int, is_public: int, actor: str = "居民") -> tuple[
     if is_public not in (0, 1):
         return False, "请选择公开或私有。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, is_public, audited_at FROM proposals WHERE id=?", (pid,)
         ).fetchone()
@@ -451,7 +434,7 @@ def change_visibility(pid: int, is_public: int, actor: str = "居民") -> tuple[
         # 7 天窗口
         if row["audited_at"]:
             deadline = _parse_ts(row["audited_at"]).timestamp() + CONFIRM_WINDOW_DAYS * 86400
-            if datetime.utcnow().timestamp() > deadline:
+            if utcnow().timestamp() > deadline:
                 return False, "已超过审核通过后 7 天，不能再修改公开/私有"
         # 只能改一次
         cnt = conn.execute(
@@ -485,7 +468,6 @@ def change_visibility(pid: int, is_public: int, actor: str = "居民") -> tuple[
 def remind_confirm(pid: int, actor: str = "负责人") -> tuple[bool, str]:
     """负责人提醒居民确认公开/私有。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title FROM proposals WHERE id=?", (pid,)
         ).fetchone()
@@ -506,7 +488,6 @@ def auto_confirm_overdue(actor: str = "系统") -> list[int]:
     """逾期未确认公开/私有：按提交时选择执行，留痕并通知（A 类自动触发）。"""
     done: list[int] = []
     with get_db() as conn:
-        _ensure_schema(conn)
         rows = conn.execute(
             "SELECT id, title, is_public FROM proposals WHERE status='待确认公示/私有' "
             "AND audited_at IS NOT NULL AND audited_at < datetime('now', '-7 days')"
@@ -560,7 +541,6 @@ def vote_proposal(pid: int, user_id: int, score: int, actor: str = "居民") -> 
         return False, "请先登录后再投票。"
 
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, voting_ended_at, reporter_id, title FROM proposals WHERE id=?",
             (pid,),
@@ -680,7 +660,6 @@ def get_proposal_vote_stats(pid: int) -> dict:
     排名：平均分高者在前，同分按票数多者在前；无评分的提案排在有评分提案之后。
     """
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT COUNT(*) c, AVG(score) a FROM proposal_votes WHERE proposal_id=?",
             (pid,),
@@ -739,7 +718,7 @@ def is_voting_ended(pid: int) -> bool:
         ).fetchone()
     if not row or not row["voting_ended_at"]:
         return False
-    return _parse_ts(row["voting_ended_at"]) <= datetime.utcnow()
+    return _parse_ts(row["voting_ended_at"]) <= utcnow()
 
 
 def get_voting_remaining_days(pid: int) -> int | None:
@@ -751,7 +730,7 @@ def get_voting_remaining_days(pid: int) -> int | None:
     if not row or row["status"] != "公示中" or not row["voting_ended_at"]:
         return None
     end = _parse_ts(row["voting_ended_at"])
-    days = (end - datetime.utcnow()).total_seconds() / 86400.0
+    days = (end - utcnow()).total_seconds() / 86400.0
     return max(0, int(-(-days // 1)))
 
 
@@ -760,7 +739,6 @@ def extend_voting(pid: int, minutes: int, actor: str = "系统") -> tuple[bool, 
     if minutes <= 0:
         return False, "顺延时长必须大于 0 分钟。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, voting_ended_at, title FROM proposals WHERE id=?", (pid,)
         ).fetchone()
@@ -804,7 +782,6 @@ def decide_execute(pid: int, execute: bool, reason: str = "",
         return False, "决定理由必填。"
     decided = ""  # 记录本次流转，用于日志
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, voting_ended_at, is_public FROM proposals WHERE id=?",
             (pid,),
@@ -841,7 +818,6 @@ def decide_execute(pid: int, execute: bool, reason: str = "",
 
     # 不予执行
     with get_db() as conn:
-        _ensure_schema(conn)
         conn.execute(
             "UPDATE proposals SET status='不予执行', decision_reason=? WHERE id=?",
             (reason, pid),
@@ -862,7 +838,6 @@ def start_execute(pid: int, dept: str, actor: str = "负责人") -> tuple[bool, 
     if not dept:
         return False, "请选择执行部门。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -885,7 +860,6 @@ def resolve_proposal(pid: int, result: str, actor: str = "负责人") -> tuple[b
     if not result:
         return False, "执行结果不能为空。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -915,7 +889,6 @@ def feedback_proposal(pid: int, satisfied: bool, reason: str = "",
                       actor: str = "居民") -> tuple[bool, str]:
     """提案人反馈满意度。满意 → 已完成；不满意 → 重新执行（最多 2 次）。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, reopen_count FROM proposals WHERE id=?", (pid,)
         ).fetchone()
@@ -971,7 +944,6 @@ def handle_reopen(pid: int, close: bool = False, reason: str = "",
     重新执行超过 2 次时，负责人必须先选择「关闭」或「继续」（留痕）。
     """
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
             "SELECT status, title, is_public, reopen_count, executor_dept FROM proposals WHERE id=?",
             (pid,),
@@ -1031,7 +1003,6 @@ def auto_end_unfeedback(actor: str = "系统") -> list[int]:
     """提案人 7 天未反馈满意度：自动标记已结束，视为满意（A 类自动触发）。"""
     done: list[int] = []
     with get_db() as conn:
-        _ensure_schema(conn)
         rows = conn.execute(
             "SELECT id, title FROM proposals WHERE status='待提案人反馈' "
             "AND resolved_at IS NOT NULL AND resolved_at < datetime('now', '-7 days')"
@@ -1061,7 +1032,6 @@ def auto_end_unfeedback(actor: str = "系统") -> list[int]:
 def withdraw_proposal(pid: int, actor: str = "居民") -> tuple[bool, str]:
     """居民撤回提案（仅待审核）。→ 已撤回。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -1078,7 +1048,6 @@ def withdraw_proposal(pid: int, actor: str = "居民") -> tuple[bool, str]:
 def reopen_proposal(pid: int, actor: str = "居民") -> tuple[bool, str]:
     """重新打开已撤回提案。→ 待审核（仅一次机会，可修改一次后重新审核，spec）。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -1108,7 +1077,6 @@ def close_proposal(pid: int, reason: str, actor: str = "负责人") -> tuple[boo
     if not reason:
         return False, "关闭原因必填。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -1132,7 +1100,6 @@ def take_down_proposal(pid: int, reason: str, actor: str = "负责人") -> tuple
     if not reason:
         return False, "下架原因必填。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -1159,7 +1126,6 @@ def update_category(pid: int, category: str, actor: str = "负责人") -> tuple[
     if category not in VALID_CATEGORIES:
         return False, "请选择提案类别（公共设施/环境卫生/文化活动/安全治理/其他）。"
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT status, title, category FROM proposals WHERE id=?", (pid,)).fetchone()
         if row is None:
             return False, "提案不存在"
@@ -1176,15 +1142,16 @@ def update_category(pid: int, category: str, actor: str = "负责人") -> tuple[
 def view_full_phone(pid: int, actor: str = "负责人") -> str:
     """查看提案人完整手机号（需二次确认，留痕）。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute(
-            "SELECT title, reporter_name, reporter_phone FROM proposals WHERE id=?", (pid,)
+            "SELECT title, reporter_name, reporter_phone, reporter_phone_enc "
+            "FROM proposals WHERE id=?", (pid,)
         ).fetchone()
     if not row:
         return ""
+    phone = _dec_phone(row["reporter_phone_enc"] or "", row["reporter_phone"] or "")
     log_activity(actor, "查看完整手机号", "proposal", pid, row["title"] or "",
                  module=MODULE, detail=f"查看 {row['reporter_name'] or ''} 完整手机号")
-    return row["reporter_phone"] or ""
+    return phone
 
 
 # ---------------------------------------------------------------------------
@@ -1193,9 +1160,9 @@ def view_full_phone(pid: int, actor: str = "负责人") -> str:
 
 def get_proposal(pid: int) -> dict | None:
     with get_db() as conn:
-        _ensure_schema(conn)
         row = conn.execute("SELECT * FROM proposals WHERE id=?", (pid,)).fetchone()
-        return dict(row) if row else None
+        # 手机号解密回明文（调用方继续脱敏展示）——P2-A 后明文列恒为空，必须解 enc
+        return _decrypt_row_phones(dict(row)) if row else None
 
 
 def get_proposals(status: str | None = None, category: str | None = None,
@@ -1224,21 +1191,19 @@ def get_proposals(status: str | None = None, category: str | None = None,
     q += " ORDER BY created_at DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
-        _ensure_schema(conn)
         rows = conn.execute(q, args).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 def get_my_proposals(user_id: int, limit: int = 50) -> list[dict]:
     """居民自己的提案（按 reporter_id 优先，兼容老数据的 author 匹配）。"""
     with get_db() as conn:
-        _ensure_schema(conn)
         rows = conn.execute(
             "SELECT * FROM proposals WHERE reporter_id=? OR author=? OR author=? "
             "ORDER BY created_at DESC LIMIT ?",
             (user_id, str(user_id), f"user_{user_id}", limit),
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 def get_pending_audit(limit: int = 100) -> list[dict]:
@@ -1263,7 +1228,6 @@ def get_active_public(limit: int = 100) -> list[dict]:
 
 def get_proposals_stats() -> dict:
     with get_db() as conn:
-        _ensure_schema(conn)
         total = conn.execute("SELECT COUNT(*) c FROM proposals").fetchone()["c"]
         by_status = {
             r["status"]: r["c"] for r in conn.execute(

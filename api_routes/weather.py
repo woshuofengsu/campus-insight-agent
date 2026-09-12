@@ -1,4 +1,4 @@
-﻿# api_routes/weather.py
+# api_routes/weather.py
 """天气历史 / 社区概况 / 预报 / 检查任务路由（从 api_web.py 拆出）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field

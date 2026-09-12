@@ -23,6 +23,7 @@ from datetime import date, datetime
 from data.db_core import get_db
 from data.db_notifications import create_notification, log_activity
 from data.db_repair import _dec_phone, _enc_phone
+from utils.timeutil import utcnow
 
 MODULE = "老年端"
 
@@ -743,7 +744,7 @@ def remind_unreviewed_medications() -> list[dict]:
       2. 审核不通过超 7 天未修改 → 通知设置人。
     """
     reminded: list[dict] = []
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = utcnow().strftime("%Y-%m-%d")
     with get_db() as conn:
         rows = conn.execute(
             "SELECT id, drug_name, patient_name, status, created_at FROM medication_reminders "
@@ -1135,7 +1136,7 @@ def escalate_sos(call_id: int, actor: str = "系统", minutes: int | None = None
         _prev_count = (row["result"] or "").count("已升级")
         if minutes is None:
             minutes = 10 if _prev_count == 0 else 5
-        age_min = (datetime.utcnow() - created_dt).total_seconds() / 60.0
+        age_min = (utcnow() - created_dt).total_seconds() / 60.0
         if age_min < minutes:
             return False, ""
         result = row["result"] or ""

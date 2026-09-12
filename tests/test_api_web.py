@@ -277,6 +277,32 @@ def test_elderly_home_and_medication(client):
     assert r.json()["success"] and len(r.json()["data"]) >= 1
 
 
+def test_elderly_home_latest_contact(client):
+    """老年首页「最近联系」必须真的返回（第七轮复审 P3-B：前端有展示块、后端没塞字段）。
+
+    此前 `latest_contact` 恒为空 → 前端 `v-if` 那块永远不渲染（死绑定）。
+    """
+    from data.db_core import get_db
+    from data.db_elderly_care import log_emergency_call
+
+    e = _login(client, "demo_elderly", "")
+    eh = {"Authorization": f"Bearer {e['token']}"}
+
+    # 先确认字段存在（没有记录时可以是 None，但不能缺键）
+    d0 = client.get("/api/web/elderly/home", headers=eh).json()["data"]
+    assert "latest_contact" in d0, "home payload 必须含 latest_contact 键"
+
+    # 造一条联系记录 → 首页应带出来
+    with get_db() as conn:
+        uid = conn.execute(
+            "SELECT id FROM user_profile WHERE username='demo_elderly'").fetchone()["id"]
+    log_emergency_call(uid, "contact", "张小明", "13900001111", result="已拨打", actor="测试")
+
+    d1 = client.get("/api/web/elderly/home", headers=eh).json()["data"]
+    assert d1["latest_contact"], "造了联系记录后 latest_contact 不应为空"
+    assert "张小明" in d1["latest_contact"], d1["latest_contact"]
+
+
 def test_elderly_voice_report(client):
     """老年端语音报修走状态机。"""
     e = _login(client, "demo_elderly", "")

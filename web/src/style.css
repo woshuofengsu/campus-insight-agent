@@ -331,6 +331,14 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
 .elderly-page .n-input__textarea-el,
 .elderly-page .n-input__placeholder,
 .elderly-page .n-empty__description { font-size: 1.25rem; }
+/* 角标（如「用药提醒 2」）：Naive 默认 12px，低于适老 20px 下限（复审 P3-C）。
+   角标数字内部是 slot-machine 组件，要连内层一起放大，否则外层大了数字还是 12px。 */
+.elderly-page .n-badge-sup {
+  font-size: 1.25rem; height: 28px; min-width: 28px; line-height: 28px; padding: 0 8px;
+}
+.elderly-page .n-badge-sup .n-base-slot-machine,
+.elderly-page .n-badge-sup .n-base-slot-machine-current-number,
+.elderly-page .n-badge-sup .n-base-slot-machine-current-number__inner { font-size: 1.25rem; line-height: 1.2; }
 
 /* ---------------- 手机端适配 ---------------- */
 @media (max-width: 768px) {

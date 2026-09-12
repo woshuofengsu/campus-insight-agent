@@ -10,6 +10,7 @@ import json
 import re
 from data.db_core import get_db
 from data.db_notifications import log_activity
+from utils.timeutil import utcnow
 
 MODULE = "报修"
 
@@ -100,14 +101,15 @@ def create_draft(user_id: int, title: str, category: str, issue_type: str,
                  agent_name: str = "", agent_phone: str = "", agent_relation: str = "") -> int:
     """保存/更新报修草稿。返回草稿 ID。"""
     with get_db() as conn:
+        # 手机号加密落库（v46 收口）：明文列写空串，真号只进 *_enc
         cur = conn.execute(
             "INSERT INTO issue_drafts (user_id, title, category, issue_type, location, "
-            "description, urgency, reporter_name, reporter_phone, photo_before, "
-            "is_agent_report, agent_name, agent_phone, agent_relation) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "description, urgency, reporter_name, reporter_phone, reporter_phone_enc, "
+            "photo_before, is_agent_report, agent_name, agent_phone, agent_phone_enc, "
+            "agent_relation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, '', ?, ?)",
             (user_id, title, category, issue_type, location, description, urgency,
-             reporter_name, reporter_phone, photo_before, is_agent_report,
-             agent_name, agent_phone, agent_relation),
+             reporter_name, _enc_phone(reporter_phone), photo_before, is_agent_report,
+             agent_name, _enc_phone(agent_phone), agent_relation),
         )
         conn.commit()
         return cur.lastrowid
@@ -118,13 +120,13 @@ def get_drafts(user_id: int) -> list[dict]:
         rows = conn.execute(
             "SELECT * FROM issue_drafts WHERE user_id=? ORDER BY updated_at DESC", (user_id,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
 def get_draft(draft_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM issue_drafts WHERE id=?", (draft_id,)).fetchone()
-        return dict(row) if row else None
+        return _decrypt_row_phones(dict(row)) if row else None
 
 
 def delete_draft(draft_id: int) -> None:
@@ -510,7 +512,7 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
             try:
                 from datetime import datetime
                 last = datetime.strptime(str(row["supplemented_at"])[:19], "%Y-%m-%d %H:%M:%S")
-                if (datetime.utcnow() - last).total_seconds() > 86400:
+                if (utcnow() - last).total_seconds() > 86400:
                     conn.execute(
                         "UPDATE community_issues SET supplement_count=0 WHERE id=?", (issue_id,)
                     )

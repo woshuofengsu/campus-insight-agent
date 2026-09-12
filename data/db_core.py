@@ -1,9 +1,12 @@
 """数据库核心 — 连接管理和公共小工具。"""
 import hashlib
 import hmac as _hmac
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
+
+log = logging.getLogger("db_core")
 
 _DB_PATH: str = ""
 
@@ -372,6 +375,7 @@ def _m16_notice_tables(conn):
         "body TEXT DEFAULT '', elderly_summary TEXT DEFAULT '', publisher TEXT DEFAULT '', "
         "scheduled_at TIMESTAMP, published_at TIMESTAMP, expire_at TIMESTAMP, "
         "is_pinned INTEGER DEFAULT 0, is_urgent INTEGER DEFAULT 0, "
+        "scope_target_json TEXT DEFAULT '[]', pinned_at TIMESTAMP, "
         "attachment_json TEXT DEFAULT '[]', status TEXT DEFAULT '草稿', "
         "down_reason TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
         "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
@@ -801,6 +805,87 @@ def _m45_knowledge_graph(conn):
     """)
 
 
+def _enc_text(value: str) -> str:
+    """迁移期文本加密（与 data 层 `_enc_phone` 同源：`utils.crypto` 单例）。
+
+    失败时返回空串 —— 调用方**只在拿到非空密文时才清空明文列**，避免「加密失败 + 已清空」丢数据。
+    """
+    if not value:
+        return ""
+    try:
+        from utils.crypto import get_crypto
+        return get_crypto().encrypt(value)
+    except Exception:  # noqa: BLE001
+        log.warning("v46 迁移：加密失败，保留明文待下次重试（不丢数据）")
+        return ""
+
+
+# v46 需要补加密列的表 → 明文列（与 `scripts/audit_phone_encryption.py` 的体检口径一致）
+_PHONE_ENC_TARGETS = (
+    ("proposals", ("reporter_phone", "agent_phone")),
+    ("proposal_drafts", ("reporter_phone", "agent_phone")),
+    ("issue_drafts", ("reporter_phone", "agent_phone")),
+)
+
+
+def _m46_phone_enc_and_schema_drift(conn):
+    """v46：手机号加密全量收口 + 收回运行时裸 ALTER（第七轮复审 P2-A / P3-D）。
+
+    **为什么一次做两件事**：P2-A（提案手机号明文 181 条）暴露的是「加密迁移漏表」这一类问题，
+    同一类缺口还有两张草稿表（issue_drafts / proposal_drafts，无 `*_enc` 列）与
+    `user_profile.phone` 在 v36 之后又被写回的 4 条明文 —— 一次性补齐，避免打地鼠。
+    同时把「运行时裸 ALTER 补列」（notices.scope_target_json / notices.pinned_at /
+    kb_embeddings 三列）收回迁移链，让「全新建库」与「存量升级」走同一条路径。
+
+    幂等：列用 PRAGMA 检查后添加；回填只在明文列非空时执行，且**加密成功才清空明文**。
+    """
+    # ① 补加密列
+    for table, cols in _PHONE_ENC_TARGETS:
+        for c in cols:
+            _add_column(conn, table, f"{c}_enc", f"{c}_enc TEXT DEFAULT ''")
+
+    # ② 存量明文回填 + 清空（加密失败则保留明文，下次迁移重试）
+    migrated = 0
+    for table, cols in _PHONE_ENC_TARGETS:
+        for c in cols:
+            rows = conn.execute(
+                f"SELECT id, {c} AS v FROM {table} WHERE length(COALESCE({c}, '')) > 0"
+            ).fetchall()
+            for r in rows:
+                enc = _enc_text(r["v"])
+                if not enc:
+                    continue
+                conn.execute(f"UPDATE {table} SET {c}_enc=?, {c}='' WHERE id=?", (enc, r["id"]))
+                migrated += 1
+
+    # ③ user_profile.phone 明文残留（有 phone_enc 就直接清空，没有则先加密）
+    rows = conn.execute(
+        "SELECT id, phone AS v, phone_enc AS e FROM user_profile "
+        "WHERE length(COALESCE(phone, '')) > 0"
+    ).fetchall()
+    for r in rows:
+        enc = r["e"] or _enc_text(r["v"])
+        if not enc:
+            continue
+        conn.execute("UPDATE user_profile SET phone_enc=?, phone='' WHERE id=?", (enc, r["id"]))
+        migrated += 1
+
+    # ④ 收回运行时裸 ALTER：notices 两列（原先只靠 db_notice._ensure_columns 补）
+    _add_column(conn, "notices", "scope_target_json", "scope_target_json TEXT DEFAULT '[]'")
+    _add_column(conn, "notices", "pinned_at", "pinned_at TIMESTAMP")
+
+    # ⑤ kb_embeddings 三列（原先只靠 agent/rag.py 惰性 ALTER；表可能尚未创建，存在才补）
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kb_embeddings'"
+    ).fetchone():
+        _add_column(conn, "kb_embeddings", "dense_json", "dense_json TEXT DEFAULT ''")
+        _add_column(conn, "kb_embeddings", "dim", "dim INTEGER DEFAULT 0")
+        _add_column(conn, "kb_embeddings", "provider", "provider TEXT DEFAULT ''")
+    conn.commit()
+    if migrated:
+        log.info("v46 迁移：%d 处手机号明文已加密并清空", migrated)
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -1011,6 +1096,7 @@ def init_db(db_path: str):
         (43, "kb_query_log", _m43_kb_query_log),
         (44, "care_event_log", _m44_care_event_log),
         (45, "knowledge_graph", _m45_knowledge_graph),
+        (46, "phone_enc_all_and_schema_drift", _m46_phone_enc_and_schema_drift),
     ]
     for version, name, fn in post:
         if version <= current:

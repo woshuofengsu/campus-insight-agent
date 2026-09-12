@@ -234,6 +234,24 @@ def test_07_tool_discovery():
 
 # 8. 数据库往返
 
+def _safe_unlink(path: str, retries: int = 5) -> None:
+    """删除临时库文件；Windows 上会因 WAL 句柄/杀软扫描短暂占用而 WinError 32。
+
+    这是**测试清理**，不是被测行为：删不掉不影响正确性（下次 init_db 会重建）。
+    因此重试几次后放弃，避免把环境抖动变成「答辩现场测试变红」。
+    （实测：同一份代码两次全量跑，一次在 test_11 的 os.unlink 上偶发 PermissionError。）
+    """
+    import time
+    for i in range(retries):
+        try:
+            os.unlink(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            time.sleep(0.2 * (i + 1))
+
+
 def test_08_database_roundtrip():
     """8. 数据库往返"""
     print('\n=== 8. Database Roundtrip ===')
@@ -295,14 +313,14 @@ def test_08_database_roundtrip():
             _fail('Topic test')
         cnt[0] += 1
 
-        os.unlink(db_path)
+        _safe_unlink(db_path)
     except Exception as e:
         _fail(f'DB test error: {e}')
         import traceback; traceback.print_exc()
         cnt[0] += 6  # mark all subtests as attempted
         if os.path.exists(db_path):
             try:
-                os.unlink(db_path)
+                _safe_unlink(db_path)
             except Exception:
                 pass
 
@@ -411,7 +429,7 @@ def test_09_prefetch_functions():
         _fail('try_prefetch("工单") returned None')
     cnt[0] += 1
 
-    os.unlink(db_path2)
+    _safe_unlink(db_path2)
 
     assert cnt[1] == cnt[0], f'{cnt[0] - cnt[1]} prefetch tests failed'
     _section_counts[:] = cnt
@@ -475,7 +493,7 @@ def test_11_proposal_status_response_preservation():
         _fail(f'Response lost: status={p["status"]}, resp={p["response_text"]}')
     cnt[0] += 1
 
-    os.unlink(db_path3)
+    _safe_unlink(db_path3)
 
     assert cnt[1] == cnt[0], f'{cnt[0] - cnt[1]} proposal-preserve tests failed'
     _section_counts[:] = cnt
@@ -511,7 +529,7 @@ def test_12_issue_reopen_resolved_clearing():
         _fail(f'Reopen: status={i["status"]}, resolved_at={i.get("resolved_at")}')
     cnt[0] += 1
 
-    os.unlink(db_path4)
+    _safe_unlink(db_path4)
 
     assert cnt[1] == cnt[0], f'{cnt[0] - cnt[1]} issue-reopen tests failed'
     _section_counts[:] = cnt
@@ -571,7 +589,7 @@ def test_13_enhanced_anomaly_detection():
     cnt[1] += 1
     cnt[0] += 1
 
-    os.unlink(db_path5)
+    _safe_unlink(db_path5)
 
     assert cnt[1] == cnt[0], f'{cnt[0] - cnt[1]} anomaly-detection tests failed'
     _section_counts[:] = cnt
@@ -668,7 +686,7 @@ def test_15_governance_audit_data():
         _fail(f'Health keys: {list(health.keys())}')
     cnt[0] += 1
 
-    os.unlink(db_path6)
+    _safe_unlink(db_path6)
 
     assert cnt[1] == cnt[0], f'{cnt[0] - cnt[1]} governance-audit tests failed'
     _section_counts[:] = cnt
@@ -774,7 +792,7 @@ def test_17_notification_module():
         _fail('Proposal count mismatch')
     cnt[0] += 1
 
-    os.unlink(db_path7)
+    _safe_unlink(db_path7)
 
     assert cnt[1] == cnt[0], f'{cnt[0] - cnt[1]} notification-module tests failed'
     _section_counts[:] = cnt

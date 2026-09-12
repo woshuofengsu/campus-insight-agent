@@ -67,19 +67,18 @@ def _ensure_embedding_table(conn: sqlite3.Connection):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS kb_embeddings (
             kb_id INTEGER PRIMARY KEY,
+            dense_json TEXT NOT NULL DEFAULT '',
+            dim INTEGER DEFAULT 0,
+            provider TEXT DEFAULT '',
             ngrams_json TEXT NOT NULL DEFAULT '[]',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (kb_id) REFERENCES knowledge_base(id) ON DELETE CASCADE
         )
     """)
-    # U1：语义向量列（惰性补列，缓存表无需走迁移；PRAGMA 幂等）
-    cols = [r[1] for r in conn.execute("PRAGMA table_info(kb_embeddings)")]
-    if "dense_json" not in cols:
-        conn.execute("ALTER TABLE kb_embeddings ADD COLUMN dense_json TEXT DEFAULT ''")
-    if "dim" not in cols:
-        conn.execute("ALTER TABLE kb_embeddings ADD COLUMN dim INTEGER DEFAULT 0")
-    if "provider" not in cols:
-        conn.execute("ALTER TABLE kb_embeddings ADD COLUMN provider TEXT DEFAULT ''")
+    # 语义向量三列（dense_json/dim/provider）由 **db_core v46 迁移**统一保证（复审 P3-D：
+    # 运行时裸 ALTER 会让「全新建库」与「存量升级」走两条路径）；这里的建表语句同样带上这三列，
+    # 供「直接调 rag、不经 init_db」的场景（如单测）也能拿到完整表结构。
+    # 若存量库由旧版本建表，升级时 init_db 的 _m46 会把缺的列补上。
 
 
 # ---------------------------------------------------------------------------

@@ -889,3 +889,47 @@
 **再次印证一致性门禁的价值**：本轮新增 2 个 B1 回归测试后，pytest 收集数 563 → 565，登录页仍写 563 → `demo_preflight` 第 8 项立刻判失败 → 同步 `meta.js` 为 565。**这是该门禁第二次当场抓到真实漂移**（上一轮 557→563 是第一次）。
 
 **验证**：`ui_audit` **26 页/视口全部 0 违规（含 6 暗色页、4 个 1366 档）**；`ruff check .` = 0；`npm run build` ✓；`demo_preflight.py` 完整模式 **8/8**；全量 pytest **564 passed / 1 skipped**。处理回执见 `docs/review/UI-v2评审-处理回执.md`。**提交**：本轮。
+
+## 三十八、第七轮复审处理：提案手机号明文（P2）+ 一串 P3 收口 + 录屏素材 ✅
+
+**背景**：第七轮全项目排查（HEAD=`b29426c`）结论——无 P1，但抓到 **1 个 P2 数据安全一致性缺口**（提案手机号明文 181 条，实证）与一串 P3 接线/纪律问题。核心批评是「最后 5% 的一致性收口」。
+
+**🔴 P2-A 手机号加密全量收口（不止修提案表）**
+- 评审只点了 `proposals`（181 条明文）。我先写了 `scripts/audit_phone_encryption.py` 做**全库扫描**，多查出两处同类缺口：
+  - `proposal_drafts` / `issue_drafts` **根本没有 `*_enc` 列**（草稿里同样存手机号，属同类漏洞）；
+  - `user_profile.phone` **仍有 4 条明文**（有 `phone_enc` 却残留明文，v36 之后被写回）。
+  → 结论：按报告只修 proposals 会留尾巴，一次性把「加密迁移漏表/漏行」这类问题清干净。
+- **`_m46_phone_enc_and_schema_drift`（v46）**：加列 → 存量回填加密 → 清空明文；**只在加密成功时清空**（失败保留明文等下次重试，绝不丢数据）；幂等（重复跑不改写已有密文，有断言）。
+- **读写成对**：写路径明文列写空串、真号只进 `*_enc`；读路径解密回明文供展示层脱敏（字段契约不变）。加解密复用 `db_repair._enc_phone/_dec_phone`，不搞两套 crypto 调用。
+- **顺带的洞**：`api_routes/auth.py` 账号注销原先只清提案明文列（清不掉密文）→ 补 `*_phone_enc` 并级联两张草稿表；`seed.py` 的「已有密文却残留明文」也一并清（防回滚明文）。
+- **门禁化**：体检脚本 + `demo_preflight` 第 8 项（现 **9 项**自检：现场可见「8 张含手机号表、明文计数 0」）+ `tests/test_proposal_phone_encryption.py` 6 项（写入即密文 `g1$` / 读回原值 / 全库明文=0 / 两张草稿表 / **迁移回填与幂等** / 非法号仍被拒）。
+- **迁移前备份 + 密钥一致性验证**：加密类改动最容易翻在「密钥不一致 → 存量解不开」，故新增 `scripts/check_crypto_consistency.py`，实测 8 张表解密 3/3 成功（本项目 `.env` 未配 `CRYPTO_KEY`，全链路统一走演示默认密钥，口径一致）。**生产前务必配 `CRYPTO_KEY` 并用 `scripts/reencrypt_phones.py` 轮换**（见 docs/deploy-keys.md）。
+
+**P3 全部收口**
+- **B 老年首页「最近联系」死绑定**：home payload 补 `latest_contact`（用现成 `get_latest_contact_call` 格式化成人文案），加测试。
+- **C 老年用药角标 12px**：角标内部的 slot-machine 也要一起放大（只放大外层无效），实测内层 **20px**、角标 28×28。角标只在 `due>0` 时渲染，故用「临时插入一条到点用药 → 量完即删」的探针验证。
+- **D 运行时裸 ALTER 收回迁移链**（三处）：`notices.scope_target_json/pinned_at` 进 m46 + v16 建表；`proposals` 的 `_ensure_schema`（与 `_m20` 重复）**整段删除 + 29 处调用点清理**；`kb_embeddings` 三列进 m46，`rag.py` 建表带全列、惰性 ALTER 删除。至此「全新建库」与「存量升级」同路径。
+- **E `demo_record.py` ruff B023**：闭包晚绑定（`shots`）用默认参数绑定修掉；工具连同 `.gitignore` 一起提交。
+- **F 12 处 `datetime.utcnow()`**：新增 `utils/timeutil.utcnow()` 返回 **naive UTC**——docstring 写明两个坑（aware 与库里 naive 时间戳相减会 TypeError；`datetime.now()` 会差 8 小时）。自有代码弃用告警清零；顺手清掉 6 个 `api_routes/*.py` 的 **BOM**（会让 `ast.parse` 直接报错，属潜伏工具链问题）。
+- **G 插件入口异常透出**：`api.py` 加 `_server_error()`，原始异常只进服务端日志（含 traceback），客户端统一文案；16 处替换。
+- **nit ui_audit 中点误报**：SOFT 尾部分隔符正则去掉 `·`（本项目装饰性分隔符）。
+
+**答辩前建议 #5：录屏素材（`scripts/demo_record.py`，真实浏览器录制）**
+
+| 场景 | 时长 | 内容 |
+|---|---|---|
+| 01-login | 13.2s | 粒子 + 数字滚动 + 按钮流光 |
+| 02-resident | 13.7s | 横幅 + 6 磁贴依次悬停 |
+| 03-grid | 13.5s | 真实统计滚动 + 满意度下钻 |
+| 04-elderly | 14.1s | 大字 + **SOS 长按确认框**（点取消，零业务写入） |
+| 05-screen | 21.0s | 8 卡差值滚动 + 呼吸 |
+| 06-agent-chat | 13.7s | 多智能体对话 |
+
+- 另存 15 张关键帧 PNG 可直接进 PPT；`index.md` 自动生成清单；脚本自动清理 Playwright 的 `page@*.webm` 原始录像与 0 字节残片。
+- 分镜/播放/转码（本机 ffmpeg 是 Playwright 精简版只有 VP8，转 mp4 需装完整 ffmpeg）/现场用法见 `docs/competition/答辩录屏分镜.md`。
+
+**我自己的两处失误（如实记录）**
+1. `edit` 误删 `db_core._apply_base_schema` 的一段建表语句（想把 m46 插到它前面，却把它的开头当成 old_string）→ **当轮即恢复**，并用 `git diff --stat` 确认只剩预期改动。教训：改动后看 diff，不凭记忆。
+2. 全量测试出现一次 `test_verify_all::test_11` 的 `PermissionError`（Windows 临时库删不掉）。没有当成「与我无关」放过：单独跑、成对跑、**同代码复跑全量**（1 失败 → 0 失败）方定性为 WAL/杀软占用的环境抖动；并把该文件 8 处清理改为 `_safe_unlink`（重试后放弃），不再把环境抖动变成「现场测试变红」。
+
+**验证**：`ui_audit` 26 页 0 违规；`ruff check .` = 0；`npm run build` ✓；`demo_preflight.py`（完整模式）**9/9**；全量 pytest **571 passed / 1 skipped**；`audit_phone_encryption.py` = 无缺口。处理回执见 `docs/review/复审报告-第七轮-处理回执.md`。**提交**：本轮。

@@ -93,17 +93,6 @@ def _ts(v) -> str:
     return str(v)[:19]
 
 
-def _ensure_columns() -> None:
-    """补齐 db_core v16 建表之外的列（幂等，不影响其他模块）。"""
-    with get_db() as conn:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(notices)")]
-        if "scope_target_json" not in cols:
-            conn.execute("ALTER TABLE notices ADD COLUMN scope_target_json TEXT DEFAULT '[]'")
-        if "pinned_at" not in cols:
-            conn.execute("ALTER TABLE notices ADD COLUMN pinned_at TIMESTAMP")
-        conn.commit()
-
-
 def can_publish_urgent(user_id: int) -> bool:
     """是否指定紧急通知负责人（白名单 + 必须是负责人角色）。"""
     if not user_id:
@@ -223,7 +212,6 @@ def create_notice(title: str, notice_type: str, publish_scope: str, body: str,
                   expire_at: str = "", attachment_json: str = "[]",
                   scope_target_json: str = "[]", actor: str = "负责人") -> int:
     """新建通知（保存为草稿）。返回通知 ID。非法类型/敏感词创建时即拦截（0 表示拒绝）。"""
-    _ensure_columns()
     if not (title or "").strip():
         raise ValueError("通知标题不能为空")
     # 创建时即校验类型与敏感词（spec：发布前检测，创建草稿早拦避免垃圾数据）
@@ -266,7 +254,6 @@ def update_notice(notice_id: int, actor: str, expected_updated_at: str = "",
     expected_updated_at：乐观锁（spec 十.13 并发冲突防护）——传入打开编辑时的
     更新时间，若已被他人修改则拒绝并提示刷新，避免覆盖。
     """
-    _ensure_columns()
     allowed = {"title", "notice_type", "publish_scope", "scope_target_json", "body",
                "elderly_summary", "is_pinned", "is_urgent", "expire_at",
                "attachment_json", "publisher"}
@@ -308,7 +295,6 @@ def update_notice(notice_id: int, actor: str, expected_updated_at: str = "",
 
 def delete_notice(notice_id: int, actor: str) -> tuple[bool, str]:
     """删除草稿（仅草稿）。"""
-    _ensure_columns()
     with get_db() as conn:
         row = conn.execute("SELECT status, title FROM notices WHERE id=?", (notice_id,)).fetchone()
         if row is None:
@@ -328,7 +314,6 @@ def delete_notice(notice_id: int, actor: str) -> tuple[bool, str]:
 def publish_notice(notice_id: int, user_id: int, actor: str,
                    confirm_urgent: bool = False) -> tuple[bool, str]:
     """立即发布。紧急通知必须二次确认（confirm_urgent=True）且发布人有权限。"""
-    _ensure_columns()
     with get_db() as conn:
         row = conn.execute("SELECT * FROM notices WHERE id=?", (notice_id,)).fetchone()
         if row is None:
@@ -389,7 +374,6 @@ def schedule_notice(notice_id: int, scheduled_at, user_id: int, actor: str,
 
     紧急通知定时同样需要二次确认 + 白名单权限（确认发生在定时那一刻）。
     """
-    _ensure_columns()
     scheduled = _ts(scheduled_at)
     if not scheduled:
         return False, "请选择定时发布时间"
@@ -432,7 +416,6 @@ def schedule_notice(notice_id: int, scheduled_at, user_id: int, actor: str,
 
 def withdraw_notice(notice_id: int, actor: str) -> tuple[bool, str]:
     """撤回待发布定时通知 → 草稿（不需二次确认，但必须留痕）。"""
-    _ensure_columns()
     with get_db() as conn:
         row = conn.execute("SELECT status, title, scheduled_at FROM notices WHERE id=?",
                            (notice_id,)).fetchone()
@@ -457,7 +440,6 @@ def process_due_notices() -> int:
     失败自动重试一次，仍失败标记「发布失败」并留痕（通知负责人手动处理）。
     返回本次成功发布条数。
     """
-    _ensure_columns()
     with get_db() as conn:
         due = conn.execute(
             "SELECT * FROM notices WHERE status=? AND scheduled_at IS NOT NULL "
@@ -560,7 +542,6 @@ def take_down_notice(notice_id: int, reason: str, actor: str) -> tuple[bool, str
     下架后居民端/老年端不再显示，后台保留记录与统计；
     下架时立即从待弹窗队列移除（弹窗查询实时过滤状态，天然生效）。
     """
-    _ensure_columns()
     if not (reason or "").strip():
         return False, "下架原因必填"
     with get_db() as conn:
@@ -583,7 +564,6 @@ def take_down_notice(notice_id: int, reason: str, actor: str) -> tuple[bool, str
 
 def set_pinned(notice_id: int, pinned: bool, actor: str) -> tuple[bool, str]:
     """普通通知手动置顶/取消置顶（最多 3 条；紧急通知置顶由系统管理）。"""
-    _ensure_columns()
     with get_db() as conn:
         row = conn.execute("SELECT status, title, is_urgent FROM notices WHERE id=?",
                            (notice_id,)).fetchone()
@@ -611,7 +591,6 @@ def set_pinned(notice_id: int, pinned: bool, actor: str) -> tuple[bool, str]:
 
 def update_urgent_expire(notice_id: int, expire_at, user_id: int, actor: str) -> tuple[bool, str]:
     """修改紧急通知有效期（仅指定负责人；修改留痕；只影响修改后仍未读的用户）。"""
-    _ensure_columns()
     exp = _ts(expire_at)
     if not exp:
         return False, "请选择有效期"
@@ -644,7 +623,6 @@ def process_expired() -> dict:
       2. 紧急通知到期自动取消置顶和弹窗（状态仍「已发布」，保留列表）。
     返回 {"pins": n, "urgent": n}。
     """
-    _ensure_columns()
     pins: list = []
     urgents: list = []
     with get_db() as conn:
@@ -753,7 +731,6 @@ def get_notice_read_stats(notice_id: int) -> dict:
     统计异常时记录异常日志并返回全零（保留最近一次正确统计由调用方缓存）。
     """
     try:
-        _ensure_columns()
         with get_db() as conn:
             row = conn.execute("SELECT * FROM notices WHERE id=?", (notice_id,)).fetchone()
             if row is None:
@@ -823,7 +800,6 @@ def get_active_urgent_notices(client_type: str, user_id: int) -> list[dict]:
 # ---- 查询 ----
 
 def get_notice(notice_id: int) -> dict | None:
-    _ensure_columns()
     with get_db() as conn:
         row = conn.execute("SELECT * FROM notices WHERE id=?", (notice_id,)).fetchone()
         return dict(row) if row else None
@@ -833,7 +809,6 @@ def get_notices(notice_type: str | None = None, status: str | None = None,
                 publish_scope: str | None = None, keyword: str | None = None,
                 limit: int = 200) -> list[dict]:
     """负责人端查询：按类型/状态/范围/关键词筛选，紧急优先、新的在前。"""
-    _ensure_columns()
     q = "SELECT * FROM notices WHERE 1=1"
     args: list = []
     if notice_type:
@@ -874,7 +849,6 @@ def get_visible_notices(client_type: str, user_id: int, notice_type: str | None 
 
     排序：紧急置顶 → 普通置顶 → 普通，同级按发布时间倒序。
     """
-    _ensure_columns()
     with get_db() as conn:
         me_row = conn.execute(
             "SELECT id, community, building, role FROM user_profile WHERE id=? AND is_active=1",

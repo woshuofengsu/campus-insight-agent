@@ -1,4 +1,4 @@
-﻿# api_routes/notices.py
+# api_routes/notices.py
 """通知路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field

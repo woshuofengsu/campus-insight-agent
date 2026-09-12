@@ -15,7 +15,8 @@
   5. .env 关键配置姿态（有无 LLM/向量 key → 决定走哪套演示姿态）
   6. 服务端口可达（8000 健康检查；未启动则给出启动命令）
   7. 三个演示账号可登录（居民/老年/网格员）
-  8. 登录页品牌指标一致性（web/src/config/meta.js vs 实测；防「登录页数字 vs 大屏实时值」打架）
+  8. 手机号加密覆盖度（所有 phone 列都有 *_enc 且明文计数为 0）
+  9. 登录页品牌指标一致性（web/src/config/meta.js vs 实测；防「登录页数字 vs 大屏实时值」打架）
 退出码：0 = 全部通过；1 = 有失败项（按输出提示修复即可）。
 """
 import argparse
@@ -107,6 +108,32 @@ def count_rag_golden(path: str | None = None) -> int:
     """
     with open(path or RAG_GOLDEN, encoding="utf-8") as f:
         return sum(1 for line in f if line.strip() and not line.lstrip().startswith("#"))
+
+
+def check_phone_encryption() -> dict:
+    """手机号加密覆盖度（第七轮复审 P2-A 沉淀成的门禁）。
+
+    体检所有含 phone 的表：必须「有 *_enc 兄弟列」且「明文列计数为 0」。
+    这条把「敏感数据全加密」从口号变成可断言的事实——提案表曾漏掉加密（生产库 181 条明文）。
+    """
+    try:
+        from scripts.audit_phone_encryption import scan_gaps
+    except Exception as e:  # noqa: BLE001
+        return {"name": "手机号加密覆盖", "passed": False, "detail": f"无法导入体检脚本：{e}",
+                "fix": "确认 scripts/audit_phone_encryption.py 存在"}
+    db = os.path.join(BASE, "data", "community_insight.db")
+    try:
+        gaps, lines = scan_gaps(db)
+    except Exception as e:  # noqa: BLE001
+        return {"name": "手机号加密覆盖", "passed": False, "detail": f"体检失败：{e}",
+                "fix": "检查数据库文件是否存在/可读"}
+    if gaps:
+        return {"name": "手机号加密覆盖", "passed": False, "detail": "；".join(gaps[:4]),
+                "fix": "跑 data/db_core 的 v46 迁移（python -c \"from config import DB_PATH;"
+                       "from data.db_core import init_db; init_db(DB_PATH)\"），"
+                       "或检查新表是否漏建 *_enc 列"}
+    return {"name": "手机号加密覆盖", "passed": True,
+            "detail": f"{len(lines)} 张含手机号表：全部有加密列且明文计数为 0", "fix": ""}
 
 
 def check_brand_metrics(fast: bool) -> dict:
@@ -302,7 +329,8 @@ def main() -> int:
 
     checks = [
         check_schema(), check_env(), check_frontend(), check_server(), check_accounts(),
-        check_brand_metrics(args.fast), check_ruff(args.fast), check_tests(args.fast),
+        check_phone_encryption(), check_brand_metrics(args.fast),
+        check_ruff(args.fast), check_tests(args.fast),
     ]
     failed = [c for c in checks if not c["passed"]]
     result = {"passed": len(checks) - len(failed), "total": len(checks),

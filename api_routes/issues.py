@@ -1,4 +1,4 @@
-﻿# api_routes/issues.py
+# api_routes/issues.py
 """报修工单路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）。"""
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from api_routes.deps import _ok, _fail, _user, _require_role
 
 import logging
+from utils.timeutil import utcnow
 _log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/issues", tags=["issues"])
@@ -66,7 +67,7 @@ def _issue_deadline(r: dict) -> dict:
         try:
             from datetime import datetime
             t0 = datetime.strptime(str(approved)[:19], "%Y-%m-%d %H:%M:%S")
-            remaining = round(hours - (datetime.utcnow() - t0).total_seconds() / 3600.0, 2)
+            remaining = round(hours - (utcnow() - t0).total_seconds() / 3600.0, 2)
             overdue = remaining < 0
         except (ValueError, TypeError):
             pass

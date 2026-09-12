@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from data.db_core import get_db
 from data.db_notifications import log_activity
 from data.db_repair import _dec_phone, _enc_phone
+from utils.timeutil import utcnow
 
 _log = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ _PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 # ---------- 小工具 ----------
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return utcnow()
 
 
 def _fmt(dt: datetime) -> str:

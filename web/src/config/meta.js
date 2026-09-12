@@ -13,10 +13,10 @@
 export const BRAND_METRICS = [
   {
     key: 'tests',
-    value: 565,
+    value: 572,
     suffix: '',
     label: '自动化测试',
-    // pytest 收集用例数（= 564 通过 + 1 需外部服务默认跳过）；全量模式由 preflight 跑 --collect-only 核对
+    // pytest 收集用例数（= 571 通过 + 1 需外部服务默认跳过）；全量模式由 preflight 跑 --collect-only 核对
     source: 'pytest --collect-only（preflight 全量模式核对）',
   },
   {

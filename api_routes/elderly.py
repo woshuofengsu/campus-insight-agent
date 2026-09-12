@@ -1,4 +1,4 @@
-﻿# api_routes/elderly.py
+# api_routes/elderly.py
 """老年端本体 + 老年关怀管理路由模块（从 api_web.py 拆出，P2-04）。
 
 - router（prefix=/api/web/elderly）：老年端本体端点（含免登录 elder_id 解析）。
@@ -127,6 +127,22 @@ def web_elderly_home(request: Request):
     except Exception:
         days_inactive = 0
     care_line = tone.care_line(weather=weather, due_meds=due, days_inactive=days_inactive)
+    # 最近联系（第七轮复审 P3-B）：前端 Home.vue 有 `v-if="home.latest_contact"` 的展示块，
+    # 但此前 payload 里一直没有这个字段 → 那块永远不显示（前后端字段没对齐的典型）。
+    # 后端本就有 get_latest_contact_call()，这里补上人文文案（拿不到给 None，前端自然不显示）。
+    latest_contact = None
+    try:
+        from data.db_elderly_care import get_latest_contact_call
+        rec = get_latest_contact_call(uid) if uid else None
+        if rec:
+            who = rec.get("target_name") or "家人"
+            when = str(rec.get("created_at") or "")[:16].replace("T", " ")
+            status = rec.get("status") or ""
+            latest_contact = f"{who}（{status}）" if status else who
+            if when:
+                latest_contact = f"{latest_contact} · {when}"
+    except Exception:
+        latest_contact = None
     return _ok({
         "name": display_name,
         "greeting": tone.greeting(datetime.now().hour),
@@ -135,6 +151,7 @@ def web_elderly_home(request: Request):
         "unread_notices": get_notice_unread_count("elderly", uid),
         "due_medications": due,
         "latest_sos": get_latest_sos(uid) if uid else None,
+        "latest_contact": latest_contact,
         "bp": (health.get("blood_pressure") or [{}])[-1] if health.get("blood_pressure") else {},
         "weather": weather,
         "community_phone": _COMMUNITY_PHONE,
