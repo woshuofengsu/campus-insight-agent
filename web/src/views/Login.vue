@@ -6,6 +6,8 @@ import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../stores/user'
 import CountUp from '../components/CountUp.vue'
+import { BRAND_METRICS } from '../config/meta.js'
+const stats = BRAND_METRICS
 
 const router = useRouter()
 const message = useMessage()
@@ -48,13 +50,8 @@ const roles = [
   { role: 'grid', icon: '🛠️', label: '网格员', desc: '工单 · 督办 · 决策' },
 ]
 
-// 品牌指标（与仓库实测一致：555 测试 / 42 条检索评测 / hit@1 100% / AI 自转率 62%）
-const stats = [
-  { v: 555, s: '', lbl: '自动化测试' },
-  { v: 42, s: '', lbl: '检索评测集' },
-  { v: 100, s: '%', lbl: '命中率 hit@1' },
-  { v: 62, s: '%', lbl: 'AI 自转率' },
-]
+// 品牌指标：唯一来源 web/src/config/meta.js（原先硬编码在这里，其中「AI 自转率 62%」与后端
+// 实测口径对不上；现已移除易变业务指标，只留可复算的稳定项，并由 demo_preflight 自动核对）
 
 // 星光粒子（固定参数，避免随机导致重渲染抖动）
 const particles = [
@@ -83,8 +80,8 @@ const particles = [
     <!-- 玻璃双栏主卡 -->
     <div class="glass fade-up"
          style="position:relative;z-index:1;border-radius:24px;width:900px;max-width:100%;display:flex;flex-wrap:wrap;overflow:hidden;">
-      <!-- 左：品牌面板 -->
-      <div class="grad-flow" style="flex:1 1 390px;min-width:320px;background:var(--primary-gradient-2);color:#fff;padding:44px 36px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;">
+      <!-- 左：品牌面板（用静态渐变，不再叠加常驻流动渐变——一屏内循环动效少一层，低端机更省 GPU） -->
+      <div style="flex:1 1 390px;min-width:320px;background:var(--primary-gradient-2);color:#fff;padding:44px 36px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;">
         <div style="position:absolute;width:230px;height:230px;border-radius:50%;background:rgba(255,255,255,0.10);top:-80px;right:-80px;"></div>
         <div style="position:absolute;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.07);bottom:-40px;left:-40px;"></div>
 
@@ -116,12 +113,12 @@ const particles = [
 
         <!-- 可信指标（数字滚动） -->
         <div class="fade-up-d2" style="position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:24px;">
-          <div v-for="s in stats" :key="s.lbl"
+          <div v-for="s in stats" :key="s.key"
                style="text-align:center;background:rgba(255,255,255,0.10);border-radius:10px;padding:9px 4px;">
             <div style="font-weight:800;font-size:0.98rem;">
-              <CountUp :value="s.v" :suffix="s.s" :duration="1600" />
+              <CountUp :value="s.value" :suffix="s.suffix" :duration="1600" />
             </div>
-            <div style="font-size:0.66rem;opacity:0.78;margin-top:1px;">{{ s.lbl }}</div>
+            <div style="font-size:0.75rem;opacity:0.9;margin-top:1px;">{{ s.label }}</div>
           </div>
         </div>
       </div>
@@ -145,7 +142,7 @@ const particles = [
                     style="font-weight:700;height:46px;letter-spacing:0.06em;">登 录</n-button>
         </n-form>
 
-        <n-divider style="font-size:0.78rem;color:var(--disabled);">或选择角色快速体验</n-divider>
+        <n-divider style="font-size:0.78rem;">或选择角色快速体验</n-divider>
 
         <div class="wave" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
           <div v-for="r in roles" :key="r.role"
@@ -155,11 +152,11 @@ const particles = [
                @click="demo(r.role)">
             <div class="entry-icon" style="font-size:1.65rem;">{{ r.icon }}</div>
             <div style="font-weight:700;margin-top:3px;">{{ r.label }}</div>
-            <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">{{ r.desc }}</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:3px;">{{ r.desc }}</div>
           </div>
         </div>
 
-        <div style="text-align:center;color:var(--disabled);font-size:0.73rem;margin-top:18px;">
+        <div style="text-align:center;color:var(--muted);font-size:0.76rem;margin-top:18px;">
           居民 / 老人演示免密 · 网格员 demo123
         </div>
       </div>

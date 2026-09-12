@@ -79,9 +79,9 @@ function remainingText(t) {
   try {
     const created = new Date((t.created_at || '').replace(' ', 'T'))
     const remain = 3 - (Date.now() - created.getTime()) / 3600000
-    if (remain < 0) return { text: '已超时', cls: 'background:#fef2f2;color:#dc2626;' }
-    if (remain < 1) return { text: `⏰ ${remain.toFixed(1)}h 内需确认`, cls: 'background:#fef2f2;color:#dc2626;' }
-    return { text: `⏳ 剩余 ${remain.toFixed(1)}h`, cls: 'background:#f0fdf4;color:#16a34a;' }
+    if (remain < 0) return { text: '已超时', cls: 'background:#fef2f2;color:var(--ink-danger);' }
+    if (remain < 1) return { text: `⏰ ${remain.toFixed(1)}h 内需确认`, cls: 'background:#fef2f2;color:var(--ink-danger);' }
+    return { text: `⏳ 剩余 ${remain.toFixed(1)}h`, cls: 'background:#f0fdf4;color:var(--ink-success);' }
   } catch {
     return { text: '', cls: '' }
   }
@@ -98,7 +98,7 @@ function remainingText(t) {
         <div v-if="w" class="card">
           <b>当前：{{ w.condition }} {{ w.temp_low }}°~{{ w.temp_high }}°</b>
           <span class="muted" style="margin-left:8px;">{{ w.wind }} · 💧{{ w.rain_prob }}%</span>
-          <div v-if="w.note" style="color:#b91c1c;font-size:0.85rem;margin-top:6px;">⚠️ {{ w.note }}</div>
+          <div v-if="w.note" style="color:var(--ink-danger);font-size:0.85rem;margin-top:6px;">⚠️ {{ w.note }}</div>
         </div>
 
         <div class="card" v-if="alerts.length">
@@ -168,7 +168,7 @@ function remainingText(t) {
           <div style="font-weight:700;margin-bottom:8px;">⚠️ 系统异常日志（保留 7 天，单独记录不混入业务留痕）</div>
           <div v-for="e in exLogs" :key="e.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <b style="color:#b91c1c;">{{ e.module }}：{{ e.error }}</b>
+              <b style="color:var(--ink-danger);">{{ e.module }}：{{ e.error }}</b>
               <span class="muted" style="font-size:0.8rem;">{{ (e.created_at || '').slice(0, 16) }}</span>
             </div>
             <div v-if="e.detail" class="muted" style="font-size:0.8rem;margin-top:2px;">{{ e.detail }}</div>

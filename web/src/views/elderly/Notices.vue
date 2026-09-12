@@ -36,18 +36,18 @@ async function play(n) {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">🔊 听通知</div>
-    <p style="text-align:center;color:#6b7280;font-size:1.1rem;">点通知听语音播报</p>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">点通知听语音播报</p>
 
-    <div v-for="n in list" :key="n.id" class="card" style="font-size:1.2rem;" @click="play(n)"
+    <div v-for="n in list" :key="n.id" class="card" style="font-size:1.25rem;" @click="play(n)"
          :style="n.is_urgent ? 'border-left:5px solid #dc2626;background:#fef2f2;' : ''">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <b style="font-size:1.3rem;">{{ n.title }}</b>
-        <span v-if="n.is_urgent" style="color:#dc2626;font-weight:800;">🚨 紧急</span>
-        <span v-else-if="!n.is_read" style="color:#4f46e5;font-weight:700;">● 未读</span>
+        <span v-if="n.is_urgent" style="color:var(--ink-danger);font-weight:800;">🚨 紧急</span>
+        <span v-else-if="!n.is_read" style="color:var(--ink-info);font-weight:700;">● 未读</span>
       </div>
       <div class="muted" style="font-size:1.05rem;margin-top:6px;">{{ n.elderly_summary || n.body }}</div>
       <div class="muted" style="font-size:0.95rem;margin-top:6px;">{{ (n.published_at || '').slice(0, 16) }} · 🔊 点击播报</div>
     </div>
-    <n-empty v-if="list.length === 0" description="暂无通知" style="font-size:1.1rem;" />
+    <n-empty v-if="list.length === 0" description="暂无通知" style="font-size:1.25rem;" />
   </div>
 </template>

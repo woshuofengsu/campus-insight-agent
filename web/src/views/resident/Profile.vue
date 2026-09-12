@@ -131,7 +131,7 @@ async function deleteAccount() {
         <div class="svc" @click="exportMyData"><span>📤</span> 导出我的数据（脱敏）</div>
         <div class="svc" @click="router.push('/resident/privacy')"><span>🔒</span> 隐私政策</div>
         <n-popconfirm @positive-click="deleteAccount" :positive-button-props="{ type: 'error' }">
-          <template #trigger><div class="svc" style="color:#dc2626;"><span>🚪</span> 注销账号（数据匿名化）</div></template>
+          <template #trigger><div class="svc" style="color:var(--ink-danger);"><span>🚪</span> 注销账号（数据匿名化）</div></template>
           注销后您的报修/提案记录将匿名化、不可恢复，确认注销？
         </n-popconfirm>
         <div class="svc" @click="store.logout(); router.replace('/login')"><span>🔑</span> 退出登录</div>

@@ -24,7 +24,7 @@ const CHECKS = [
     <div class="card">
       <div style="font-weight:700;margin-bottom:8px;">✅ 质量基线</div>
       <div v-for="(c, i) in CHECKS" :key="i" style="padding:4px 0;font-size:0.92rem;">
-        <span style="color:#16a34a;">✔</span> {{ c }}
+        <span style="color:var(--ink-success);">✔</span> {{ c }}
       </div>
     </div>
 

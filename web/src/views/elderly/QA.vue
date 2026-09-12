@@ -89,7 +89,7 @@ async function doTransfer() {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">📖 政策问答</div>
-    <p style="text-align:center;color:#6b7280;font-size:1.1rem;">问医保、养老、住房政策</p>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">问医保、养老、住房政策</p>
 
     <div class="card">
       <n-button type="error" block size="large" style="min-height:64px;font-size:1.3rem;" :loading="listening" @click="startListen">
@@ -97,7 +97,7 @@ async function doTransfer() {
       </n-button>
 
       <!-- 转写确认（对，提交 / 重新说） -->
-      <div v-if="pendingText" class="card" style="margin-top:10px;background:#fefce8;font-size:1.2rem;">
+      <div v-if="pendingText" class="card" style="margin-top:10px;background:#fefce8;font-size:1.25rem;">
         <div>您说的是：<b>{{ pendingText }}</b></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
           <n-button type="success" size="large" style="min-height:56px;" @click="confirmText">✅ 对，提交</n-button>
@@ -108,12 +108,12 @@ async function doTransfer() {
       <n-input v-model:value="question" type="textarea" :rows="3" placeholder="想问什么政策？"
                style="font-size:1.3rem;margin-top:12px;" />
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">
-        <n-button type="primary" size="large" style="min-height:60px;font-size:1.2rem;" :loading="asking" @click="ask">🔍 提问</n-button>
-        <n-button size="large" style="min-height:60px;font-size:1.2rem;" @click="transferConfirm = true">🙋 转人工</n-button>
+        <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" :loading="asking" @click="ask">🔍 提问</n-button>
+        <n-button size="large" style="min-height:60px;font-size:1.25rem;" @click="transferConfirm = true">🙋 转人工</n-button>
       </div>
     </div>
 
-    <div v-if="result" class="card" style="font-size:1.2rem;">
+    <div v-if="result" class="card" style="font-size:1.25rem;">
       <template v-if="result.matched">
         <div style="font-weight:700;color:#2E7D32;">✅ 已回答</div>
         <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
@@ -128,8 +128,8 @@ async function doTransfer() {
 
     <!-- 最近 5 条历史（大字版） -->
     <div v-if="history.length" class="card" style="margin-top:12px;">
-      <div style="font-weight:700;font-size:1.2rem;margin-bottom:8px;">📋 最近提问</div>
-      <div v-for="h in history" :key="h.id" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:1.1rem;">
+      <div style="font-weight:700;font-size:1.25rem;margin-bottom:8px;">📋 最近提问</div>
+      <div v-for="h in history" :key="h.id" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:1.25rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <b>{{ h.summary }}</b>
           <n-tag size="large" :type="h.status === '已自动回答' ? 'success' : h.status === '已回复' ? 'success' : 'warning'">{{ h.status }}</n-tag>

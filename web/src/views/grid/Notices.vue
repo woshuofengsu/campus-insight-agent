@@ -237,7 +237,7 @@ async function exportNotices() {
           <span class="muted" style="margin-left:8px;font-size:0.8rem;">{{ (detail.published_at || detail.created_at || '').slice(0, 16) }}</span>
         </div>
         <div style="font-size:0.95rem;line-height:1.8;white-space:pre-wrap;">{{ detail.body }}</div>
-        <div v-if="detail.elderly_summary" style="margin-top:10px;font-size:0.9rem;color:#b45309;">🔊 老年端播报：{{ detail.elderly_summary }}</div>
+        <div v-if="detail.elderly_summary" style="margin-top:10px;font-size:0.9rem;color:var(--ink-warning);">🔊 老年端播报：{{ detail.elderly_summary }}</div>
         <div v-if="atts(detail).length" style="margin-top:10px;">
           <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📎 附件</div>
           <div v-for="(a, i) in atts(detail)" :key="i" style="display:inline-block;margin-right:8px;">

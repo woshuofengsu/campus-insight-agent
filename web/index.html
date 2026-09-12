@@ -14,14 +14,7 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
-    <!-- 真机调试：只需本行即生效，生产可移除 -->
-    <script>
-      if (location.search.includes('debug=1')) {
-        var s = document.createElement('script')
-        s.src = 'https://cdn.jsdelivr.net/npm/eruda@3.4.1'
-        s.onload = function () { window.eruda && eruda.init() }
-        document.body.appendChild(s)
-      }
-    </script>
+    <!-- 真机调试：加 ?debug=1 生效；改同源外部文件以符合 CSP script-src 'self'（内联会被拦截并报错） -->
+    <script src="/debug.js" defer></script>
   </body>
 </html>

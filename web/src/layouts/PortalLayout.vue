@@ -67,7 +67,7 @@ function logout() {
         <div class="brand-dot">🏘️</div>
         <div>
           <div class="grad-text" style="font-weight:800;font-size:1.06rem;line-height:1.25;">社区先知</div>
-          <div style="color:var(--muted);font-size:0.74rem;">网格员工作台</div>
+          <div style="color:var(--muted);font-size:0.76rem;">网格员工作台</div>
         </div>
       </div>
       <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
@@ -92,6 +92,7 @@ function logout() {
       <n-layout-header bordered class="glass topbar" style="height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
         <div style="font-weight:800;font-size:1.05rem;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
+          <n-button size="small" quaternary @click="router.push('/screen')">🖥️ 治理大屏</n-button>
           <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
           <n-tag :bordered="false" type="success" size="small">● AI 治理</n-tag>
           <span style="color:var(--muted);">{{ store.user?.name }}</span>
@@ -135,8 +136,8 @@ function logout() {
            :class="{ 'tab-active': activeTab === t.key }"
            :style="{
              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-             gap: '2px', cursor: 'pointer', fontSize: '0.72rem',
-             color: activeTab === t.key ? 'var(--primary)' : 'var(--muted)',
+             gap: '2px', cursor: 'pointer', fontSize: '0.76rem',
+             color: activeTab === t.key ? 'var(--primary-ink)' : 'var(--muted)',
              fontWeight: activeTab === t.key ? 700 : 400,
            }"
            @click="router.push(t.key)">

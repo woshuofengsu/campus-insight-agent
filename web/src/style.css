@@ -25,8 +25,8 @@
   --bg: #F6F8FB;
   --card-bg: #FFFFFF;
   --text: #16233B;
-  --muted: #64748B;
-  --disabled: #9CA3AF;
+  --muted: #5B6B80;   /* 对比度 ≥5.2:1 on #fff（原 #64748B 只有 4.48:1，刚好卡在 WCAG AA 线下） */
+  --disabled: #8A93A3;
   --border: #E7ECF3;
   --dark-bg: #1E293B;
   /* —— 状态色 —— */
@@ -54,6 +54,15 @@
   --shadow-3: 0 16px 40px rgba(18, 35, 59, 0.14);
   --shadow-danger: 0 6px 20px rgba(239, 68, 68, 0.25);
   --shadow-primary: 0 6px 18px rgba(45, 91, 255, 0.28);
+  /* —— 语义文字色（亮/暗成对）——
+     内联写死 #047857 / #b91c1c 这类颜色在暗底上只有 2.3~2.7:1，是「内联色不跟主题走」的根因；
+     统一用这些令牌，暗色自动换成亮色变体。 */
+  --ink-success: #047857;
+  --ink-danger: #B91C1C;
+  --ink-info: #2563EB;
+  --ink-purple: #7C3AED;
+  --ink-warning: #B45309;
+  --primary-ink: #2D5BFF;   /* 主色作为「文字」用时（暗色下 #2D5BFF 只有 3.4:1） */
 }
 
 body.dark {
@@ -67,6 +76,12 @@ body.dark {
   --accent-light: #2A2410;
   --teal-light: #123B33;
   --dark-bg: #0B1120;
+  --ink-success: #6EE7B7;
+  --ink-danger: #FCA5A5;
+  --ink-info: #93B4FF;
+  --ink-purple: #C4B5FD;
+  --ink-warning: #FCD34D;
+  --primary-ink: #8FA8FF;
 }
 
 * { box-sizing: border-box; }
@@ -249,19 +264,28 @@ body.dark .glass {
   border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
-/* ---------------- 暗色模式：内联浅色块防残留（保留 v1 逻辑） ---------------- */
-body.dark [style*="background:#fef2f2"] { background: #3d1f1f !important; border-color: #7f1d1d !important; color: #fecaca !important; }
-body.dark [style*="background:#f0fdf4"] { background: #12241b !important; border-color: #14532d !important; }
-body.dark [style*="background:#fefce8"] { background: #2a2410 !important; border-color: #713f12 !important; }
-body.dark [style*="background:#f0f9ff"] { background: #10202e !important; border-color: #1e3a5f !important; }
-body.dark [style*="background:#eef2ff"] { background: #1b1e3a !important; border-color: #312e81 !important; }
-body.dark [style*="background:#f0faf0"] { background: #12241b !important; }
-body.dark [style*="background:#f8fafc"] { background: var(--card-bg) !important; }
-body.dark [style*="background:#fff"] { background: var(--card-bg) !important; }
-body.dark [style*="background:#fffbeb"] { background: #2a2410 !important; }
-body.dark [style*="background:#fff7ed"] { background: #2a2410 !important; }
-body.dark [style*="background:#FFF4E8"], body.dark [style*="background:#fff4e8"] { background: #2a2410 !important; }
-body.dark [style*="color:#1f2937"], body.dark [style*="color:#1A1A1A"] { color: var(--text) !important; }
+/* ---------------- 暗色模式：内联浅色块补丁（**必须按 DOM 规范化形式匹配**） ----------------
+   ⚠ 本轮踩坑记录（重要）：原先这里写的是 `[style*="background:#fef2f2"]`，即 hex 源码形式。
+   但 Vue 渲染时会把 style 经 CSSOM 规范化，实际 DOM 上是
+       style="background: rgb(254, 242, 242); color: var(--ink-danger); margin-left: 8px;"
+   —— 属性选择器匹配的是**规范化后的属性值**，所以整套补丁**从未命中过任何元素**：
+   暗色模式下浅色块一直是刺眼亮块（实测 grid 工作台暗色 5 处不达标、老年端面板 1.16:1）。
+   现在按 rgb() 规范化形式匹配；并且 tests/test_frontend_style_hygiene.py 强制校验
+   「每个在用内联浅色块都有对应暗色规则」，这类静默失效以后会被测试拦住。 */
+body.dark [style*="rgb(254, 242, 242)"] { background: #3D1F1F !important; border-color: #7F1D1D !important; color: #FECACA !important; }
+body.dark [style*="rgb(240, 253, 244)"] { background: #12241B !important; border-color: #14532D !important; }
+body.dark [style*="rgb(236, 253, 245)"] { background: #12241B !important; border-color: #14532D !important; }
+body.dark [style*="rgb(254, 252, 232)"] { background: #2A2410 !important; border-color: #713F12 !important; }
+body.dark [style*="rgb(255, 251, 235)"] { background: #2A2410 !important; border-color: #713F12 !important; }
+body.dark [style*="rgb(255, 247, 237)"] { background: #2A2410 !important; border-color: #713F12 !important; }
+body.dark [style*="rgb(255, 244, 232)"] { background: #2A2410 !important; border-color: #713F12 !important; }
+body.dark [style*="rgb(240, 249, 255)"] { background: #10202E !important; border-color: #1E3A5F !important; }
+body.dark [style*="rgb(238, 242, 255)"] { background: #1B1E3A !important; border-color: #312E81 !important; }
+body.dark [style*="rgb(240, 250, 240)"] { background: #12241B !important; }
+body.dark [style*="rgb(248, 250, 252)"] { background: var(--card-bg) !important; }
+body.dark [style*="rgb(245, 245, 245)"] { background: var(--card-bg) !important; }
+body.dark [style*="rgb(255, 255, 255)"] { background: var(--card-bg) !important; }
+body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 26, 26)"] { color: var(--text) !important; }
 
 /* ---------------- 老年端适老化（WCAG AA：字号≥20px、按钮≥60px、行距1.8） ---------------- */
 .elderly-page { padding: 20px; max-width: 720px; margin: 0 auto; font-size: 1.25rem; line-height: 1.8; animation: fade-up 0.35s ease both; }
@@ -275,8 +299,30 @@ body.dark [style*="color:#1f2937"], body.dark [style*="color:#1A1A1A"] { color: 
   font-weight: 700 !important;
   border-radius: 18px !important;
   transition: transform 0.15s, box-shadow 0.15s;
+  /* 实测修复：Naive 按钮内容默认 white-space:nowrap，导致 3 列栅格的 min-content 撑破容器
+     （390px 视口横向溢出 153px、第三列跑到屏幕外）。这里允许换行 + 允许收缩。 */
+  min-width: 0 !important;
+  max-width: 100%;
+  white-space: normal !important;
 }
+.elderly-btn .n-button__content { white-space: normal; line-height: 1.3; text-align: center; }
 .elderly-btn:active { transform: scale(0.97); }
+
+/* 老年端 3 列栅格：用 minmax(0,1fr) 而非 1fr（1fr = minmax(auto,1fr)，会被内容顶破） */
+.elderly-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 359px) {
+  .elderly-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* 老年端说明性小字也要 ≥20px（此前 0.9~1.05rem 只有 14~17px，未达自己声明的适老下限） */
+.elderly-page .muted { font-size: 1.25rem; }
+/* Naive 组件自带字号（按钮 15px / 标签 14px / 输入 14px）也要提到适老下限：
+   逐页加内联 style 容易漏，这里按「老年端容器」统一兜底（内联写了更大值的仍以更大值为准） */
+.elderly-page .n-button__content { font-size: 1.25rem; }
+.elderly-page .n-tag__content { font-size: 1.25rem; }
+.elderly-page .n-input__input-el,
+.elderly-page .n-input__textarea-el,
+.elderly-page .n-input__placeholder,
+.elderly-page .n-empty__description { font-size: 1.25rem; }
 
 /* ---------------- 手机端适配 ---------------- */
 @media (max-width: 768px) {
@@ -452,6 +498,11 @@ body.dark .panel-sky   { background: linear-gradient(135deg, #10202E, #14304A); 
 body.dark .panel-lemon { background: linear-gradient(135deg, #2A2410, #3A3410); border-color: #A16207; color: #FDE68A; }
 body.dark .panel-mint  { background: linear-gradient(135deg, #12241B, #16311F); border-color: #15803D; }
 
+/* 面板内高亮文字：亮色面板用深色高亮，暗色面板必须换成亮色高亮（否则深底深字，实测 2.3:1） */
+.panel-hi { color: #075985; }
+body.dark .panel-hi { color: #7DD3FC; }                                  /* 天空面板 → 亮蓝 */
+body.dark .panel-warm .panel-hi, body.dark .panel-lemon .panel-hi { color: #FDE68A; }  /* 暖/黄面板 → 暖黄 */
+
 /* ---------------- 路由级过渡（登录 ↔ 门户，仅顶层切换） ---------------- */
 .page-fade-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
 .page-fade-leave-active { transition: opacity 0.14s ease; }
@@ -468,4 +519,14 @@ body.dark .panel-mint  { background: linear-gradient(135deg, #12241B, #16311F); 
     scroll-behavior: auto !important;
   }
   .mesh-particles, .breathe, .title-sheen, .btn-shimmer::after { display: none !important; }
+}
+
+/* 页面不可见（切到别的标签/最小化）时暂停所有动画：挂墙大屏与低端机不必为空转消耗 GPU */
+body.anim-paused *, body.anim-paused *::before, body.anim-paused *::after {
+  animation-play-state: paused !important;
+}
+
+/* 小屏降低毛玻璃成本：backdrop-filter 在低端安卓上很贵，视觉收益却很小 */
+@media (max-width: 768px) {
+  .glass, .topbar, .tabbar { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 }

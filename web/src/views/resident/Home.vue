@@ -68,14 +68,14 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
           <span class="bob" style="font-size:1.9rem;">{{ w.emoji || '🌤️' }}</span>
           <div>
             <div style="font-size:1.35rem;font-weight:800;line-height:1.1;">{{ w.temp_high }}°C</div>
-            <div style="font-size:0.72rem;opacity:0.85;">{{ w.condition }} · {{ w.temp_low }}°~{{ w.temp_high }}°</div>
+            <div style="font-size:0.76rem;opacity:0.9;">{{ w.condition }} · {{ w.temp_low }}°~{{ w.temp_high }}°</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 天气提示 / 预警 -->
-    <div v-if="w?.note" class="card fade-up-d1" style="background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;font-weight:600;">
+    <div v-if="w?.note" class="card fade-up-d1" style="background:#fef2f2;border:1px solid #fca5a5;color:var(--ink-danger);font-weight:600;">
       ⚠️ {{ w.note }}
     </div>
 
@@ -109,9 +109,11 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
            @click="router.push(e.to)">
         <div class="entry-icon" style="font-size:2.1rem;line-height:1;">{{ e.icon }}</div>
         <div style="font-weight:700;margin-top:8px;font-size:1.02rem;">{{ e.label }}</div>
-        <div style="font-size:0.74rem;color:var(--muted);margin-top:2px;">{{ e.desc }}</div>
-        <div :style="{ background: e.bg, color: e.color }"
-             style="display:inline-block;margin-top:9px;padding:2px 10px;border-radius:999px;font-size:0.7rem;font-weight:600;">
+        <div style="font-size:0.76rem;color:var(--muted);margin-top:2px;">{{ e.desc }}</div>
+        <!-- 无障碍修正：原先用 e.color 作文字色（彩色浅底上仅 2.1~3.65:1，低于 AA 4.5:1），
+             改为「同色淡底 + 正文色文字」，亮/暗两种模式都稳定达标 -->
+        <div :style="{ background: e.bg }"
+             style="display:inline-block;margin-top:9px;padding:2px 10px;border-radius:999px;font-size:0.76rem;font-weight:600;color:var(--text);">
           进入 ›
         </div>
       </div>

@@ -152,17 +152,18 @@ async function batchClose() {
                 <n-checkbox :checked="selected.includes(i.id)" @update:checked="(v) => { if (v) selected.push(i.id); else selected = selected.filter((x) => x !== i.id) }" @click.stop />
                 <div>
                   <b>#{{ i.id }} {{ i.title }}</b>
+                  <!-- 状态色文字统一用 AA 达标值：#059669→#047857(5.54:1)、#888→#5B6B80(5.2:1)、#dc2626→#b91c1c(6.15:1) -->
                   <span class="status-pill" :style="{
                     background: i.status === '处理结束' ? '#ecfdf5' : i.status === '已关闭' ? '#f5f5f5' : i.status === '已撤回' ? '#f5f5f5' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#fef2f2' : '#eef2ff',
-                    color: i.status === '处理结束' ? '#059669' : i.status === '已关闭' || i.status === '已撤回' ? '#888' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#dc2626' : '#4f46e5',
+                    color: i.status === '处理结束' ? '#047857' : i.status === '已关闭' || i.status === '已撤回' ? '#5B6B80' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#b91c1c' : '#4f46e5',
                   }" style="margin-left:8px;">{{ i.status }}</span>
-                  <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:#dc2626;margin-left:4px;">🔴 紧急</span>
-                  <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:#dc2626;margin-left:4px;">🚫 违规标记</span>
-                  <span v-if="i.non_community_responsibility" class="status-pill" style="background:#fffbeb;color:#b45309;margin-left:4px;">🏗️ 第三方施工</span>
+                  <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;">🔴 紧急</span>
+                  <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;">🚫 违规标记</span>
+                  <span v-if="i.non_community_responsibility" class="status-pill" style="background:#fffbeb;color:var(--ink-warning);margin-left:4px;">🏗️ 第三方施工</span>
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <span v-if="deadlineText(i)" class="status-pill" :style="i.overdue ? 'background:#fef2f2;color:#dc2626;' : 'background:#f0fdf4;color:#16a34a;'">{{ deadlineText(i) }}</span>
+                <span v-if="deadlineText(i)" class="status-pill" :style="i.overdue ? 'background:#fef2f2;color:var(--ink-danger);' : 'background:#f0fdf4;color:var(--ink-success);'">{{ deadlineText(i) }}</span>
                 <span class="muted" style="font-size:0.85rem;">{{ expanded[i.id] ? '收起 ▲' : '展开 ▼' }}</span>
               </div>
             </div>

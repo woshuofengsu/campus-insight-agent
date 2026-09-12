@@ -53,9 +53,9 @@ async function confirmCall() {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">👨‍👩‍👧 紧急联系人</div>
-    <p style="text-align:center;color:#6b7280;font-size:1.1rem;">紧急时可以一键呼叫他们（最多 3 个）</p>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">紧急时可以一键呼叫他们（最多 3 个）</p>
 
-    <div v-for="c in list" :key="c.id" class="card" style="font-size:1.2rem;">
+    <div v-for="c in list" :key="c.id" class="card" style="font-size:1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <b>{{ c.name }}（{{ c.relation }}）</b>
         <div>
@@ -64,7 +64,7 @@ async function confirmCall() {
       </div>
       <div class="muted" style="font-size:1.05rem;margin-top:6px;">📱 {{ c.phone }}</div>
       <div v-if="c.status === '审核通过'" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:10px;">
-        <n-button type="primary" size="large" style="min-height:60px;font-size:1.2rem;" @click="callConfirm = c">📞 呼叫 {{ c.name }}</n-button>
+        <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" @click="callConfirm = c">📞 呼叫 {{ c.name }}</n-button>
         <n-popconfirm @positive-click="remove(c)">
           <template #trigger><n-button quaternary type="error" size="large" style="min-height:60px;">🗑️ 删除</n-button></template>
           删除后该联系人不再生效，确认删除？
@@ -77,13 +77,13 @@ async function confirmCall() {
         </n-popconfirm>
       </div>
     </div>
-    <n-empty v-if="list.length === 0" description="还没有紧急联系人" style="font-size:1.1rem;" />
+    <n-empty v-if="list.length === 0" description="还没有紧急联系人" style="font-size:1.25rem;" />
 
     <n-button v-if="!showForm" type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
               @click="showForm = true">➕ 添加联系人</n-button>
 
     <div v-if="showForm" class="card" style="margin-top:12px;">
-      <n-input v-model:value="form.name" placeholder="联系人姓名" size="large" style="font-size:1.2rem;" />
+      <n-input v-model:value="form.name" placeholder="联系人姓名" size="large" style="font-size:1.25rem;" />
       <n-input v-model:value="form.phone" placeholder="11 位手机号" size="large" style="margin-top:10px;" />
       <n-input v-model:value="form.relation" placeholder="与您的关系（如：儿子/女儿）" size="large" style="margin-top:10px;" />
       <n-button type="primary" block size="large" style="margin-top:12px;min-height:60px;" @click="add">📨 提交（待审核）</n-button>

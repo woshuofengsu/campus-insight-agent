@@ -36,11 +36,11 @@ const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
         <div v-if="w.travel"><b>🚶 出行：</b>{{ w.travel }}</div>
         <div v-if="w.updated_at" class="muted" style="font-size:0.8rem;">数据更新于 {{ (w.updated_at || '').slice(0, 16) }}</div>
       </div>
-      <div v-if="w.note" style="margin-top:10px;color:#b91c1c;font-weight:600;">⚠️ {{ w.note }}</div>
+      <div v-if="w.note" style="margin-top:10px;color:var(--ink-danger);font-weight:600;">⚠️ {{ w.note }}</div>
     </div>
 
     <div v-if="alerts.length" class="card" style="background:#fef2f2;border:1px solid #fca5a5;">
-      <div style="font-weight:700;color:#b91c1c;">🚨 极端天气预警</div>
+      <div style="font-weight:700;color:var(--ink-danger);">🚨 极端天气预警</div>
       <div v-for="a in alerts" :key="a.id" style="margin-top:8px;">
         <span class="status-pill" :style="{ background: (LEVEL_COLOR[a.level] || '#eab308') + '22', color: LEVEL_COLOR[a.level] || '#eab308', border: '1px solid ' + (LEVEL_COLOR[a.level] || '#eab308') }">
           {{ a.alert_type }}{{ a.level }}预警

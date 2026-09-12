@@ -239,7 +239,7 @@ async function kgSearch() {
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
             {{ q.nickname_masked || q.nickname || '居民' }} · {{ q.q_type }} · {{ (q.created_at || '').slice(0, 16) }}
-            <span v-if="q.remaining_hours != null" :style="q.overdue ? 'color:#dc2626;font-weight:700;' : ''">
+            <span v-if="q.remaining_hours != null" :style="q.overdue ? 'color:var(--ink-danger);font-weight:700;' : ''">
               · {{ q.overdue ? `⏰ 超时 ${Math.abs(q.remaining_hours).toFixed(1)}h` : `⏳ 剩 ${q.remaining_hours.toFixed(1)}h` }}
             </span>
           </div>
@@ -308,7 +308,7 @@ async function kgSearch() {
             <div style="font-weight:700;margin-bottom:8px;">🔗 关联实体</div>
             <div style="font-size:0.9rem;">
               <span v-for="re in kgResult.related_entities.slice(0, 15)" :key="re.name"
-                    class="status-pill" style="background:#eef2ff;color:#4f46e5;margin:0 6px 6px 0;display:inline-block;">
+                    class="status-pill" style="background:#eef2ff;color:var(--ink-info);margin:0 6px 6px 0;display:inline-block;">
                 {{ re.name }}<span class="muted"> · {{ re.rel }}</span>
               </span>
             </div>

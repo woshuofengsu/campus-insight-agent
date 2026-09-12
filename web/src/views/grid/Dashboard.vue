@@ -82,25 +82,25 @@ const cards = computed(() => [
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
       <div class="card" style="text-align:center;margin:0;border-left:4px solid #2563eb;">
-        <div style="font-size:1.8rem;font-weight:800;color:#2563eb;">{{ selfRes.ai_self_resolution_rate }}%</div>
+        <div style="font-size:1.8rem;font-weight:800;color:var(--ink-info);">{{ selfRes.ai_self_resolution_rate }}%</div>
         <div class="muted" style="font-size:0.85rem;">AI 自解决率（{{ selfRes.total_dialogs }} 轮对话，转人工 {{ selfRes.transferred || 0 }}）</div>
       </div>
       <div class="card" style="text-align:center;margin:0;border-left:4px solid #059669;">
-        <div style="font-size:1.8rem;font-weight:800;color:#059669;">{{ selfRes.issue_self_resolution_rate }}%</div>
+        <div style="font-size:1.8rem;font-weight:800;color:var(--ink-success);">{{ selfRes.issue_self_resolution_rate }}%</div>
         <div class="muted" style="font-size:0.85rem;">工单社区自办结率（{{ selfRes.done_issues || 0 }}/{{ selfRes.total_issues }}）</div>
       </div>
       <div class="card" style="text-align:center;margin:0;grid-column:span 2;border-left:4px solid #7c3aed;">
         <div style="display:flex;justify-content:space-around;align-items:center;">
           <div>
-            <div style="font-size:1.8rem;font-weight:800;color:#7c3aed;">{{ llm.cost_yuan }}</div>
+            <div style="font-size:1.8rem;font-weight:800;color:var(--ink-purple);">{{ llm.cost_yuan }}</div>
             <div class="muted" style="font-size:0.85rem;">LLM 费用（¥/近7天）</div>
           </div>
           <div>
-            <div style="font-size:1.8rem;font-weight:800;color:#7c3aed;">{{ llm.calls || llm.total_calls || 0 }}</div>
+            <div style="font-size:1.8rem;font-weight:800;color:var(--ink-purple);">{{ llm.calls || llm.total_calls || 0 }}</div>
             <div class="muted" style="font-size:0.85rem;">LLM 调用次数</div>
           </div>
           <div>
-            <div style="font-size:1.8rem;font-weight:800;color:#059669;">{{ llm.cache_hits }}</div>
+            <div style="font-size:1.8rem;font-weight:800;color:var(--ink-success);">{{ llm.cache_hits }}</div>
             <div class="muted" style="font-size:0.85rem;">缓存命中</div>
           </div>
         </div>
@@ -109,11 +109,11 @@ const cards = computed(() => [
     </div>
 
     <div class="card" v-if="urgent.length" style="border:2px solid #dc2626;">
-      <div style="font-weight:700;color:#dc2626;margin-bottom:10px;">🚨 需要立即处理</div>
+      <div style="font-weight:700;color:var(--ink-danger);margin-bottom:10px;">🚨 需要立即处理</div>
       <div v-for="i in urgent" :key="i.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <b>#{{ i.id }} {{ i.title }}</b>
-          <span class="status-pill" style="background:#fef2f2;color:#b91c1c;margin-left:8px;">{{ i.status }}</span>
+          <span class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:8px;">{{ i.status }}</span>
         </div>
         <n-button size="small" type="primary" @click="router.push('/grid/work-orders')">去处理</n-button>
       </div>
@@ -130,9 +130,9 @@ const cards = computed(() => [
     <!-- 红黑榜（P2-B4-01） -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
       <div class="card" style="border:1px solid #dcfce7;margin:0;">
-        <div style="font-weight:700;color:#059669;margin-bottom:10px;">🏆 红榜 · 值得表扬</div>
+        <div style="font-weight:700;color:var(--ink-success);margin-bottom:10px;">🏆 红榜 · 值得表扬</div>
         <div v-if="board.red_board.satisfied_issues.length">
-          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">近期满意工单</div>
+          <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">近期满意工单</div>
           <div v-for="i in board.red_board.satisfied_issues.slice(0,3)" :key="'ri'+i.id"
                style="padding:6px 0;border-bottom:1px solid #f0fdf4;font-size:0.9rem;cursor:pointer;"
                @click="openDrilldown('', '', '满意', '红榜 · 满意工单下钻')">
@@ -140,7 +140,7 @@ const cards = computed(() => [
           </div>
         </div>
         <div v-if="board.red_board.good_workers.length" style="margin-top:8px;">
-          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">高效网格员</div>
+          <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">高效网格员</div>
           <div v-for="w in board.red_board.good_workers.slice(0,3)" :key="'rw'+w.name"
                style="padding:6px 0;font-size:0.9rem;">
             👍 {{ w.name }} · 解决 {{ w.solved }} 单 · 满意 {{ w.satisfied }}
@@ -150,9 +150,9 @@ const cards = computed(() => [
         <div v-if="!board.red_board.satisfied_issues.length && !board.red_board.good_workers.length" class="muted" style="font-size:0.9rem;">暂无红榜数据</div>
       </div>
       <div class="card" style="border:1px solid #fee2e2;margin:0;">
-        <div style="font-weight:700;color:#dc2626;margin-bottom:10px;">⚠️ 黑榜 · 需要改进</div>
+        <div style="font-weight:700;color:var(--ink-danger);margin-bottom:10px;">⚠️ 黑榜 · 需要改进</div>
         <div v-if="board.black_board.dissatisfied_issues.length">
-          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">不满意工单</div>
+          <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">不满意工单</div>
           <div v-for="i in board.black_board.dissatisfied_issues.slice(0,3)" :key="'bi'+i.id"
                style="padding:6px 0;border-bottom:1px solid #fef2f2;font-size:0.9rem;cursor:pointer;"
                @click="openDrilldown('', '', '不满意', '黑榜 · 不满意工单下钻')">
@@ -160,7 +160,7 @@ const cards = computed(() => [
           </div>
         </div>
         <div v-if="board.black_board.sla_breaches.length" style="margin-top:8px;">
-          <div style="font-size:0.85rem;color:#64748b;margin-bottom:4px;">SLA 超时</div>
+          <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">SLA 超时</div>
           <div v-for="b in board.black_board.sla_breaches.slice(0,3)" :key="'sl'+b.id"
                style="padding:6px 0;font-size:0.9rem;">
             ⏰ #{{ b.id }} {{ b.title }} <span class="muted">（{{ b.level }}）</span>
@@ -176,15 +176,15 @@ const cards = computed(() => [
       <n-drawer-content :title="drillTitle" :native-scrollbar="false">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
           <div class="card" style="text-align:center;margin:0;">
-            <div style="font-size:1.4rem;font-weight:800;color:#059669;">{{ drill.summary.satisfied }}</div>
+            <div style="font-size:1.4rem;font-weight:800;color:var(--ink-success);">{{ drill.summary.satisfied }}</div>
             <div class="muted" style="font-size:0.8rem;">满意</div>
           </div>
           <div class="card" style="text-align:center;margin:0;">
-            <div style="font-size:1.4rem;font-weight:800;color:#dc2626;">{{ drill.summary.dissatisfied }}</div>
+            <div style="font-size:1.4rem;font-weight:800;color:var(--ink-danger);">{{ drill.summary.dissatisfied }}</div>
             <div class="muted" style="font-size:0.8rem;">不满意</div>
           </div>
           <div class="card" style="text-align:center;margin:0;">
-            <div style="font-size:1.4rem;font-weight:800;color:#2563eb;">{{ drill.summary.total }}</div>
+            <div style="font-size:1.4rem;font-weight:800;color:var(--ink-info);">{{ drill.summary.total }}</div>
             <div class="muted" style="font-size:0.8rem;">总数</div>
           </div>
         </div>

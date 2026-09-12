@@ -11,7 +11,7 @@ from scripts import demo_preflight as P
 def test_fast_checks_all_run():
     """fast 模式各检查项都能返回结构化结果（不抛异常）。"""
     checks = [P.check_schema(), P.check_env(), P.check_frontend(), P.check_server(),
-              P.check_accounts(), P.check_ruff(True), P.check_tests(True)]
+              P.check_accounts(), P.check_brand_metrics(True), P.check_ruff(True), P.check_tests(True)]
     for c in checks:
         assert set(c) >= {"name", "passed", "detail", "fix"}, c
         assert isinstance(c["passed"], bool)
@@ -95,3 +95,50 @@ def test_utf8_stdout_guard_never_raises():
         gbk.flush()
     finally:
         sys.stdout, sys.stderr = orig_out, orig_err
+
+
+def test_brand_metrics_match_backend():
+    """登录页品牌指标（meta.js）必须与后端/仓库实测一致（外部评审 P2 的一致性门禁）。
+
+    防的是「登录页写 62%、大屏实测 90.9%」这类数字打架——那会直接削弱「数据可验证」的卖点。
+    """
+    declared = P.parse_brand_metrics()
+    assert declared, "meta.js 应至少声明一项指标"
+    assert set(declared) >= {"tests", "rag_golden", "rag_hit1", "agents"}, declared
+
+    # golden 集条数：必须与 rag_eval 的真实 loader 同口径（文件里有 9 行 # 注释，按行数会误判）
+    from scripts.rag_eval import load_golden
+    assert P.count_rag_golden() == len(load_golden()), "count_rag_golden 与 rag_eval.load_golden 口径不一致"
+    assert declared["rag_golden"] == len(load_golden()), \
+        f"登录页写 {declared['rag_golden']} 条，实测 {len(load_golden())} 条"
+
+    # 智能体角色数：以 AGENT_CLASSES 为准
+    from agent.roles import AGENT_CLASSES
+    assert declared["agents"] == len(AGENT_CLASSES), \
+        f"登录页写 {declared['agents']} 个角色，实测 {len(AGENT_CLASSES)} 个"
+
+    # fast 模式不跑 --collect-only，但仍要返回结构化的通过结果
+    r = P.check_brand_metrics(True)
+    assert r["passed"], r
+
+
+def test_brand_metrics_detects_drift(tmp_path):
+    """负向用例：meta.js 被改歪（数字与实测不符）时，检查必须判失败并给出修复指引。"""
+    src = P.parse_brand_metrics()
+    fake = tmp_path / "meta.js"
+    lines = ["export const BRAND_METRICS = ["]
+    for k, v in src.items():
+        bumped = v + 1 if k in ("rag_golden", "agents") else v
+        lines.append(f"  {{ key: '{k}', value: {bumped} }},")
+    lines.append("]")
+    fake.write_text("\n".join(lines), encoding="utf-8")
+
+    orig = P.META_JS
+    try:
+        P.META_JS = str(fake)
+        r = P.check_brand_metrics(True)
+        assert r["passed"] is False, "数字与实测不符时必须判失败"
+        assert "rag_golden" in r["detail"] and "agents" in r["detail"]
+        assert "meta.js" in r["fix"]
+    finally:
+        P.META_JS = orig

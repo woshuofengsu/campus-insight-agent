@@ -251,9 +251,11 @@ async function clearAll() {
 .agent-msg.bot { justify-content: flex-start; }
 .agent-msg.user { justify-content: flex-end; }
 .agent-bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; line-height: 1.6; }
-.agent-bubble.error { color: #dc2626; }
+.agent-bubble.error { color: var(--ink-danger); }
 .agent-msg.user .agent-bubble { background: #2E7D32; color: #fff; }
-.agent-msg.bot .agent-bubble { background: #fff; color: #374151; border: 1px solid var(--border); }
+/* 用变量而非写死白底：写死会让暗色模式下机器人气泡是一块刺眼白（此处是 CSS 规则，
+   style.css 里那套 body.dark [style*=...] 覆盖不到） */
+.agent-msg.bot .agent-bubble { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
 .agent-quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px; border-top: 1px solid var(--border); }
 .agent-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
 </style>

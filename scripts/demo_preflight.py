@@ -15,11 +15,13 @@
   5. .env 关键配置姿态（有无 LLM/向量 key → 决定走哪套演示姿态）
   6. 服务端口可达（8000 健康检查；未启动则给出启动命令）
   7. 三个演示账号可登录（居民/老年/网格员）
+  8. 登录页品牌指标一致性（web/src/config/meta.js vs 实测；防「登录页数字 vs 大屏实时值」打架）
 退出码：0 = 全部通过；1 = 有失败项（按输出提示修复即可）。
 """
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -83,6 +85,77 @@ def check_tests(fast: bool) -> dict:
     ok = code == 0
     return {"name": "单元测试全绿", "passed": ok, "detail": tail if not ok else tail,
             "fix": "" if ok else "先修失败用例：python -m pytest -q"}
+
+
+# ---------------- 登录页品牌指标 vs 后端实测（外部评审 P2） ----------------
+META_JS = os.path.join(BASE, "web", "src", "config", "meta.js")
+RAG_GOLDEN = os.path.join(BASE, "tests", "llm_eval", "rag_golden.jsonl")
+
+_META_RE = re.compile(r"key:\s*'([a-z_0-9]+)',\s*value:\s*(\d+)")
+
+
+def parse_brand_metrics(path: str | None = None) -> dict[str, int]:
+    """从 web/src/config/meta.js 解析 {key: value}（登录页数字的唯一来源）。"""
+    with open(path or META_JS, encoding="utf-8") as f:
+        return {k: int(v) for k, v in _META_RE.findall(f.read())}
+
+
+def count_rag_golden(path: str | None = None) -> int:
+    """golden 集条数：与 scripts/rag_eval.load_golden 同口径（跳过 # 注释行与空行）。
+
+    注意别用「文件行数」——文件里有 9 行注释，原样计数会得出 51 而误判不一致。
+    """
+    with open(path or RAG_GOLDEN, encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip() and not line.lstrip().startswith("#"))
+
+
+def check_brand_metrics(fast: bool) -> dict:
+    """登录页展示的数字必须能被后端/仓库实测复算（防止「登录页 62% vs 大屏 90.9%」式打架）。"""
+    try:
+        declared = parse_brand_metrics()
+    except Exception as e:  # noqa: BLE001
+        return {"name": "登录页指标一致性", "passed": False, "detail": f"读取 meta.js 失败：{e}",
+                "fix": "确认 web/src/config/meta.js 存在且键值格式为 key: 'x', value: N"}
+
+    actual: dict[str, int] = {}
+    try:
+        actual["rag_golden"] = count_rag_golden()
+    except Exception as e:  # noqa: BLE001
+        actual["rag_golden"] = -1
+        _ = e
+    try:
+        from agent.roles import AGENT_CLASSES
+        actual["agents"] = len(AGENT_CLASSES)
+    except Exception:  # noqa: BLE001
+        actual["agents"] = -1
+
+    bad = []
+    for key, want in declared.items():
+        if key in actual and actual[key] != want:
+            bad.append(f"{key}: 登录页 {want} ≠ 实测 {actual[key]}")
+
+    # 全量模式顺带核对用例数（--collect-only 很快，2~3 秒）
+    tests_collected = None
+    if not fast and "tests" in declared:
+        code, tail = _run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"], timeout=300)
+        m = re.search(r"(\d+)/\d+ tests collected", tail) or re.search(r"(\d+) tests collected", tail)
+        if code == 0 and m:
+            tests_collected = int(m.group(1))
+            if tests_collected != declared["tests"]:
+                bad.append(f"tests: 登录页 {declared['tests']} ≠ pytest 收集 {tests_collected}")
+
+    detail = f"meta.js 声明 {len(declared)} 项；已核对 " + \
+             "、".join(f"{k}={v}" for k, v in actual.items() if v >= 0)
+    if tests_collected is not None:
+        detail += f"、tests={tests_collected}"
+    if fast:
+        detail += "（--fast：用例数未核对）"
+    if bad:
+        return {"name": "登录页指标一致性", "passed": False, "detail": "；".join(bad),
+                "fix": "改 web/src/config/meta.js 的 value 使其等于实测值（或改后端口径），"
+                       "不要在两处各写一个数"}
+    return {"name": "登录页指标一致性", "passed": True,
+            "detail": detail + "；rag_hit1 由 CI 的 rag_eval 门禁核对", "fix": ""}
 
 
 def check_ruff(fast: bool) -> dict:
@@ -229,7 +302,7 @@ def main() -> int:
 
     checks = [
         check_schema(), check_env(), check_frontend(), check_server(), check_accounts(),
-        check_ruff(args.fast), check_tests(args.fast),
+        check_brand_metrics(args.fast), check_ruff(args.fast), check_tests(args.fast),
     ]
     failed = [c for c in checks if not c["passed"]]
     result = {"passed": len(checks) - len(failed), "total": len(checks),

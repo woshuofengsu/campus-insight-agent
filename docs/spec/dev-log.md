@@ -812,3 +812,48 @@
 - 动效是**次要**的：硬指标（555→556 测试全绿、hit@1 100%、知识图谱覆盖 96%、自检 7/7）才是评审看的东西；页面写满动效 ≠ 好看，故老年端刻意「几乎不动」（既是适老可达性论点，也避开「炫技」质疑）。
 
 **验证**：前端 `npm run build` 通过（545/526/529ms 三次增量构建无报错）；`ruff check .` = 0；`demo_preflight.py`（完整模式）**7/7**；全量 pytest **556 passed / 1 skipped**。**提交**：本轮。
+
+## 三十六、视觉自检第二遍：用真实浏览器做客观审计，抓出 6 个真 bug（含一个"整套补丁是死代码"）✅
+
+**背景与转向**：我（AI）无法「看」渲染结果，第一遍全量版是按规范写的、不是看着调的——这意味着**盲写最危险的不是「不好看」，而是「有硬伤却看不见」**。于是这轮不再靠感觉，改了方法：用 Playwright 驱动真实浏览器，把「视觉问题」变成**可复算的数字**。
+
+**新增工具（可复用，非一次性脚本）**
+- `scripts/ui_audit.py`：22 个页面/视口组合 × 8 类客观检查——横向溢出（含未被祖先裁剪的越界元素）、**WCAG AA 对比度**（普通 4.5 / 大字 3.0，渐变与透明文字自动跳过避免误报）、手机热区 <44px、字号下限（常规 12px / 老年端 20px）、断图、**暗色亮度取样**、动效是否真的生效、`prefers-reduced-motion` 是否真的关掉循环动效；控制台错误与 pageerror 一并收集。`--json` 可机读，退出码可当门禁。
+- `scripts/ui_audit_summary.py` / `ui_audit_detail.py`：汇总表与单页明细。
+- `scripts/shots.py`：逐角色/逐页截图（供人眼看；我读不了图，但你能）。
+- `scripts/gen_dark_patch.py`：内联浅色块 → 生成暗色补丁；与测试联动（见下）。
+
+**审计抓出的真 bug（全部已修，都有实测数字佐证）**
+
+1. **深链刷新被弹回首页 + 治理大屏在登录后根本打不开**（`App.vue`）
+   - `onMounted` 里直接读 `router.currentRoute.value.path`，此时首屏导航还没解析完（仍是 `/`），于是任何「不以角色前缀开头」的路径都被 `router.replace(角色首页)` 覆盖：刷新 `/grid/work-orders` → 回工作台；`/screen`（公开大屏）→ 也被弹走（`!== '/screen'` 的豁免判断恰好也没生效）。
+   - 实测：`page.goto('/grid/work-orders')` 立即变成 `/grid/dashboard`；连 `/screen` 也一样。
+   - 修复：`await router.isReady()` 后再判断，且**只**在 `/` 或 `/login` 做兜底跳转。修复后审计里 `grid-workorders → /grid/work-orders`、`screen → /screen` 均正常。
+2. **暗色模式下老年端「浅底浅字」（1.16:1，几乎不可读）**：`ElderlyLayout` 根节点内联写死 `background:#F7F8FA`，不跟随主题 → 改 `var(--bg)`。
+3. **⚠ 整套暗色内联补丁是死代码（本轮最有价值的发现）**：`style.css` 用 `body.dark [style*="background:#fef2f2"]`（hex 源码形式）匹配内联样式，但 **Vue 渲染时会经 CSSOM 规范化 DOM 上的 style 为 `background: rgb(254, 242, 242);`** —— 属性选择器匹配的是规范化后的值，所以这批规则**从未命中过任何元素**，暗色下浅色块一直是刺眼亮块（实测 grid 工作台暗色 5 处不达标）。
+   - 修复：全部改为 `[style*="rgb(r, g, b)"]` 形式（`scripts/gen_dark_patch.py` 生成）。
+   - 防复发：`tests/test_frontend_style_hygiene.py::test_every_inline_light_bg_has_dark_rule` —— 扫描 `web/src` 所有内联浅色块，逐色断言 style.css 里存在对应暗色规则，缺了就失败并给出修法。
+4. **老年端 3 列栅格横向溢出 153px**（第三列按钮跑到屏幕外）：`grid-template-columns:1fr 1fr 1fr`（`1fr` = `minmax(auto,1fr)`，被 Naive 按钮的 `white-space:nowrap` 撑破）→ 改 `.elderly-grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}` + 允许按钮内容换行收缩（`<360px` 降为 2 列）。
+5. **大屏守卫与接口权限两套机制打架**：`/screen` 路由放行、但 8 个指标端点 grid 锁定 → 匿名访问会先渲染再被 axios 拦截器 401 弹回登录页，居民访问同样被弹。→ 路由层直接 `meta.role='grid'`（一套机制、行为可预期），并在网格端顶栏加「🖥️ 治理大屏」入口。
+6. **老年端用药时间把数组原样打印成 JSON**：页面显示 `⏰ [ "08:00", "20:00" ]`（给老人看的乱码）→ 加 `fmtTimes()` 格式化。
+
+**外部评审 P2/P3 落地**
+- **P2 登录页数字打架**：新增 `web/src/config/meta.js` 作为登录页指标的**唯一来源**，并**移除易变业务指标**（原「AI 自转率 62%」与后端实测口径 AI 对话自解决率 90.9% / 工单自办结率 12.9% 对不上），只留可复算项：**557 自动化测试**（pytest 收集数 = 556 通过 + 1 跳过）、**42 检索评测集**、**100% hit@1**、**9 智能体角色**。
+  - 新增 `demo_preflight.py` 第 8 项 **登录页指标一致性**：解析 meta.js → 与 `len(AGENT_CLASSES)`、golden 集条数（同 `rag_eval.load_golden` 口径，跳过 `#` 注释行——按文件行数会误算成 51）、pytest 收集数逐项核对；`rag_hit1` 由 CI 的 rag_eval 步骤门禁。附带负向测试 `test_brand_metrics_detects_drift`。
+  - **门禁当天就抓到一次真实漂移**：本轮新增 7 个测试后收集数 557 → 563，登录页仍写 557 → preflight 立刻判失败；已同步 meta.js（这正是「下次加测试就会漂」的实证）。
+- **P3 内联色不跟主题走（根因治理）**：新增亮/暗成对的语义令牌 `--ink-success/-danger/-info/-purple/-warning`、`--primary-ink`，把 46 处内联写死色收口到令牌；老年端 34 处内联灰字/小字号收口到 `var(--muted)` + 适老字号；Naive 组件（按钮 15px / 标签 14px / 输入 14px）在老年端容器内统一提到 20px。并把「内联浅色块只减不增」做成 ratchet 门禁（基线 21 处，亮度>0.5 且饱和度<0.35 才算浅色块，避免把品牌光斑/状态色误判）。
+- **P3 动效收敛（可选建议）**：登录页去掉常驻流动渐变（保留光斑 + 玻璃，一屏循环动效少一层）；小屏 `backdrop-filter` 由 18px 降到 10px；新增 `body.anim-paused` + `visibilitychange` —— **页面不可见时全站动画暂停**（挂墙大屏/低端机不再空转耗 GPU）。
+
+**顺带修的可访问性硬伤（都是审计实测出来的，之前没人看见）**
+- Naive 默认 `placeholder` #C2C2C2 = **1.78:1**、`Divider` 文字 2.54:1、`Tag` success/warning 文字 1.96~2.27:1、`Empty` 描述 1.67:1 → 全部通过 `themeOverrides` 提到达标值。
+- 语义色**填充按钮**是白字，白字配 #10B981/#F59E0B/#0EA5E9 只有 2.5~2.8:1 → 只把「填充按钮」的底色调深（标签/图表仍用亮色）：success 5.54 / warning 5.05 / error 4.84 / info 5.94。
+- `--muted` #64748B 在白底只有 **4.48:1**（差 0.02 卡在 AA 线下）→ 调深到 #5B6B80（5.2:1）。
+- 状态 pill 文字色 `#dc2626`/`#16a34a`/`#059669` 在浅底上 3.58~4.41:1 → 统一调到达标值。
+
+**验证（全绿，可复算）**
+- `python scripts/ui_audit.py`：**22 个页面/视口（含 6 个暗色页）全部 0 违规**——对比度 0、字号 0、横向溢出 0、热区 0、断图 0、JS 报错 0、`prefers-reduced-motion` 下循环动效均已关闭。
+- `ruff check .` = 0；`npm run build` 通过；`demo_preflight.py`（完整模式）**8/8**；全量 pytest **562 passed / 1 skipped**（新增 7 项：前端样式卫生 4 + 品牌指标一致性 2 + UTF-8 回归 1）。
+
+**踩坑记录（给自己的教训）**：中途我把 HTML 注释写进了 `:style="{...}"` 对象字面量 → Vite 构建失败，而我用 `Select-Object -Last 3` 截断输出把错误吞了，导致「审计通过」其实测的是旧产物（旧色值仍在报错才暴露）。**结论：构建验证必须显式判定成功**（`if ($out -match '✓ built in')` 或看退出码），不能只看末尾几行。
+
+**提交**：本轮。

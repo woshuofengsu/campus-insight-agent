@@ -5,7 +5,10 @@ import { useUserStore } from '../stores/user'
 const routes = [
   { path: '/', redirect: '/login' },
   { path: '/login', name: 'login', component: () => import('../views/Login.vue') },
-  { path: '/screen', name: 'screen', component: () => import('../views/Screen.vue'), meta: { title: '治理大屏' } },
+  // 治理大屏：展示的是治理侧指标（agent/* 端点 grid 锁定），因此路由层就要求 grid 身份。
+  // 原先是「路由放行 + 接口 401 被 axios 拦截器弹回登录页」两套机制打架：匿名访问会先渲染再被弹走，
+  // 居民访问也会被弹（他们没有这些指标），统一为路由层拦截，行为可预期。
+  { path: '/screen', name: 'screen', component: () => import('../views/Screen.vue'), meta: { title: '治理大屏', role: 'grid' } },
   { path: '/stability', name: 'stability', component: () => import('../views/Stability.vue'), meta: { title: '系统稳定性演示' } },
 
   // 居民端
@@ -76,7 +79,7 @@ const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach((to) => {
   const store = useUserStore()
-  if (to.path === '/login' || to.path === '/screen') return true
+  if (to.path === '/login') return true
   if (!store.token) return '/login'
   const required = to.meta.role
   if (required && store.role !== required) {

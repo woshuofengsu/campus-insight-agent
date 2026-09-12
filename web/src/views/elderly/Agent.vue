@@ -104,7 +104,7 @@ function sendOption(o) {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">🤖 社区小助手</div>
-    <p style="text-align:center;color:#6b7280;font-size:1.1rem;">按住说话，或直接打字问我</p>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">按住说话，或直接打字问我</p>
 
     <!-- 语音按钮（至少 80px 高） -->
     <div style="margin:8px 0;">
@@ -114,7 +114,7 @@ function sendOption(o) {
     </div>
 
     <!-- 转写确认（对，提交 / 重新说） -->
-    <div v-if="pendingText" class="card" style="background:#fefce8;font-size:1.2rem;">
+    <div v-if="pendingText" class="card" style="background:#fefce8;font-size:1.25rem;">
       <div>您说的是：<b>{{ pendingText }}</b></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
         <n-button type="success" size="large" style="min-height:56px;" @click="confirmText">✅ 对，提交</n-button>
@@ -124,36 +124,36 @@ function sendOption(o) {
 
     <!-- 快捷问题 -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;justify-content:center;">
-      <n-button v-for="(q, i) in QUICK" :key="i" size="large" @click="sendOption(q)">{{ q }}</n-button>
+      <n-button v-for="(q, i) in QUICK" :key="i" size="large" style="font-size:1.25rem;min-height:56px;" @click="sendOption(q)">{{ q }}</n-button>
     </div>
 
     <!-- 对话区（大字回复） -->
-    <div class="card" style="min-height:220px;max-height:420px;overflow-y:auto;font-size:1.15rem;">
+    <div class="card" style="min-height:220px;max-height:420px;overflow-y:auto;font-size:1.25rem;">
       <div v-for="(m, i) in msgs" :key="i" style="margin-bottom:12px;">
         <div v-if="!m.bot" style="text-align:right;">
           <div style="display:inline-block;background:#2E7D32;color:#fff;border-radius:12px;padding:10px 14px;max-width:85%;">🗣️ {{ m.text }}</div>
         </div>
         <div v-else>
-          <div style="display:inline-block;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 14px;max-width:90%;white-space:pre-wrap;"
-               :style="m.error ? 'color:#dc2626;' : ''">
+          <div style="display:inline-block;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:10px 14px;max-width:90%;white-space:pre-wrap;"
+               :style="m.error ? 'color:var(--ink-danger);' : ''">
             🤖 {{ m.text }}
             <div v-if="m.intent" style="margin-top:6px;"><n-tag size="small" type="info">{{ m.intent }}</n-tag></div>
             <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
               <n-button v-for="(a, ai) in (m.actions || [])" :key="ai" size="large" type="primary"
                         @click="a.type === 'navigate' && $router.push(a.to)">{{ a.label }}</n-button>
-              <n-button size="large" @click="replay(m)">🔊 再听一次</n-button>
+              <n-button size="large" style="font-size:1.25rem;min-height:56px;" @click="replay(m)">🔊 再听一次</n-button>
             </div>
           </div>
         </div>
       </div>
-      <div v-if="busy" style="color:#6b7280;">🤖 正在思考…</div>
+      <div v-if="busy" style="color:var(--muted);">🤖 正在思考…</div>
     </div>
 
     <!-- 文字输入 -->
     <div style="display:flex;gap:8px;margin-top:10px;">
       <n-input ref="inputEl" v-model:value="input" type="textarea" :rows="2" placeholder="或直接打字告诉我（最多 200 字）" maxlength="200"
-               style="font-size:1.2rem;" @keyup.enter="send()" />
-      <n-button type="primary" size="large" style="min-height:56px;" :loading="busy" @click="send()">发送</n-button>
+               style="font-size:1.25rem;" @keyup.enter="send()" />
+      <n-button type="primary" size="large" style="min-height:56px;font-size:1.25rem;" :loading="busy" @click="send()">发送</n-button>
     </div>
 
     <!-- 底部紧急求助（长按 3 秒） -->

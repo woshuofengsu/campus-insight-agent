@@ -58,7 +58,7 @@ async function submit() {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">🗣️ 一句话报修</div>
-    <p style="text-align:center;color:#6b7280;font-size:1.1rem;">点「🎤 按住说话」语音上报，或直接打字</p>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">点「🎤 按住说话」语音上报，或直接打字</p>
 
     <div class="card" style="font-size:1.3rem;">
       <n-button type="error" block size="large" style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
@@ -69,7 +69,7 @@ async function submit() {
                style="font-size:1.3rem;margin-top:12px;" />
 
       <!-- 转写确认（10 秒超时） -->
-      <div v-if="confirming" style="background:#eef2ff;border-radius:10px;padding:10px;margin-top:12px;font-size:1.1rem;">
+      <div v-if="confirming" style="background:#eef2ff;border-radius:10px;padding:10px;margin-top:12px;font-size:1.25rem;">
         ✅ 已识别：{{ text }}（10 秒内确认）
       </div>
 

@@ -203,7 +203,7 @@ async function exportContents() {
           <div style="margin-top:8px;" class="muted">{{ (c.content || '').slice(0, 50) }}{{ (c.content || '').length > 50 ? '…' : '' }} <n-button size="tiny" text @click="showDetail(c)">查看详情</n-button></div>
           <div v-if="c.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
             💬 已回复：{{ c.reply }}
-            <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:#b45309;">🏥 就医指引：{{ c.doctor_guide }}</div>
+            <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:var(--ink-warning);">🏥 就医指引：{{ c.doctor_guide }}</div>
           </div>
           <div v-if="['待回复', '超时未回复'].includes(c.status)" style="margin-top:10px;">
             <div class="muted" style="font-size:0.75rem;margin-bottom:4px;">⚠️ 请勿进行疾病诊断，回复仅为健康建议</div>
@@ -353,8 +353,8 @@ async function exportContents() {
         </div>
         <div v-if="cDetail.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:10px;">
           💬 回复：{{ cDetail.reply }}
-          <div v-if="cDetail.doctor_guide" style="margin-top:4px;color:#b45309;">🏥 就医指引：{{ cDetail.doctor_guide }}</div>
-          <div v-if="cDetail.need_offline" style="margin-top:4px;color:#dc2626;">⚠️ 已建议尽快线下就医</div>
+          <div v-if="cDetail.doctor_guide" style="margin-top:4px;color:var(--ink-warning);">🏥 就医指引：{{ cDetail.doctor_guide }}</div>
+          <div v-if="cDetail.need_offline" style="margin-top:4px;color:var(--ink-danger);">⚠️ 已建议尽快线下就医</div>
         </div>
         <div v-if="cDetail.feedback" style="margin-top:10px;font-size:0.9rem;">
           居民反馈：{{ cDetail.feedback === '已解决' ? '✅ 已解决' : '😕 未解决' }}<span v-if="cDetail.feedback_reason">（{{ cDetail.feedback_reason }}）</span>

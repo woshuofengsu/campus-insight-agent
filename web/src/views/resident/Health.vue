@@ -187,7 +187,7 @@ function atts(c) {
         </div>
         <!-- 提交成功反馈 -->
         <div v-if="submitted" class="card" style="border-color:#86efac;">
-          <b style="color:#16a34a;">✅ 咨询已提交</b>
+          <b style="color:var(--ink-success);">✅ 咨询已提交</b>
           <div class="muted" style="font-size:0.9rem;margin-top:6px;">
             编号：<b>{{ submitted.code }}</b> · 状态：待回复 · 类型：{{ submitted.consult_type || cform.consult_type }} · 提交时间：{{ new Date().toLocaleString('zh-CN') }}
           </div>
@@ -213,8 +213,8 @@ function atts(c) {
           </div>
           <div v-if="c.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
             💬 负责人：{{ c.reply }}
-            <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:#b45309;">🏥 就医指引：{{ c.doctor_guide }}</div>
-            <div v-if="c.need_offline" style="margin-top:4px;font-size:0.85rem;color:#dc2626;">⚠️ 建议尽快线下就医</div>
+            <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:var(--ink-warning);">🏥 就医指引：{{ c.doctor_guide }}</div>
+            <div v-if="c.need_offline" style="margin-top:4px;font-size:0.85rem;color:var(--ink-danger);">⚠️ 建议尽快线下就医</div>
           </div>
           <!-- 反馈已解决/未解决 -->
           <div v-if="c.status === '已回复' && !c.solved_feedback" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
