@@ -1,5 +1,11 @@
 # 社区先知 CommunityInsight — 技术亮点
 
+> ⚠️ **历史实现（原型阶段：Streamlit + LangChain）**。本文描述的是早期演示形态（328 测试、16 工具、AgentExecutor/OODA 链路），
+> **已被 FastAPI + Vue3 三端 + 9 声明式角色 + 黑板协作的主线取代**。
+> 现状与最终版数字请以 [`docs/competition/最终版交付说明.md`](competition/最终版交付说明.md)、
+> [`docs/competition/技术实现报告.md`](competition/技术实现报告.md) 开头的状态更正声明、以及 `python scripts/check_claims.py` 为准。
+> 保留本文仅为说明设计演进脉络。
+
 > 面向评委的 5 分钟技术深度速览。建议配合演示视频阅读。
 
 ---

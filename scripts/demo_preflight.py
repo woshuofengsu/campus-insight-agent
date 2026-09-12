@@ -180,7 +180,8 @@ def check_brand_metrics(fast: bool) -> dict:
     if bad:
         return {"name": "登录页指标一致性", "passed": False, "detail": "；".join(bad),
                 "fix": "改 web/src/config/meta.js 的 value 使其等于实测值（或改后端口径），"
-                       "不要在两处各写一个数"}
+                       "不要在两处各写一个数；用例数变了直接跑 "
+                       "`python scripts/sync_test_count.py`（自动同步 meta.js 与各文档）"}
     return {"name": "登录页指标一致性", "passed": True,
             "detail": detail + "；rag_hit1 由 CI 的 rag_eval 门禁核对", "fix": ""}
 

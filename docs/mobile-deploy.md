@@ -235,5 +235,7 @@ iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) �
 | 5 | 安全响应头 | 生产 `curl -I` 核验 5 个头（P1-2） | ⬜ 上线时 |
 | 6 | 手机号明文 | 生产前 `SELECT COUNT(*)` 核验全库明文列 = 0；全库密文为 `g1$`（AES-256-GCM） | ⬜ 上线时 |
 | 7 | 压测 | `python scripts/benchmark_business.py` 业务混合压测（p50/p95/p99、错误率、QPS）；`benchmark_concurrency.py` 复验 550 并发 | ⬜ 上线时 |
-| 8 | 数字一致性 | `python scripts/check_claims.py`（测试数/schema v42/路由/角色/表数），材料数字与其一致 | ⬜ 每次发材料前 |
+| 8 | 数字一致性 | `python scripts/check_claims.py`（测试数/schema/路由/角色/表数，并交叉核对登录页 meta.js），材料数字与其一致 | ⬜ 每次发材料前 |
+| 9 | 数据安全 | `python scripts/audit_phone_encryption.py`（8 张含手机号表明文计数必须为 0） | ⬜ 改数据层后 |
+| 10 | UI 无障碍 | `python scripts/ui_audit.py`（26 页 × 9 类检查，0 违规） | ⬜ 改前端后 |
 

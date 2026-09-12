@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、457 项测试）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、577 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -19,7 +19,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ```
 
 - **主服务**：`uvicorn api_web:app --port 8000`（FastAPI）
-- **数据库**：SQLite（`data/community_insight.db`），schema **v41**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
+- **数据库**：SQLite（`data/community_insight.db`），schema **v46**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
 
 ## 多智能体核心（9 个声明式角色）
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（457 项，全绿基线）
+# 后端测试（可运行 577 项：576 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -54,40 +54,54 @@ elderly:  demo_elderly（免登录）
 ## 数据库迁移约定
 
 - schema 版本在 `data/db_core.py`，迁移函数命名 `_m{N}_{name}`，注册进 `post` 列表（`(version, name, fn)`），幂等（`_add_column` 用 PRAGMA 检查）
-- **当前版本 v41**。加列/索引/新表都走这个机制，**不要**直接 ALTER 业务代码
+- **当前版本 v46**。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
 - 迁移脚本放 `scripts/`（照 `migrate_phone_encryption_v39.py` 模式：含 `_ensure_db()`、可回滚 `--rollback`、幂等）
 - **D12（评审建议）**：`data/db_policy.proposal/elderly_care/health_content/weather/notice` 各 800–1240 行，**比赛期不做大重构**；答辩后按 read/write 拆分（纯计算抽 `data/_*_logic.py` + 单测），其结构写入 WS11
 
 ## 数据安全约定（重要，评委查库会看）
 
 - **手机号加密落库**：`data/db_repair.py` 提供 `_enc_phone()` / `_dec_phone(enc, plain)` / `_mask_phone()`（复用 `utils/crypto.get_crypto()` 单例）。**任何新表的手机号字段**必须：明文列写空 + 加密列写密文 + 读取解密。
-- 已加密表：`community_issues`、`user_profile`、`emergency_contacts`、`health_consults`、`emergency_calls`。
+- 已加密表（**v46 起全覆盖**）：`community_issues`、`user_profile`、`emergency_contacts`、`health_consults`、
+  `emergency_calls`、`proposals`、`proposal_drafts`、`issue_drafts`。
+- **新增含手机号的表后必跑** `python scripts/audit_phone_encryption.py`：要求「有 `*_enc` 兄弟列 + 明文计数 0」，
+  并加进 `_mN_` 迁移做存量回填（只在加密成功时清空明文）。`demo_preflight` 第 8 项会现场核对。
 - 留痕（`activity_log.detail`）不得含完整手机号（用 `_mask_phone`）。
 - 密钥：`.env` 的 `WEB_JWT_SECRET`/`CRYPTO_KEY` 生产必配；`.env`/`*.db`/`*.db.bak`/`.coverage` 已 gitignore。
 
 ## 约束与陷阱
 
-- **不要破坏 457 项测试**：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交。
+- **不要破坏这 577 项测试**（576 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（26 页 UI 客观审计）。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
 - `config.DEFAULT_TENANT` 为多租户默认值（演示级，仅预留字段不改查询）；`AGENT_CLASSES` 角色 id 不得随意改（有状态）。
 - LLM 默认**规则优先降本**：`LLM_NEGOTIATION`/`LLM_ORCHESTRATION` 默认关，`=1` 才走真实 DeepSeek（用于答辩演示）。
-- CSP `script-src 'self'` 会拦截 `?debug=1` 的 Eruda CDN（上生产需知悉）；WebSocket `/ws/notify` 用内存连接池（单机够用，多进程需 Redis）。
+- CSP `script-src 'self'` **禁止内联脚本**：调试入口已改为同源外部文件 `web/public/debug.js`（`?debug=1` 生效），
+  不要再往 `index.html` 里写内联 `<script>`（会在每个页面报 CSP 错、评委开 DevTools 就能看到）。
+  WebSocket `/ws/notify` 用内存连接池（单机够用，多进程需 Redis）。
 
 ## 关键文件索引
 
 | 文件 | 作用 |
 |---|---|
 | `api_web.py` | FastAPI 主服务：App 装配 + JWT 中间件 + 安全头 + WebSocket + SPA 托管 |
-| `api_routes/` | 16 个业务路由模块（auth/agent/issues/proposals/notices/health/...）|
+| `api_routes/` | 14 个业务路由模块 + 共享依赖（auth/agent/issues/proposals/notices/health/...）|
 | `agent/orchestrator.py` | 多 Agent 编排（黑板、协商、Verifier/Arbiter 接入、转人工）|
 | `agent/roles/business_agents.py` | 5 个业务角色（报修/提案/政策/健康/通知）|
 | `agent/roles/auto_agents.py` | 天气守护 + 网格助手 |
-| `data/db_core.py` | schema + 迁移注册（v41）|
+| `data/db_core.py` | schema + 迁移注册（**v46**）|
 | `web/src/views/{resident,grid,elderly}/` | 三端页面 |
 | `docs/mobile-deploy.md` | 移动端部署 + 发布检查清单 |
-| `docs/spec/dev-log.md` | 开发日志（最新 二十五 节为本次升级）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 三十八 节**为第七轮复审收口）|
 
-## 本轮已完成的大改动（2026-08）
+## 已完成的大改动（截至最终版）
 
-数据安全收口（手机号全加密）/ LLM 自主协商（`llm_negotiator.py`，默认关）/ 安全响应头 / 索引优化（v40）/ 自转率统计 / 红黑榜下钻 / NLU 方言扩充 / 多租户预留（v41）/ 舆情源框架 / WebSocket 实时通知 / 分级路由降本（`route_grade`）。详见 `docs/spec/dev-log.md` 二十五节。
+- **P0/P1 收口**：数据安全（手机号全加密 + 脱敏 + 审计留痕）/ LLM 自主协商（`llm_negotiator.py`，默认关）/ 安全响应头 /
+  索引优化（v40）/ 自转率统计 / 红黑榜下钻 / NLU 方言扩充 / 多租户预留（v41）/ 舆情源框架 / WebSocket 实时通知 / 分级路由降本
+- **竞品对标升级 U1–U7**：混合检索（词法+语义 RRF）/ 真实政策语料 40 条 / 知识库健康度观测 / 关怀量化 / 演示前自检 /
+  轻量知识图谱 / 数据层演进路径（见 dev-log 二十七～三十四节）
+- **视觉系统 v2 + 客观 UI 审计**：设计令牌重建、三端差异化、暗色达标、无障碍达标，
+  `scripts/ui_audit.py` 26 页 × 9 类检查 0 违规（见 dev-log 三十五～三十六节）
+- **第七轮复审收口**：v46 手机号加密全量补齐（提案/草稿/user_profile 残留）/ 运行时裸 ALTER 收回迁移链 /
+  utcnow 弃用清理 / 异常文案脱敏 / 录屏素材（见 dev-log 三十七～三十八节）
+
+详见 `docs/spec/dev-log.md`（最新 **三十八** 节）。

@@ -2,7 +2,36 @@
 
 > 社区先知 CommunityInsight Agent —— 治理闭环 + 优化落地 + 老年关怀版 + Agent 内核重构
 >
-> 日期：2026-08-14　测试基线：**328 passed, 3 deselected, 7 subtests passed**（`pytest -q`，无 key 也绿）
+> **当前版本：v1.0 定稿（2026-09-12）** —— 现状与数字请看下面的「v1.0 定稿」一节，
+> 或直接跑 `python scripts/check_claims.py`（实时核对代码库事实数字）。
+
+---
+
+## v1.0 定稿（2026-09-12）
+
+**基线**：可运行测试 **576 项**（576 passed / 1 skipped，需外部服务默认跳过）· schema **v46** · 130 条路由 · 9 个 Agent 角色 · 50 张表。
+
+**本版内容**（详见 `docs/spec/dev-log.md` 三十四～三十八节）：
+
+- **竞品对标升级 U1–U7**：混合检索（词法 + 语义向量 RRF，口语金标 hit@1 85.7% → **100%**）/ 真实政策语料 40 条（可溯源）/
+  知识库健康度观测 / 关怀量化（情绪与触达率）/ 演示前一键自检 / 轻量知识图谱（88 实体·199 关系·覆盖 96%）/ 数据层演进路径。
+- **视觉系统 v2 + 客观 UI 审计**：设计令牌重建、三端差异化、暗色与无障碍达标；
+  新增 `scripts/ui_audit.py`（**26 页/视口 × 9 类检查**：对比度/溢出/热区/字号/断图/暗色亮度/动效生效/reduced-motion/**渲染残缺文本**），当前 **0 违规**。
+- **数据安全 v46 全量收口**：手机号加密覆盖到全部 8 张含手机号表（补齐提案/提案草稿/报修草稿遗漏面与 user_profile 残留），
+  **明文计数 0**；`scripts/audit_phone_encryption.py` 体检 + `demo_preflight` 第 8 项现场核对；账号注销级联清密文。
+- **工程纪律**：历史遗留的运行时裸 ALTER 全部收回迁移链（全新建库与存量升级同路径）；`datetime.utcnow` 弃用清理；
+  插件入口异常文案脱敏；`check_claims.py` 升级为门禁（含登录页 `meta.js` 与材料措辞一致性）。
+- **答辩素材**：`scripts/demo_record.py` 真实浏览器录屏 6 段（含老年端 SOS 长按）+ 15 张关键帧；
+  分镜与现场用法见 `docs/competition/答辩录屏分镜.md`；交付入口见 `docs/competition/最终版交付说明.md`。
+
+**验证**：`pytest` 576 passed / 1 skipped · `ruff check .` = 0 · `npm run build` 通过 ·
+`demo_preflight.py` **9/9** · `ui_audit.py` 26 页 0 违规 · `audit_phone_encryption.py` 无缺口。
+
+---
+
+> 以下为**历史条目**（按当时版本记录，测试基线以各条写作时点为准；如需现状请以顶部 v1.0 定稿与 `check_claims.py` 为准）。
+>
+> 日期：2026-08-14　写作时点测试基线：**328 passed, 3 deselected, 7 subtests passed**（`pytest -q`，无 key 也绿）
 
 本日志记录本轮「全都做」迭代对系统的改动。改动原则：**内部标识不动**（表 `campus_issues`、字段 `school/grade/major/student_id`、角色 `student/teacher`、工具 `get_campus_pulse/get_school_policy`、路由 `/api/campus-pulse`、DB `campus_insight.db`、类 `CampusAgent` 均保留），只改用户可见文案与数据口径。
 

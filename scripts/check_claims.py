@@ -16,22 +16,29 @@ _PROJ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _PROJ)
 
 
-def _pytest_collection_count() -> int:
-    """通过子进程运行 pytest --collect-only，解析"tests collected"数字。"""
+def _pytest_collection_count() -> tuple[int, int]:
+    """返回 (可运行用例数, 收集总数)。
+
+    pytest -q 的汇总行形如 `572/575 tests collected (3 deselected)`：
+    - 总数 575 含被 `-m` 标记排除的 3 项；
+    - **可运行 572 = 571 通过 + 1 需要外部服务默认跳过**（对外报数字用这个，与登录页 meta.js 一致）。
+    """
+    import re
     try:
         p = subprocess.run(
-            [sys.executable, "-m", "pytest", "--collect-only"],
-            cwd=_PROJ, capture_output=True, text=True, timeout=180, check=False,
+            [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+            cwd=_PROJ, capture_output=True, text=True, timeout=300, check=False,
         )
-        out = p.stdout or ""
-    except Exception:
-        return -1
-    import re
-    m = re.search(r"(\d+)\s+tests? collected", out) or re.search(r"collected (\d+) items", out)
+        out = (p.stdout or "") + (p.stderr or "")
+    except Exception:  # noqa: BLE001
+        return -1, -1
+    m = re.search(r"(\d+)/(\d+)\s+tests?\s+collected", out)
     if m:
-        return int(m.group(1))
-    # 兜底：退回 -q 点号统计（罕见，不用也行）
-    return -1
+        return int(m.group(1)), int(m.group(2))
+    m = re.search(r"(\d+)\s+tests?\s+collected", out)
+    if m:
+        return int(m.group(1)), int(m.group(1))
+    return -1, -1
 
 
 def _schema_version() -> int:
@@ -83,13 +90,91 @@ def _table_count() -> int:
 
 
 def main():
+    runnable, total = _pytest_collection_count()
+    # 明细不写死：按「可运行 = 通过 + 1 项需外部服务跳过」推导，避免总数变了明细没变
+    passed = max(0, runnable - 1)
     print("社区先知 CommunityInsight —— 当前代码库事实数字：")
-    print(f"  pytest 用例数   : {_pytest_collection_count()}")
-    print(f"  schema 版本号  : {_schema_version()}")
-    print(f"  HTTP 路由数    : {_route_count()}")
-    print(f"  Agent 角色数   : {_role_count()}")
-    print(f"  业务表数量     : {_table_count()}")
+    print(f"  pytest 可运行用例数  : {runnable}（= {passed} 通过 + 1 需外部服务默认跳过）")
+    print(f"  pytest 收集总数      : {total}（含 {max(0, total - runnable)} 项按标记排除；对外报「可运行」口径）")
+    print(f"  schema 版本号        : {_schema_version()}")
+    print(f"  HTTP 路由数          : {_route_count()}")
+    print(f"  Agent 角色数         : {_role_count()}")
+    print(f"  业务表数量           : {_table_count()}")
+    print("\n对外材料的数字请以以上为准；下表为自动核对结果：")
+    return _cross_check(runnable)
+
+
+# 「当前状态文档」——数字必须与代码一致；历史快照（docs/review/**、dev-log、
+# docs/superpowers/**、docs/spec/方案类）保留当时事实，不在此列。
+CURRENT_DOCS = [
+    "README.md", "AGENTS.md", "HANDOFF.md", "PRODUCT.md", "CHANGELOG.md",
+    "安装说明.md", "开发约定.md", "docs/DEPLOY.md",
+    "docs/mobile-deploy.md", "docs/scaling.md", "docs/deploy-keys.md",
+    "docs/competition/创意说明书-提交版.md", "docs/competition/最终版交付说明.md",
+]
+
+# 历史文档：正文允许保留原型阶段的数字（328 测试 / Streamlit / LangChain / 16 工具），
+# **但必须在开头明确标注**是历史实现，否则会误导评委 → 门禁检查「标注存在」。
+LEGACY_BANNER_DOCS = {
+    "docs/TECHNICAL.md": "历史实现",
+    "docs/competition/技术实现报告.md": "状态更正声明",
+    "docs/competition/创意说明书.md": "历史实现",
+}
+
+# 明确过时的表述（改完即不再出现；命中即失败）
+STALE = [
+    "schema v41", "schema v42", "schema v43", "schema v44", "schema v45",
+    "schema **v41**", "schema **v42**", "schema **v43**", "schema **v44**", "schema **v45**",
+    "328 测试", "328 项", "457 项", "495 passed", "538 项", "555 项", "564 passed",
+    "16 个治理工具", "16 个函数工具", "Streamlit 三角色", "LangChain AgentExecutor",
+]
+
+
+def _cross_check(collected: int) -> int:
+    """① 登录页 meta.js 的用例数必须等于 pytest 收集数；② 当前状态文档不得含过时表述。"""
+    import io
+    import re
+
+    bad: list[str] = []
+
+    meta = os.path.join(_PROJ, "web", "src", "config", "meta.js")
+    if os.path.exists(meta):
+        m = re.search(r"key:\s*'tests',\s*value:\s*(\d+)", io.open(meta, encoding="utf-8").read())
+        if m and collected > 0 and int(m.group(1)) != collected:
+            bad.append(f"登录页 meta.js 写 {m.group(1)}，pytest 可运行用例实际 {collected}"
+                       f"（跑 `python scripts/sync_test_count.py {collected}` 一键同步全部文档）")
+        elif m:
+            print(f"  ✅ 登录页用例数与 pytest 可运行数一致：{collected}")
+    else:
+        bad.append("web/src/config/meta.js 不存在（登录页数字的唯一来源）")
+
+    for doc in CURRENT_DOCS:
+        p = os.path.join(_PROJ, doc)
+        if not os.path.exists(p):
+            continue
+        for i, ln in enumerate(io.open(p, encoding="utf-8").read().splitlines(), 1):
+            for s in STALE:
+                if s in ln:
+                    bad.append(f"{doc}:{i} 含过时表述「{s}」→ {ln.strip()[:70]}")
+                    break
+
+    # 历史文档必须带「这是历史实现」标注
+    for doc, banner in LEGACY_BANNER_DOCS.items():
+        p = os.path.join(_PROJ, doc)
+        if not os.path.exists(p):
+            continue
+        head = io.open(p, encoding="utf-8").read()[:1500]
+        if banner not in head:
+            bad.append(f"{doc} 是历史实现文档，但开头缺少「{banner}」标注（会误导评委）")
+
+    if bad:
+        print("\n❌ 数字/表述不一致：")
+        for b in bad:
+            print("  -", b)
+        return 1
+    print("  ✅ 当前状态文档无过时表述（历史快照 docs/review、dev-log 不在此列）")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
