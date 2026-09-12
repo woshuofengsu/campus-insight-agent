@@ -374,7 +374,12 @@ def get_daily_advice(force: bool = False, city: str = "") -> dict:
 
 
 def get_simplified_weather(city: str = "") -> dict:
-    """老年端大字版简化天气：只返回温度、天气现象、预警标签、一句建议。"""
+    """老年端大字版简化天气：只返回温度、天气现象、预警标签、一句建议。
+
+    ⚠ 键名一致性（外部评审 B1 修复）：原先只返回 `temp`（=最高温）与 `temp_low`，**没有 `temp_high`**，
+    而老年端首页模板与语音播报都读 `temp_high` → 页面渲染成 "晴 17°~°"、播报漏最高温（只在适老旗舰页，
+    答辩演示一眼可见）。现在同时给出 `temp_high`（保留 `temp` 兼容既有引用）。
+    """
     result = get_weather_for_display(city)
     days = result.get("days") or []
     d = days[0] if days else None
@@ -382,6 +387,7 @@ def get_simplified_weather(city: str = "") -> dict:
     return {
         "city": city or result.get("location", ""),
         "temp": d.get("temp_high") if d else None,
+        "temp_high": d.get("temp_high") if d else None,
         "temp_low": d.get("temp_low") if d else None,
         "condition": d.get("condition", "") if d else "",
         "emoji": d.get("emoji", "") if d else "",

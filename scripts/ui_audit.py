@@ -182,6 +182,40 @@ AUDIT_JS = r"""
       bgImage: cs.backgroundImage !== 'none' ? 'gradient' : 'none',
     };
   }
+  // ---- 9. 渲染后残缺文本扫描（数据层绑定错误：字段对不上会渲染出空值拼接） ----
+  // 结构层检查（对比度/溢出）查不出「后端少返回一个字段」这类 bug，只能扫渲染后的文本。
+  // 例：老年端天气 `{{ temp_low }}°~{{ temp_high }}°` 在后端缺 temp_high 时渲染成 "17°~°"。
+  const RESIDUE = [
+    { name: 'undefined', re: /undefined/ },
+    { name: 'NaN', re: /\bNaN\b/ },
+    { name: '对象未展开', re: /\[object Object\]/ },
+    { name: '模板未渲染', re: /\{\{|\}\}/ },
+    { name: '温度缺失占位', re: /°\s*~\s*°/ },
+    { name: 'Infinity', re: /Infinity/ },
+  ];
+  const SOFT = [
+    { name: '空括号', re: /（\s*）|\(\s*\)/ },
+    { name: '尾部分隔符', re: /[、，,·]\s*$/ },
+  ];
+  res.residue = [];
+  res.residueSoft = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const t = (node.textContent || '').trim();
+    if (!t || t.length > 200) continue;
+    const host = node.parentElement;
+    if (!host) continue;
+    const cs = getComputedStyle(host);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) continue;
+    for (const p of RESIDUE) {
+      if (p.re.test(t)) res.residue.push({ kind: p.name, text: t.slice(0, 60), sel: sel(host) });
+    }
+    for (const p of SOFT) {
+      if (p.re.test(t)) res.residueSoft.push({ kind: p.name, text: t.slice(0, 60), sel: sel(host) });
+    }
+    if (res.residue.length > 12) break;
+  }
   return res;
 }
 """
@@ -202,6 +236,11 @@ REDUCED_JS = r"""
 # 需要审计的页面：(名称, 角色, 路由, 视口, 适老阈值, 手机热区, 暗色)
 PAGES = [
     ("login-desktop", None, "/login", (1440, 900), False, False, False),
+    # 1366×768：答辩投影仪/老笔记本的常见分辨率（外部评审建）
+    ("login-1366", None, "/login", (1366, 768), False, False, False),
+    ("screen-1366", "grid", "/screen", (1366, 768), False, False, False),
+    ("grid-dashboard-1366", "grid", "/grid/dashboard", (1366, 768), False, False, False),
+    ("elderly-home-1366", "elderly", "/elderly/home", (1366, 768), True, False, False),
     ("login-mobile", None, "/login", (390, 844), False, True, False),
     ("login-320", None, "/login", (320, 720), False, True, False),
     # 大屏的指标端点 grid 锁定 → 审计也要以 grid 身份进入（这才是答辩真实路径）
@@ -321,6 +360,14 @@ def main() -> int:
         if r["broken"]:
             high += 1
             print(f"   ⚠ 断图: {r['broken'][:3]}")
+        if r.get("residue"):
+            high += 1
+            print(f"   ⚠ 渲染残缺文本 {len(r['residue'])}（数据层字段对不上）:")
+            for d in r["residue"][:6]:
+                print(f"      [{d['kind']}] «{d['text']}»  {d['sel']}")
+        if r.get("residueSoft"):
+            print(f"   · 疑似残缺（人工确认）{len(r['residueSoft'])}: "
+                  + "；".join(f"[{d['kind']}]«{d['text']}»" for d in r["residueSoft"][:3]))
         if r.get("panels"):
             print("   暗色取样: " + "; ".join(f"{p['name']}={p.get('value')}" + (f" lum={p['lum']}"
                                               if p.get("lum") is not None else "") for p in r["panels"]))

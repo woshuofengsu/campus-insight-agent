@@ -310,6 +310,14 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
 
 /* 老年端 3 列栅格：用 minmax(0,1fr) 而非 1fr（1fr = minmax(auto,1fr)，会被内容顶破） */
 .elderly-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+/* 每格「图标在上、文字在下」：统一结构后同排自然等高，4 字标签也有整列宽度（不再折成两行参差）；
+   徽标包裹层与按钮都撑满单元格，保证同排三格高度一致（外部评审 B2） */
+.elderly-grid-3 .n-badge { height: 100%; }
+.elderly-grid-3 .elderly-btn { height: 100%; width: 100%; padding: 10px 4px !important; }
+.elderly-grid-3 .elderly-btn .n-button__content {
+  flex-direction: column; gap: 2px; line-height: 1.25; text-align: center;
+}
+.elderly-grid-3 .elderly-btn .n-button__content > span:first-child { font-size: 1.6rem !important; }
 @media (max-width: 359px) {
   .elderly-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

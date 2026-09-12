@@ -15,6 +15,8 @@ for k, v in d.items():
         print(f"{k:22s} ERROR {v['error']}")
         continue
     js = len(v.get("jsErrors") or [])
+    residue = len(v.get("residue") or [])
     print(f"{k:22s} url={v['url']:22s} vw={v['vw']:4d} ovX={v['overflowX']:4d} "
           f"contrast={len(v['contrast']):2d} targets={len(v['targets']):2d} "
-          f"fonts={len(v['fonts']):2d} overs={len(v['overs']):2d} broken={len(v['broken'])} js={js}")
+          f"fonts={len(v['fonts']):2d} overs={len(v['overs']):2d} broken={len(v['broken'])} "
+          f"residue={residue:2d} js={js}")

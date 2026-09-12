@@ -88,5 +88,43 @@ class TestElderlySafety(unittest.TestCase):
         self.assertFalse(any(s["id"] == sid for s in pending2))
 
 
+class TestElderlyWeatherPayload(unittest.TestCase):
+    """老年端简化天气的**键名契约**（外部评审 B1 回归）。
+
+    B1 现象：老年端首页显示 "晴 17°~°"、语音播报漏最高温。
+    根因：`get_simplified_weather()` 只返回 `temp`/`temp_low`，而前端模板与语音播报都读 `temp_high`
+    → 取不到就渲染成空串。结构类检查（溢出/对比度）天然查不出这种「接口字段对不上」的 bug，
+    所以这里把键名契约钉死：temp_high 与 temp_low 必须同时存在且非空。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls._db_path = _init_test_db("weather")
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup(cls._db_path)
+
+    def test_simplified_weather_has_both_temp_keys(self):
+        from data.db_weather import get_simplified_weather
+        w = get_simplified_weather("海淀小区")
+        self.assertIn("temp_high", w, "缺 temp_high → 老年端会渲染成 '17°~°'")
+        self.assertIn("temp_low", w, "缺 temp_low → 老年端会渲染成 '°~27°'")
+        self.assertIsNotNone(w["temp_high"], "temp_high 不能为 None（前端会渲染成空）")
+        self.assertIsNotNone(w["temp_low"], "temp_low 不能为 None（前端会渲染成空）")
+        # 兼容旧引用：temp 仍等于最高温
+        self.assertEqual(w["temp"], w["temp_high"])
+
+    def test_elderly_home_weather_has_no_residue(self):
+        """端到端：老年端首页接口返回的天气字段能拼出完整温度串（不出现 '°~°'）。"""
+        from data.db_weather import get_simplified_weather
+        w = get_simplified_weather("海淀小区")
+        shown = f"{w['temp_low']}°~{w['temp_high']}°"
+        self.assertNotIn("°~°", shown, f"渲染残缺：{shown}")
+        self.assertNotIn("None", shown, f"渲染残缺：{shown}")
+        # 数值可比较（最高温 ≥ 最低温）
+        self.assertGreaterEqual(int(w["temp_high"]), int(w["temp_low"]))
+
+
 if __name__ == "__main__":
     unittest.main()

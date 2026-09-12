@@ -22,6 +22,10 @@ ROLE_BTN = {"resident": "居民", "elderly": "老年", "grid": "网格员"}
 
 def shot_role(browser, base, out, name, role, path, viewport, wait=3200, dark=False):
     ctx = browser.new_context(viewport=viewport, device_scale_factor=1)
+    # 暗色必须用 localStorage 预置主题（ci_theme），不能靠点「🌙 夜间」按钮：
+    # 老年端布局压根没有这个按钮，点击会超时 → 截出的浅色图被命名成 -dark（评审 B3 抓到的正是这个）。
+    if dark:
+        ctx.add_init_script("localStorage.setItem('ci_theme','dark')")
     page = ctx.new_page()
     errs = []
     page.on("pageerror", lambda e: errs.append(str(e)))
@@ -38,12 +42,12 @@ def shot_role(browser, base, out, name, role, path, viewport, wait=3200, dark=Fa
         page.wait_for_timeout(600)
         page.goto(f"{base}{path}", wait_until="networkidle", timeout=30000)
         page.wait_for_timeout(wait)
+        # 主题已由 add_init_script 预置；这里只做一次断言式自检，防止再出现
+        # 「文件名叫 -dark、内容其实是浅色」的假截图
         if dark:
-            try:
-                page.get_by_text("🌙 夜间").first.click(timeout=4000)
-                page.wait_for_timeout(900)
-            except Exception as e:
-                errs.append(f"dark-toggle: {e}")
+            cls = page.evaluate("() => document.body.className")
+            if "dark" not in cls:
+                errs.append(f"dark 未生效：body.className={cls!r}")
         page.screenshot(path=os.path.join(out, f"{name}.png"))
     ctx.close()
     return errs
