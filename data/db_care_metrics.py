@@ -39,7 +39,7 @@ def get_care_metrics(days: int = 7) -> dict:
     """关怀量化指标（近 days 天）。任何异常返回零值结构，不影响页面。"""
     out = {
         "days": days, "care_events": 0, "emotion_events": 0,
-        "touch_events": 0, "touch_rate": 0.0,
+        "touch_events": 0, "touch_rate": 0.0, "scene_line_events": 0,
         "emotion_to_human": 0, "emotion_to_human_rate": 0.0,
         "emotion_closed": 0, "emotion_closed_rate": 0.0,
         "by_emotion": {}, "by_scene": {},
@@ -49,7 +49,10 @@ def get_care_metrics(days: int = 7) -> dict:
             row = conn.execute(
                 "SELECT COUNT(*) c, "
                 "SUM(CASE WHEN emotion_tag != '' THEN 1 ELSE 0 END) emo, "
-                "SUM(CASE WHEN comfort_used=1 OR scene_line_used=1 THEN 1 ELSE 0 END) touch, "
+                # 触达数只在「识别到情绪」的事件里统计 → 触达率恒 ≤100%（分母=情绪事件数）
+                "SUM(CASE WHEN emotion_tag != '' AND (comfort_used=1 OR scene_line_used=1) "
+                "    THEN 1 ELSE 0 END) touch, "
+                "SUM(CASE WHEN scene_line_used=1 THEN 1 ELSE 0 END) scene_line, "
                 "SUM(CASE WHEN emotion_tag != '' AND status IN "
                 "    ('transferred_to_human','needs_human') THEN 1 ELSE 0 END) to_human, "
                 "SUM(CASE WHEN emotion_tag != '' AND status='成功' THEN 1 ELSE 0 END) closed "
@@ -58,6 +61,7 @@ def get_care_metrics(days: int = 7) -> dict:
             out["care_events"] = row["c"] or 0
             out["emotion_events"] = row["emo"] or 0
             out["touch_events"] = row["touch"] or 0
+            out["scene_line_events"] = row["scene_line"] or 0
             out["emotion_to_human"] = row["to_human"] or 0
             out["emotion_closed"] = row["closed"] or 0
             if out["emotion_events"]:

@@ -159,30 +159,50 @@ def check_env() -> dict:
 
 
 def check_server() -> dict:
+    """服务可达性 + **身份校验**（端口被别的进程占用时会静默劫走请求，必须区分）。
+
+    实测踩坑：另一个程序的 mock 服务绑在 127.0.0.1:8000（比我们的 0.0.0.0 更具体），
+    健康检查返回 200 但响应体不是本服务的 JSON —— 若只判「200 即通过」，演示会当场翻车。
+    这里额外校验响应形状（success + data.service），不是本服务就明确报「端口被其它进程占用」。
+    """
     st, body = _http("/api/web/health")
-    if st == 200 and (body or {}).get("success"):
-        return {"name": "服务可达（:8000）", "passed": True,
-                "detail": (body.get("data") or {}).get("service", "ok"), "fix": ""}
+    if st == 0:
+        return {"name": "服务可达（:8000）", "passed": False,
+                "detail": "无响应：服务未启动或端口未监听",
+                "fix": "python -m uvicorn api_web:app --host 0.0.0.0 --port 8000"}
+    if st == 200 and isinstance(body, dict) and body.get("success"):
+        svc = (body.get("data") or {}).get("service", "")
+        if svc:
+            return {"name": "服务可达（:8000）", "passed": True, "detail": svc, "fix": ""}
+    # 200 但响应不是本服务（端口被别的进程占用 / 代理劫持）
+    snippet = str(body)[:80] if body is not None else "(空响应)"
     return {"name": "服务可达（:8000）", "passed": False,
-            "detail": "健康检查未通过（服务未启动或端口被占）",
-            "fix": "python -m uvicorn api_web:app --host 0.0.0.0 --port 8000"}
+            "detail": f"端口被其它进程占用：响应不是本服务（{snippet}）",
+            "fix": ("先查看占用者并结束它，再启动本服务：\n"
+                    "      Get-NetTCPConnection -LocalPort 8000 -State Listen | "
+                    "ForEach-Object { Get-CimInstance Win32_Process -Filter \"ProcessId=$($_.OwningProcess)\" | "
+                    "Select-Object ProcessId,CommandLine }\n"
+                    "      python -m uvicorn api_web:app --host 0.0.0.0 --port 8000")}
 
 
 def check_accounts() -> dict:
+    """三个演示账号可登录 + 鉴权中间件在跑（无 token → 401）。"""
     roles = [("resident", "居民端"), ("elderly", "老年端"), ("grid", "网格员端")]
     bad = []
     for role, label in roles:
         st, body = _post("/api/web/auth/demo", {"role": role})
-        token = ((body or {}).get("data") or {}).get("token") if st == 200 else None
+        token = ((body or {}).get("data") or {}).get("token") if isinstance(body, dict) and st == 200 else None
         if not token:
             bad.append(label)
             continue
-        st2, me = _http("/api/web/auth/me")  # 无 token 应 401（顺带验证鉴权中间件在跑）
-        if st2 not in (401,):
+        st2, _me = _http("/api/web/auth/me")  # 无 token 应 401（顺带验证鉴权中间件在跑）
+        if st2 != 401:
             bad.append(f"{label}(鉴权异常)")
     if bad:
         return {"name": "演示账号可登录", "passed": False, "detail": f"异常：{'、'.join(bad)}",
-                "fix": "确认 DEMO_MODE=true 且演示账号存在（python -c \"from config import DB_PATH;from data.seed import seed_all;seed_all(DB_PATH)\"）"}
+                "fix": ("若「服务可达」已失败，先解决端口占用/服务未启动；"
+                        "否则确认 DEMO_MODE=true 且演示账号存在："
+                        "python -c \"from config import DB_PATH;from data.seed import seed_all;seed_all(DB_PATH)\"")}
     return {"name": "演示账号可登录", "passed": True,
             "detail": "居民/老年/网格员三角色均可登录，鉴权中间件正常（无 token → 401）", "fix": ""}
 

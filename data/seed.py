@@ -527,15 +527,63 @@ def _seed_feedback():
         conn.commit()
 
 
+def _seed_care_events():
+    """种演示用关怀事件（U4：让大屏「关怀触达率」卡有数据，而不是 0）。
+
+    **只种标签，不种任何 PII**（无原文、无手机号、无姓名）：emotion_tag / scene / status 而已。
+    幂等：仅当 `care_event_log` 为空时写入；跨最近 7 天分布，便于周维度统计。
+    """
+    from datetime import datetime, timedelta
+    # (天数前, 情绪标签, 是否安抚, 场景, 是否共情, 意图, 状态)
+    rows = [
+        (0, "着急", 1, "repair_ok", 1, "repair_dispatch", "成功"),
+        (0, "担忧", 1, "repair_ok", 1, "health_advisor", "成功"),
+        (1, "不满", 1, "sos", 1, "handoff", "transferred_to_human"),
+        (1, "着急", 1, "repair_ok", 1, "repair_dispatch", "成功"),
+        (2, "焦虑", 1, "sos", 1, "health_advisor", "transferred_to_human"),
+        (2, None, 0, "fail", 1, "policy_expert", "失败"),
+        (3, "担忧", 1, "repair_ok", 1, "repair_dispatch", "成功"),
+        (4, "着急", 1, "repair_ok", 1, "repair_dispatch", "成功"),
+        (4, None, 0, "repair_ok", 1, "proposal_collab", "成功"),
+        (5, "不满", 1, "sos", 1, "handoff", "transferred_to_human"),
+        (5, "担忧", 1, "repair_ok", 1, "notification_manager", "成功"),
+        (6, "焦虑", 1, "repair_ok", 1, "health_advisor", "成功"),
+        (6, "着急", 1, "repair_ok", 1, "repair_dispatch", "成功"),
+    ]
+    try:
+        with get_db() as conn:
+            existing = conn.execute("SELECT COUNT(*) FROM care_event_log").fetchone()[0]
+            # 守卫：库里已有 ≥5 条就认为数据足够（避免覆盖真实使用中积累的数据）；
+            # 空库或仅零星几条（如演示前有人试聊过）时补种，保证大屏卡片不空。
+            if existing >= 5:
+                return 0
+            now = datetime.now()
+            for days_ago, emo, comfort, scene, scene_line, intent, status in rows:
+                ts = (now - timedelta(days=days_ago, hours=(days_ago * 3) % 12)).strftime("%Y-%m-%d %H:%M:%S")
+                conn.execute(
+                    "INSERT INTO care_event_log (user_id, role, emotion_tag, comfort_used, "
+                    "scene, scene_line_used, intent, status, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (0, "resident", emo or "", comfort, scene, scene_line, intent, status, ts),
+                )
+            conn.commit()
+            return len(rows)
+    except Exception as e:  # noqa: BLE001
+        _log.debug("种关怀事件失败：%s", e, exc_info=True)
+        return 0
+
+
 def seed_all(db_path: str):
     """往库里种治理演示数据。只在库空的时候种——绝不删已有数据。"""
     init_db(db_path)
     with get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
     if count > 0:
-        # 已有数据：只确保 demo 账号 + 老年档案存在（幂等），绝不重灌工单
+        # 已有数据：只确保 demo 账号 + 老年档案 + 演示用关怀事件存在（幂等），绝不重灌工单
         _seed_users()
         _seed_elderly_profile()
+        n = _seed_care_events()
+        if n:
+            print(f"[seed] Care events seeded: {n} rows")
         print(f"[seed] Database already has {count} issues, ensuring demo accounts only")
         return
     print("[seed] Empty database — seeding community governance demo data (narrative edition)...")
@@ -546,6 +594,7 @@ def seed_all(db_path: str):
     _seed_proposals()
     _seed_topics()
     _seed_feedback()
+    _seed_care_events()
     # 疾控监测数据（国家疾控局月度公报）
     try:
         from data.db_surveillance import seed_surveillance

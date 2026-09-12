@@ -37,8 +37,10 @@ def test_care_metrics_aggregation(fresh_db):
     m = get_care_metrics(days=7)
     assert m["care_events"] == 3
     assert m["emotion_events"] == 2
-    assert m["touch_events"] == 3
-    assert m["touch_rate"] == 150.0 or m["touch_rate"] == 100.0  # 触达数可能>情绪数（第3条无情绪）
+    # 触达数只在「识别到情绪」的事件里统计 → 2 条情绪事件都有安抚，触达率 100%
+    assert m["touch_events"] == 2
+    assert m["touch_rate"] == 100.0
+    assert m["scene_line_events"] == 3  # 场景共情句 3 条（含无情绪那条）
     assert m["emotion_to_human"] == 1
     assert m["emotion_to_human_rate"] == 50.0
     assert m["emotion_closed"] == 1
@@ -52,6 +54,32 @@ def test_care_metrics_empty_safe(fresh_db):
     m = get_care_metrics(days=7)
     assert m["care_events"] == 0 and m["touch_rate"] == 0.0
     assert m["by_emotion"] == {} and m["by_scene"] == {}
+
+
+def test_seed_care_events_idempotent_and_no_pii(fresh_db):
+    """演示种子：空库补种关怀事件（大屏不空）；已够数不重复；**只种标签不种 PII**。"""
+    from data.seed import _seed_care_events
+    from data.db_core import get_db
+    n1 = _seed_care_events()
+    assert n1 >= 8, f"应种 8~15 条演示关怀事件，实际 {n1}"
+    with get_db() as conn:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM care_event_log")]
+    assert len(rows) == n1
+    # 幂等：再跑不加倍
+    assert _seed_care_events() == 0
+    with get_db() as conn:
+        assert conn.execute("SELECT COUNT(*) c FROM care_event_log").fetchone()["c"] == n1
+    # 无 PII：不含手机号/姓名/原文（只应有标签、场景、状态、意图）
+    import re
+    for r in rows:
+        joined = " ".join(str(v) for v in r.values())
+        assert not re.search(r"1[3-9]\d{9}", joined), "不得含手机号"
+        assert not r.get("user_id"), "种子事件 user_id 应为 0（非真实用户）"
+    # 跨天分布（便于周维度统计）：至少覆盖 3 个不同日期
+    with get_db() as conn:
+        days = conn.execute(
+            "SELECT COUNT(DISTINCT date(created_at)) c FROM care_event_log").fetchone()["c"]
+    assert days >= 3, f"应跨多天分布，实际 {days} 天"
 
 
 def test_clean_care_event_log(fresh_db):

@@ -30,6 +30,13 @@ from data.db_notifications import log_activity
 MODULE = "政策问答"
 _log = logging.getLogger(__name__)
 
+# U1：语义向量在最终分中的最大加分（最终分 = 词法分 + _DENSE_WEIGHT × max(0, 余弦)）。
+# 为什么取 3：词法分的量级为「关键词 +2/个、标题命中 +3、n-gram 余弦 ×5」——单次关键词命中
+# 值 2 分。取 3 表示「语义高度相似（余弦接近 1）最多相当于 1.5 次关键词命中」，足以纠正
+# 口语改述（难例）却不足以压过词条精确命中。1~2 分语义几乎不起作用，≥8 分会让语义相近但
+# 词条不相关的条目挤掉精确命中。量化对比与复现命令见 scripts/rag_sensitivity.py。
+_DENSE_WEIGHT = 3.0
+
 # 知识库分类（5 大类）
 POLICY_CATEGORIES = ["社保医保", "养老服务", "住房保障", "办事指引", "社区规定"]
 
@@ -310,10 +317,10 @@ def search_published_knowledge(query: str, top_k: int = 5,
     dense = _dense_boost(query, candidates) if candidates else {}
     for e in candidates:
         s, _ = _score_entry(query, e)
-        # 语义加分：余弦 ∈ [-1,1] → 折算最高 +3（不改变词法主序，仅在相近时纠偏）
+        # 语义加分：余弦 ∈ [-1,1] → 折算最高 +_DENSE_WEIGHT（默认 3，见下方常量说明）
         d = dense.get(e.get("id"))
         if d is not None:
-            s += 3.0 * max(0.0, d)
+            s += _DENSE_WEIGHT * max(0.0, d)
         if s > 0:
             scored.append((e, s))
     scored.sort(key=lambda x: -x[1])

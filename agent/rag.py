@@ -300,88 +300,9 @@ def build_index(force: bool = False):
         return {"error": str(e)}
 
 
-def semantic_search(query: str, top_k: int = 5,
-                    category: str | None = None) -> list[dict]:
-    """用字符 n-gram TF-IDF 检索知识库条目。
-
-    按与查询的余弦相似度排序返回。还没有向量索引时退回关键词 LIKE 搜索。
-
-    Args:
-        query: 搜索词（中文或英文都行）
-        top_k: 返回多少条结果
-        category: 可选，按知识库类别过滤
-    """
-    try:
-        with get_db() as conn:
-            _ensure_embedding_table(conn)
-            # 把所有带向量的条目取出来
-            if category:
-                rows = conn.execute(
-                    "SELECT k.id, k.title, k.content, k.keywords, k.category, "
-                    "e.ngrams_json "
-                    "FROM knowledge_base k "
-                    "LEFT JOIN kb_embeddings e ON k.id = e.kb_id "
-                    "WHERE k.category = ?",
-                    (category,),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT k.id, k.title, k.content, k.keywords, k.category, "
-                    "e.ngrams_json "
-                    "FROM knowledge_base k "
-                    "LEFT JOIN kb_embeddings e ON k.id = e.kb_id"
-                ).fetchall()
-
-        if not rows:
-            return _fallback_keyword_search(query, top_k, category)
-
-        # 检查有没有向量（至少一条带 n-gram）
-        has_embeddings = any(r["ngrams_json"] for r in rows)
-        if not has_embeddings:
-            return _fallback_keyword_search(query, top_k, category)
-
-        # 算查询的 TF 向量
-        query_ngrams = _text_to_ngrams(query)
-        query_tf = _compute_tf(query_ngrams)
-
-        # 逐条打分
-        json_mod = __import__('json')
-        scored: list[tuple[dict, float]] = []
-
-        for row in rows:
-            try:
-                doc_ngrams = json_mod.loads(row["ngrams_json"]) if row["ngrams_json"] else []
-            except Exception:
-                _log.debug("解析 ngrams JSON 失败，改为从文本计算", exc_info=True)
-                doc_ngrams = _text_to_ngrams(
-                    f"{row['title']} {row['content']} {row.get('keywords', '')}"
-                )
-            if not doc_ngrams:
-                continue
-            doc_tf = _compute_tf(doc_ngrams)
-            score = _cosine_similarity(query_tf, doc_tf)
-            if score > 0.05:  # 相关度下限
-                scored.append(({
-                    "id": row["id"],
-                    "title": row["title"],
-                    "content": row["content"],
-                    "keywords": row["keywords"],
-                    "category": row["category"],
-                    "score": round(score, 4),
-                }, score))
-
-        scored.sort(key=lambda x: -x[1])
-        results = [item for item, _score in scored[:top_k]]
-
-        # 语义搜索没结果就退回关键词搜索
-        if not results:
-            return _fallback_keyword_search(query, top_k, category)
-
-        return results
-
-    except Exception:  # 挂了也没关系
-        _log.debug("语义搜索失败，退回关键词搜索", exc_info=True)
-        return _fallback_keyword_search(query, top_k, category)
+# 说明：U1 起对外统一走 search_hybrid()（词法 + 语义 RRF 融合）。
+# 旧的纯词法实现 semantic_search() 已无调用方，于本次清理删除；
+# 如需纯词法基线对比，用 scripts/rag_eval.py --no-embedding。
 
 
 def _fallback_keyword_search(query: str, top_k: int = 5,

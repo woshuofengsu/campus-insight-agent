@@ -243,3 +243,32 @@ def test_kg_endpoints_permission(fresh_db, client):
     # 隔离证明：本用例写的是临时库，不是生产库 data/community_insight.db
     import config
     assert db_core._DB_PATH != config.DB_PATH
+
+
+def test_kg_authz_regression(client):
+    """鉴权矩阵回归（显式）：无 token → 401；居民 token → 1003；grid → 200。
+
+    U6 端点是「负责人专用分析能力」，必须与全站一致地 fail-closed：
+    图谱会暴露全社区工单/政策关联，绝不能被居民 token 调到。
+    """
+    from api_routes.deps import make_token
+    resident = {"Authorization": f"Bearer {make_token(9101, 'resident', '测试居民')}"}
+    grid = {"Authorization": f"Bearer {make_token(9102, 'grid', '测试网格员')}"}
+    endpoints = [("get", "/api/web/agent/kg/stats", None),
+                 ("get", "/api/web/agent/kg/entity?name=电梯", None),
+                 ("post", "/api/web/agent/kg/rebuild", None)]
+
+    for method, url, _body in endpoints:
+        # 1) 无 token → 中间件 401（不是 403/200）
+        r = getattr(client, method)(url)
+        assert r.status_code == 401, f"{url} 无 token 应 401，实际 {r.status_code}"
+        assert r.json()["code"] == 1002
+        # 2) 居民 token → 1003 无权限（fail-closed）
+        r = getattr(client, method)(url, headers=resident)
+        assert r.status_code == 400 and r.json()["code"] == 1003, \
+            f"{url} 居民应被拒，实际 {r.status_code} {r.json().get('code')}"
+        assert not r.json()["success"]
+        # 3) grid token → 放行（保证不是「一刀切全拒」）
+        r = getattr(client, method)(url, headers=grid)
+        assert r.status_code == 200 and r.json()["success"], \
+            f"{url} grid 应放行，实际 {r.status_code}"
