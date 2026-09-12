@@ -726,6 +726,81 @@ def _m43_kb_query_log(conn):
     """)
 
 
+def _m44_care_event_log(conn):
+    """U4/v44：关怀事件日志（人情味可量化：情绪识别 / 安抚触达 / 场景共情）。
+
+    一行 = 一次「关怀动作」（有情绪安抚句或场景共情句时记录），用于统计：
+      - 情绪识别次数与分布（emotion_tag）
+      - 关怀触达数与场景分布（scene：repair_ok / sos / fail）
+      - 情绪 → 转人工率 / 情绪 → 闭环率（配合 status/intent）
+    无 PII（不存原文，只存情绪标签与场景）。
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS care_event_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            role TEXT DEFAULT 'resident',
+            emotion_tag TEXT DEFAULT '',        -- 焦虑/着急/不满…（tone.EMOTION 的 key）
+            comfort_used INTEGER DEFAULT 0,     -- 是否用了情绪安抚句
+            scene TEXT DEFAULT '',              -- repair_ok / sos / fail
+            scene_line_used INTEGER DEFAULT 0,  -- 是否用了场景共情句
+            intent TEXT DEFAULT '',
+            status TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_care_created ON care_event_log(created_at);
+        CREATE INDEX IF NOT EXISTS idx_care_emotion ON care_event_log(emotion_tag, created_at);
+    """)
+
+
+def _m45_knowledge_graph(conn):
+    """U6/v45：轻量知识图谱三表（只做「能查得出东西」的图谱，不做可视化花架子）。
+
+    - `kg_entity`：实体（楼栋 / 设施 / 政策事项 / 人群 / 工单类别），`name` 全局唯一，
+      带 `etype` 与来源计数 `attrs_json`。
+    - `kg_relation`：实体间关系（located_in / has_facility / applies_to / mentions /
+      related_issue），`UNIQUE(src_id, rel, dst_id)` 保证重复建图不产生重复边，
+      `weight` 为共现强度，`source` 记录边来自哪类业务对象（issue/knowledge/proposal）。
+    - `kg_mention`：实体 ↔ 业务对象的引用（ref_type ∈ issue/knowledge/proposal），
+      是「按实体反查历史工单 / 相关政策」的落地依据。
+
+    幂等（IF NOT EXISTS）；实体由 `data/db_kg.extract_entities` 规则抽取，不依赖 LLM、
+    无 PII（不存原文，只存实体名与引用 id）。
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS kg_entity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,          -- 实体名（归一化后，如「3号楼」「电梯」）
+            etype TEXT NOT NULL DEFAULT '',     -- building/facility/topic/group/category
+            community TEXT DEFAULT '',          -- 所属社区（预留，当前多为空）
+            attrs_json TEXT DEFAULT '{}',       -- 来源计数等附加属性
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS kg_relation (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            src_id INTEGER NOT NULL,
+            rel TEXT NOT NULL,                  -- 关系类型（见 RELS）
+            dst_id INTEGER NOT NULL,
+            weight REAL DEFAULT 1,              -- 共现强度（次数）
+            source TEXT DEFAULT '',             -- issue / knowledge / proposal
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(src_id, rel, dst_id)
+        );
+        CREATE TABLE IF NOT EXISTS kg_mention (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_id INTEGER NOT NULL,
+            ref_type TEXT NOT NULL,             -- issue / knowledge / proposal
+            ref_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(entity_id, ref_type, ref_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_kg_rel_src ON kg_relation(src_id, rel);
+        CREATE INDEX IF NOT EXISTS idx_kg_rel_dst ON kg_relation(dst_id, rel);
+        CREATE INDEX IF NOT EXISTS idx_kg_mention_entity ON kg_mention(entity_id, ref_type);
+        CREATE INDEX IF NOT EXISTS idx_kg_mention_ref ON kg_mention(ref_type, ref_id);
+    """)
+
+
 def _apply_base_schema(conn):
     """建基础表（可重复执行）。总是在 pre-base 迁移之后跑。"""
     conn.executescript("""
@@ -934,6 +1009,8 @@ def init_db(db_path: str):
         (41, "tenant_column", _m41_tenant_column),
         (42, "medication_intake", _m42_medication_intake),
         (43, "kb_query_log", _m43_kb_query_log),
+        (44, "care_event_log", _m44_care_event_log),
+        (45, "knowledge_graph", _m45_knowledge_graph),
     ]
     for version, name, fn in post:
         if version <= current:

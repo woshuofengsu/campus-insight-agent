@@ -131,3 +131,72 @@ def _m39_multitenant_community(conn):
 
 > 一切集群化/多租户改造都以「会话已落库（v31/v35）+ 黑板可换后端」为前提，这已在架构上预留，
 > 是支撑「可落地」说法的关键证据。
+
+---
+
+## 6. 数据层分层演进（D12：read/write 拆分，**比赛期不做**）
+
+> 本节记录**已决策的重构路径**：为什么现在不做、后续怎么做、如何验证。
+> 决策依据：评审建议 D12 + 风险控制（答辩前动大文件 = 高风险低收益）。
+
+### 6.1 现状（实测行数，2026-08）
+
+| 文件 | 行数 | 主要职责混杂情况 |
+|---|---|---|
+| `data/db_policy.py` | 1371 | 知识库 CRUD + 审核/版本状态机 + 提问状态机 + 检索打分 + RAG 接线 + 导出 |
+| `data/db_elderly_care.py` | 1215 | 用药提醒 + SOS + 联系人 + 打卡 + 主动关怀 |
+| `data/db_proposal.py` | 1202 | 提案状态机 + 投票 + 议论 + 附件 + 导出 |
+| `data/db_health_content.py` | 1139 | 健康内容审核 + 咨询状态机 + 导出 |
+| `data/db_weather.py` | 1006 | 天气缓存 + 预警 + 检查任务 + 联动 |
+| `data/db_notice.py` | 863 | 通知发布状态机 + 已读 + 定时 + 导出 |
+
+**问题**：单文件同时承担「写状态机 + 读查询 + 纯计算（打分/校验/脱敏）+ 导出/CSV 拼装」四类职责。
+后果不是「跑不动」，而是**改一处要读上千行、单测只能整文件导入**——对团队协作与长期维护不利。
+
+### 6.2 演进目标结构（每文件 <300 行）
+
+```
+data/
+  db_policy.py          # 保留：对外 API（re-export），向后兼容不破坏调用方
+  policy/
+    __init__.py         # 组装与 re-export
+    _logic.py           # 纯计算：validate_knowledge_fields / _score_entry / apply_source_notice / split_keywords
+    read.py             # 读：get_knowledge / get_knowledge_list / search_published_knowledge / get_question
+    write.py            # 写：create_knowledge / audit_knowledge / create_new_version / ask_question / reply_question
+    export.py           # 导出：CSV 拼装（与 read 分离，见 6.3）
+```
+
+### 6.3 拆分原则（按序执行，每步独立可回滚）
+
+1. **先抽纯计算**（风险最低、收益最高）：把 `_logic.py` 类的函数（`validate_*`、`_score_entry`、`_tf/_cosine`、
+   `apply_source_notice`、`split_keywords`、各 `_mask_*`）搬到 `data/<mod>/_logic.py`，**原文件 `from ... import` 复用**，
+   签名与行为一字不改。收益：这些函数可**脱离 DB 单测**（当前很多分支只能靠集成测试覆盖）。
+2. **再拆 read/write**：`read.py` 只做 `SELECT` 与视图组装，`write.py` 只做状态机与 `INSERT/UPDATE`。
+   两者都 `from data.db_core import get_db`，不互相 import（避免环）。
+3. **最后拆 export**：CSV/报表拼装独立（它是最容易与业务读混淆的一块）。
+4. **`db_<mod>.py` 保留为 re-export 垫片**（项目已有先例：`ui/cache.py` 迁 `utils/cache.py` 时留了重导出垫片），
+   保证 `api_routes/`、`agent/`、`tests/` 的既有 `from data.db_policy import ...` **零改动**。
+5. **每步跑全量**：`python -m pytest -q`（基线 538 passed）+ `ruff check .` = 0；每步一个 commit。
+
+### 6.4 单测策略（拆分后的新增能力）
+
+拆分前很多逻辑只能整文件导入，拆分后可为 `_logic.py` 写**纯函数单测**（无需 DB、毫秒级）：
+```python
+# tests/test_policy_logic.py（拆分后新增，示例）
+def test_score_entry_keyword_and_title():
+    e = {"title": "既有多层住宅增设电梯实施办法", "keywords": "增设电梯,加装电梯",
+         "plain_interpretation": "老楼加装电梯需业主协商", "content": ""}
+    s, hits = _score_entry("老楼装电梯怎么申请", e)
+    assert s > 0 and any("电梯" in h for h in hits)
+```
+
+### 6.5 执行时机与验收
+
+- **比赛期（现在）**：**零代码改动**。理由：答辩前重构核心数据层 = 用「确定的回归风险」换「不确定的可维护性收益」，
+  且当前 538 项测试已覆盖主要路径，评委看到的是「有测试 + 有清晰演进路径」，而非「正在重构」。
+- **答辩后（试点前）**：按 6.3 顺序执行，优先 `db_policy.py`（最大、最常用）→ `db_elderly_care.py` → `db_proposal.py`。
+- **验收标准**：① 每个新模块 <300 行；② `db_*.py` 垫片 re-export 齐全（外部 import 零改动）；
+  ③ 为 `_logic.py` 新增纯函数单测 ≥15 项；④ 全量测试数不减、全绿；⑤ `ruff` = 0。
+
+> 与第 2 节（多租户/PG）的关系：**先拆分、再迁移**。拆分后 `read.py` 是唯一需要加租户过滤的位置，
+> 迁移 PG 时也只需改 `db_core.get_connection` 一处——两者的收益互相放大。

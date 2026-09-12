@@ -575,6 +575,21 @@ class Orchestrator:
             prefix = " ".join([c for c in (comfort, line) if c])
             if prefix and reply:
                 reply = f"{prefix}\n{reply}"
+            # U4：关怀量化——有安抚句/场景共情句时记一条关怀事件（无 PII，只存标签）
+            if prefix:
+                try:
+                    from data.db_care_metrics import log_care_event
+                    emo_tag = ""
+                    try:
+                        emo_tag, _c = tone.detect_emotion(ctx.get("user_input") or "")
+                    except Exception:
+                        emo_tag = ""
+                    log_care_event(ctx.get("uid"), ctx.get("role") or "resident",
+                                   emotion_tag=emo_tag or "", comfort_used=bool(comfort),
+                                   scene=scene or "", scene_line_used=bool(line),
+                                   intent=intent or "", status=status or "")
+                except Exception:
+                    pass
         except Exception:
             pass
         # 会话落库：state 持久化（重启不丢）

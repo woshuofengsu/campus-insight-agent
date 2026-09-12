@@ -3,7 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { issues, proposals, weather, agent } from '../api'
 
-const data = ref({ issues: 0, pending: 0, props: 0, alerts: 0, selfRate: '--', temp: '--', kbRate: '--', kbCount: 0 })
+const data = ref({ issues: 0, pending: 0, props: 0, alerts: 0, selfRate: '--', temp: '--', kbRate: '--', kbCount: 0, careRate: '--' })
 const tick = ref(0)
 
 async function load() {
@@ -14,6 +14,7 @@ async function load() {
     const w = await weather.current()
     const sr = (await agent.selfResolution()) || {}
     const kb = (await agent.kbHealth()) || {}
+    const care = (await agent.careMetrics()) || {}
     data.value = {
       issues: all.length,
       pending: all.filter((i) => ['待审核', '已审核待派单', '处理中'].includes(i.status)).length,
@@ -23,6 +24,7 @@ async function load() {
       temp: w?.temp_high || '--',
       kbRate: kb.queries ? kb.hit_rate : '--',
       kbCount: kb.kb_published || 0,
+      careRate: care.emotion_events ? care.touch_rate : '--',
     }
   } catch { /* 大屏失败不阻塞 */ }
 }
@@ -40,6 +42,7 @@ const cards = [
   { label: 'AI 自转率', value: () => (data.value.selfRate === '--' ? '--' : data.value.selfRate + '%'), color: '#ba68c8', icon: '🤖' },
   { label: '知识库命中率', value: () => (data.value.kbRate === '--' ? '--' : data.value.kbRate + '%'), color: '#4dd0e1', icon: '📚' },
   { label: '政策语料', value: () => data.value.kbCount || '--', color: '#ffd54f', icon: '📄' },
+  { label: '关怀触达率', value: () => (data.value.careRate === '--' ? '--' : data.value.careRate + '%'), color: '#f06292', icon: '💗' },
 ]
 </script>
 

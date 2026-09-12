@@ -189,6 +189,7 @@ export const agent = {
   llmUsage: (params) => api.get('/agent/llm-usage', { params }),
   selfResolution: (params) => api.get('/agent/self-resolution', { params }),
   kbHealth: (params) => api.get('/agent/kb-health', { params }),
+  careMetrics: (params) => api.get('/agent/care-metrics', { params }),
   board: (params) => api.get('/agent/board', { params }),
   satisfactionDrilldown: (params) => api.get('/agent/satisfaction-drilldown', { params }),
   analytics: (params) => api.get('/agent/analytics', { params }),

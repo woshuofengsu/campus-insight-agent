@@ -15,9 +15,13 @@ def test_fast_checks_all_run():
     for c in checks:
         assert set(c) >= {"name", "passed", "detail", "fix"}, c
         assert isinstance(c["passed"], bool)
-    # 前端产物与 schema 在仓库内应可通过
+    # schema 版本是确定性检查（库与代码应一致）
     assert P.check_schema()["passed"], P.check_schema()
-    assert P.check_frontend()["passed"], P.check_frontend()
+    # 前端检查是**状态相关**（源码改了未 build 就会失败）——只断言行为契约：
+    # 未通过时必须给出 npm run build 指令（不把「仓库当前已构建」写死进测试）
+    fe = P.check_frontend()
+    if not fe["passed"]:
+        assert "npm run build" in fe["fix"], fe
 
 
 def test_server_down_is_detected_with_fix():

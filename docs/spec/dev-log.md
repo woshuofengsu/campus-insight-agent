@@ -707,3 +707,20 @@
 **测试**：`tests/test_demo_preflight.py` 4 项（各检查项结构/服务不可达被检出且带修复命令/姿态详情不泄露密钥/账号检查不静默通过）。
 
 **验证**：全量 pytest 待复跑；`ruff check .` = 0。**提交**：本轮 U5。
+
+## 三十二、竞品对标升级 U4 + U7 ✅
+
+**U4 关怀量化（把「人情味」变成数字）**
+- **schema v44 `care_event_log`**：一行 = 一次关怀动作（情绪标签 / 是否用安抚句 / 场景 / 是否用共情句 / 意图 / 状态）。**无 PII**（不存原文，只存标签）。
+- 接线：`orchestrator._finish` 在拼装「情绪安抚句 + 场景共情句」时写一条关怀事件（异常吞掉，绝不影响回复）。
+- `data/db_care_metrics.py`：`get_care_metrics(days)` 输出关怀事件数 / 情绪识别数 / **关怀触达率** / **情绪→转人工率** / **情绪→闭环率** / 情绪标签分布 / 场景分布；`log_care_event()` / `clean_care_event_log(days=180)`。
+- 端点 `GET /api/web/agent/care-metrics`（grid 专属）；调度器新增 `care_event_cleaned` 自动任务；大屏新增「关怀触达率」卡（共 8 卡）。
+- 测试 `tests/test_care_metrics.py` 5 项（指标口径/空库安全/清理/端点权限/编排接线）。
+
+**U7 数据层分层演进路径（D12，比赛期零代码改动）**
+- `docs/scaling.md` 新增第 6 节「数据层分层演进（read/write 拆分）」：实测各文件行数（db_policy 1371 / db_elderly_care 1215 / db_proposal 1202 …）、目标目录结构（`data/<mod>/{_logic,read,write,export}.py`，每文件 <300 行）、**5 步拆分原则**（先抽纯计算 → read/write → export → `db_<mod>.py` 保留 re-export 垫片保证外部零改动 → 每步跑全量+ruff）、拆分后可新增的 `_logic.py` 纯函数单测示例、执行时机（**比赛期不做**，答辩后按 db_policy → db_elderly_care → db_proposal 顺序）与 5 条验收标准。
+- 与多租户/PG 演进的关系写清：**先拆分再迁移**（拆分后 read.py 是唯一加租户过滤的位置，PG 迁移只需改 `db_core.get_connection` 一处）。
+
+**顺带修正测试耦合**：`test_demo_preflight` 原先断言「仓库前端已构建」（环境状态相关，源码改动未 build 即误报），改为断言**行为契约**（未通过时必须给出 `npm run build` 指令）。
+
+**验证**：全量 pytest **542 passed / 1 skipped**（新增 U4 五项）；`ruff check .` = 0；`npm run build` 通过；`demo_preflight --fast` **7/7**。**提交**：本轮。

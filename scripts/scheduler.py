@@ -138,6 +138,7 @@ def run_all() -> dict:
     results["draft_cleaned"] = _safe("草稿清理", lambda: _rep.clean_issue_drafts(days=7))
     results["agent_draft_cleaned"] = _safe("Agent草稿清理", lambda: _draft_clean())
     results["kb_query_cleaned"] = _safe("知识库查询日志清理", lambda: _kb_query_clean())
+    results["care_event_cleaned"] = _safe("关怀事件日志清理", lambda: _care_event_clean())
     results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
     results["proactive_followup"] = _safe("主动关怀-办结回访", lambda: _proactive_care())
     return results
@@ -160,6 +161,15 @@ def _kb_query_clean() -> int:
     try:
         from data.db_kb_metrics import clean_kb_query_log
         return clean_kb_query_log(days=90)
+    except Exception:
+        return 0
+
+
+def _care_event_clean() -> int:
+    """清理关怀事件日志（U4：保留 180 天，供关怀量化趋势）。"""
+    try:
+        from data.db_care_metrics import clean_care_event_log
+        return clean_care_event_log(days=180)
     except Exception:
         return 0
 

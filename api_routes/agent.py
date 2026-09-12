@@ -195,6 +195,15 @@ def agent_analytics(request: Request, days: int = 7):
                 "brief": build_data_brief()})
 
 
+@router.get("/care-metrics")
+def agent_care_metrics(request: Request, days: int = 7):
+    """关怀量化（U4）：情绪识别 / 关怀触达率 / 情绪→转人工率 / 场景分布（grid 专属）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_care_metrics import get_care_metrics
+    return _ok(get_care_metrics(days=days))
+
+
 @router.get("/kb-health")
 def agent_kb_health(request: Request, days: int = 7, top_n: int = 10):
     """知识库健康度（U3）：命中率 / 零命中问题 top / 检索路线 / 语料规模（grid 专属）。"""
@@ -211,3 +220,40 @@ def agent_trace_chain(trace_id: str, request: Request):
         return _require_role(request, "grid")
     from data.db_agent import get_trace_chain
     return _ok(get_trace_chain(trace_id))
+
+
+@router.get("/kg/entity")
+def agent_kg_entity(request: Request, name: str = "", limit: int = 20):
+    """轻量知识图谱（U6）：按实体反查关联工单/政策/提案/关联实体（grid 专属）。
+
+    例：`?name=3号楼` → 该楼栋历史工单 + 相关设施 + 相关政策；
+    `?name=3号楼电梯` → 复合查询取交集（同时提到两者的工单）。
+    """
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    if not (name or "").strip():
+        return _fail(1003, "请提供实体名 name（如 3号楼 / 电梯 / 加装电梯）")
+    from data.db_kg import query_entity
+    return _ok(query_entity(name, limit=limit))
+
+
+@router.get("/kg/stats")
+def agent_kg_stats(request: Request):
+    """图谱规模统计（U6）：实体/关系/引用数、类型分布、关系强度 top、工单覆盖率（grid 专属）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_kg import graph_stats
+    return _ok(graph_stats())
+
+
+@router.post("/kg/rebuild")
+def agent_kg_rebuild(request: Request, limit: int = 500):
+    """重建知识图谱（U6，grid 专属）：从工单/已发布政策/提案重抽实体与关系，幂等。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_kg import build_graph
+    try:
+        return _ok(build_graph(limit=limit), "图谱重建完成")
+    except Exception as e:  # noqa: BLE001
+        _log.warning("图谱重建失败：%s", e)
+        return _fail(2001, "图谱重建失败，请稍后再试")
