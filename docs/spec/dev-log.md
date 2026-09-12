@@ -685,3 +685,25 @@
 **顺带修复一个真 bug**：`scripts/rag_eval.run(no_embedding=True)` 原先**永久改写** `utils.embedding.is_enabled`（非临时 patch），会污染同进程内后续调用与测试（组合运行 `test_kb_metrics + test_rag_hybrid` 时暴露 2 个失败）。现改为 `try/finally` 恢复原函数，用例拆分 `_run_cases()`。
 
 **验证**：全量 pytest **534 passed / 1 skipped**；`ruff check .` = 0；`npm run build` 通过。**提交**：本轮。
+
+## 三十一、竞品对标升级 U5：答辩前一键自检 + 一键启动（演示工程）✅
+
+**借鉴来源**：对标作品的 `start_dev.bat`/`start_prod.sh` + 部署说明书（演示启动体验）。
+
+- **`scripts/demo_preflight.py`（新增）**：7 项串行自检，任一失败给出**可执行的修复命令**：
+  1. 数据库 schema 版本（库 vs 代码迁移表最大版本，防止「库里还是 v42」这类现场翻车）
+  2. `.env` 演示姿态（LLM 真实/规则、向量 provider 有无 key、政策 LLM 生成开关）——**只报有无、绝不回显密钥**
+  3. 前端产物存在且**新于源码**（源码改了没重新 build 是最常见的现场事故）
+  4. 服务可达（:8000 健康检查；未启动直接给 uvicorn 命令）
+  5. 三个演示账号可登录（居民/老年/网格员）+ 顺带验证鉴权中间件（无 token → 401）
+  6. ruff check = 0
+  7. 全量 pytest 全绿
+  - `--fast` 跳过 6/7（现场 10 秒体检）；`--json` 机器可读；退出码 0/1 供脚本串联。
+- **`scripts/demo_start.ps1`（新增）**：一键 = 自检 → 起服务（端口占用检测）→ 打开登录页 → 打印三角色演示账号与演示要点。文件带 UTF-8 BOM（PowerShell 5.1 按 ANSI 读 .ps1 会把中文变乱码导致解析失败，已踩坑修复）。
+- **CI**：RAG 评测步骤改为「混合检索（门禁）+ `--no-embedding` 对比基线（信息性）」。
+
+**实测**：`demo_preflight.py --fast` → **7/7 通过**；负向验证（把 API 指向空端口）能正确判失败并给出启动命令；`demo_start.ps1 -SkipPreflight` 跑通。
+
+**测试**：`tests/test_demo_preflight.py` 4 项（各检查项结构/服务不可达被检出且带修复命令/姿态详情不泄露密钥/账号检查不静默通过）。
+
+**验证**：全量 pytest 待复跑；`ruff check .` = 0。**提交**：本轮 U5。
