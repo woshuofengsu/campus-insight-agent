@@ -77,13 +77,23 @@ def get_kb_health(days: int = 7, top_n: int = 10) -> dict:
 def log_kb_query(user_id: int | None, question: str, matched: bool, reason: str = "",
                  top_score: float = 0.0, top_kb_id: int | None = None,
                  retrieval: str = "", role: str = "resident") -> None:
-    """记录一次知识库检索尝试（U3）。失败只记日志，绝不影响业务主流程。"""
+    """记录一次知识库检索尝试（U3）。失败只记日志，绝不影响业务主流程。
+
+    合规：`question` 是自由文本（居民可能顺口说出手机号），落库前**必须掩码**
+    （`utils.text.mask_phones`）——与「全表手机号加密 + 留痕不含完整手机号」既定口径一致。
+    """
+    safe_q = (question or "")[:200]
+    try:
+        from utils.text import mask_phones
+        safe_q = mask_phones(safe_q)
+    except Exception:
+        pass
     try:
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO kb_query_log (user_id, role, question, matched, reason, "
                 "top_score, top_kb_id, retrieval) VALUES (?,?,?,?,?,?,?,?)",
-                (user_id, role, (question or "")[:200], 1 if matched else 0, reason or "",
+                (user_id, role, safe_q, 1 if matched else 0, reason or "",
                  float(top_score or 0), top_kb_id, retrieval or ""),
             )
             conn.commit()

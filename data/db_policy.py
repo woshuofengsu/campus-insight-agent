@@ -286,6 +286,13 @@ def search_published_knowledge(query: str, top_k: int = 5,
 
     U1 混合检索：词法分（同义词扩展）+ 语义余弦加分（provider 可用时），
     provider=none / 无向量 / 调用失败 → 纯词法，行为与升级前一致。
+
+    ⚠️ 排序口径说明（两套并存、各有用途，勿混用）：
+      - **本函数（词法分 + 语义加性加分）**：线上答题路径（`web_qa_ask` → `ask_question`），
+        输出连续分并与业务阈值 `_match_threshold` 比较，决定自动回答 / 弱命中转人工。
+      - **`agent/rag.search_hybrid()`（RRF 融合）**：Agent 侧上下文注入与离线评测
+        （`scripts/rag_eval.py`）使用，只依据两路排名融合，不做阈值判定。
+      - 二者共享同一批数据与 `utils.embedding`，仅融合算子不同（加权和 vs RRF）。
     """
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM knowledge_base").fetchall()

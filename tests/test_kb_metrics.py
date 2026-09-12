@@ -67,6 +67,41 @@ def test_kb_health_counts_knowledge_scale(fresh_db):
     assert h["by_category"].get("社保医保", 0) >= 1
 
 
+def test_kb_query_log_masks_phone(fresh_db):
+    """合规：问题文本里的手机号落库前必须掩码（不得存完整手机号）。"""
+    from data.db_kb_metrics import log_kb_query
+    from data.db_core import get_db
+    log_kb_query(1, "我家电话是13812345678，漏水了找谁", True)
+    with get_db() as conn:
+        row = conn.execute("SELECT question FROM kb_query_log ORDER BY id DESC LIMIT 1").fetchone()
+    q = row["question"]
+    assert "13812345678" not in q, f"完整手机号不得落库：{q}"
+    assert "138****5678" in q, f"应掩码为 138****5678：{q}"
+    # 非手机号数字串不受影响（如工单号）
+    log_kb_query(1, "工单 WO00012345 进度", True)
+    with get_db() as conn:
+        row = conn.execute("SELECT question FROM kb_query_log ORDER BY id DESC LIMIT 1").fetchone()
+    assert "WO00012345" in row["question"]
+
+
+def test_mask_phones_util():
+    """utils.text.mask_phones：掩码手机号、保留工单号、空值安全。"""
+    from utils.text import mask_phones
+    assert mask_phones("联系13900001111") == "联系139****1111"
+    assert mask_phones("工单号 WO12345678901") == "工单号 WO12345678901"  # 非 1[3-9] 开头
+    assert mask_phones("") == ""
+    assert mask_phones("13812345678 和 15987654321") == "138****5678 和 159****4321"
+
+
+def test_rag_eval_reports_hit_at_1(fresh_db):
+    """评测输出应同时给 top-k 命中率与 hit@1（Top-1 正确率）。"""
+    from scripts.rag_eval import run
+    r = run(topk=3, no_embedding=True)
+    assert "hit1_rate" in r and "hit1" in r
+    assert 0 <= r["hit1_rate"] <= 100
+    assert r["hit1"] <= r["hits"], "hit@1 不可能多于 top-k 命中数"
+
+
 def test_clean_kb_query_log(fresh_db):
     """清理函数可运行（90 天保留）。"""
     from data.db_kb_metrics import clean_kb_query_log, log_kb_query

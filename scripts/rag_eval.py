@@ -43,15 +43,27 @@ def run(topk: int = 3, verbose: bool = False, no_embedding: bool = False) -> dic
     from config import DB_PATH
     from data.db_core import init_db
     init_db(DB_PATH)
+    _orig_is_enabled = None
     if no_embedding:
-        # 对比基线：强制关闭语义向量 → 只走词法（+同义词扩展），用于量化语义增益
+        # 对比基线：临时关闭语义向量 → 只走词法（+同义词扩展），用于量化语义增益。
+        # 注意必须在 finally 里恢复：直接改写模块函数会污染同进程内后续调用/测试。
         import utils.embedding as E
+        _orig_is_enabled = E.is_enabled
         E.is_enabled = lambda: False
+    try:
+        return _run_cases(topk=topk, verbose=verbose)
+    finally:
+        if _orig_is_enabled is not None:
+            import utils.embedding as E
+            E.is_enabled = _orig_is_enabled
+
+
+def _run_cases(topk: int = 3, verbose: bool = False) -> dict:
     from data.db_policy import search_published_knowledge
     from utils.embedding import describe
 
     cases = load_golden()
-    hits, details = 0, []
+    hits, top1_hits, details = 0, 0, []
     for c in cases:
         q = c["query"]
         expects = c.get("expect_any") or []
@@ -60,16 +72,24 @@ def run(topk: int = 3, verbose: bool = False, no_embedding: bool = False) -> dic
             f"{r.get('title', '')} {r.get('keywords', '')} {r.get('content', '')}"
             for r in results)
         hit = any(k in blob for k in expects)
+        # hit@1：更严格——只看第一条是否命中（Top-1 正确性，避免「靠后面的结果凑命中」）
+        blob1 = ""
+        if results:
+            r0 = results[0]
+            blob1 = f"{r0.get('title', '')} {r0.get('keywords', '')} {r0.get('content', '')}"
+        hit1 = bool(results) and any(k in blob1 for k in expects) if expects else False
         route = results[0].get("retrieval") if results else "none"
         hits += 1 if hit else 0
-        details.append({"query": q, "hit": hit, "route": route,
+        top1_hits += 1 if hit1 else 0
+        details.append({"query": q, "hit": hit, "hit_at_1": hit1, "route": route,
                         "top": [r.get("title") for r in results]})
         if verbose:
-            mark = "✓" if hit else "✗"
+            mark = "✓" if hit1 else ("~" if hit else "✗")
             print(f"[{mark}] {q} → {route} | {details[-1]['top'][:2]}")
     n = len(cases)
-    return {"cases": n, "hits": hits,
+    return {"cases": n, "hits": hits, "hit1": top1_hits,
             "hit_rate": round(hits * 100 / n, 1) if n else 0.0,
+            "hit1_rate": round(top1_hits * 100 / n, 1) if n else 0.0,
             "topk": topk, "embedding": describe(), "details": details}
 
 
@@ -99,11 +119,13 @@ def main():
         else:
             mode = f"混合检索（{emb['provider']}/{emb['model']}）" if emb.get("enabled") else "纯词法（同义词扩展）"
         print("=== RAG 检索命中率评测（U1）===")
-        print(f"模式：{mode} | 用例 {r['cases']} 条 | top-{r['topk']} 命中 {r['hits']} 条 → 命中率 {r['hit_rate']}%")
+        print(f"模式：{mode} | 用例 {r['cases']} 条")
+        print(f"  top-{r['topk']} 命中率：{r['hit_rate']}%（{r['hits']}/{r['cases']}）")
+        print(f"  hit@1（Top-1 正确率）：{r['hit1_rate']}%（{r['hit1']}/{r['cases']}）")
         if args.no_embedding:
             print("（对比基线：不加 --no-embedding 即混合检索模式，可量化语义向量增益）")
         else:
-            print(f"阈值：{threshold}% → {'✅ 达标' if r['hit_rate'] >= threshold else '❌ 未达标'}")
+            print(f"阈值：top-k {threshold}% → {'✅ 达标' if r['hit_rate'] >= threshold else '❌ 未达标'}")
             if not emb.get("enabled"):
                 print("提示：配置 EMBEDDING_PROVIDER=bailian + DASHSCOPE_API_KEY 可启用语义向量，命中率进一步提升。")
     if args.no_embedding:

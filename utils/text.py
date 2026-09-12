@@ -108,3 +108,20 @@ def expand_query(query: str) -> str:
             seen.add(w)
             uniq.append(w)
     return q + " " + " ".join(uniq)
+
+
+# ---- 文本级手机号脱敏（留痕/日志合规：自由文本落库前必须掩码）----
+
+_PHONE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+
+
+def mask_phones(text: str) -> str:
+    """把自由文本中的 11 位手机号替换为 138****8000。
+
+    PIPL 口径：留痕/日志不得含完整手机号。用于「用户随口输入可能带手机号」的场景
+    （如知识库查询日志 `kb_query_log.question`、Agent 留痕等自由文本字段）。
+    只掩码、不改动其它内容；非手机号的数字串（如工单号）不受影响。
+    """
+    if not text:
+        return ""
+    return _PHONE_RE.sub(lambda m: f"{m.group()[:3]}****{m.group()[-4:]}", str(text))

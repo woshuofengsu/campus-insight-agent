@@ -673,3 +673,15 @@
 - 测试 `tests/test_kb_metrics.py` 5 项（日志与命中率/零命中 top/空库安全/语料规模/端点权限）；`tests/test_rag_hybrid.py` 补 autouse fixture **默认关闭语义向量**（单测不依赖外部 API、不产生费用），并把「默认 provider=none」断言改为显式关闭（原断言耦合环境，配置真 key 后误报）。
 
 **验证**：全量 pytest 待复跑（上一轮 525 passed + 本轮 U3 新增 5 项）；`ruff check .` = 0；`npm run build` 通过。**提交**：本轮 U3。
+
+## 三十、U1/U3 复核修正（4 项，来自外部评审意见）✅
+
+1. **两套排序口径并存 → 交叉注释互相指向**：`agent/rag.search_hybrid()`（RRF 融合，用于 Agent 上下文注入与离线评测）与 `data/db_policy.search_published_knowledge()`（词法分 + 语义**加性加分**，用于线上答题并按业务阈值判定自动回答/转人工）各自在 docstring 里写明「谁在线上、谁在评测」及为何算子不同（阈值需要可解释连续分 vs 评测只需排序），避免被追问「到底哪个在线上」。
+2. **评测判据偏宽 → 补 hit@1**：`scripts/rag_eval.py` 增加 **hit@1（Top-1 正确率）**，输出与 JSON 均含 `hit1`/`hit1_rate`；verbose 标记改为 `✓`（Top-1 命中）/`~`（仅 top-k 命中）/`✗`。
+   - 实测：混合检索 **top-3 100% / hit@1 100%（27/27）**；纯词法 **top-3 88.9% / hit@1 81.5%（22/27）**——更严格的口径下语义增益 **+18.5pp**（此前宽松口径为 +11.1pp）。
+3. **查询日志合规 → 落库前手机号掩码**：新增 `utils/text.mask_phones()`（正则 `(?<!\d)1[3-9]\d{9}(?!\d)` → `138****5678`），`data/db_kb_metrics.log_kb_query()` 落库前调用（问题文本是自由文本，居民可能顺口说出手机号）；非手机号数字串（如工单号）不受影响。新增 2 项测试覆盖。
+4. **Streamlit 大屏仍用旧接口 → 切到混合检索**：`ui/pages/pulse.py` 的 `semantic_search` 改为 `search_hybrid`，并在 caption 里显示实际路线（混合检索/词法检索），与 Web 端 Agent 侧同函数。
+
+**顺带修复一个真 bug**：`scripts/rag_eval.run(no_embedding=True)` 原先**永久改写** `utils.embedding.is_enabled`（非临时 patch），会污染同进程内后续调用与测试（组合运行 `test_kb_metrics + test_rag_hybrid` 时暴露 2 个失败）。现改为 `try/finally` 恢复原函数，用例拆分 `_run_cases()`。
+
+**验证**：全量 pytest **534 passed / 1 skipped**；`ruff check .` = 0；`npm run build` 通过。**提交**：本轮。

@@ -223,11 +223,13 @@ kb_search_query = st.text_input(
 )
 
 if kb_search_query.strip():
-    # RAG 语义搜索
-    from agent.rag import semantic_search
-    results = semantic_search(kb_search_query.strip(), top_k=6)
+    # U1 混合检索（词法 + 语义 RRF 融合）——与 Web 端 Agent 侧同一函数；
+    # 语义不可用（未配 EMBEDDING_PROVIDER / 无 key）时自动降级为纯词法，无需分支。
+    from agent.rag import search_hybrid
+    results = search_hybrid(kb_search_query.strip(), top_k=6)
     if results:
-        st.caption(f"🔎 「{kb_search_query.strip()}」— 找到 {len(results)} 条结果（语义搜索）")
+        _route = "混合检索" if any("dense" in (r.get("source_route") or "") for r in results) else "词法检索"
+        st.caption(f"🔎 「{kb_search_query.strip()}」— 找到 {len(results)} 条结果（{_route}）")
         kb_icons = {"faq": "📞", "governance": "📋", "notice": "📢", "event": "📅", "calendar": "🗓️"}
         for r in results:
             icon = kb_icons.get(r.get("category", ""), "📌")

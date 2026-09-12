@@ -152,6 +152,14 @@ def search_hybrid(query: str, top_k: int = 5, category: str | None = None) -> li
     - 语义路不可用（未配 provider / 未建索引 / 调用失败）→ 自动只用词法（等价于升级前行为）
     - 两路都无结果 → 回退关键词 LIKE 搜索
     返回 [{id,title,content,keywords,category,score,source_route}]，score 为 RRF 分。
+
+    ⚠️ 排序口径说明（两套并存、各有用途，勿混用）：
+      - **本函数（RRF 融合）**：用于 Agent 侧上下文注入与离线评测（`scripts/rag_eval.py`），
+        排序只依赖「词法/语义两路的排名」，不做业务阈值判定。
+      - **线上答题**走 `data/db_policy.search_published_knowledge()`：同义词扩展的词法分
+        + 语义**加性加分**（最高 +3），再与业务阈值（`get_match_threshold`）比较以决定
+        「自动回答 / 弱命中转人工」——它需要可解释、可调阈值的连续分。
+      - 二者共享同一批数据与 `utils.embedding`，仅融合算子不同（RRF vs 加权和）。
     """
     try:
         with get_db() as conn:
