@@ -1,9 +1,10 @@
 <script setup>
 // 网格员工作台：待办统计 + 紧急工单 + 待审核提案 + 红黑榜
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { issues, proposals, agent } from '../../api'
+import CountUp from '../../components/CountUp.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -52,12 +53,14 @@ onMounted(async () => {
   } catch { /* LLM 用量失败不阻塞 */ }
 })
 
-const cards = [
-  { label: '待处理工单', value: stats.value.pending, color: '#f59e0b' },
-  { label: '处理中', value: stats.value.processing, color: '#059669' },
-  { label: '待审核提案', value: pendingProps.value.length, color: '#2563eb' },
-  { label: '已结工单', value: stats.value.resolved, color: '#64748b' },
-]
+// 注意：必须是 computed —— 普通数组在 setup 期求值，会永久锁死在初始的 0，
+// 导致四个统计卡恒显示 0（数据在 onMounted 才回来）。
+const cards = computed(() => [
+  { label: '待处理工单', value: stats.value.pending, color: '#f59e0b', icon: '📥' },
+  { label: '处理中', value: stats.value.processing, color: '#059669', icon: '🔧' },
+  { label: '待审核提案', value: pendingProps.value.length, color: '#2563eb', icon: '💡' },
+  { label: '已结工单', value: stats.value.resolved, color: '#64748b', icon: '✅' },
+])
 </script>
 
 <template>
@@ -66,8 +69,13 @@ const cards = [
     <p class="page-sub">社区治理 · 今日待办概览</p>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-      <div v-for="c in cards" :key="c.label" class="card" style="text-align:center;margin:0;">
-        <div style="font-size:1.8rem;font-weight:800;" :style="{ color: c.color }">{{ c.value }}</div>
+      <div v-for="c in cards" :key="c.label" class="card fade-up"
+           style="text-align:center;margin:0;position:relative;overflow:hidden;border-radius:16px;">
+        <div :style="{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: c.color, opacity: 0.85 }"></div>
+        <div class="entry-icon" style="font-size:1.1rem;opacity:0.7;margin-bottom:2px;">{{ c.icon }}</div>
+        <div style="font-size:2rem;font-weight:800;line-height:1.15;">
+          <CountUp :value="c.value" :duration="900" />
+        </div>
         <div class="muted" style="font-size:0.85rem;">{{ c.label }}</div>
       </div>
     </div>

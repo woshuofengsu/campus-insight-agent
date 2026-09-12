@@ -63,9 +63,12 @@ function logout() {
   <!-- 网格员端：保持原样（浅色侧边导航 + 顶栏 + AI 工作助手） -->
   <n-layout v-if="store.isGrid" style="min-height:100vh" has-sider>
     <n-layout-sider class="grid-desktop-sider" bordered width="230">
-      <div style="padding:18px 16px;border-bottom:1px solid var(--border);">
-        <div style="font-weight:800;color:#2E7D32;font-size:1.05rem;">🏘️ 社区先知</div>
-        <div style="color:var(--muted);font-size:0.75rem;">网格员工作台</div>
+      <div class="sider-brand">
+        <div class="brand-dot">🏘️</div>
+        <div>
+          <div class="grad-text" style="font-weight:800;font-size:1.06rem;line-height:1.25;">社区先知</div>
+          <div style="color:var(--muted);font-size:0.74rem;">网格员工作台</div>
+        </div>
       </div>
       <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
               :value="active" @update:value="(k) => router.push(k)" />
@@ -86,8 +89,8 @@ function logout() {
         <n-button quaternary @click="drawerOpen = true">☰</n-button>
         <span style="font-weight:700;">{{ route.meta.title || '工作台' }}</span>
       </n-layout-header>
-      <n-layout-header bordered style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
-        <div style="font-weight:700;">{{ route.meta.title || '' }}</div>
+      <n-layout-header bordered class="glass topbar" style="height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
+        <div style="font-weight:800;font-size:1.05rem;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
           <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
           <n-tag :bordered="false" type="success" size="small">● AI 治理</n-tag>
@@ -111,8 +114,11 @@ function logout() {
   <!-- 居民端：顶部栏 + 底部标签栏 + 内容 -->
   <n-layout v-else style="min-height:100vh">
     <WeatherBanner />
-    <n-layout-header bordered style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top)) 20px 0;min-height:56px;background:var(--card-bg);position:sticky;top:0;z-index:10;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));">
-      <div style="font-weight:800;color:var(--primary);">🏘️ 社区先知</div>
+    <n-layout-header bordered class="glass topbar" style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top)) 20px 0;min-height:58px;position:sticky;top:0;z-index:10;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="brand-dot" style="width:30px;height:30px;font-size:1rem;border-radius:9px;">🏘️</span>
+        <span class="grad-text" style="font-weight:800;font-size:1.06rem;">社区先知</span>
+      </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
         <span style="color:var(--muted);">{{ store.user?.name }}</span>
@@ -123,8 +129,10 @@ function logout() {
       <router-view />
     </n-layout-content>
     <!-- 底部标签栏 -->
-    <div style="position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom);background:var(--card-bg);border-top:1px solid var(--border);display:flex;z-index:20;min-height:64px;">
+    <div class="glass tabbar" style="position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom);border-top:1px solid var(--border);display:flex;z-index:20;min-height:64px;">
       <div v-for="t in residentTabs" :key="t.key"
+           class="tab-item"
+           :class="{ 'tab-active': activeTab === t.key }"
            :style="{
              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
              gap: '2px', cursor: 'pointer', fontSize: '0.72rem',
@@ -132,7 +140,7 @@ function logout() {
              fontWeight: activeTab === t.key ? 700 : 400,
            }"
            @click="router.push(t.key)">
-        <span style="font-size:1.25rem;">{{ t.icon }}</span>{{ t.label }}
+        <span class="tab-icon" :style="{ fontSize: '1.3rem', display: 'inline-block' }">{{ t.icon }}</span>{{ t.label }}
       </div>
     </div>
   </n-layout>

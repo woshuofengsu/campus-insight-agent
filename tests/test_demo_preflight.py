@@ -59,3 +59,39 @@ def test_accounts_check_reports_each_role():
         assert r["fix"], "应给出修复提示"
     finally:
         P.API = orig
+
+
+def test_utf8_stdout_guard_never_raises():
+    """回归：Windows 中文控制台（GBK）打印 ✅ 会 UnicodeEncodeError 直接崩。
+
+    自检脚本崩在答辩现场是最糟的失败模式，所以 _force_utf8_stdout 必须在
+    任何流形态下都不抛异常（含缺少 reconfigure 的对象 / reconfigure 报错的流），
+    并且在真实可重配的流上确实把编码切到 UTF-8。
+    """
+    import io
+
+    class _NoReconfigure:
+        pass
+
+    class _RaisesOnReconfigure:
+        def reconfigure(self, **_kw):
+            raise ValueError("stream is closed")
+
+    orig_out, orig_err = sys.stdout, sys.stderr
+    try:
+        # 1) 缺 reconfigure 的流：跳过，不抛
+        sys.stdout = _NoReconfigure()
+        P._force_utf8_stdout()
+        # 2) reconfigure 抛异常的流：吞掉异常，不抛
+        sys.stderr = _RaisesOnReconfigure()
+        P._force_utf8_stdout()
+        # 3) 真实文本流（GBK 模拟中文控制台）：确实切到 UTF-8
+        buf = io.BytesIO()
+        gbk = io.TextIOWrapper(buf, encoding="gbk")
+        sys.stdout = gbk
+        P._force_utf8_stdout()
+        assert gbk.encoding.lower().replace("-", "") == "utf8"
+        gbk.write("✅")  # 修复前这里会 UnicodeEncodeError
+        gbk.flush()
+    finally:
+        sys.stdout, sys.stderr = orig_out, orig_err

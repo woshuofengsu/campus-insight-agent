@@ -1,50 +1,61 @@
 /* ============================================================
-   全局 UI 设计令牌（依据《社区服务智能体 UI/UX 设计规范·最终交付版》）
-   主色蓝 #2D5BFF · 暖橙 #FF8C42 · 中性色 · 统一状态色 · 夜间模式
-   纯视觉层：不改动任何业务逻辑
+   社区先知 CommunityInsight · 视觉系统 v2（最终版）
+   ————————————————————————————————————————————————
+   设计语言：可信赖的社区蓝 × 温暖橙点缀 · 轻盈留白 · 微动效
+   · 保留全部既有类名（.page/.card/.status-pill/.stat-card/.elderly-*），
+     老页面零改动即可获得全面观感提升
+   · 夜间模式完整保留（body.dark）
+   · 纯视觉层：不改动任何业务逻辑
    ============================================================ */
 
 :root {
-  /* 主色 */
+  /* —— 品牌主色（社区蓝） —— */
   --primary: #2D5BFF;
   --primary-deep: #1E3A8A;
   --primary-light: #E8EDFF;
   --primary-gradient: linear-gradient(135deg, #2D5BFF 0%, #6A8DFF 100%);
-  /* 辅助色 */
-  --accent: #FF8C42;            /* 暖橙：待办提醒/高亮/待反馈 */
+  --primary-gradient-2: linear-gradient(135deg, #1E3A8A 0%, #2D5BFF 55%, #6A8DFF 100%);
+  /* —— 辅助色 —— */
+  --accent: #FF8C42;
   --accent-light: #FFF4E8;
   --accent-deep: #D96B1A;
-  /* 中性色 */
-  --bg: #F7F8FA;
+  --teal: #14B8A6;
+  --teal-light: #E6FFFA;
+  /* —— 中性色 —— */
+  --bg: #F6F8FB;
   --card-bg: #FFFFFF;
-  --text: #1A1A1A;
-  --muted: #5A5A5A;
+  --text: #16233B;
+  --muted: #64748B;
   --disabled: #9CA3AF;
-  --border: #E5E7EB;
-  --dark-bg: #1E293B;           /* 网格员深色导航 */
-  /* 状态色（全局统一：待处理黄/处理中蓝/待反馈橙/已结束灰/超时红） */
+  --border: #E7ECF3;
+  --dark-bg: #1E293B;
+  /* —— 状态色 —— */
   --st-pending: #F59E0B;
   --st-doing: #2D5BFF;
   --st-feedback: #FF8C42;
   --st-done: #9CA3AF;
   --st-danger: #EF4444;
   --st-info: #2D5BFF;
-  /* 字体 */
-  --font: "PingFang SC", "Microsoft YaHei", "Inter", "Roboto", -apple-system, sans-serif;
-  /* 圆角 */
+  --st-success: #10B981;
+  /* —— 字体 —— */
+  --font: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei",
+          "Inter", "Roboto", -apple-system, "Segoe UI", sans-serif;
+  /* —— 圆角 —— */
+  --r-xs: 8px;
   --r-btn: 10px;
   --r-card: 16px;
+  --r-card-lg: 22px;
   --r-modal: 20px;
   --r-input: 10px;
   --r-tag: 999px;
-  /* 阴影（一级卡片 / 二级悬浮 / 三级弹窗 / 特殊紧急） */
-  --shadow-1: 0 1px 4px rgba(0, 0, 0, 0.04);
-  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.10);
-  --shadow-danger: 0 4px 16px rgba(239, 68, 68, 0.25);
+  /* —— 阴影 —— */
+  --shadow-1: 0 1px 3px rgba(18, 35, 59, 0.05);
+  --shadow-2: 0 6px 16px rgba(18, 35, 59, 0.08);
+  --shadow-3: 0 16px 40px rgba(18, 35, 59, 0.14);
+  --shadow-danger: 0 6px 20px rgba(239, 68, 68, 0.25);
+  --shadow-primary: 0 6px 18px rgba(45, 91, 255, 0.28);
 }
 
-/* 夜间模式（深蓝系，保持 WCAG AA 对比度） */
 body.dark {
   --bg: #0F172A;
   --card-bg: #1E293B;
@@ -54,71 +65,94 @@ body.dark {
   --border: #334155;
   --primary-light: #1E3A8A;
   --accent-light: #2A2410;
+  --teal-light: #123B33;
   --dark-bg: #0B1120;
 }
 
 * { box-sizing: border-box; }
-html { -webkit-font-smoothing: antialiased; }
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 body {
   margin: 0;
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
+  line-height: 1.6;
   transition: background 0.25s, color 0.25s;
 }
 
+/* —— 精致细节：选中色 / 滚动条 / 焦点环 —— */
+::selection { background: rgba(45, 91, 255, 0.18); }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.28); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.45); }
+*::-webkit-scrollbar-track { background: transparent; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
 /* ---------------- 布局 ---------------- */
-.page { padding: 24px; max-width: 1080px; margin: 0 auto; }
-.page-title { font-size: 1.25rem; font-weight: 700; color: var(--text); margin: 0 0 4px; }
-.page-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+.page { padding: 24px; max-width: 1080px; margin: 0 auto; animation: fade-up 0.35s ease both; }
+.page-title {
+  font-size: 1.45rem; font-weight: 800; color: var(--text); margin: 0 0 4px;
+  letter-spacing: 0.01em; display: flex; align-items: center; gap: 8px;
+}
+.page-sub { color: var(--muted); font-size: 0.86rem; margin-bottom: 18px; }
 .muted { color: var(--muted); }
 
-/* ---------------- 卡片（圆角16px，一级阴影；hover 上浮二级） ---------------- */
+/* ---------------- 卡片 ---------------- */
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  padding: 16px;
+  padding: 18px;
   box-shadow: var(--shadow-1);
-  margin-bottom: 12px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .card[style*="cursor:pointer"], .card.clickable { cursor: pointer; }
-.card:hover[style*="cursor:pointer"] { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.card:hover[style*="cursor:pointer"], .card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+  border-color: rgba(45, 91, 255, 0.28);
+}
 
-/* ---------------- 状态胶囊标签（圆点 + 状态色 10% 底） ---------------- */
+/* —— 强调卡（品牌渐变头 + 白身） —— */
+.hero-card {
+  background: var(--card-bg);
+  border: none;
+  border-radius: var(--r-card-lg);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  position: relative;
+}
+.hero-card::before {
+  content: "";
+  position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: var(--primary-gradient);
+}
+
+/* ---------------- 状态胶囊 ---------------- */
 .status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: var(--r-tag);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: var(--r-tag);
+  font-size: 12px; font-weight: 600; white-space: nowrap;
 }
 .status-pill::before {
-  content: "";
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
 }
-
-/* 状态色映射（页面内联色保留优先；无内联时走这里） */
-.st-pending { background: rgba(245, 158, 11, 0.10); color: var(--st-pending); }
-.st-doing   { background: rgba(45, 91, 255, 0.10); color: var(--st-doing); }
-.st-feedback{ background: rgba(255, 140, 66, 0.10); color: var(--st-feedback); }
-.st-done    { background: rgba(156, 163, 175, 0.12); color: var(--st-done); }
-.st-danger  { background: rgba(239, 68, 68, 0.10); color: var(--st-danger); }
-.st-info    { background: rgba(45, 91, 255, 0.10); color: var(--st-info); }
+.st-pending  { background: rgba(245, 158, 11, 0.10);  color: var(--st-pending); }
+.st-doing    { background: rgba(45, 91, 255, 0.10);   color: var(--st-doing); }
+.st-feedback { background: rgba(255, 140, 66, 0.10);  color: var(--st-feedback); }
+.st-done     { background: rgba(156, 163, 175, 0.12); color: var(--st-done); }
+.st-danger   { background: rgba(239, 68, 68, 0.10);   color: var(--st-danger); }
+.st-info     { background: rgba(45, 91, 255, 0.10);   color: var(--st-info); }
+.st-success  { background: rgba(16, 185, 129, 0.10);  color: var(--st-success); }
 
 /* ---------------- 紧急橙提醒 ---------------- */
 .urgent { color: var(--accent); font-weight: 700; }
 .urgent-bg { background: var(--accent-light); border: 1px solid rgba(255, 140, 66, 0.5); border-radius: 10px; }
 
-/* ---------------- 数字统计卡（网格员工作台） ---------------- */
+/* ---------------- 数字统计卡 ---------------- */
 .stat-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -126,15 +160,96 @@ body {
   padding: 16px;
   box-shadow: var(--shadow-1);
   text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
 .stat-card .num { font-size: 1.9rem; font-weight: 800; line-height: 1.2; }
 .stat-card .lbl { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
 
-/* ---------------- 页面切换动效（淡入淡出 200ms） ---------------- */
+/* ---------------- 区块标题 ---------------- */
+.section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 1.02rem; font-weight: 800; margin: 18px 0 10px;
+}
+.section-title::before {
+  content: ""; width: 4px; height: 16px; border-radius: 4px;
+  background: var(--primary-gradient);
+}
+
+/* ---------------- 动效 ---------------- */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(3deg); }
+}
+@keyframes pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.35); }
+  60% { box-shadow: 0 0 0 10px rgba(45, 91, 255, 0); }
+}
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-up { animation: fade-up 0.4s ease both; }
+.fade-up-d1 { animation: fade-up 0.4s ease 0.06s both; }
+.fade-up-d2 { animation: fade-up 0.4s ease 0.12s both; }
+.fade-up-d3 { animation: fade-up 0.4s ease 0.18s both; }
+.fade-up-d4 { animation: fade-up 0.4s ease 0.24s both; }
 
-/* ---------------- 暗色模式内联强调色浅底转深色系（防残留白/亮块） ---------------- */
+/* ---------------- 渐变文字 / 品牌字 ---------------- */
+.grad-text {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+.brand-dot {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--primary-gradient);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; color: #fff;
+  box-shadow: var(--shadow-primary);
+}
+
+/* ---------------- 登录页网格背景 ---------------- */
+.mesh-bg {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden;
+  background:
+    radial-gradient(52rem 52rem at 12% -8%, rgba(106, 141, 255, 0.35) 0%, transparent 55%),
+    radial-gradient(44rem 44rem at 105% 8%, rgba(20, 184, 166, 0.28) 0%, transparent 52%),
+    radial-gradient(40rem 40rem at 85% 105%, rgba(255, 140, 66, 0.20) 0%, transparent 55%),
+    linear-gradient(160deg, #EEF3FF 0%, #F6F8FB 45%, #EAF4F3 100%);
+}
+body.dark .mesh-bg {
+  background:
+    radial-gradient(52rem 52rem at 12% -8%, rgba(45, 91, 255, 0.22) 0%, transparent 55%),
+    radial-gradient(44rem 44rem at 105% 8%, rgba(20, 184, 166, 0.16) 0%, transparent 52%),
+    radial-gradient(40rem 40rem at 85% 105%, rgba(255, 140, 66, 0.12) 0%, transparent 55%),
+    linear-gradient(160deg, #0B1120 0%, #0F172A 60%, #0B1F1C 100%);
+}
+.mesh-orb {
+  position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55;
+  animation: float-slow 12s ease-in-out infinite;
+}
+
+/* ---------------- 玻璃卡片 ---------------- */
+.glass {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: var(--shadow-3);
+}
+body.dark .glass {
+  background: rgba(30, 41, 59, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+/* ---------------- 暗色模式：内联浅色块防残留（保留 v1 逻辑） ---------------- */
 body.dark [style*="background:#fef2f2"] { background: #3d1f1f !important; border-color: #7f1d1d !important; color: #fecaca !important; }
 body.dark [style*="background:#f0fdf4"] { background: #12241b !important; border-color: #14532d !important; }
 body.dark [style*="background:#fefce8"] { background: #2a2410 !important; border-color: #713f12 !important; }
@@ -144,16 +259,213 @@ body.dark [style*="background:#f0faf0"] { background: #12241b !important; }
 body.dark [style*="background:#f8fafc"] { background: var(--card-bg) !important; }
 body.dark [style*="background:#fff"] { background: var(--card-bg) !important; }
 body.dark [style*="background:#fffbeb"] { background: #2a2410 !important; }
+body.dark [style*="background:#fff7ed"] { background: #2a2410 !important; }
 body.dark [style*="background:#FFF4E8"], body.dark [style*="background:#fff4e8"] { background: #2a2410 !important; }
+body.dark [style*="color:#1f2937"], body.dark [style*="color:#1A1A1A"] { color: var(--text) !important; }
 
 /* ---------------- 老年端适老化（WCAG AA：字号≥20px、按钮≥60px、行距1.8） ---------------- */
-.elderly-page { padding: 20px; max-width: 720px; margin: 0 auto; font-size: 1.25rem; line-height: 1.8; }
-.elderly-title { font-size: 1.8rem; font-weight: 800; text-align: center; color: var(--text); margin-bottom: 12px; }
+.elderly-page { padding: 20px; max-width: 720px; margin: 0 auto; font-size: 1.25rem; line-height: 1.8; animation: fade-up 0.35s ease both; }
+.elderly-title {
+  font-size: 1.9rem; font-weight: 800; text-align: center; color: var(--text);
+  margin-bottom: 14px; letter-spacing: 0.02em;
+}
 .elderly-btn {
   min-height: 72px !important;
   font-size: 1.35rem !important;
   font-weight: 700 !important;
-  border-radius: 16px !important;
-  transition: transform 0.15s;
+  border-radius: 18px !important;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 .elderly-btn:active { transform: scale(0.97); }
+
+/* ---------------- 手机端适配 ---------------- */
+@media (max-width: 768px) {
+  .page { padding: 16px; }
+  .page-title { font-size: 1.25rem; }
+}
+
+/* ============================================================
+   动效层（视觉系统 v2 · 每个特效都有信息意义，非纯装饰）
+   —— 全部仅用 transform / opacity（GPU 合成，不触发重排）
+   ============================================================ */
+
+/* 1) 上升星光粒子（登录页：社区星光隐喻，12 颗纯 CSS） */
+@keyframes rise {
+  0%   { transform: translateY(0) scale(0.8); opacity: 0; }
+  12%  { opacity: 0.85; }
+  85%  { opacity: 0.35; }
+  100% { transform: translateY(-108vh) scale(1.15); opacity: 0; }
+}
+.mesh-particles { position: absolute; inset: 0; overflow: hidden; }
+.mesh-particles i {
+  position: absolute; bottom: -12px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+  animation: rise linear infinite;
+}
+
+/* 2) 主按钮流光扫过（指引主行动：登录按钮，每 3.2s 一次） */
+@keyframes shimmer {
+  0%   { transform: translateX(-130%) skewX(-18deg); }
+  55%  { transform: translateX(230%) skewX(-18deg); }
+  100% { transform: translateX(230%) skewX(-18deg); }
+}
+.btn-shimmer { position: relative; overflow: hidden; }
+.btn-shimmer::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  animation: shimmer 3.2s ease-in-out infinite; pointer-events: none;
+}
+
+/* 3) 呼吸光环（危险/在办状态可感知：未读红点、紧急求助、超时） */
+@keyframes glow-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+  60%      { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+}
+.pulse-danger { animation: glow-ring 2s ease-out infinite; }
+@keyframes glow-ring-primary {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.40); }
+  60%      { box-shadow: 0 0 0 12px rgba(45, 91, 255, 0); }
+}
+.pulse-primary { animation: glow-ring-primary 2.4s ease-out infinite; }
+@keyframes dot-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+.dot-breathe { animation: dot-breathe 1.6s ease-in-out infinite; }
+
+/* 4) 大屏：背景呼吸 + 卡片辉光 + 标题流光 */
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.95; transform: scale(1.06); }
+}
+.breathe { animation: breathe 12s ease-in-out infinite; }
+.screen-card {
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+.screen-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(129, 199, 132, 0.55) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(129, 199, 132, 0.25) inset;
+}
+@keyframes sheen {
+  0%   { background-position: -220% 0; }
+  60%  { background-position: 220% 0; }
+  100% { background-position: 220% 0; }
+}
+.title-sheen {
+  background: linear-gradient(90deg, #81c784 0%, #4fc3f7 35%, #e8fff4 50%, #4fc3f7 65%, #81c784 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: sheen 8s ease-in-out infinite;
+}
+
+/* 5) 卡片波浪入场（阵列节奏：给容器加 .wave，子项依次淡入上浮） */
+@keyframes wave-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wave > * { animation: wave-in 0.5s cubic-bezier(0.22, 0.68, 0.36, 1) both; }
+.wave > *:nth-child(1) { animation-delay: 0.00s; }
+.wave > *:nth-child(2) { animation-delay: 0.06s; }
+.wave > *:nth-child(3) { animation-delay: 0.12s; }
+.wave > *:nth-child(4) { animation-delay: 0.18s; }
+.wave > *:nth-child(5) { animation-delay: 0.24s; }
+.wave > *:nth-child(6) { animation-delay: 0.30s; }
+.wave > *:nth-child(7) { animation-delay: 0.36s; }
+.wave > *:nth-child(8) { animation-delay: 0.42s; }
+.wave > *:nth-child(n+9) { animation-delay: 0.48s; }
+
+/* 6) 悬浮/漂浮（天气图标、品牌图标） */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.bob { animation: bob 3.5s ease-in-out infinite; }
+@keyframes tilt {
+  0%, 100% { transform: rotate(0deg); }
+  35%      { transform: rotate(-7deg); }
+  70%      { transform: rotate(4deg); }
+}
+.tilt-hover:hover { animation: tilt 0.5s ease-in-out; }
+
+/* 7) 渐变流动（欢迎横幅、AI 卡片头部：让重点区域"活"起来） */
+@keyframes gradient-flow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.grad-flow {
+  background-size: 220% 220%;
+  animation: gradient-flow 9s ease-in-out infinite;
+}
+
+/* 8) 入口卡 hover（居民首页 6 宫格：图标弹跳 + 卡片上浮） */
+.entry-tile {
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
+  cursor: pointer;
+}
+.entry-tile:hover { transform: translateY(-5px); box-shadow: var(--shadow-2); }
+.entry-tile:hover .entry-icon { transform: translateY(-6px) scale(1.18); }
+.entry-icon { transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); display: inline-block; }
+
+/* 9) 底部标签激活弹跳（导航位置反馈） */
+@keyframes tab-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+.tab-pop { animation: tab-pop 0.32s ease-out; }
+
+/* 10) 紧急求助呼吸（老年端唯一动效：让最重要的按钮被看见） */
+@keyframes sos-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55), 0 6px 20px rgba(220, 38, 38, 0.35); }
+  55%      { box-shadow: 0 0 0 18px rgba(220, 38, 38, 0), 0 6px 20px rgba(220, 38, 38, 0.35); }
+}
+.sos-breathe { animation: sos-breathe 2.4s ease-out infinite; }
+
+/* ---------------- 门户外壳（侧栏品牌 / 玻璃顶栏 / 底部标签栏） ---------------- */
+.sider-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 14px; border-bottom: 1px solid var(--border);
+}
+.topbar { background: rgba(255, 255, 255, 0.86) !important; }
+body.dark .topbar { background: rgba(15, 23, 42, 0.86) !important; }
+.tabbar { background: rgba(255, 255, 255, 0.9); }
+body.dark .tabbar { background: rgba(15, 23, 42, 0.9); }
+.tab-item { position: relative; transition: color 0.2s ease; }
+.tab-item::before {
+  content: ''; position: absolute; top: 4px; left: 50%; width: 0; height: 3px;
+  border-radius: 3px; background: var(--primary-gradient);
+  transform: translateX(-50%); transition: width 0.24s ease;
+}
+.tab-item.tab-active::before { width: 26px; }
+.tab-item.tab-active .tab-icon { animation: tab-pop 0.32s ease-out; }
+.tab-item:active { transform: scale(0.94); }
+
+/* ---------------- 老年端彩色信息面板（带暗色变体，避免暗色下刺眼） ---------------- */
+.panel-warm  { background: linear-gradient(135deg, #FFF7ED, #FFF1E0); border: 1px solid #FED7AA; color: #9A3412; }
+.panel-sky   { background: linear-gradient(135deg, #F0F9FF, #E6F6FF); border: 1px solid #BAE6FD; }
+.panel-lemon { background: linear-gradient(135deg, #FEFCE8, #FEF9C3); border: 1px solid #FDE68A; color: #854D0E; }
+.panel-mint  { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); border: 1px solid #86EFAC; }
+body.dark .panel-warm  { background: linear-gradient(135deg, #2A2410, #3A2E12); border-color: #A16207; color: #FDE68A; }
+body.dark .panel-sky   { background: linear-gradient(135deg, #10202E, #14304A); border-color: #1E3A5F; }
+body.dark .panel-lemon { background: linear-gradient(135deg, #2A2410, #3A3410); border-color: #A16207; color: #FDE68A; }
+body.dark .panel-mint  { background: linear-gradient(135deg, #12241B, #16311F); border-color: #15803D; }
+
+/* ---------------- 路由级过渡（登录 ↔ 门户，仅顶层切换） ---------------- */
+.page-fade-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
+.page-fade-leave-active { transition: opacity 0.14s ease; }
+.page-fade-enter-from { opacity: 0; transform: translateY(8px); }
+.page-fade-leave-to { opacity: 0; }
+
+/* ---------------- 无障碍：尊重系统「减少动态」 ----------------
+   开启后关闭所有循环/位移动效，仅保留必要的即时状态变化 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .mesh-particles, .breathe, .title-sheen, .btn-shimmer::after { display: none !important; }
+}

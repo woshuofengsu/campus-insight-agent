@@ -207,7 +207,21 @@ def check_accounts() -> dict:
             "detail": "居民/老年/网格员三角色均可登录，鉴权中间件正常（无 token → 401）", "fix": ""}
 
 
+def _force_utf8_stdout() -> None:
+    """Windows 中文控制台默认 GBK，会因 ✅/❌ 触发 UnicodeEncodeError 直接崩。
+
+    答辩前现场跑这个脚本时崩溃是最糟的失败模式，因此这里主动把 stdout/stderr
+    切到 UTF-8；老终端不支持时降级为 errors='replace'（图标变 ?，检查结果仍可读）。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def main() -> int:
+    _force_utf8_stdout()
     ap = argparse.ArgumentParser(description="答辩/演示前自检（U5）")
     ap.add_argument("--fast", action="store_true", help="跳过测试与构建（现场快速体检）")
     ap.add_argument("--json", action="store_true")

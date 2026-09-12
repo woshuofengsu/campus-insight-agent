@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 // 老年端首页：大字天气(可播放) + 两行三列大按钮 + 用药/通知摘要 + 长按紧急求助 + 联系家属/社区拨打 + 语音帮助
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
@@ -174,14 +174,15 @@ function cancelCall() {
 
 <template>
   <div class="elderly-page">
-    <!-- M1：时段问候 + 今日关怀 -->
+    <!-- 时段问候 + 今日关怀（暖色，唯一保留的淡入动效） -->
     <div class="elderly-title">{{ greetText || ('你好，' + (home?.name || '大爷/阿姨')) }}</div>
-    <div v-if="careLine" class="card" style="background:#fff7ed;border:1px solid var(--border);text-align:center;font-size:1.25rem;margin-bottom:10px;">
-      {{ careLine }}
+    <div v-if="careLine" class="card panel-warm fade-up"
+         style="text-align:center;font-size:1.3rem;font-weight:600;margin-bottom:12px;border-radius:18px;">
+      💗 {{ careLine }}
     </div>
 
     <!-- 音量设置（语音按老人设置音量） -->
-    <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:12px;">
       <span style="font-size:1.1rem;">🔊 音量：</span>
       <n-button-group size="large">
         <n-button v-for="(v, k) in volLabels" :key="k" :type="vol === v ? 'primary' : 'default'" @click="vol = v; speak('音量已设置', v, rate)">{{ k }}</n-button>
@@ -189,51 +190,60 @@ function cancelCall() {
     </div>
 
     <!-- 大字天气（可播放） -->
-    <div v-if="home?.weather" class="card" style="text-align:center;background:#f0f9ff;font-size:1.3rem;">
-      <div style="font-size:1.6rem;font-weight:700;">{{ home.weather.emoji }} {{ home.weather.condition }} {{ home.weather.temp_low }}°~{{ home.weather.temp_high }}°</div>
-      <div v-if="home.weather.alert_tags && home.weather.alert_tags.length" style="margin-top:4px;">
+    <div v-if="home?.weather" class="card panel-sky fade-up-d1"
+         style="text-align:center;font-size:1.3rem;border-radius:20px;">
+      <div style="font-size:1.7rem;font-weight:800;color:#075985;">
+        <span class="bob" style="display:inline-block;">{{ home.weather.emoji }}</span>
+        {{ home.weather.condition }} {{ home.weather.temp_low }}°~{{ home.weather.temp_high }}°
+      </div>
+      <div v-if="home.weather.alert_tags && home.weather.alert_tags.length" style="margin-top:6px;">
         <n-tag v-for="(a, i) in home.weather.alert_tags" :key="i" size="large" type="error" style="margin:0 4px;">⚠️ {{ a.type }}{{ a.level }}</n-tag>
       </div>
-      <div v-if="home.weather.advice" class="muted" style="margin-top:6px;font-size:1rem;">💬 {{ home.weather.advice }}</div>
-      <div class="muted" style="font-size:0.85rem;margin-top:4px;">更新于 {{ (home.weather.updated_at || '').slice(11, 16) || home.weather.updated_at }}</div>
-      <n-button size="large" type="primary" ghost style="margin-top:8px;" @click="playWeather">🔊 播放天气</n-button>
+      <div v-if="home.weather.advice" class="muted" style="margin-top:8px;font-size:1.05rem;">💬 {{ home.weather.advice }}</div>
+      <div class="muted" style="font-size:0.9rem;margin-top:4px;">更新于 {{ (home.weather.updated_at || '').slice(11, 16) || home.weather.updated_at }}</div>
+      <n-button size="large" type="primary" ghost style="margin-top:10px;min-height:56px;font-size:1.15rem;" @click="playWeather">🔊 播放天气</n-button>
     </div>
 
     <!-- 用药提醒 -->
-    <div v-if="home?.due_medications > 0" class="card" style="background:#fefce8;text-align:center;font-size:1.3rem;font-weight:700;">
+    <div v-if="home?.due_medications > 0" class="card panel-lemon"
+         style="text-align:center;font-size:1.35rem;font-weight:800;border-radius:18px;">
       💊 您有 {{ home.due_medications }} 条用药提醒
     </div>
 
     <!-- 未读通知 -->
-    <div v-if="home?.unread_notices > 0" class="card" style="background:#f0fdf4;text-align:center;font-size:1.2rem;">
+    <div v-if="home?.unread_notices > 0" class="card entry-tile panel-mint"
+         style="text-align:center;font-size:1.25rem;border-radius:18px;"
+         @click="router.push('/elderly/notices')">
       🔔 {{ home.unread_notices }} 条新通知
-      <n-button size="large" type="success" @click="router.push('/elderly/notices')">去听</n-button>
+      <n-button size="large" type="success" style="margin-left:8px;">去听 ›</n-button>
     </div>
 
     <!-- 最近求助状态 -->
-    <div v-if="home?.latest_sos" class="card" style="background:#fef2f2;text-align:center;">
+    <div v-if="home?.latest_sos" class="card" style="background:#fef2f2;text-align:center;font-size:1.15rem;border-radius:18px;">
       🆘 最近求助：{{ home.latest_sos.status || '处理中' }}
     </div>
 
-    <!-- 语音对话区：社区小助手（语音优先，点开全页） -->
-    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#2E7D32;color:#fff;">
-        <b style="font-size:1.2rem;">🤖 社区小助手（按住说话）</b>
+    <!-- 语音对话区：社区小助手（语音优先） -->
+    <div class="card hero-card" style="padding:0;">
+      <div class="grad-flow" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#166534,#2E7D32);color:#fff;">
+        <b style="font-size:1.25rem;">🤖 社区小助手</b>
         <n-button size="small" text style="color:#fff;" @click="router.push('/elderly/agent')">全页对话 ›</n-button>
       </div>
-      <div style="padding:12px;">
-        <n-button type="error" block size="large" style="min-height:72px;font-size:1.3rem;" @click="router.push('/elderly/agent')">
+      <div style="padding:14px;">
+        <n-button type="error" block size="large" style="min-height:76px;font-size:1.3rem;font-weight:700;border-radius:18px;"
+                  @click="router.push('/elderly/agent')">
           🎤 按住说话，报修 / 查政策 / 问天气
         </n-button>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;justify-content:center;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:center;">
           <n-button v-for="(q, i) in ['家里灯不亮了', '医保怎么报销', '今天天气', '我要联系社区']" :key="i" size="large"
+                    style="border-radius:14px;min-height:52px;font-size:1.05rem;"
                     @click="router.push('/elderly/agent')">{{ q }}</n-button>
         </div>
       </div>
     </div>
 
     <!-- 两行三列大按钮 -->
-    <div v-for="(row, ri) in rows" :key="ri" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;">
+    <div v-for="(row, ri) in rows" :key="ri" class="wave" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:14px 0;">
       <n-badge v-for="b in row" :key="b.label" :value="b.label === '用药提醒' ? home?.due_medications || 0 : 0"
                :show="b.label === '用药提醒' && home?.due_medications > 0" :offset="[-8, 8]">
         <n-button size="large" type="primary" ghost class="elderly-btn"
@@ -244,22 +254,24 @@ function cancelCall() {
     </div>
 
     <!-- 最近联系（留痕记录） -->
-    <div v-if="home?.latest_contact" class="muted" style="text-align:center;font-size:0.95rem;">
+    <div v-if="home?.latest_contact" class="muted" style="text-align:center;font-size:0.98rem;">
       最近联系：{{ home.latest_contact }}
     </div>
 
-    <!-- 紧急求助（长按 3 秒） -->
-    <div style="margin-top:20px;">
-      <n-button size="large" type="error" block class="elderly-btn" data-longpress style="min-height:84px;font-size:1.6rem;background:#dc2626;"
+    <!-- 紧急求助（长按 3 秒）——老年端唯一动效：呼吸光圈，让最重要的按钮被看见 -->
+    <div style="margin-top:22px;">
+      <n-button size="large" type="error" block class="elderly-btn sos-breathe" data-longpress
+                style="min-height:92px;font-size:1.7rem;background:linear-gradient(135deg,#DC2626,#B91C1C);border-radius:20px;"
                 @mousedown="pressStart" @mouseup="pressCancel" @mouseleave="pressCancel" @touchstart="pressStart" @touchend="pressCancel">
         🆘 紧急求助（长按 3 秒）
       </n-button>
-      <div class="muted" style="text-align:center;font-size:0.9rem;margin-top:4px;">按住 3 秒后确认呼叫</div>
+      <div class="muted" style="text-align:center;font-size:0.95rem;margin-top:6px;">按住 3 秒后确认呼叫</div>
     </div>
 
     <!-- 拨打 120 红色大按钮 -->
-    <div style="margin-top:12px;">
-      <n-button size="large" type="error" block class="elderly-btn" style="min-height:70px;font-size:1.4rem;background:#b91c1c;"
+    <div style="margin-top:14px;">
+      <n-button size="large" type="error" block class="elderly-btn"
+                style="min-height:76px;font-size:1.45rem;background:linear-gradient(135deg,#B91C1C,#991B1B);border-radius:20px;"
                 tag="a" href="tel:120">🚑 拨打 120（急救）</n-button>
     </div>
 
@@ -269,7 +281,7 @@ function cancelCall() {
              positive-text="确认求助" negative-text="取消"
              @positive-click="confirmSos" @negative-click="sosConfirm = false">
       <template #default>
-        <div style="text-align:center;font-size:2rem;font-weight:800;color:#dc2626;">{{ sosCountdown }} 秒后自动取消</div>
+        <div style="text-align:center;font-size:2.1rem;font-weight:800;color:#dc2626;">{{ sosCountdown }} 秒后自动取消</div>
       </template>
     </n-modal>
 
