@@ -71,6 +71,31 @@ html { scroll-padding-bottom: 120px; }
   flex-direction: column; align-items: center; justify-content: center;
   font-size: 1.5rem; line-height: 2; text-align: center;
 }
+/* ---------- 治理大屏移动端降级（P1-G3）：仅 <900px 显示提示层 ---------- */
+.screen-mobile-only { display: none; }
+@media (max-width: 899px) {
+  .screen-mobile-only { display: flex; }
+}
+
+/* 触发条件（P1-G4 补强）：原来只看「横屏 + 高度 ≤500px」，
+   部分机型横屏高度会超过 500（如 390×844 机型横屏后高度 390~430 没问题，
+   但 6.7 寸以上或带浏览器 UI 时可达 500+），导致老年端横屏排版错乱却没有提示。
+   改为「触屏小屏设备的横屏」：pointer:coarse（触摸）+ 横屏 + 宽度 ≤1024（排除桌面/平板横屏宽屏）。
+   竖屏与桌面完全不受影响。 */
+@media (orientation: landscape) and (pointer: coarse) and (max-width: 1024px) {
+  .elderly-rotate-mask { display: flex; }
+}
+/* 兜底：极矮的横屏（旧设备/浏览器 UI 占高）仍按原条件触发 */
 @media (orientation: landscape) and (max-height: 500px) {
   .elderly-rotate-mask { display: flex; }
+}
+
+/* ---------- 移动端视口高度（P1-G7）：100vh 在 iOS 地址栏收起/展开时会跳变 ----------
+   现代浏览器用 dvh（动态视口高度）跟随地址栏；不支持的浏览器回退 100vh。
+   只作用于「整屏容器」，不动页面内部布局，零回归风险。 */
+@media (max-width: 767px) {
+  .n-layout { min-height: 100vh; min-height: 100dvh; }
+  /* 底部固定栏跟随安全区，且给内容留足滚动余量（防最后一项被遮挡） */
+  .tabbar { padding-bottom: calc(env(safe-area-inset-bottom)); }
+  main, .n-layout-content { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
 }

@@ -1013,3 +1013,43 @@
 按**语义**分口径替换（`passed`/`通过` = 可运行数−1，`可运行 N`/`N 项测试` = 可运行数），
 并把 `tests/test_claims_consistency.py` 的校验从「落在允许集合里」升级为**按口径分别断言**——
 正是这条加严后的规则精确指出了 3 处错误。**教训：一致性校验必须编码语义，而不是放宽成集合包含。**
+
+## 四十、移动端适配收口（专项审计 + PWA + 大屏降级）✅
+
+**背景**：移动端基础早已具备（响应式断点、安全区、适老热区、横屏提示），但**没有专项验证手段**——
+`ui_audit` 只查视觉/无障碍，查不出三类只有真机才会暴露的问题。方案先行（`docs/mobile-adaptation-plan.md`），
+再按 P0→P1 执行。
+
+**① 新增移动端专项审计 `scripts/mobile_audit.py`（21 页 × 7 类检查）**
+真机 UA（iPhone Safari）+ DPR3 + `has_touch`，覆盖登录 2 档 / 居民 8 页 / 网格 2 页 + 大屏 / 老年 9 页 + 横屏专项：
+横向溢出（含未裁剪元素）· 触屏热区 <44px · **输入框字号 <16px（iOS 聚焦会整页放大）** ·
+字号下限（常规 12 / 老年 20）· **滚到底部是否被固定底栏遮挡（`elementFromPoint` 真测）** ·
+老年端横屏遮罩方向 · 大屏手机降级层是否显示。
+
+**② 审计发现的真问题（已修）**
+- **老年端「紧急联系人」里手机号 16.8px**，低于适老 20px 下限（`Contacts.vue` 内联 `font-size:1.05rem`）→ 去掉内联字号，交给 `.elderly-page .muted` 的 20px 兜底。
+- **审计脚本自身假阳性**：底栏判据太松（`position:fixed` + 贴底 + 宽 >60%），把登录页全屏背景 `.mesh-bg`
+  与老年端横屏遮罩都当成底栏（报告里出现"底栏 844px"这种离谱值）。修判据：**高度必须 < 1/4 屏高**、
+  排除 `.mesh-bg`/`.rotate-mask`，且遮罩显示时跳过遮挡检查。修完后正确识别居民端底栏 64px。
+
+**③ PWA 三件套（补齐"添加到主屏幕"的全屏体验）**
+- `web/public/manifest.json`：`display:standalone` + 主题色 + 3 个图标 + 2 个快捷方式（报修 / 长辈版）；
+- 图标由 `scripts/gen_pwa_icons.py` **用 Playwright 渲染 SVG 生成**（192/512 PNG，512 带品牌蓝底供 maskable），
+  **不引入 Pillow/ImageMagick 等新依赖**；
+- `index.html` 补 4 个全屏 meta（`manifest` / `mobile-web-app-capable` / `apple-mobile-web-app-capable` /
+  `apple-mobile-web-app-title`），并把 `apple-touch-icon` 指向 PNG（iOS 对 SVG 图标支持不稳）。
+- 实测：`/manifest.json`、`/icon-192.png`、`/icon-512.png` 均 HTTP 200，6 项 meta/资源全部就位。
+
+**④ 两处隐患（方案里的 G3/G4/G7）**
+- **G3 大屏手机降级**：`Screen.vue` 加 `.screen-mobile-only` 层（<900px 显示「请在电脑/投屏查看」+ 返回 / 仍要查看），
+  **不改大屏本体逻辑**，并纳入审计（`screen-mobile` 一项专门验它）。
+- **G4 老年端横屏遮罩补强**：原条件「`landscape` 且 `max-height:500px`」在部分机型不触发 →
+  放宽为「`landscape` 且 `pointer:coarse` 且 `max-width:1024px`」（触屏小屏设备的横屏），保留原条件作兜底；竖屏/桌面不受影响。
+- **G7 iOS 地址栏高度跳变**：`.n-layout` 增 `min-height:100dvh`（不支持则回退 `100vh`）；底部栏与内容区安全区余量一并补齐。
+
+**⑤ 验证**
+- `scripts/mobile_audit.py`：**21/21 页全部通过**（修复前为 2 项待改进）；
+- `scripts/ui_audit.py`：**26 页仍 0 违规**（回归确认）；
+- `npm run build` ✓；`docs/mobile-deploy.md` 第六节升级为「自动化 21 页 + 真机 8 步」清单，第八节发布清单新增第 11/12 项。
+
+**提交**：本轮。

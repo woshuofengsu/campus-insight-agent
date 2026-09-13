@@ -1,0 +1,21 @@
+{
+  "name": "社区先知 CommunityInsight · 基层治理多智能体系统",
+  "short_name": "社区先知",
+  "description": "接诉即办的社区治理多智能体平台：居民报修、邻里议事、网格督办、适老关怀。",
+  "lang": "zh-CN",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF3FF",
+  "theme_color": "#2D5BFF",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "居民报修", "short_name": "报修", "url": "/resident/work-orders/new" },
+    { "name": "老年关怀版", "short_name": "长辈版", "url": "/elderly/home" }
+  ]
+}

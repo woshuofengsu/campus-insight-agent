@@ -10,7 +10,12 @@ const data = ref({
   selfRate: 0, temp: '--', kbRate: 0, kbCount: 0, careRate: 0,
 })
 const ready = ref(false) // 数据未到达前不显示 0（避免"先 0 再跳"）
+const forceShow = ref(false) // 手机端「仍要查看」：临时绕过降级层
 let timer = null
+
+function toggleForce() {
+  forceShow.value = true
+}
 
 async function load() {
   try {
@@ -56,6 +61,21 @@ const cards = [
 
 <template>
   <div style="min-height:100vh;background:radial-gradient(ellipse at top,#0d3b2e 0%,#071f18 60%,#04120d 100%);color:#fff;padding:40px;display:flex;flex-direction:column;position:relative;overflow:hidden;">
+    <!-- 移动端降级（P1-G3）：治理大屏是桌面/投屏场景，手机上 8 卡会被压扁，
+         这里明确告知而不是渲染挤压布局。仅 <900px 显示，桌面/大屏完全不受影响。 -->
+    <div v-if="!forceShow" class="screen-mobile-only" style="position:absolute;inset:0;z-index:20;background:rgba(4,18,13,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;">
+      <div style="font-size:3rem;">🖥️</div>
+      <div style="font-size:1.4rem;font-weight:800;margin-top:12px;">治理大屏请在电脑或投屏上查看</div>
+      <div style="color:#9fd8c4;margin-top:10px;line-height:1.9;max-width:22rem;">
+        大屏为 8 张实时指标卡设计，手机屏幕会挤压布局。<br />
+        建议用电脑浏览器全屏打开，或横屏后刷新。
+      </div>
+      <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+        <n-button type="primary" size="large" @click="$router.push('/grid/dashboard')">返回工作台</n-button>
+        <n-button size="large" ghost style="color:#fff;" @click="toggleForce">仍要查看</n-button>
+      </div>
+    </div>
+
     <!-- 背景呼吸光环（沉浸感） -->
     <div class="breathe" style="position:absolute;width:900px;height:900px;border-radius:50%;left:-220px;top:-320px;background:radial-gradient(circle,rgba(129,199,132,0.20) 0%,transparent 62%);pointer-events:none;"></div>
     <div class="breathe" style="position:absolute;width:760px;height:760px;border-radius:50%;right:-200px;bottom:-300px;background:radial-gradient(circle,rgba(79,195,247,0.16) 0%,transparent 62%);animation-delay:4s;pointer-events:none;"></div>

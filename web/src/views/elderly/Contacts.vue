@@ -62,7 +62,7 @@ async function confirmCall() {
           <n-tag size="large" :type="c.status === '审核通过' ? 'success' : 'warning'">{{ c.status }}</n-tag>
         </div>
       </div>
-      <div class="muted" style="font-size:1.05rem;margin-top:6px;">📱 {{ c.phone }}</div>
+      <div class="muted" style="margin-top:6px;">📱 {{ c.phone }}</div>
       <div v-if="c.status === '审核通过'" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:10px;">
         <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" @click="callConfirm = c">📞 呼叫 {{ c.name }}</n-button>
         <n-popconfirm @positive-click="remove(c)">

@@ -11,16 +11,34 @@ from data.db_user import create_user
 
 
 def _init_test_db(name: str) -> str:
+    """建测试库：**先清残留**（db + -wal + -shm），保证重复运行/中断后可重入。
+
+    踩坑记录：原先只 `init_db()` 不清理，残留库会让 `create_user` 抛
+    `Username 'grid_mgmt' already taken` → 单独跑通过、全量跑 error 的偶发失败。
+    """
     db_path = os.path.join(os.path.dirname(__file__), f"_test_dispatch_{name}.db")
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            os.unlink(db_path + suffix)
+        except OSError:
+            pass
     init_db(db_path)
     return db_path
 
 
-def _cleanup(db_path: str):
-    try:
-        os.unlink(db_path)
-    except Exception:
-        pass
+def _cleanup(db_path: str, retries: int = 5):
+    """清理临时库（含 -wal/-shm）；Windows 下句柄占用会短暂拒绝删除 → 重试后放弃。"""
+    import time
+
+    for suffix in ("", "-wal", "-shm"):
+        for i in range(retries):
+            try:
+                os.unlink(db_path + suffix)
+                break
+            except FileNotFoundError:
+                break
+            except PermissionError:
+                time.sleep(0.2 * (i + 1))
 
 
 class TestDispatchByDepartment(unittest.TestCase):
