@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、582 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、586 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 582 项：581 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 586 项：585 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 582 项测试**（581 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 586 项测试**（585 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
 - `config.DEFAULT_TENANT` 为多租户默认值（演示级，仅预留字段不改查询）；`AGENT_CLASSES` 角色 id 不得随意改（有状态）。
@@ -100,7 +100,8 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 四十四 节**为第九轮复审收口）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 四十五 节**为第十轮观察项 O1/O2 门禁化）|
+| `tests/test_claims_consistency.py` | 材料口径门禁：过时表述 / 测试数口径 / **PWA 只能宣称"可安装"、不得宣称离线能力** / 消融供数冒烟项白名单 |
 
 ## 已完成的大改动（截至最终版）
 
@@ -113,4 +114,4 @@ elderly:  demo_elderly（免登录）
 - **第七轮复审收口**：v46 手机号加密全量补齐（提案/草稿/user_profile 残留）/ 运行时裸 ALTER 收回迁移链 /
   utcnow 弃用清理 / 异常文案脱敏 / 录屏素材（见 dev-log 三十七～三十八节）
 
-详见 `docs/spec/dev-log.md`（最新 **四十四** 节）。
+详见 `docs/spec/dev-log.md`（最新 **四十五** 节）。

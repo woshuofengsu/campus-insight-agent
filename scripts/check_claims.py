@@ -138,6 +138,11 @@ STALE = [
     "16 个治理工具", "16 个函数工具", "Streamlit 三角色", "LangChain AgentExecutor",
     # 第九轮：UI 审计从 26 页扩到全站 34 个路由页 / 54 个页面视口，旧页数不得回流
     "26 页", "26 个页面",
+    # 第十轮观察项 O1：PWA **没有 service worker**，只能宣称「可添加到主屏幕」，
+    # 不得出现"离线能力"类表述；同时 PWA 文件名必须与仓库实际一致
+    # （曾把不存在的 manifest.webmanifest / pwa-192.png 写成已落地方案 → 误导）。
+    "离线可用", "支持离线", "离线 PWA", "断网可用",
+    "manifest.webmanifest", "pwa-192", "pwa-512",
 ]
 
 

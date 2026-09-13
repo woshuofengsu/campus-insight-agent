@@ -1301,3 +1301,61 @@ PWA manifest/图标 → 三角色进入（网格员密码登录 200 role=grid / 
 
 **提交**：本轮。
 
+---
+
+## 四十五、第十轮观察项 O1/O2 落地：把「口径」变成机器能拦的门禁 ✅
+
+**背景**：第十轮复核判定 F1–F4 全部闭环、无新增问题、可以冻结，只剩两条观察项（非缺陷）：
+O1「PWA 无 SW，别说离线」、O2「581 里有 6 条供数冒烟项，关键指标另有强断言兜底」。
+本轮不再改功能，只做一件事：**把这两句话从"口头口径"变成可执行门禁**（回执见 `docs/review/复核报告-第十轮-处理回执.md`）。
+
+**① O1 查实**：`web/src/**` 确实无 `serviceWorker` 注册、`public/dist` 无 `sw*.js`；
+`manifest.json` 合法（standalone / 3 图标含 512 maskable / 2 快捷方式）。**"可安装"是真的，"可离线"是假的。**
+
+**② 但自查发现材料里有一处更隐蔽的失真**（报告没指出）：`docs/mobile-deploy.md` §4.3 原文
+`manifest.webmanifest + pwa-192/512.png + sw.js（缓存优先 /assets/），main.js 生产注册 SW`
+—— 既是"把没做的 SW 写成已落地"，又**引用了根本不存在的文件名**（仓库里是 `manifest.json` /
+`icon-192.png` / `icon-512.png`），表格里还写着用途是"离线壳"。已重写为
+「已完成：可安装 / 未做：SW 与离线能力」的事实表 + 能/不能做什么 + 对外口径，
+`docs/mobile-adaptation-plan.md` 路线图条目同步更正。
+
+**③ O1 门禁**：新增 `tests/test_claims_consistency.py::test_pwa_is_installable_but_not_offline` ——
+断言「无 SW 注册代码 / 无 sw 文件」「manifest 合法且**它引用的每个图标真实存在**」
+「禁止短语表必须登记四个离线能力式表述」「不能把诚实的那半句也删掉（须保留『可添加到主屏幕』）」；
+`scripts/check_claims.py` 过时表述表新增 `离线可用 / 支持离线 / 离线 PWA / 断网可用 / manifest.webmanifest / pwa-192 / pwa-512`。
+**门禁当场咬到我**：我在文档里写"不要说「…支持离线…」"，注释本身引用了被禁词 → 门禁报 `mobile-deploy.md:166 「支持离线」`。
+改为不带原词的表述后通过（这条也说明该口径的写法要避开原词）。
+
+**④ O2 查实（这轮最该说清的一点）**：6 条供数冒烟项里，**只有 2 条有强断言兜底** ——
+`test_persona_routing → test_persona_routing_is_accurate`（断言 `rate == 100.0`）、
+`test_tool_discovery → test_tool_discovery_covers_expected`（断言 `missing == []`）；
+另外 4 条（OODA 阶段耗时 / DB 性能 / 反射组件 / 记忆读写）**是机器相关的性能与组件观测值，
+只给消融报告取数、不进任何对外材料**（已核对材料未引用）。
+报告原话"关键指标另有强断言兜底"容易被读成"6 条都有"，本轮把这个准确口径写进交付说明（主动讲，不等问）。
+
+**⑤ O2 门禁**：用 `ast` 把"不带 `assert` 的 `test_*`"钉成**白名单恰好等于这 6 个** ——
+以后谁再加一个不做断言的 `test_*`，CI 直接红（第八轮就是靠补真断言才发现人设路由只有 91.67%）；
+另加「对外引用的指标必须有对应断言测试，且断言要带明确阈值」与「材料把消融用例算进规模时必须说明其性质」两条自洽检查。
+
+**⑥ 连带**：新增 4 条测试让可运行用例数 582 → **586**，`check_claims` 立刻报红并给出同步命令
+（`sync_test_count.py 586`）；`meta.js` 属 `web/src` → **按 F4 规矩重新 build** 后才跑审计。
+
+**⑦ 验证**
+
+| 门禁 | 结果 |
+|---|---|
+| `pytest tests/ -q` | **585 passed / 1 skipped / 0 warnings**（可运行 **586**） |
+| `check_claims.py` | ✅ 用例数与 meta.js 一致（586）；无过时表述 |
+| **门禁有效性反证** | 注入一行 UTF-8 违规 → 两个门禁**双双变红并指到行号**；清理后 9 passed |
+| `ruff` / `npm run build` | 0 / ✓ |
+| `ui_audit` / `mobile_audit` | 54 页视口 / 21 页 **0 违规** |
+| `demo_preflight` | **9/9** |
+
+**⑧ 我这轮犯的两个错（如实记录）**
+1. 用 PowerShell `Add-Content` 往 UTF-8 文档追加中文 → 写入 GBK 字节污染文件，第一次"反证"失败的真实原因是
+   `UnicodeDecodeError`（**假证明**）。已按字节定位截断修复（18,313 字节 / 298 行，无非法字节），
+   改用 Python 以 UTF-8 注入重做反证。教训写进本节：**本仓库文本文件一律只用 UTF-8 工具链改**。
+2. 在文档注释里引用被禁短语 → 触发自己的门禁（见 ③）。
+
+**提交**：本轮。
+

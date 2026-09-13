@@ -12,7 +12,7 @@
 | 方案 | 选择 | 迁移成本 | 说明 |
 |---|---|---|---|
 | H5 响应式 | **采用** | 无 | 现有 Vue3 + Vite + Naive UI 同源架构，零迁移 |
-| PWA | 可选 | 0.5 天（手写，不引插件以避免 Vite 8 兼容风险） | 需"类 App"图标/离线壳/全屏演示时启用 |
+| PWA | 可选 | 0.5 天（手写，不引插件以避免 Vite 8 兼容风险） | 已落地「可安装（类 App 全屏）」；**service worker / 离线未做**（见 §4.3） |
 | 微信小程序 | 不采用 | 重写 | 仅当分发限定微信生态时；WXML 不能复用 Vue SFC |
 | 原生 App | 不采用 | 重写 | 仅需要蓝牙/NFC/后台定位/推送时 |
 
@@ -148,9 +148,28 @@ manualChunks(id) {
 
 效果：`naiveui-*.js` 1.44MB（独立 chunk，不随业务代码变化，可 `immutable` 一年缓存）/ `index-*.js` ~40KB（vue+router+pinia+axios 默认聚合）。已验证无 `e is not a function` 报错。
 
-### 4.3 PWA（可选，手写方案，未落地）
+### 4.3 PWA（**已完成：可安装**；**未做**：service worker / 离线）
 
-`web/public/manifest.webmanifest` + `pwa-192/512.png` + `sw.js`（缓存优先 `/assets/`），`index.html` 加 `<link rel="manifest">`，`main.js` 生产注册 SW。零构建插件依赖。
+**当前实际落地的东西**（都已在仓库里，可直接访问验证）：
+
+| 文件 | 状态 |
+|---|---|
+| `web/public/manifest.json` | ✅ 已落地（`name`/`short_name`/`start_url`/`display:standalone`/`theme_color`/3 个图标含 512 maskable/2 个快捷方式） |
+| `web/public/icon-192.png`、`icon-512.png` | ✅ 已落地（`scripts/gen_pwa_icons.py` 用 Playwright 渲染 `favicon.svg` 生成，不引新依赖） |
+| `web/index.html` | ✅ `<link rel="manifest">` + `viewport-fit=cover` + 4 个 iOS meta + `apple-touch-icon` 用 PNG |
+
+**能做什么**：手机浏览器「添加到主屏幕」后以 standalone 全屏（类 App）运行。
+**不能做什么**：**没有 service worker，所以没有离线能力** —— 断网打不开、也没有后台同步。
+这是**刻意的取舍**：接诉即办业务强依赖后端实时数据，缓存政策/工单反而可能让人看到过期内容。
+
+> ⚠️ **对外口径（答辩/材料必须一致）**：只说「**可添加到手机主屏幕的类 App 体验**」；
+> **任何"脱网也能用"式的能力承诺都不能说**（本机断网时页面打不开）。若被追问，
+> 按 `docs/review/复审报告-第九轮-移动端与常开方案.md` Q2 的诚实答法回应。
+> 这条口径由 `tests/test_claims_consistency.py::test_pwa_is_installable_but_not_offline` 与
+> `scripts/check_claims.py` 的过时表述表共同守着（表里登记了四个禁止出现的短语，写进任何当前状态文档都会红）。
+
+**若将来真要做**（路线图，非比赛期）：手写 app-shell 版 service worker（只缓存 `index.html`/css/js，
+**不缓存 `/api`**），约 30 行，仍不引构建插件；同时必须补脱网状态的 UI 提示与缓存版本失效策略。
 
 ---
 

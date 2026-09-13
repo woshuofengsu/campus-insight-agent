@@ -181,7 +181,7 @@ python scripts/mobile_audit.py        # 退出码 0 = 全过；否则逐条修
 | 网格表格横滚提示 | 工单列表外层加「← 左右滑动看更多列 →」提示（仅 <768px） | 体验 |
 | 老年 SOS 触觉反馈 | 长按确认时 `navigator.vibrate?.(80)` | 适老亮点 |
 | 底部标签过渡 | 激活态小条已有 `tab-pop`，可加 0.15s 背景过渡 | 观感 |
-| Service Worker 离线 | 真离线 PWA（缓存 `web/dist` 静态资源）；**答辩可讲可不讲，工程量大，放 P2** | 技术分 |
+| Service Worker / 离线能力 | **未做**：PWA 目前只做到「可添加到主屏幕 + standalone 全屏」，**对外不得宣称离线能力**（口径由门禁守着）；真离线要手写 app-shell SW，工程量大，放 P2 | 技术分 |
 
 ---
 
