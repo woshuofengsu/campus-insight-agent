@@ -37,6 +37,11 @@
   --st-danger: #EF4444;
   --st-info: #2D5BFF;
   --st-success: #10B981;
+  /* —— 状态色「当文字用」的达标变体（第九轮全站审计新增）——
+     --st-pending/--st-feedback 是给 10% 淡底标签配的亮色，直接当大字色在白底上只有 2.15/2.31:1。
+     这两个令牌专门给「文字/大数字」用，暗色下自动换回亮色（深底上亮色才够）。 */
+  --st-pending-ink: #B45309;
+  --st-feedback-ink: #B85C10;
   /* —— 无障碍补充：白字/深字必须达 AA 4.5:1 的两个专用色 ——
      · --danger-solid：红底白字的**实心**徽标（#EF4444 只有 3.76:1，#DC2626 为 4.83:1）
      · --success-ink：浅绿底上的**绿色文字**（#10B981 在 #f0fdf4 上只有 2.42:1，
@@ -91,6 +96,9 @@ body.dark {
   /* 暗色下浅绿卡片变深绿底 → 绿字改用亮绿，白字红底仍用 #DC2626（4.83:1） */
   --success-ink: #6EE7B7;
   --danger-solid: #DC2626;
+  /* 深底上亮色才够：与 :root 的深色变体成对（审计两侧都量过） */
+  --st-pending-ink: #F59E0B;
+  --st-feedback-ink: #FF8C42;
 }
 
 * { box-sizing: border-box; }
@@ -410,6 +418,12 @@ body.role-elderly .n-dialog .n-button .n-button__content { font-size: 1.25rem; }
 .n-button.n-button--success-type.n-button--text { color: var(--success-ink); }
 .n-button.n-button--success-type.n-button--ghost:hover,
 .n-button.n-button--success-type.n-button--text:hover { color: var(--success-ink); filter: brightness(0.92); }
+
+/* Naive 输入框的字数统计用 .85em：正文 14px 时只有 11.9px，低于 12px 下限
+   （全站审计在「提交提案」页实测 11.9px < 12px）。用 max() 保底：随上下文放大但不低于 12px。
+   多带一个 body 提升优先级——Naive 的样式是运行时注入的，同优先级会盖掉我们。 */
+body .n-input .n-input-word-count { font-size: max(12px, 0.85em); }
+body.role-elderly .n-input .n-input-word-count { font-size: 20px; }
 @keyframes glow-ring-primary {
   0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.40); }
   60%      { box-shadow: 0 0 0 12px rgba(45, 91, 255, 0); }

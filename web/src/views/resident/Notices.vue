@@ -53,7 +53,8 @@ function atts(n) {
         <div class="muted" style="font-size:0.85rem;margin-top:4px;">
           {{ n.notice_type }} · {{ (n.published_at || '').slice(0, 16) }}
         </div>
-        <div style="margin-top:8px;color:#374151;">{{ n.body }}</div>
+        <!-- 不写死 #374151：暗色下只有 1.42:1 几乎读不出来，交给 --text 跟随主题（全站审计实测抓到） -->
+        <div style="margin-top:8px;">{{ n.body }}</div>
       </div>
       <n-empty v-if="!loading && list.length === 0" description="暂无通知" />
     </n-spin>

@@ -16,7 +16,7 @@
 | 大屏手机降级 | `/screen` 在 <900px 显示「请在电脑/投屏查看」+ 返回/仍要查看按钮（纳入审计） |
 | 老年端横屏遮罩 | 触发条件补强为「触屏 + 横屏 + ≤1024px」，横屏专项审计通过 |
 | iOS 高度跳变 | `.n-layout` 增 `min-height:100dvh`（不支持则回退 100vh） |
-| 回归 | `ui_audit` 26 页仍 0 违规；前端构建通过 |
+| 回归 | `ui_audit` 全站 54 页视口仍 0 违规；前端构建通过 |
 
 ---
 
@@ -27,7 +27,7 @@
 已具备（不需要重做）：响应式断点 767/359/427、`touch-action: manipulation`、
 `overscroll-behavior-y: contain`、粗指针热区 ≥44px + 输入框 ≥16px、老年端安全区与大字、
 网格端手机抽屉导航、键盘弹起归位、语音降级引导、`prefers-reduced-motion` + 页面不可见暂停、
-深链刷新修复、`ui_audit` 26 页客观审计。
+深链刷新修复、`ui_audit` 全站 54 页视口客观审计。
 
 ---
 
@@ -60,7 +60,7 @@
 | 9 | 语音 Web Speech API，不支持时给大字降级引导 | `elderly/Agent.vue`、`useSpeech.js` |
 | 10 | 动效尊重系统 `prefers-reduced-motion` + 页面不可见暂停 | `style.css` + `main.js` |
 | 11 | 深链/刷新不再被弹回首页（此前修的移动端硬伤） | `App.vue` `await router.isReady()` |
-| 12 | 移动/投影/桌面多视口 UI 客观审计 | `scripts/ui_audit.py`（26 页含 320/390/1366） |
+| 12 | 移动/投影/桌面多视口 UI 客观审计 | `scripts/ui_audit.py`（全站 54 页视口含 320/390/1366/1440/1920） |
 
 **结论**：响应式与适老的基础已经扎实，剩下的差距集中在「专项验证」「PWA」「大屏降级」三块。
 
@@ -192,7 +192,7 @@ python scripts/mobile_audit.py        # 退出码 0 = 全过；否则逐条修
 cd web && npm run build                         # 必须打印 ✓ built in（别只看末尾几行）
 python -m pytest tests/ -q                      # 576 passed / 1 skipped（可运行 577）
 ruff check .                                    # 0
-python scripts/ui_audit.py                      # 26 页 × 9 类 0 违规
+python scripts/ui_audit.py                      # 全站 54 页视口 × 9 类 0 违规
 python scripts/mobile_audit.py                  # ≥20 页移动端 0 违规（P0 后启用）
 python scripts/demo_acceptance.py               # 11/11 端到端
 python scripts/demo_preflight.py                # 9/9

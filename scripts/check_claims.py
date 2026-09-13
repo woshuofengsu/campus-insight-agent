@@ -136,6 +136,8 @@ STALE = [
     "schema **v41**", "schema **v42**", "schema **v43**", "schema **v44**", "schema **v45**",
     "328 测试", "328 项", "457 项", "495 passed", "538 项", "555 项", "564 passed",
     "16 个治理工具", "16 个函数工具", "Streamlit 三角色", "LangChain AgentExecutor",
+    # 第九轮：UI 审计从 26 页扩到全站 34 个路由页 / 54 个页面视口，旧页数不得回流
+    "26 页", "26 个页面",
 ]
 
 

@@ -42,7 +42,9 @@ const themeOverrides = computed(() => theme.isDark
       Button: { borderRadiusMedium: '10px', fontWeight: '600' },
       Card: { borderRadius: '16px' },
       Input: { borderRadius: '10px', placeholderColor: '#8B95A8' },
-      Select: { peers: { InternalSelection: { borderRadius: '10px' } } },
+      // Select/级联等的占位符走 InternalSelection 自己的 --n-placeholder-color
+      // （不改就是 Naive 默认 #C2C2C2，白底 1.78:1；审计在提案类别下拉里实测抓到）
+      Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: '#8B95A8' } } },
       Modal: { borderRadius: '20px' },
       // 无障碍修正：Naive 默认 placeholder(#C2C2C2, 1.78:1) / Divider 文字(#9CA3AF, 2.54:1) /
       // success 标签文字(2.27:1) 都低于 WCAG AA 4.5:1，这里统一提到达标值
@@ -80,7 +82,7 @@ const themeOverrides = computed(() => theme.isDark
       },
       Card: { borderRadius: '16px' },
       Input: { borderRadius: '10px', placeholderColor: '#66738A' },
-      Select: { peers: { InternalSelection: { borderRadius: '10px' } } },
+      Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: '#66738A' } } },
       Modal: { borderRadius: '20px' },
       Divider: { textColor: '#5B6B80' },
       Empty: { textColor: '#66738A', iconColor: '#CBD5E1' },

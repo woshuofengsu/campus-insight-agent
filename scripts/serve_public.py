@@ -10,6 +10,7 @@
   python scripts/serve_public.py              # 起服务 + 隧道，打印并复制公网地址、生成扫码页
   python scripts/serve_public.py --status     # 看服务/隧道状态与当前公网地址
   python scripts/serve_public.py --stop       # 停掉隧道（可选 --all 连服务一起停）
+  python scripts/serve_public.py --lan        # 额外让局域网能直连（默认只绑 127.0.0.1）
   python scripts/serve_public.py --autostart  # 注册开机（登录）自启
   python scripts/serve_public.py --no-autostart
   python scripts/serve_public.py --no-tunnel  # 只起本机服务（不暴露公网）
@@ -132,9 +133,23 @@ def copy_to_clipboard(text: str) -> bool:
         return False
 
 
+def _has_console() -> bool:
+    """当前进程是否挂着控制台窗口（开机自启的隐藏 VBS 没有 → 不弹浏览器）。"""
+    try:
+        return bool(sys.stdout and sys.stdout.isatty()) or sys.stderr.isatty()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 # ---------------------------------------------------------------- 启动 / 停止
-def start_server() -> bool:
-    """起 uvicorn（若已在跑则复用）。返回是否最终可用。"""
+def start_server(lan: bool = False) -> bool:
+    """起 uvicorn（若已在跑则复用）。返回是否最终可用。
+
+    默认**只绑回环 127.0.0.1**（第九轮复审 F1）：cloudflared 隧道是本机出站拨号到
+    127.0.0.1:8000，所以绑回环隧道照样能用，但**局域网这条多余的免密暴露面被关掉**——
+    校园网/宿舍/公共 WiFi 里同网段的人扫不到 :8000 了。要连局域网（比如手机同一 WiFi 直连）
+    再显式加 --lan。
+    """
     svc = health()
     if svc:
         print(f"  ✅ 服务已在跑：{svc}（{LOCAL}）")
@@ -144,14 +159,16 @@ def start_server() -> bool:
         print(f"  ❌ 端口 {PORT} 被 PID {pid} 占用，但不是本服务（可能是别的程序）")
         print(f"     处理：taskkill /PID {pid} /F  然后重跑本脚本")
         return False
+    host = "0.0.0.0" if lan else "127.0.0.1"
     os.makedirs(LOG_DIR, exist_ok=True)
     log = os.path.join(LOG_DIR, "uvicorn.log")
     f = open(log, "ab")
     creationflags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     subprocess.Popen([sys.executable, "-m", "uvicorn", "api_web:app",
-                      "--host", "0.0.0.0", "--port", str(PORT)],
+                      "--host", host, "--port", str(PORT)],
                      cwd=ROOT, stdout=f, stderr=f, creationflags=creationflags)
-    print(f"  ⏳ 启动主服务（首次会跑迁移+种子，约 15 秒）…日志：{log}")
+    scope = "全部网卡（含局域网，--lan）" if lan else "仅本机回环 127.0.0.1（局域网不可见）"
+    print(f"  ⏳ 启动主服务：绑定 {host} —— {scope}；首次会跑迁移+种子，约 15 秒…日志：{log}")
     for _ in range(40):
         time.sleep(1)
         if health():
@@ -210,8 +227,15 @@ def flush_dns() -> None:
 
 
 def verify_public(url: str, attempts: int = 3) -> bool:
-    """从公网访问一次，确认外网真能打开（不只本地可达）。带 DNS 负缓存自愈。"""
+    """从公网访问一次，确认外网真能打开（不只本地可达）。
+
+    两级自愈：
+      1. 清本机 DNS 负缓存（`ipconfig /flushdns`）；
+      2. 若本机解析器仍然说"域名不存在"（校园网常见，实测过），改用公共 DNS 解析 +
+         **本进程内改写解析结果**再请求一次 —— 这不是修网络，是为了能如实判断隧道通不通。
+    """
     import json
+    host = url.split("//", 1)[-1].split("/")[0]
     last = ""
     for i in range(attempts):
         if i:
@@ -227,7 +251,30 @@ def verify_public(url: str, attempts: int = 3) -> bool:
             last = f"返回内容异常：{svc}"
         except Exception as e:  # noqa: BLE001
             last = f"{type(e).__name__}"
-    print(f"  ⚠ 公网校验未通过（{last}）——隧道可能刚建立，稍后重跑 --status 即可")
+
+    # 本机解析器不行 → 公共 DNS 兜底（含 IP+SNI 交叉验证，双重确认隧道真的对外可用）
+    try:
+        from net_probe import describe_dns, get_via_ip, patch_getaddrinfo, resolve_bypass
+    except ImportError:  # 单文件拷贝场景下优雅降级
+        print(f"  ⚠ 公网校验未通过（{last}）—— 等几秒重跑 --status 即可")
+        return False
+    print(f"  · {describe_dns(host)}")
+    ip, how = resolve_bypass(host)
+    if not ip:
+        print(f"  ⚠ 公网校验未通过（{last}）—— 等几秒重跑 --status 即可")
+        return False
+    try:
+        status_line, body = get_via_ip(host, ip)
+        svc = (json.loads(body).get("data") or {}).get("service")
+        if status_line.endswith("200 OK") and svc == "CommunityInsight Web":
+            print(f"  ✅ 公网可达校验（{how} 解析 {ip} + IP/SNI 直连）：{svc}")
+            patch_getaddrinfo(host, ip)   # 让本次进程后续请求也走得通
+            print("     手机端提示：连校园网/公司 WiFi 时可能同样解析不到该新域名，"
+                  "请用 4G/5G 流量打开（或换 DNS）。")
+            return True
+    except Exception as e:  # noqa: BLE001
+        last = f"IP/SNI 直连 {type(e).__name__}"
+    print(f"  ⚠ 公网校验未通过（{last}）—— 隧道可能刚建立，稍后重跑 --status 即可")
     return False
 
 
@@ -235,6 +282,7 @@ def make_qr_page(url: str) -> str:
     """生成扫码页（本地 HTML，用 CDN 渲染二维码；断网时仍显示可手输的地址）。"""
     os.makedirs(os.path.dirname(QR_PAGE), exist_ok=True)
     target = url.rstrip("/") + "/login"
+    gen = time.strftime("%Y-%m-%d %H:%M:%S")
     html = f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -248,6 +296,7 @@ def make_qr_page(url: str) -> str:
  h1{{font-size:1.32rem;margin:0 0 6px}} .sub{{color:#5B6B80;font-size:.85rem;margin-bottom:16px}}
  #qr{{display:inline-block;padding:12px;border:1px solid #E7ECF3;border-radius:14px}}
  .url{{margin:14px 0 4px;font-size:1rem;font-weight:700;word-break:break-all;color:#2D5BFF}}
+ .gen{{color:#5B6B80;font-size:.8rem;margin-bottom:6px}}
  .warn{{background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:12px;padding:10px 14px;
        font-size:.82rem;line-height:1.8;text-align:left;margin-top:14px}}
  table{{border-collapse:collapse;width:100%;margin-top:12px;font-size:.85rem}}
@@ -256,9 +305,10 @@ def make_qr_page(url: str) -> str:
 </style></head><body>
  <div class="card">
   <h1>🏘️ 社区先知 · 手机访问</h1>
-  <div class="sub">手机相机 / 微信扫码即可打开（任何网络都行，不限同一 Wi-Fi）</div>
+  <div class="sub">手机相机 / 微信扫码即可打开（手机用 4G/5G 最稳，不限同一 Wi-Fi）</div>
   <div id="qr"></div>
   <div class="url">{target}</div>
+  <div class="gen">本页生成于 <b>{gen}</b> —— 地址每次重启都会变，请以本页为准</div>
   <table>
    <tr><th>角色</th><th>怎么进</th></tr>
    <tr><td>居民端</td><td>登录页点「居民」→ 免密进入（报修 / 议事 / 政策问答 / 通知）</td></tr>
@@ -266,9 +316,13 @@ def make_qr_page(url: str) -> str:
    <tr><td>网格员端</td><td>点「网格员」→ <code>demo_grid</code> / <code>demo123</code>（工作台 / 工单 / 大屏）</td></tr>
   </table>
   <div class="warn">
-   <b>这是临时公网地址：</b>关掉电脑上的 cloudflared 就失效，重启后域名会变
-   （重新跑 <code>python scripts/serve_public.py</code> 会刷新本页地址）。<br />
-   <b>拿到链接的人都能进</b>（演示账号免密），演示结束请跑 <code>--stop</code>。
+   <b>⚠️ 手机打开报 Cloudflare 错误（1033 / 1016 / 530）？</b>说明扫到的是<b>旧二维码</b>：
+   本页地址只在当次启动有效，重启脚本后域名就换了。处理：在电脑上重新跑
+   <code>python scripts/serve_public.py</code>（会重新生成本页并自动打开），<b>刷新本页后再扫</b>。<br />
+   <b>⚠️ 手机连校园网 / 公司 WiFi 打不开？</b>那个网络可能解析不到这个新域名 ——
+   换成<b>手机流量（4G/5G）</b>再试一次。<br />
+   <b>这是临时公网地址：</b>关掉电脑上的 cloudflared 就失效；<b>拿到链接的人都能进</b>（演示账号免密），
+   演示结束请跑 <code>--stop</code>。
   </div>
  </div>
 <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
@@ -372,6 +426,9 @@ def main() -> int:
     ap.add_argument("--all", action="store_true", help="配合 --stop：连主服务一起停")
     ap.add_argument("--status", action="store_true", help="查看状态与当前公网地址")
     ap.add_argument("--no-tunnel", action="store_true", help="只起本机服务，不暴露公网")
+    ap.add_argument("--no-open", action="store_true", help="不自动打开扫码页")
+    ap.add_argument("--lan", action="store_true",
+                    help="服务同时对局域网开放（默认只绑 127.0.0.1；隧道不受影响）")
     ap.add_argument("--autostart", action="store_true", help="注册登录自启")
     ap.add_argument("--no-autostart", action="store_true", help="移除登录自启")
     args = ap.parse_args()
@@ -386,10 +443,11 @@ def main() -> int:
         return autostart(False)
 
     print("=== 社区先知 · 本机常开（服务 + 公网 HTTPS 隧道）===")
-    if not start_server():
+    if not start_server(lan=args.lan):
         return 1
     if args.no_tunnel:
-        print(f"已按 --no-tunnel 跳过隧道；本机访问：{LOCAL}/login")
+        print(f"已按 --no-tunnel 跳过隧道；本机访问：{LOCAL}/login"
+              + ("" if args.lan else "（未开 --lan，局域网设备访问不到，这是默认的最小暴露）"))
         return 0
     url = start_tunnel()
     if not url:
@@ -397,10 +455,21 @@ def main() -> int:
     verify_public(url)
     page = make_qr_page(url)
     copied = copy_to_clipboard(url.rstrip("/") + "/login")
+    opened = False
+    # 自动打开扫码页：**这一点很关键** —— 手工开着旧标签页时，人扫到的会是上一轮的旧二维码，
+    # 手机会报 Cloudflare 1033（隧道不存在）。每次启动自动打开/刷新，看到的就一定是最新的。
+    # 隐藏启动（开机自启的 VBS，没有控制台）时不弹窗，避免每次登录都跳浏览器。
+    if not args.no_open and _has_console():
+        try:
+            os.startfile(page)  # noqa: S606  Windows 专用
+            opened = True
+        except Exception:  # noqa: BLE001
+            opened = False
     print("\n—— 手机访问 ——")
     print(f"  地址：{url}/login" + ("（已复制到剪贴板）" if copied else ""))
-    print(f"  扫码页：{page}（已生成，可直接打开让人扫）")
+    print(f"  扫码页：{page}{'（已自动打开，扫码请以这个页面为准）' if opened else '（已生成，可直接打开让人扫）'}")
     print("  账号：居民=点「居民」免密 · 老年=点「老年」免密 · 网格员=demo_grid / demo123")
+    print("  提示：手机报 Cloudflare 1033/1016 = 扫到了旧二维码，重跑本脚本后刷新页面再扫")
     print("\n停止公网暴露：python scripts/serve_public.py --stop")
     return 0
 

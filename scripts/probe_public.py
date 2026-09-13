@@ -15,8 +15,29 @@ try:
 except Exception:
     pass
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 URL_FILE = os.path.join(ROOT, ".shots", "当前公网地址.txt")
+
+
+def _bypass_local_dns(host: str) -> None:
+    """本机解析器打不开这个新域名时（校园网常见），用公共 DNS 解析并改写本进程解析结果。
+
+    实测：校园 DNS 对刚创建的 *.trycloudflare.com 返回 NXDOMAIN，8.8.8.8 正常。
+    不改写就没法在这台机器上验证公网链路（会误判成"隧道坏了"）。
+    """
+    try:
+        from net_probe import describe_dns, local_dns_ok, patch_getaddrinfo, resolve_bypass
+    except ImportError:
+        return
+    if local_dns_ok(host):
+        return
+    ip, how = resolve_bypass(host)
+    print(f"  ⓘ {describe_dns(host)}")
+    if ip:
+        patch_getaddrinfo(host, ip)
+        print(f"  ⓘ 已临时改用 {how} 解析（{ip}）继续校验；TLS SNI 仍是原域名，证书校验不受影响\n")
 
 
 def base() -> str:
@@ -45,6 +66,7 @@ def req(method: str, path: str, body: dict | None = None, token: str | None = No
 def main() -> int:
     b = base()
     print(f"目标：{b}\n")
+    _bypass_local_dns(b.split("//", 1)[-1].split("/")[0])
     ok = bad = 0
 
     def check(name: str, cond: bool, detail: str = "") -> None:

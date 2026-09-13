@@ -91,18 +91,19 @@ async function deleteAccount() {
       </div>
     </div>
 
-    <!-- 事务卡片 -->
+    <!-- 事务卡片（数字色用「文字专用」令牌：--st-* 是给标签底色配的亮色，
+         直接当 24px 大字色在白底上只有 2.15~2.31:1；全站审计实测抓到） -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px;">
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/work-orders')">
-        <div class="num" style="color:var(--st-doing);">🔧 {{ issueCount }}</div>
+        <div class="num" style="color:var(--primary-ink);">🔧 {{ issueCount }}</div>
         <div class="lbl">我的报修</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/proposals')">
-        <div class="num" style="color:var(--st-feedback);">💡 {{ proposalCount }}</div>
+        <div class="num" style="color:var(--st-feedback-ink);">💡 {{ proposalCount }}</div>
         <div class="lbl">我的提案</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/notices')">
-        <div class="num" style="color:var(--st-pending);">📢 {{ unreadNotices }}</div>
+        <div class="num" style="color:var(--st-pending-ink);">📢 {{ unreadNotices }}</div>
         <div class="lbl">未读通知</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/messages')">

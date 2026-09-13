@@ -14,10 +14,20 @@ const commentText = ref('')
 const fbReason = ref('')
 
 onMounted(load)
+
+// 可议论阶段必须与后端白名单严格一致（api_routes/proposals.py:230-232）。
+// 复审 F2：此前无条件请求评论，居民打开"草稿/待审核"提案会拿到 400 code1003，
+// 于是**用户什么都没做错就被弹一个红色错误 toast**，控制台还留一条 400。
+const CAN_DISCUSS = new Set(['公示中', '待执行', '执行中', '待提案人反馈', '重新执行'])
+function canDiscuss() {
+  return !!(p.value && p.value.is_public && CAN_DISCUSS.has(p.value.status))
+}
+
 async function load() {
   try {
     p.value = await proposals.detail(route.params.id)
-    comments.value = await proposals.comments(route.params.id)
+    // 不可议论阶段直接给空数组，不发请求（也就不会有 400 与误弹提示）
+    comments.value = canDiscuss() ? await proposals.comments(route.params.id) : []
   } catch (e) { message.error(e.message) }
 }
 
@@ -112,8 +122,8 @@ async function changeVis(isPublic) {
         </div>
       </div>
 
-      <!-- 匿名议论 -->
-      <div v-if="['公示中','待执行','执行中','待提案人反馈','重新执行'].includes(p.status)" class="card">
+      <!-- 匿名议论（门控条件与后端白名单一致：is_public + 5 个可议论阶段，见 canDiscuss()） -->
+      <div v-if="canDiscuss()" class="card">
         <div style="font-weight:700;margin-bottom:8px;">💬 议论（匿名）</div>
         <div v-for="c in comments" :key="c.id" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
           <span style="color:var(--accent);font-weight:600;">{{ c.author }}</span>

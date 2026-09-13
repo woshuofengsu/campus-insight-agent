@@ -1183,3 +1183,121 @@ PWA manifest/图标 → 三角色进入（网格员密码登录 200 role=grid / 
 
 **提交**：本轮。
 
+---
+
+## 四十三、UI 审计扩到全站（26 → 54 个页面视口）：一轮就照出 6 处真问题 ✅
+
+**背景**：前一轮把门禁从 4 处修回 0，但**审计面本身是个漏洞**——`ui_audit` 只审 26 个页面/视口，
+而 router 里其实有 **34 个路由页**。没进审计的页面（详情页、表单页、消息中心、天气、隐私政策、
+`/stability`）就是从没被量过的地方，"0 违规"这句话对它们并不成立。这轮先把**审计面补齐**，再修它抓出来的东西。
+
+**① 审计扩面：26 → 54 个页面/视口，覆盖全部 34 个路由页**
+- 补上此前漏审的：`/stability`、居民端 notifications/weather/profile/messages/privacy/提案列表/提案详情/提案新建/工单详情/工单新建、网格端 proposals/notices/weather/health/messages、老年端 agent/report/contacts/orders/qa。
+- **详情页要"有数据"才叫真审计**：新增 `_resolve_ids()`，用居民演示身份从 `/api/web/issues`、`/api/web/proposals`
+  取"自己看得到的那条" id 填进 `/resident/work-orders/{issue}`，否则详情页查不到记录会渲染成空壳，等于没审。
+  实测进入 `/resident/work-orders/225`、`/resident/proposals/189`。
+- 暗色从 6 页扩到 11 页（三端 + 大屏代表页）；新增 `--only <子串>` 便于单页调试。
+- **顺手修掉一个"假审计"**：`/stability` 原写成 `role=None`，未登录被路由守卫弹回 `/login`，
+  审计输出里它其实是"登录页"（同一个 URL 打印两次）——改成 grid 身份后才是真的审到那一页。
+
+**② 扩面立刻抓出 6 处真问题（4 个页面，其中 5 处都在从未审过的页面上）**
+
+| 页面 | 实测 | 根因 | 修法 |
+|---|---|---|---|
+| `grid-proposals` | `改类别` 占位符 **1.78:1** ×15 | Naive 的下拉占位符走 `InternalSelection` 自己的 `--n-placeholder-color`，我们只覆盖了 `Input.placeholderColor`，一直是默认 #C2C2C2 | 两个主题都给 `Select.peers.InternalSelection.placeholderColor`（#66738A / #8B95A8 = 4.79:1） |
+| `grid-workorders-dark` | `待审核` **2.58:1** ×15 | 靛蓝写死 `#4f46e5`，暗色下标签底被补丁换成深底、字色不跟 | `var(--ink-info)`（亮 #2563EB 4.62:1 / 暗 #93B4FF） |
+| `grid-workorders-dark` | `处理结束` **2.96:1** | 同上，写死 `#047857` | `var(--ink-success)` |
+| `grid-workorders`（同一条绑定） | 未触发但是隐患 | `已关闭/已撤回 #5B6B80`、`超时 #b91c1c` 也是写死色 | 一并换 `var(--muted)` / `var(--ink-danger)`（**亮色下取值与原写死色完全相同**，只让暗色自动跟上） |
+| `resident-proposal-new` | 字数统计 **11.9px < 12px 下限** | Naive 用 `.85em`（14px 正文 × 0.85 = 11.9px） | `body .n-input .n-input-word-count { font-size: max(12px, .85em) }`（多带 `body` 提权，Naive 样式是运行时注入的，同优先级会被盖） |
+| `resident-profile` | 大数字 24px **2.15 / 2.31:1** | `.num` 直接拿标签用的亮色 `--st-pending/--st-feedback` 当文字色 | 新增"当文字用"令牌 `--st-pending-ink`(#B45309)/`--st-feedback-ink`(#B85C10)，暗色自动换回亮色 |
+| `resident-notices-dark` | 通知正文 **1.42:1** ×5 | 写死 `color:#374151`（暗色补丁只补背景不补文字色） | 删掉写死色，交给 `--text` |
+| `resident-profile-dark` | 报修数字 **2.82:1** | `--st-doing`(#2D5BFF) 深底上偏暗 | `var(--primary-ink)`（暗色 #8FA8FF = 6.35:1） |
+
+**③ 顺手把"页数口径"做成不可回流**
+`check_claims.py` 的 STALE 列表加入 `26 页` / `26 个页面`——旧页数一旦回流到当前状态文档（README/AGENTS/CHANGELOG/
+交付说明/创意说明书/移动端文档）立刻失败；同时把 12 处材料里的页数统一更新为「全站 34 个路由页 / 54 个页面视口」。
+（历史快照 `docs/review/**` 与 dev-log 旧章节保留当时事实，不在扫描范围内——这正是门禁设计时的约定。）
+
+**④ 验证**
+
+| 门禁 | 结果 |
+|---|---|
+| `ui_audit.py` | **54 页/视口 × 9 类 0 违规**（覆盖全部 34 个路由页；本轮从 6 处修回 0） |
+| 其余门禁 | 见下方本轮汇总（pytest / ruff / build / preflight / acceptance / mobile_audit / check_claims / probe_public 全绿） |
+
+**提交**：本轮。
+
+---
+
+## 四十四、第九轮复审处理：F1/F2/F4 全修，F3 采纳一半并更正根因；自查再补 3 项 ✅
+
+**背景**：外部《复审报告·第九轮》对 `501cc2a` 独立复核（重跑 pytest/ruff/build/ui_audit/mobile_audit + 直查源码），
+结论"无 P1/P2，只剩 4 个 P3"。处理回执见 `docs/review/复审报告-第九轮-处理回执.md`。
+
+**① F1（安全加固）默认绑 `0.0.0.0` → 默认只绑回环**
+`start_server(lan=False)` 绑定 `127.0.0.1`，新增 `--lan` 显式开放；启动时打印绑定范围。
+实测 `netstat -ano | findstr :8000` → **只有 `127.0.0.1:8000 LISTENING`**，同时公网链路仍 8/8
+（cloudflared 本来就是本机出站拨号，绑回环不影响隧道）。理由：不开隧道时绑 `0.0.0.0`
+等于对整个校园网/宿舍网/公共 WiFi **免密敞开**。
+
+**② F2（体验 bug）打开提案详情就误弹 400 错误 → 白名单对齐**
+后端 `proposals.py:230-232` 规定居民只有 `is_public` + 5 个可议论阶段才能取评论，前端却**无条件**请求 →
+用户什么都没做错就被弹红色 toast、控制台留 400。
+修：`ProposalDetail.vue` 加 `CAN_DISCUSS` + `canDiscuss()` 与后端严格对齐，不可议论时不发请求；
+**顺带发现同类漏项**——议论卡片的 `v-if` 只判了 5 个状态、**漏了 `is_public`**，私有提案会渲染出议论框，一并改掉。
+
+**③ F4（流程/工具）dist 落后源码 → 双保险**
+`ui_audit._dist_stale_check()` 比较 `web/dist/index.html` 与 `web/src/**` 最新 mtime，落后直接红字退出；
+`mobile_audit` 复用同一道闸；约定写进 AGENTS.md 与交付说明 Checklist。
+**当场生效**：我改完 `main.js` 没 build 顺手跑审计，被拦下 ——
+`❌ web/dist 落后于源码（约 23 分钟）：web/src/main.js`。
+
+**④ F3（暗色首帧）：采纳改法，但更正根因（重要）**
+- 采纳：`main.js` 在 `app.mount()` 前按 `localStorage.ci_theme` 先给 `body` 加 `dark` 类（消除 FOUC），
+  `App.vue` 的 `theme.apply()` 保留。
+- 更正：报告称残留的 `处理结束 2.96:1` 是"审计采样时序造成的假问题、稳定后实测是 #6EE7B7"。
+  **方向是反的**：该元素颜色是源码里的**写死字面量 `'#047857'`**（`Issues.vue:159`），**不读 CSS 变量**，
+  所以 body 上的 `--ink-success=#6ee7b7` 对它没有任何影响；走 CSS 补丁的是它的**背景**（`#ecfdf5`→暗色 `#12241B`）。
+  也就是说：首帧（补丁未生效）= 深绿字配浅绿底 ≈5.5:1 **通过**，稳定帧 = 深绿字配深绿底 = **2.96:1 不通过** ——
+  若真是时序问题，被误抓的应该是"通过的那一帧"。修：改 `var(--ink-success)`（亮色取值与原写死色完全相同），
+  并把同一条绑定里另外三个写死色（`#5B6B80`/`#b91c1c`/`#4f46e5`）一并令牌化 ——
+  其中"已关闭/已超时"两分支当前数据没触发（审计量不到）但属同类隐患。修后连续两轮全量审计稳定 0。
+
+**⑤ 自查 A（工具级漏洞）控制台报错此前只打印、不计入违规**
+`ui_audit` 对外宣称"0 JS 报错"，但 `jsErrors` 只是打印一行、**不影响退出码** ——
+于是 **F2 那种"打开页面就发 400"审计根本抓不到**（4xx 请求会进 Chromium 控制台）。
+修：`jsErrors` 计入 HIGH 并逐条列出。修后 54 页/视口 **0 JS 报错**（反向验证了 F2）。
+
+**⑥ 自查 B（网络级真坑）校园 DNS 对新隧道域名返回 NXDOMAIN**
+现象：隧道刚建好，**本机连自己的公网地址都打不开**（`getaddrinfo failed [Errno 11001]`），像"隧道挂了"。
+实测对照：校园 DNS(59.64.80.110) 说 `Non-existent domain`，`nslookup <域名> 8.8.8.8` 立刻给出
+`104.16.230.132`；`ipconfig /flushdns` 救不回来（是上游问题）。`dns.google` 在本网络也被墙（超时）。
+修：新增 `scripts/net_probe.py`（纯标准库）——**UDP/53 直问公共 DNS** + **本进程改写 `getaddrinfo`**
+（TLS SNI 仍用原域名，证书校验不受影响）+ `get_via_ip()` 做**完全不经 DNS 的 IP/SNI 直连**交叉验证。
+接进 `serve_public.py --status` 与 `probe_public.py`（自动绕行）。实测：
+`UDP/53 8.8.8.8 → 104.16.230.132`、`IP+SNI 直连 → HTTP/1.1 200 OK service=CommunityInsight Web`。
+**对用户的影响已写进文档**：手机若连同一个校园 WiFi 可能同样打不开 → 用 4G/5G 最稳。
+
+**⑦ 自查 C（实扫报错触发）Cloudflare `1033` = 扫到了旧二维码**
+用户实际扫码遇到 `错误 1033`。定位：`1033` 是 Cloudflare"隧道不存在"—— 重启脚本后域名变了，
+而浏览器里那个扫码页还是**上一轮打开的旧内容**（文件已刷新，标签页没刷新）。
+三重加固：① 扫码页显著位置写**生成时间**与"地址每次重启都会变，请以本页为准"；
+② 页面直接**自解释 1033/1016/530 的处置**（重跑脚本 → 刷新页面 → 再扫）与"校园 WiFi 打不开就切 4G/5G"；
+③ `serve_public.py` **每次启动自动打开扫码页**（隐藏自启场景不弹窗，另有 `--no-open`），
+让"人看到的那一页"永远是最新域名。实测重生成页面 → `probe_public` 8/8。
+
+**⑧ 验证（全绿）**
+
+| 门禁 | 结果 |
+|---|---|
+| `ui_audit.py` | 54 页/视口 × 9 类 **0 违规**（含 **0 JS 报错**） |
+| `mobile_audit.py` | 21 页 × 7 类 **0 违规** |
+| `pytest` | **581 passed / 1 skipped / 0 warnings** |
+| `ruff` / `npm run build` | 0 / ✓ |
+| `demo_preflight` / `demo_acceptance` | **9/9** / 全部通过 |
+| `check_claims` | 通过 |
+| `probe_public.py`（公网，含 DNS 绕行） | **8/8** |
+| `serve_public.py` 默认绑定 | 仅 `127.0.0.1:8000` LISTEN |
+
+**提交**：本轮。
+

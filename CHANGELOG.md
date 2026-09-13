@@ -16,7 +16,8 @@
 - **竞品对标升级 U1–U7**：混合检索（词法 + 语义向量 RRF，口语金标 hit@1 85.7% → **100%**）/ 真实政策语料 40 条（可溯源）/
   知识库健康度观测 / 关怀量化（情绪与触达率）/ 演示前一键自检 / 轻量知识图谱（88 实体·199 关系·覆盖 96%）/ 数据层演进路径。
 - **视觉系统 v2 + 客观 UI 审计**：设计令牌重建、三端差异化、暗色与无障碍达标；
-  新增 `scripts/ui_audit.py`（**26 页/视口 × 9 类检查**：对比度/溢出/热区/字号/断图/暗色亮度/动效生效/reduced-motion/**渲染残缺文本**），当前 **0 违规**。
+  新增 `scripts/ui_audit.py`（**54 页/视口 × 9 类检查**：对比度/溢出/热区/字号/断图/暗色亮度/动效生效/reduced-motion/**渲染残缺文本**），
+  审计面覆盖**全部 34 个路由页**（含详情页/表单页/消息中心/隐私政策/稳定性页），当前 **0 违规**。
 - **数据安全 v46 全量收口**：手机号加密覆盖到全部 8 张含手机号表（补齐提案/提案草稿/报修草稿遗漏面与 user_profile 残留），
   **明文计数 0**；`scripts/audit_phone_encryption.py` 体检 + `demo_preflight` 第 8 项现场核对；账号注销级联清密文。
 - **工程纪律**：历史遗留的运行时裸 ALTER 全部收回迁移链（全新建库与存量升级同路径）；`datetime.utcnow` 弃用清理；
@@ -25,7 +26,7 @@
   分镜与现场用法见 `docs/competition/答辩录屏分镜.md`；交付入口见 `docs/competition/最终版交付说明.md`。
 
 **验证**：`pytest` 576 passed / 1 skipped · `ruff check .` = 0 · `npm run build` 通过 ·
-`demo_preflight.py` **9/9** · `ui_audit.py` 26 页 0 违规 · `audit_phone_encryption.py` 无缺口。
+`demo_preflight.py` **9/9** · `ui_audit.py` 全站 34 个路由页 / 54 个页面视口 0 违规 · `audit_phone_encryption.py` 无缺口。
 
 ---
 

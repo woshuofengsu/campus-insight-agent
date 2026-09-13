@@ -17,7 +17,8 @@
   8. reduced-motion：模拟 prefers-reduced-motion: reduce 后循环动效应被关闭
 
 用法：
-  python scripts/ui_audit.py                # 全部页面（需服务已在 :8000 运行 + 前端已 build）
+  python scripts/ui_audit.py                # 全站页面（需服务已在 :8000 运行 + 前端已 build）
+  python scripts/ui_audit.py --only grid    # 只审名字含该子串的页面（调试用）
   python scripts/ui_audit.py --json         # 机器可读
 退出码：0 = 无 HIGH 问题；1 = 有 HIGH（可当门禁）
 """
@@ -236,36 +237,67 @@ REDUCED_JS = r"""
 """
 
 # 需要审计的页面：(名称, 角色, 路由, 视口, 适老阈值, 手机热区, 暗色)
+# 覆盖策略（第九轮扩面）：**router 里有几页就审几页**——列表页、表单页、详情页、
+# 消息中心、天气、隐私政策、/stability 全都要过一遍；暗色再抽各端代表页做回归。
+# 详情页的 id 用 `{issue}` / `{proposal}` 占位，运行时从接口取真实数据（见 _resolve_ids）。
 PAGES = [
     ("login-desktop", None, "/login", (1440, 900), False, False, False),
     # 1366×768：答辩投影仪/老笔记本的常见分辨率（外部评审建）
     ("login-1366", None, "/login", (1366, 768), False, False, False),
-    ("screen-1366", "grid", "/screen", (1366, 768), False, False, False),
-    ("grid-dashboard-1366", "grid", "/grid/dashboard", (1366, 768), False, False, False),
-    ("elderly-home-1366", "elderly", "/elderly/home", (1366, 768), True, False, False),
     ("login-mobile", None, "/login", (390, 844), False, True, False),
     ("login-320", None, "/login", (320, 720), False, True, False),
+    ("login-dark", None, "/login", (1440, 900), False, False, True),
     # 大屏的指标端点 grid 锁定 → 审计也要以 grid 身份进入（这才是答辩真实路径）
     ("screen", "grid", "/screen", (1920, 1080), False, False, False),
+    ("screen-1366", "grid", "/screen", (1366, 768), False, False, False),
+    ("stability", "grid", "/stability", (1440, 900), False, False, False),
     ("grid-dashboard", "grid", "/grid/dashboard", (1440, 900), False, False, False),
+    ("grid-dashboard-1366", "grid", "/grid/dashboard", (1366, 768), False, False, False),
     ("grid-workorders", "grid", "/grid/work-orders", (1440, 900), False, False, False),
+    ("grid-proposals", "grid", "/grid/proposals", (1440, 900), False, False, False),
+    ("grid-notices", "grid", "/grid/notices", (1440, 900), False, False, False),
     ("grid-qa", "grid", "/grid/qa", (1440, 900), False, False, False),
+    ("grid-weather", "grid", "/grid/weather", (1440, 900), False, False, False),
+    ("grid-health", "grid", "/grid/health", (1440, 900), False, False, False),
+    ("grid-messages", "grid", "/grid/messages", (1440, 900), False, False, False),
     ("grid-elderly-care", "grid", "/grid/elderly-care", (1440, 900), False, False, False),
+    ("grid-dashboard-dark", "grid", "/grid/dashboard", (1440, 900), False, False, True),
+    ("grid-workorders-dark", "grid", "/grid/work-orders", (1440, 900), False, False, True),
+    ("grid-elderly-care-dark", "grid", "/grid/elderly-care", (1440, 900), False, False, True),
     ("resident-home", "resident", "/resident/home", (390, 844), False, True, False),
     ("resident-home-320", "resident", "/resident/home", (320, 720), False, True, False),
     ("resident-orders", "resident", "/resident/work-orders", (390, 844), False, True, False),
+    ("resident-order-detail", "resident", "/resident/work-orders/{issue}", (390, 844), False, True, False),
+    ("resident-order-new", "resident", "/resident/work-orders/new", (390, 844), False, True, False),
+    ("resident-proposals", "resident", "/resident/proposals", (390, 844), False, True, False),
+    ("resident-proposal-detail", "resident", "/resident/proposals/{proposal}", (390, 844), False, True, False),
+    ("resident-proposal-new", "resident", "/resident/proposals/new", (390, 844), False, True, False),
+    ("resident-notices", "resident", "/resident/notices", (390, 844), False, True, False),
     ("resident-qa", "resident", "/resident/qa", (390, 844), False, True, False),
     ("resident-health", "resident", "/resident/health", (390, 844), False, True, False),
+    ("resident-weather", "resident", "/resident/weather", (390, 844), False, True, False),
+    ("resident-profile", "resident", "/resident/profile", (390, 844), False, True, False),
+    ("resident-messages", "resident", "/resident/messages", (390, 844), False, True, False),
+    ("resident-privacy", "resident", "/resident/privacy", (390, 844), False, True, False),
+    ("resident-home-dark", "resident", "/resident/home", (390, 844), False, True, True),
+    ("resident-notices-dark", "resident", "/resident/notices", (390, 844), False, True, True),
+    ("resident-qa-dark", "resident", "/resident/qa", (390, 844), False, True, True),
+    ("resident-weather-dark", "resident", "/resident/weather", (390, 844), False, True, True),
+    ("resident-profile-dark", "resident", "/resident/profile", (390, 844), False, True, True),
     ("elderly-home", "elderly", "/elderly/home", (390, 844), True, True, False),
-    ("elderly-home-dark", "elderly", "/elderly/home", (390, 844), True, True, True),
+    ("elderly-home-1366", "elderly", "/elderly/home", (1366, 768), True, False, False),
     ("elderly-agent", "elderly", "/elderly/agent", (390, 844), True, True, False),
+    ("elderly-report", "elderly", "/elderly/report", (390, 844), True, True, False),
     ("elderly-medication", "elderly", "/elderly/medication", (390, 844), True, True, False),
     ("elderly-notices", "elderly", "/elderly/notices", (390, 844), True, True, False),
-    # 暗色覆盖扩面：内联写死色在暗色下翻车是这批问题的共同根因，多抽两页暗色做回归
+    ("elderly-contacts", "elderly", "/elderly/contacts", (390, 844), True, True, False),
+    ("elderly-orders", "elderly", "/elderly/orders", (390, 844), True, True, False),
+    ("elderly-qa", "elderly", "/elderly/qa", (390, 844), True, True, False),
+    # 暗色覆盖扩面：内联写死色在暗色下翻车是这批问题的共同根因，多抽几页暗色做回归
     ("elderly-notices-dark", "elderly", "/elderly/notices", (390, 844), True, True, True),
     ("elderly-medication-dark", "elderly", "/elderly/medication", (390, 844), True, True, True),
-    ("resident-home-dark", "resident", "/resident/home", (390, 844), False, True, True),
-    ("grid-dashboard-dark", "grid", "/grid/dashboard", (1440, 900), False, False, True),
+    ("elderly-contacts-dark", "elderly", "/elderly/contacts", (390, 844), True, True, True),
+    ("elderly-report-dark", "elderly", "/elderly/report", (390, 844), True, True, True),
 ]
 
 ROLE_BTN = {"resident": "居民", "elderly": "老年", "grid": "网格员"}
@@ -301,11 +333,46 @@ def audit(browser, name, role, path, vp, elderly, touch, dark):
     return r
 
 
+def _dist_stale_check() -> str:
+    """dist 新鲜度校验（复审 F4）：测的必须是**当前源码**构建出来的包。
+
+    为什么需要：`web/dist` 在 gitignore 里、由 `npm run build` 生成，改完 `web/src` 忘记 build
+    时，审计/演示测的是旧包 —— 第九轮复审就真实踩到（dist 落后 42 分钟，旧包里还带着已修掉的
+    写死颜色，导致"报了 6 处、其实源码早修了"的错觉）。这里从工具层面直接拦住。
+
+    返回空串 = 新鲜；否则返回一行红字建议（调用方决定是退出还是警告）。
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dist_index = os.path.join(root, "web", "dist", "index.html")
+    src = os.path.join(root, "web", "src")
+    if not os.path.exists(dist_index):
+        return ("❌ web/dist 不存在 —— 先构建：cd web && npm run build\n"
+                "   （审计要跑的是构建产物，不是源码）")
+    if not os.path.isdir(src):
+        return ""
+    dist_m = os.path.getmtime(dist_index)
+    newest, newest_f = 0.0, ""
+    for dirpath, _dirs, files in os.walk(src):
+        for fn in files:
+            p = os.path.join(dirpath, fn)
+            try:
+                m = os.path.getmtime(p)
+            except OSError:
+                continue
+            if m > newest:
+                newest, newest_f = m, os.path.relpath(p, root).replace("\\", "/")
+    if newest > dist_m:
+        lag = int((newest - dist_m) / 60)
+        return (f"❌ web/dist 落后于源码（约 {lag} 分钟）：{newest_f}\n"
+                "   先构建再审计：cd web && npm run build")
+    return ""
+
+
 def _preflight(base: str) -> str:
     """跑审计前先探活（第八轮终审 N3）。
 
-    为什么必须做：审计要跑 26 页 × 10 分钟，如果服务中途停了，会逐页报
-    `ERR_CONNECTION_REFUSED`，看起来像"26 个页面都有问题"——把「环境没起」误读成「页面缺陷」。
+    为什么必须做：审计要跑全站 54 个页面/视口 × 约 10 分钟，如果服务中途停了，会逐页报
+    `ERR_CONNECTION_REFUSED`，看起来像"每个页面都有问题"——把「环境没起」误读成「页面缺陷」。
     这里先打一次健康检查，校验**服务身份**（不只 200），失败就明确说「服务未起」并给出启动命令。
     """
     import json as _json
@@ -329,27 +396,89 @@ def _preflight(base: str) -> str:
                 "   （启动约 15 秒，之后再跑本审计）")
 
 
+def _resolve_ids(base: str) -> dict[str, str]:
+    """取详情页要用的真实 id（工单 / 提案）。
+
+    为什么要取真数据：详情页在"查不到记录"时会渲染成空壳，审计量到的是**空页面**，
+    等于没审。这里用居民演示身份拿"自己看得到的那条"，保证详情页真有内容可量。
+    取不到就返回空 dict，`{issue}` 这类页面会被跳过并明确打印原因（不静默）。
+    """
+    import json as _json
+    import urllib.request
+
+    def _post(path: str, body: dict) -> dict:
+        r = urllib.request.Request(base + path, data=_json.dumps(body).encode(), method="POST")
+        r.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(r, timeout=20) as resp:
+            return _json.loads(resp.read().decode("utf-8"))
+
+    def _get(path: str, token: str):
+        r = urllib.request.Request(base + path)
+        r.add_header("Authorization", "Bearer " + token)
+        with urllib.request.urlopen(r, timeout=20) as resp:
+            return _json.loads(resp.read().decode("utf-8"))
+
+    out: dict[str, str] = {}
+    try:
+        token = (_post("/api/web/auth/demo", {"role": "resident"}).get("data") or {}).get("token")
+        if not token:
+            return out
+        issues = _get("/api/web/issues", token).get("data") or []
+        if issues:
+            out["issue"] = str(issues[0]["id"])
+        props = _get("/api/web/proposals", token).get("data") or []
+        mine = [x for x in props if x.get("mine")] or props
+        if mine:
+            out["proposal"] = str(mine[0]["id"])
+    except Exception as e:  # noqa: BLE001
+        print(f"  ⚠ 详情页 id 解析失败（{type(e).__name__}），将跳过带占位符的页面")
+    return out
+
+
 def main() -> int:
     global BASE  # 允许 --base 覆盖，便于在别的端口/机器上审计（声明必须在任何使用之前）
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--out", default=".shots/ui-audit.json")
     ap.add_argument("--base", default=BASE, help="服务地址（默认 http://127.0.0.1:8000）")
+    ap.add_argument("--only", default="", help="只审名字包含该子串的页面（调试用）")
     args = ap.parse_args()
 
     BASE = args.base
+
+    stale = _dist_stale_check()
+    if stale:
+        print(stale)
+        return 1
 
     problem = _preflight(BASE)
     if problem:
         print(problem)
         return 1
 
+    ids = _resolve_ids(BASE)
+    if ids:
+        print(f"详情页数据：工单 #{ids.get('issue', '-')} · 提案 #{ids.get('proposal', '-')}")
+
+    pages = []
+    for spec in PAGES:
+        path = spec[2]
+        if "{" in path:
+            try:
+                path = path.format(**ids)
+            except KeyError:
+                print(f"  ⚠ 跳过 {spec[0]}：缺少详情页 id（{path}）")
+                continue
+        pages.append((spec[0], spec[1], path) + tuple(spec[3:]))
+    if args.only:
+        pages = [p for p in pages if args.only in p[0]]
+
     from playwright.sync_api import sync_playwright
 
     report = {}
     with sync_playwright() as p:
         b = p.chromium.launch()
-        for spec in PAGES:
+        for spec in pages:
             name = spec[0]
             try:
                 report[name] = audit(b, *spec)
@@ -430,7 +559,13 @@ def main() -> int:
             else:
                 print("   reduced-motion: 循环动效已关闭 ✓")
         if r.get("jsErrors"):
-            print(f"   JS 报错: {r['jsErrors']}")
+            # 第九轮自查：控制台报错此前只打印、不计入违规 —— 于是「打开提案详情页就发 400
+            # 并弹红色 toast」（复审 F2）在审计里是隐形的。前端门禁既然对外宣称"0 JS 报错"，
+            # 就得让它真的能拦住：控制台 error（含 4xx/5xx 资源请求失败）算 HIGH。
+            high += 1
+            print(f"   ⚠ JS 报错 {len(r['jsErrors'])}：")
+            for je in r["jsErrors"]:
+                print(f"      {je}")
     print(f"\n结果：{'存在需修复项' if high else '无 HIGH 问题'}（{high} 处）")
     print(f"明细 JSON：{args.out}")
     return 1 if high else 0

@@ -70,11 +70,16 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 582 项测试**（581 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（26 页 UI 客观审计）。
+- **不要破坏这 582 项测试**（581 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
 - `config.DEFAULT_TENANT` 为多租户默认值（演示级，仅预留字段不改查询）；`AGENT_CLASSES` 角色 id 不得随意改（有状态）。
 - LLM 默认**规则优先降本**：`LLM_NEGOTIATION`/`LLM_ORCHESTRATION` 默认关，`=1` 才走真实 DeepSeek（用于答辩演示）。
+- **改完 `web/src` 必须先 `cd web && npm run build` 再审计/演示**（复审 F4）：`web/dist` 不进 git，
+  改完不 build 的话 `ui_audit`/`mobile_audit`/演示测的都是**旧包**，会得出"修了但没生效/没修也报绿"的假结论。
+  两个审计脚本已内置 dist 新鲜度闸：落后于源码直接红字退出。
+- 语义文字色**一律用亮/暗成对令牌**（`--ink-*`、`--st-*-ink`、`--primary-ink`、`--danger-solid`/`--success-ink`），
+  **不要在内联样式里写死 hex**：写死色在暗色下不跟着换，`ui_audit` 会抓（第九轮抓到 6 处这类问题）。
 - CSP `script-src 'self'` **禁止内联脚本**：调试入口已改为同源外部文件 `web/public/debug.js`（`?debug=1` 生效），
   不要再往 `index.html` 里写内联 `<script>`（会在每个页面报 CSP 错、评委开 DevTools 就能看到）。
   WebSocket `/ws/notify` 用内存连接池（单机够用，多进程需 Redis）。
@@ -91,10 +96,11 @@ elderly:  demo_elderly（免登录）
 | `data/db_core.py` | schema + 迁移注册（**v46**）|
 | `web/src/views/{resident,grid,elderly}/` | 三端页面 |
 | `docs/mobile-deploy.md` | 移动端部署 + 发布检查清单 |
-| `scripts/serve_public.py` | **本机常开一键工具**：起服务 + 公网 HTTPS 隧道 + 抓新域名 + 刷新扫码页（`--status` / `--stop` / `--autostart`）|
-| `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项）|
-| `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、5 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 四十二 节**为本机常开方案收口）|
+| `scripts/serve_public.py` | **本机常开一键工具**：起服务（默认只绑 127.0.0.1）+ 公网 HTTPS 隧道 + 抓新域名 + 刷新扫码页（`--status` / `--stop` / `--lan` / `--autostart`）|
+| `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
+| `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
+| `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
+| `docs/spec/dev-log.md` | 开发日志（**最新 四十四 节**为第九轮复审收口）|
 
 ## 已完成的大改动（截至最终版）
 
@@ -103,8 +109,8 @@ elderly:  demo_elderly（免登录）
 - **竞品对标升级 U1–U7**：混合检索（词法+语义 RRF）/ 真实政策语料 40 条 / 知识库健康度观测 / 关怀量化 / 演示前自检 /
   轻量知识图谱 / 数据层演进路径（见 dev-log 二十七～三十四节）
 - **视觉系统 v2 + 客观 UI 审计**：设计令牌重建、三端差异化、暗色达标、无障碍达标，
-  `scripts/ui_audit.py` 26 页 × 9 类检查 0 违规（见 dev-log 三十五～三十六节）
+  `scripts/ui_audit.py` **全站 34 个路由页 / 54 个页面视口 × 9 类检查 0 违规**（见 dev-log 三十五～三十六、四十三节）
 - **第七轮复审收口**：v46 手机号加密全量补齐（提案/草稿/user_profile 残留）/ 运行时裸 ALTER 收回迁移链 /
   utcnow 弃用清理 / 异常文案脱敏 / 录屏素材（见 dev-log 三十七～三十八节）
 
-详见 `docs/spec/dev-log.md`（最新 **四十二** 节）。
+详见 `docs/spec/dev-log.md`（最新 **四十四** 节）。

@@ -272,7 +272,7 @@ iPhone SE/8(375) · iPhone 14/15(390-393) · Pro Max(430) · 小屏安卓(360) �
 | 7 | 压测 | `python scripts/benchmark_business.py` 业务混合压测（p50/p95/p99、错误率、QPS）；`benchmark_concurrency.py` 复验 550 并发 | ⬜ 上线时 |
 | 8 | 数字一致性 | `python scripts/check_claims.py`（测试数/schema/路由/角色/表数，并交叉核对登录页 meta.js），材料数字与其一致 | ⬜ 每次发材料前 |
 | 9 | 数据安全 | `python scripts/audit_phone_encryption.py`（8 张含手机号表明文计数必须为 0） | ⬜ 改数据层后 |
-| 10 | UI 无障碍 | `python scripts/ui_audit.py`（26 页 × 9 类检查，0 违规） | ⬜ 改前端后 |
+| 10 | UI 无障碍 | `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 × 9 类检查，0 违规） | ⬜ 改前端后 |
 | 11 | **移动端适配** | `python scripts/mobile_audit.py`（21 页 × 7 类专项：溢出/热区/输入框字号/底栏遮挡/横屏遮罩/大屏降级） | ✅ 当前 21/21 |
 | 12 | **PWA 可安装** | `/manifest.json` + `/icon-192.png` + `/icon-512.png` 可访问；「添加到主屏幕」全屏运行 | ✅ 资源就位（真机复验） |
 

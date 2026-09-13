@@ -201,6 +201,18 @@ def main() -> int:
     ap.add_argument("--out", default=".shots/mobile-audit.json")
     args = ap.parse_args()
 
+    # dist 新鲜度校验（复审 F4，与 ui_audit 同一道闸）：测的必须是当前源码构建的包，
+    # 否则"改完 src 忘了 build"会让我们测旧包、得出假结论。
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from ui_audit import _dist_stale_check
+        stale = _dist_stale_check()
+        if stale:
+            print(stale)
+            return 1
+    except ImportError:
+        pass
+
     from playwright.sync_api import sync_playwright
 
     report, bad = {}, 0

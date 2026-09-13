@@ -152,10 +152,14 @@ async function batchClose() {
                 <n-checkbox :checked="selected.includes(i.id)" @update:checked="(v) => { if (v) selected.push(i.id); else selected = selected.filter((x) => x !== i.id) }" @click.stop />
                 <div>
                   <b>#{{ i.id }} {{ i.title }}</b>
-                  <!-- 状态色文字统一用 AA 达标值：#059669→#047857(5.54:1)、#888→#5B6B80(5.2:1)、#dc2626→#b91c1c(6.15:1) -->
+                  <!-- 状态色文字全部改用「跟随主题」的令牌（值与原写死色在亮色下完全相同，暗色下自动换亮变体）：
+                       处理结束 #047857→var(--ink-success)、已关闭/已撤回 #5B6B80→var(--muted)、
+                       超时 #b91c1c→var(--ink-danger)、待审核 #4f46e5→var(--ink-info)。
+                       写死色的暗色实测：待审核 2.58:1、处理结束 2.96:1（全站审计抓到），
+                       另外「已关闭/超时」两条当前数据没触发，但同样是隐患，一并收掉。 -->
                   <span class="status-pill" :style="{
                     background: i.status === '处理结束' ? '#ecfdf5' : i.status === '已关闭' ? '#f5f5f5' : i.status === '已撤回' ? '#f5f5f5' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#fef2f2' : '#eef2ff',
-                    color: i.status === '处理结束' ? '#047857' : i.status === '已关闭' || i.status === '已撤回' ? '#5B6B80' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#b91c1c' : '#4f46e5',
+                    color: i.status === '处理结束' ? 'var(--ink-success)' : i.status === '已关闭' || i.status === '已撤回' ? 'var(--muted)' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? 'var(--ink-danger)' : 'var(--ink-info)',
                   }" style="margin-left:8px;">{{ i.status }}</span>
                   <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;">🔴 紧急</span>
                   <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;">🚫 违规标记</span>
