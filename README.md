@@ -106,7 +106,8 @@ campus-insight-agent/
 
 | 验证项 | 命令 | 实测 |
 |---|---|---|
-| 功能与回归 | `python -m pytest tests/ -q` | **577 passed / 1 skipped** |
+| 功能与回归 | `python -m pytest tests/ -q` | **576 passed / 1 skipped**（可运行 577） |
+| **端到端验收（真实服务）** | `python scripts/demo_acceptance.py` | **11/11 通过**（三角色登录、AI 对话、政策命中、老年天气、工作台指标、图谱反查、留痕） |
 | 演示前一键自检 | `python scripts/demo_preflight.py` | **9/9 通过**（schema、手机号加密覆盖、演示账号、服务身份…） |
 | UI 无障碍/一致性 | `python scripts/ui_audit.py` | **26 页/视口 × 9 类检查 0 违规**（含暗色与 1366×768 投影档） |
 | 检索命中率 | `python scripts/rag_eval.py` | 混合 **hit@1 42/42 = 100%**（纯词法 85.7%） |

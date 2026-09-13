@@ -176,7 +176,7 @@ data/
 3. **最后拆 export**：CSV/报表拼装独立（它是最容易与业务读混淆的一块）。
 4. **`db_<mod>.py` 保留为 re-export 垫片**（项目已有先例：`ui/cache.py` 迁 `utils/cache.py` 时留了重导出垫片），
    保证 `api_routes/`、`agent/`、`tests/` 的既有 `from data.db_policy import ...` **零改动**。
-5. **每步跑全量**：`python -m pytest -q`（基线 577 passed）+ `ruff check .` = 0；每步一个 commit。
+5. **每步跑全量**：`python -m pytest -q`（基线 576 passed）+ `ruff check .` = 0；每步一个 commit。
 
 ### 6.4 单测策略（拆分后的新增能力）
 

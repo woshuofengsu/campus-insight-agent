@@ -67,31 +67,37 @@ def test_meta_js_is_wellformed_and_matches_checkable_facts():
 
 
 def test_doc_test_numbers_match_single_source():
-    """**主文档**里出现的测试数只能等于 meta.js 口径值（可运行数）或其通过数（可运行−1）。
+    """**主文档**里的测试数必须与其口径匹配（不是"落在某个集合里"就算过）。
 
     只查「评委当成现状来读」的四份主文档（README / AGENTS / 最终版交付说明 / 创意说明书-提交版）；
     CHANGELOG、HANDOFF、dev-log、技术报告正文等属于历史或日志，其中的旧数字是当时事实，不应改写。
-    拦的是「总数改了、明细没改」这类自相矛盾——实测踩过：批量改 572→576 后正文仍写「571 通过」。
+
+    为什么按口径分别校验：实测踩过两次坑——① 批量改总数后正文仍写「571 通过」；
+    ② 同步脚本把「N passed」也替换成可运行数，产出「577 passed（可运行 576）」这种**互换**。
     """
     from scripts import demo_preflight as P
     runnable = P.parse_brand_metrics()["tests"]
-    allowed = {runnable, runnable - 1}
     primary = [
         "README.md", "AGENTS.md",
         "docs/competition/最终版交付说明.md", "docs/competition/创意说明书-提交版.md",
     ]
-    pat = re.compile(r"\b(\d{3})\s*(?:项\s*)?(?:自动化\s*)?(?:测试|passed|通过)")
+    RULES = [
+        (re.compile(r"\b(\d{3})\s*passed"), runnable - 1, "passed 应=可运行数−1"),
+        (re.compile(r"\b(\d{3})\s*通过"), runnable - 1, "「N 通过」应=可运行数−1"),
+        (re.compile(r"可运行\s*(\d{3})"), runnable, "「可运行 N」应=可运行数"),
+        (re.compile(r"\b(\d{3})\s*(?:项\s*)?(?:自动化\s*)?测试"), runnable, "「N 项测试」应=可运行数"),
+    ]
     bad = []
     for doc in primary:
         p = os.path.join(PROJ, doc)
         if not os.path.exists(p):
             continue
         for i, ln in enumerate(io.open(p, encoding="utf-8").read().splitlines(), 1):
-            for m in pat.finditer(ln):
-                num = int(m.group(1))
-                if num not in allowed:
-                    bad.append(f"{doc}:{i} 出现 {num}（只允许 {sorted(allowed)}）→ {ln.strip()[:70]}")
-    assert not bad, "主文档测试数与唯一来源不一致：\n  " + "\n  ".join(bad)
+            for pat, want, why in RULES:
+                for m in pat.finditer(ln):
+                    if int(m.group(1)) != want:
+                        bad.append(f"{doc}:{i} 出现 {m.group(1)}，应为 {want}（{why}）→ {ln.strip()[:60]}")
+    assert not bad, "主文档测试数与口径不一致：\n  " + "\n  ".join(bad)
 
 
 def test_final_delivery_doc_exists_and_covers_key_gates():

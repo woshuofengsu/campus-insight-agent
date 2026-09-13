@@ -93,9 +93,13 @@ def main() -> int:
         if not os.path.exists(p):
             continue
         s = orig = io.open(p, encoding="utf-8").read()
-        s = re.sub(r"\b\d{3}(\s*项\s*自动化\s*测试|\s*项\s*测试|\s*测试|\s*项\b)",
+        # 按**语义**替换每种表述。踩过的坑：先前把「N passed」也替换成可运行数，导致文档出现
+        # 「577 passed（可运行 576）」这种互换——`passed` 必须是「可运行数 − 1」。
+        s = re.sub(r"\b\d{3}(\s*项\s*自动化\s*测试|\s*项\s*测试|\s*测试|\s*项(?=\s*[（(]))",
                    lambda m: f"{new}{m.group(1)}", s)
-        s = re.sub(r"\b\d{3}(\s*passed|\s*通过)", lambda m: f"{new - 1 if '通过' in m.group(1) else new}{m.group(1)}", s)
+        s = re.sub(r"(可运行\s*)\d{3}", lambda m: f"{m.group(1)}{new}", s)
+        s = re.sub(r"\b\d{3}(\s*passed)", lambda m: f"{new - 1}{m.group(1)}", s)
+        s = re.sub(r"\b\d{3}(\s*通过)", lambda m: f"{new - 1}{m.group(1)}", s)
         if s != orig:
             io.open(p, "w", encoding="utf-8", newline="").write(s)
             print(f"  {doc} 已同步")
