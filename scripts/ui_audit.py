@@ -301,11 +301,48 @@ def audit(browser, name, role, path, vp, elderly, touch, dark):
     return r
 
 
+def _preflight(base: str) -> str:
+    """跑审计前先探活（第八轮终审 N3）。
+
+    为什么必须做：审计要跑 26 页 × 10 分钟，如果服务中途停了，会逐页报
+    `ERR_CONNECTION_REFUSED`，看起来像"26 个页面都有问题"——把「环境没起」误读成「页面缺陷」。
+    这里先打一次健康检查，校验**服务身份**（不只 200），失败就明确说「服务未起」并给出启动命令。
+    """
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    url = f"{base}/api/web/health"
+    try:
+        with urllib.request.urlopen(url, timeout=8) as r:
+            body = _json.loads(r.read().decode("utf-8"))
+        svc = ((body or {}).get("data") or {}).get("service")
+        if svc != "CommunityInsight Web":
+            return (f"❌ {base} 有响应但不是本服务（service={svc!r}）——端口可能被别的程序占用。\n"
+                    "   查看占用：netstat -ano | findstr :8000")
+        return ""
+    except urllib.error.HTTPError as e:
+        return f"❌ 健康检查返回 HTTP {e.code}（{url}）"
+    except Exception as e:  # noqa: BLE001
+        return (f"❌ 服务未启动（{url} 不可达：{type(e).__name__}）。\n"
+                "   先启动主服务：python -m uvicorn api_web:app --host 0.0.0.0 --port 8000\n"
+                "   （启动约 15 秒，之后再跑本审计）")
+
+
 def main() -> int:
+    global BASE  # 允许 --base 覆盖，便于在别的端口/机器上审计（声明必须在任何使用之前）
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--out", default=".shots/ui-audit.json")
+    ap.add_argument("--base", default=BASE, help="服务地址（默认 http://127.0.0.1:8000）")
     args = ap.parse_args()
+
+    BASE = args.base
+
+    problem = _preflight(BASE)
+    if problem:
+        print(problem)
+        return 1
 
     from playwright.sync_api import sync_playwright
 

@@ -12,7 +12,7 @@
   python tests/test_ablation.py --quick       # 快速检查（只跑 2 个用例）
   python tests/test_ablation.py --output report.md  # 结果存成文件
 """
-import os, sys, time, json, io, contextlib
+import os, sys, time, json, io, contextlib, warnings
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -71,11 +71,16 @@ def _make_mock_state():
         "role": "resident", "onboarding_done": 1,
     }
     # mock 掉 LangChain 记忆，ConversationBufferMemory 必须要 chat_memory
+    # 局部抑制第三方弃用告警：`ConversationBufferMemory` 在 langchain 0.3.1 起被标记弃用，
+    # 这里只为给 legacy engine 的测试构造一个 mock 记忆，属**第三方/legacy** 告警；
+    # 在源头局部抑制（而不是全局 ignore）可保证「自有代码告警为零」这件事仍然可见。
     from langchain_classic.memory import ConversationBufferMemory
-    state["langchain_memory"] = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        state["langchain_memory"] = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+        )
     state["tool_registry"] = []
     return state
 
@@ -268,6 +273,31 @@ def test_memory_operations():
         "profile_community": profile.get("community", ""),
         "recent_count": len(recent),
     }
+
+
+# ---------------------------------------------------------------------------
+# 真断言测试（第八轮终审 N1 核查后补）
+#
+# 背景：本文件上面的 `test_*` 函数是「消融报告的数据采集函数」——它们 `return dict` 给
+# `run_full_ablation()` 用，pytest 收集它们只是「能跑不崩」的冒烟，**永远不会失败**。
+# 也就是说：即使角色识别准确率掉到 50%，pytest 依然全绿。这里补两条真正卡指标的断言，
+# 让「准确率 100%」「工具无缺失」这两个对外引用的数字真的被测试守住。
+# ---------------------------------------------------------------------------
+
+def test_persona_routing_is_accurate():
+    """角色路由准确率必须 100%（对外材料引用该指标，必须被断言卡住）。"""
+    r = test_persona_routing()
+    assert r["total"] >= 5, f"用例太少，指标不可信：{r['total']}"
+    assert r["rate"] == 100.0, f"角色路由准确率 {r['rate']}% < 100%，失败用例：" + str(
+        [d for d in r["details"] if not d["passed"]])
+
+
+def test_tool_discovery_covers_expected():
+    """工具自动发现必须覆盖全部期望工具（零注册接入，缺一个都说明发现机制退化）。"""
+    r = test_tool_discovery()
+    assert r["missing"] == [], f"缺少期望工具：{r['missing']}"
+    assert r["found_expected"] == r["expected"], r
+    assert r["total"] >= r["expected"], f"发现工具数 {r['total']} 少于期望 {r['expected']}"
 
 
 # 报告生成

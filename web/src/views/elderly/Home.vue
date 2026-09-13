@@ -222,7 +222,7 @@ function cancelCall() {
     </div>
 
     <!-- 最近求助状态 -->
-    <div v-if="home?.latest_sos" class="card" style="background:#fef2f2;text-align:center;font-size:1.15rem;border-radius:18px;">
+    <div v-if="home?.latest_sos" class="card" style="background:#fef2f2;text-align:center;border-radius:18px;">
       🆘 最近求助：{{ home.latest_sos.status || '处理中' }}
     </div>
 

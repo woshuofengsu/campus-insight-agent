@@ -1053,3 +1053,62 @@
 - `npm run build` ✓；`docs/mobile-deploy.md` 第六节升级为「自动化 21 页 + 真机 8 步」清单，第八节发布清单新增第 11/12 项。
 
 **提交**：本轮。
+
+## 四十一、终审报告处理 + 第九轮全项目自查：8 个真 BUG 修复 ✅
+
+**背景**：第八轮终审报告判定「无 P1/P2、可定稿上场」，只列了 3 个「提交前顺手级」小项（N1–N3）。
+按要求把 N1–N3 处理完后，我在核查中**又自查出 8 个真 BUG**（报告未覆盖），本轮一并修复。
+处理回执见 `docs/review/终审报告-处理回执.md`。
+
+**① N1 的诊断其实不准（如实记录）**
+报告认为 2 条 warning 来自 `test_ablation` 的 `return dict`。核查发现 `PytestReturnNotNoneWarning`
+**早已被 `pytest.ini` 抑制**（注释写明是"能跑不崩"的冒烟收集），真正的 2 条是**第三方**告警：
+FastAPI TestClient 提示改用 httpx2、LangChain 弃用 `ConversationBufferMemory`。
+达成 0 warning 的做法（都落在源头，避免全局 ignore 掩盖自有代码问题）：
+- LangChain：在 `test_ablation._make_mock_state` 构造 mock 记忆处局部 `catch_warnings()`。
+  **踩坑**：Python warnings 过滤器按**精确类**匹配（写基类 `DeprecationWarning` 无效），
+  pytest 的 ini 对第三方点分类解析也不生效 → 只能源头抑制。
+- FastAPI：该告警在**首次导入第三方模块时**触发（收集期，用例级 filter 来不及）→
+  在 `conftest.py` 顶部**受控预热导入**消耗掉，之后命中 `sys.modules` 缓存。
+- 现状：`581 passed / 1 skipped / 0 warnings`。
+
+**② 自查出的 8 个真 BUG（B5–B8 属"空数据掩盖缺陷"）**
+- **B1 legacy 人设路由**：「有什么热门提案吗」被判成社区观察员（调脉搏），答非所问。实测准确率
+  **91.67%** 而材料声称 100% —— 因为那 6 个 `test_*` 是"**永远不会失败**"的冒烟收集。
+  修：观察员与议事顾问同时命中时，出现「提案/议题」具体名词即归议事顾问 → 复测 100%。
+- **B2 主线续接误判**：先进入报修追问、再问「今天社区有什么新鲜事」→ 回复引用了**上一次的旧草稿**。
+  修：`_resume_target` 增加新问句识别（≥8 字 + 疑问特征即视为改话题），并用正反两向测试保证
+  「家里」这类短应答仍续接。
+- **B3 居民问「通知」收到负责人口吻**（"请到「通知管理」创建"）。修：居民也走各自可见通知列表。
+- **B4「报修统计有多少」被当成新报修**（追问"家里还是公共区域"）。修：查询消歧 → 直答本人报修概览。
+- **B5 演示数据缺口：`notices` 表为 0 条** → 居民通知页 / 老年「听通知」/ 网格通知管理**三处功能都演示不出来**。
+  修：`_seed_notices()` 种 6 条虚构通知（4 类型 + 已发布/草稿 + 1 紧急 + 1 置顶，幂等，无真实个人信息）。
+- **B6/B7 由 B5 触发暴露**（页面此前是空的，元素不存在 → 审计量不到）：老年端通知页摘录/时间
+  16.8/15.2px（低于适老 20px）；弹窗关闭按钮 **22×22**、居民未读徽标 11.2px、老年端紧急弹窗
+  标题 18px/正文 14px/按钮 14px。修：去内联字号 + 触屏下关闭按钮 ≥44px + 新增 **`body.role-elderly`**
+  角色类（Naive 弹窗 teleport 到 body，写在 `.elderly-page` 下命不中）。
+- **B8 测试基础设施**：`test_dispatch.py` 建库不清残留、清理不删 `-wal/-shm` → 偶发
+  `Username 'grid_mgmt' already taken`（单独跑过、全量跑 error）。修：该文件补齐清理 + 带重试；
+  **`conftest.py` 增加 sessionstart 统一清理** `tests/**` 遗留 `_test_*.db*`，一处兜住整类问题。
+- 附带：`ui/pages_grid/health_mgmt.py` 还残留 1 处 `datetime.utcnow()`（此前只清了 7 个 data/api 文件，
+  漏了 legacy `ui/`）→ 现在**全项目 utcnow 残留 = 0**。
+
+**③ 工具健壮性（同类问题一并修）**
+- `ui_audit.py` 加 `_preflight()`：跑前校验**服务身份**（不只 200），未起时明确报「服务未启动 + 启动命令」，
+  避免 26 页逐页连接错被误读成页面缺陷（终审 N3）。
+- `demo_acceptance.py` 加**会话重置 + 退避重试**：演示账号共享，残留会话会让脚本假失败 → 连跑两次一致。
+- 新增 `scripts/mobile_audit.py`（21 页 × 7 类移动端专项：溢出/热区/**输入框<16px（iOS 聚焦放大）**/
+  字号/底栏遮挡/横屏遮罩/大屏降级）。
+
+**④ 最终验证（全绿，且新增静态类别排查 = 0）**
+| 门禁 | 结果 |
+|---|---|
+| `pytest` | **581 passed / 1 skipped / 0 warnings**（可运行 582） |
+| `demo_preflight.py` | **9/9** |
+| `demo_acceptance.py` | **11/11**（连跑两次一致） |
+| `ui_audit.py` | 26 页 × 9 类 **0 违规** |
+| `mobile_audit.py` | 21 页 × 7 类 **0 违规** |
+| 静态排查（裸 ALTER / utcnow / 暗色规则 / 老年端小字号） | **0 项待处理** |
+| `ruff` / `npm run build` | 0 / ✓ |
+
+**提交**：本轮。

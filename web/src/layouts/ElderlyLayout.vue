@@ -1,11 +1,18 @@
 <script setup>
 // 老年端布局：顶部标题 + 大字导航 + 内容
+import { onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
 const route = useRoute()
 const store = useUserStore()
+
+// 在 body 上打角色类：Naive 的弹窗会 teleport 到 body，
+// 只写在 .elderly-page 下的适老样式命不中它们（紧急通知弹窗正是这种）。
+// 有了 body.role-elderly，弹窗字号/热区规则就能覆盖（见 style.css）。
+onMounted(() => document.body.classList.add('role-elderly'))
+onBeforeUnmount(() => document.body.classList.remove('role-elderly'))
 
 const navs = [
   { key: '/elderly/home', label: '🏠 首页' },

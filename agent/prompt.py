@@ -294,8 +294,15 @@ def detect_persona(user_input: str) -> dict | None:
         # "看看有什么提案" / "看看大家提了xxx" → 明显是看提案的意图
         # 用户在翻提案时强制走议事路由，哪怕"有什么"/"什么"
         # 这类观察员关键词命中数更高。
+        #
+        # ⚠ 修复（第八轮终审衍生 BUG）：原先只认这四个固定短语，导致
+        #   「有什么热门提案吗」被观察员的"有什么"+"什么"（命中 2）压过议事顾问的"提案"（命中 1）
+        #   → 判成社区观察员（调 get_community_pulse），答非所问。
+        #   规则修正：**具体治理名词（提案/议题）比泛疑问词更有信息量**——
+        #   只要两者都命中且文本里出现提案/议题，就归议事顾问。
         _view_proposal = ("看看有什么" in txt or "看看大家提了" in txt
-                          or "看看都有什么" in txt or "有什么好" in txt)
+                          or "看看都有什么" in txt or "有什么好" in txt
+                          or "提案" in txt or "议题" in txt)
         if _view_proposal:
             role, hint, count = roles_by_idx[1]
             return {"role": role, "focus_hint": hint, "confidence": "medium",

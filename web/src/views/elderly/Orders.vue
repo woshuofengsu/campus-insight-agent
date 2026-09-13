@@ -38,7 +38,7 @@ const STATUS_TEXT = {
     <div class="elderly-title">🔧 我的报修</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">查看报修进度</p>
 
-    <div v-for="i in list" :key="i.id" class="card" style="font-size:1.15rem;">
+    <div v-for="i in list" :key="i.id" class="card" style="font-size:1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <b>#{{ i.id }} {{ i.title }}</b>
       </div>

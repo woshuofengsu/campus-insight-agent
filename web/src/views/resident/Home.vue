@@ -83,7 +83,7 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
     <div v-if="unread() > 0" class="card fade-up-d1 entry-tile" style="background:#f0fdf4;border:1px solid #86efac;display:flex;align-items:center;justify-content:space-between;"
          @click="router.push('/resident/notices')">
       <div style="display:flex;align-items:center;gap:9px;">
-        <span class="pulse-danger" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;font-size:0.7rem;font-weight:700;">{{ unread() }}</span>
+        <span class="pulse-danger" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#ef4444;color:#fff;font-size:0.78rem;font-weight:700;line-height:1;">{{ unread() }}</span>
         <b>您有 {{ unread() }} 条未读通知</b>
       </div>
       <n-button size="small" type="success" ghost>查看 ›</n-button>

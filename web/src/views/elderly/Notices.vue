@@ -45,8 +45,8 @@ async function play(n) {
         <span v-if="n.is_urgent" style="color:var(--ink-danger);font-weight:800;">🚨 紧急</span>
         <span v-else-if="!n.is_read" style="color:var(--ink-info);font-weight:700;">● 未读</span>
       </div>
-      <div class="muted" style="font-size:1.05rem;margin-top:6px;">{{ n.elderly_summary || n.body }}</div>
-      <div class="muted" style="font-size:0.95rem;margin-top:6px;">{{ (n.published_at || '').slice(0, 16) }} · 🔊 点击播报</div>
+      <div class="muted" style="margin-top:6px;">{{ n.elderly_summary || n.body }}</div>
+      <div class="muted" style="margin-top:6px;">{{ (n.published_at || '').slice(0, 16) }} · 🔊 点击播报</div>
     </div>
     <n-empty v-if="list.length === 0" description="暂无通知" style="font-size:1.25rem;" />
   </div>

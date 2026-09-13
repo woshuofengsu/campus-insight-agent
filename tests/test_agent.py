@@ -49,6 +49,65 @@ def _reset(client, role="resident", elder=False):
 
 # ---------- 多 Agent 报修闭环 ----------
 
+def test_new_question_does_not_resume_old_flow(client):
+    """回归（第八轮终审衍生 BUG）：**新的完整问句**不得续接上一次的报修流程。
+
+    实测反例：先进入报修追问（step=ask_type），再问「今天社区有什么新鲜事」——
+    这句既不是应答词、又恰好没命中其他业务意图，原先会被当成对追问的回答，
+    于是用户收到「请确认报修信息：…（旧草稿内容）」，答非所问且引用了过期上下文。
+    """
+    _reset(client)
+    out, _ = _chat(client, "我家水管漏水了")
+    assert out["intent"] == "repair_dispatch" and out["status"] == "追问"   # 已进入追问
+
+    out2, _ = _chat(client, "今天社区有什么新鲜事")
+    assert out2["intent"] != "repair_dispatch", f"新问句被当成追问应答：{out2}"
+    assert "确认报修信息" not in out2["reply"], f"引用了旧报修草稿：{out2['reply']}"
+
+    # 但**真正的追问应答**仍必须续接（防止把修复做过头）
+    _reset(client)
+    out3, _ = _chat(client, "我家水管漏水了")
+    assert out3["status"] == "追问"
+    out4, _ = _chat(client, "家里")          # 简短应答 → 应续接
+    assert out4["intent"] == "repair_dispatch" and "紧急" in out4["reply"], out4
+    _reset(client)
+
+
+def test_community_pulse_intent_answers_natural_question(client):
+    """回归（第九轮自查 BUG）：自然问句「今天社区有什么新鲜事」必须给出**社区动态快照**。
+
+    修复前：没有任何意图命中 → 回"我没太理解您的意思，您可以换个说法"，演示时很掉分。
+    现在：拼装「最新通知 + 今日天气 + 我的报修」真实快照（取数失败逐项降级，不整段失败）。
+    """
+    _reset(client)
+    out, _ = _chat(client, "今天社区有什么新鲜事")
+    assert out["intent"] == "community_pulse", out
+    assert "我没太理解" not in out["reply"], out["reply"]
+    assert ("社区最近" in out["reply"]) or ("没有特别" in out["reply"]), out["reply"]
+    assert any(a.get("type") == "navigate" for a in out["actions"]), out["actions"]
+    _reset(client)
+
+
+def test_repair_stats_query_is_not_a_new_report(client):
+    """回归（第八轮终审衍生 BUG）：「报修统计有多少」是**查询**，不是新报修。
+
+    legacy 人设路由早已写明「分析类关键词压过报修类」，主线原先缺这条规则，
+    会把查询判成报修并追问"是您家里还是公共区域"。
+    """
+    _reset(client)
+    out, _ = _chat(client, "报修统计有多少")
+    assert out["intent"] == "报修查询", out
+    assert "确认报修信息" not in out["reply"] and "家里还是公共区域" not in out["reply"], out["reply"]
+    assert ("条报修" in out["reply"]) or ("查不到" in out["reply"]), out["reply"]
+    assert any(a.get("type") == "navigate" for a in out["actions"]), out["actions"]
+
+    # 真实报修描述不能被误判成查询
+    _reset(client)
+    out2, _ = _chat(client, "我家阳台水管漏水了")
+    assert out2["intent"] == "repair_dispatch", out2
+    _reset(client)
+
+
 def test_repair_flow(client):
     _reset(client)
     out, _ = _chat(client, "我家水管漏水了")
@@ -82,7 +141,12 @@ def test_policy_weather_notice_contact(client):
     out, _ = _chat(client, "今天天气怎么样")
     assert out["intent"] == "weather_guardian" and "今天天气" in out["reply"]
     out, _ = _chat(client, "最近有什么通知")
-    assert out["intent"] == "notification_manager"
+    # 修复（第八轮终审衍生 BUG）：居民问「通知」应看到**他自己的通知列表**。
+    # 旧行为是路由到负责人角色 notification_manager，回复"通知发布请到「通知管理」创建（支持定时与附件）"
+    # —— 那是负责人视角，居民看了莫名其妙（实测发现）。网格员问通知仍走 notification_manager。
+    assert out["intent"] == "notification", out
+    assert "通知管理」创建" not in out["reply"], f"居民不该收到负责人口吻：{out['reply']}"
+    assert ("最近通知" in out["reply"]) or ("没有新通知" in out["reply"]), out["reply"]
     out, _ = _chat(client, "帮我联系社区")
     assert out["intent"] == "community" and any(a.get("type") == "confirm_call" for a in out["actions"])
 

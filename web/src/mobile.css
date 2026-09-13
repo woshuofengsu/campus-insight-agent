@@ -24,6 +24,8 @@ img, .n-button, .n-tag, .card { user-select: none; -webkit-user-select: none; }
   .n-button--tiny, .n-button--small { min-height: 40px; margin: 2px 0; }
   .n-input, .n-select { min-height: 44px; }
   .card[style*="cursor:pointer"], .card.clickable { min-height: 44px; }
+  /* 弹窗右上角关闭按钮默认 22×22，手指点不准（移动端审计实测抓到）→ 触屏下放大到 44×44 */
+  .n-dialog__close, .n-modal .n-base-close { min-width: 44px; min-height: 44px; }
 }
 
 /* ---------- 触屏输入：iOS 聚焦防自动放大（任何输入控件字号 ≥16px） ---------- */

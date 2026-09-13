@@ -7,6 +7,7 @@
 - 异常：Agent 超时重试一次、黑板锁冲突提示、用户取消清理、审计拦截
 """
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -174,6 +175,14 @@ class Orchestrator:
             return None
         # 话题切换检测：非应答词且识别到其他意图 → 中断当前流程
         if text not in self._ANSWER_WORDS and step:
+            # 修复（第八轮终审衍生 BUG）：**新的完整问句**也算改话题。
+            # 反例：「有什么热门提案吗」「今天社区有什么新鲜事」这类问句既不是应答词、
+            # 又恰好没命中其他业务意图（detect_intent 返回 None）→ 原先会**续接上一次的报修流程**，
+            # 用户明明在问社区动态，却收到"请确认报修信息：…"（引用了旧草稿），演示时非常刺眼。
+            if self._looks_like_new_question(text):
+                self._log("receptionist", "话题切换",
+                          "检测到新的完整问句，中断原流程并重新识别意图")
+                return None
             try:
                 from agent import web_agent as A
                 from agent.roles.receptionist import INTENT_KEY_MAP
@@ -189,6 +198,13 @@ class Orchestrator:
             except Exception:
                 pass
         return target
+
+    # 新问句识别（话题切换用）：长度 + 疑问特征双重条件，避免把「楼道」这类
+    # 简短回答误判成改话题；5 字的「怎么修？」也不会命中（长度 <8）。
+    _NEW_QUESTION_RE = re.compile(r"[?？]|吗|呢|什么|哪些|哪个|怎么|如何|多少|有没有|是不是|能不能|可以吗")
+
+    def _looks_like_new_question(self, text: str) -> bool:
+        return len(text) >= 8 and bool(self._NEW_QUESTION_RE.search(text))
 
     def _dispatch(self, ctx: dict, intent: str) -> dict:
         """按意图路由到业务/自动角色 Agent，末尾过合规审计。"""
@@ -206,8 +222,14 @@ class Orchestrator:
         target = ROUTE_MAP.get(intent)
         if target is None and intent in self.agents:
             target = intent  # 续接会话时 intent 即角色 key
-        # 老年端通知查询 → 直答通知列表（不进负责人通知管理）
-        if intent == "notification" and ctx.get("role") == "elderly":
+        # 社区动态快照（修复：问「今天社区有什么新鲜事」原先落到"未知意图"，答"我没太理解"）
+        if intent == "community_pulse":
+            return self._community_pulse(ctx)
+        # 通知查询 → 直答**用户自己**能看到的通知列表（不进负责人通知管理）
+        # 修复（第八轮终审衍生 BUG）：原先只对老年端特判，导致**居民**问「最近有什么通知」
+        # 被路由到 notification_manager，回复是"通知发布请到「通知管理」创建"——那是负责人视角，
+        # 居民看了一头雾水。现在居民/老年都走各自的可见通知列表。
+        if intent == "notification" and ctx.get("role") in ("elderly", "resident"):
             return self._community_or_withdraw(ctx, "notification")
         if not target:
             # 联系社区 / 撤回引导 等接待员可直答的意图
@@ -502,6 +524,53 @@ class Orchestrator:
         result["handoff_id"] = hid
         return result
 
+    def _community_pulse(self, ctx: dict) -> dict:
+        """社区动态快照：最新通知 + 今日天气 + 我名下的待办（接待员直答，仍过审计）。
+
+        修复背景（第九轮自查）：居民问「今天社区有什么新鲜事」这类**自然问句**原先没有任何意图命中，
+        回复是"我没太理解您的意思"——演示时很掉分。这里用**已有数据**拼一个真实快照回答，
+        取数失败逐项降级，绝不整段失败。
+        """
+        parts: list[str] = []
+        # ① 最新通知（取用户可见的前 3 条）
+        try:
+            from data.db_notice import get_visible_notices
+            role = ctx.get("role") if ctx.get("role") in ("elderly", "resident") else "resident"
+            rows = get_visible_notices(role, ctx.get("uid"), limit=3) or []
+            if rows:
+                parts.append("📢 最新通知：" + "；".join(n.get("title", "") for n in rows))
+        except Exception:  # noqa: BLE001
+            pass
+        # ② 今日天气
+        try:
+            from data.db_weather import get_simplified_weather
+            w = get_simplified_weather("") or {}
+            if w.get("condition"):
+                parts.append(f"🌤️ 今日天气：{w.get('condition')} "
+                             f"{w.get('temp_low')}°~{w.get('temp_high')}°")
+        except Exception:  # noqa: BLE001
+            pass
+        # ③ 我名下的未结报修
+        try:
+            from data.db_repair import get_issues
+            mine = get_issues(reporter_id=ctx.get("uid"), limit=100) if ctx.get("uid") else []
+            open_n = sum(1 for r in mine if r.get("status") not in ("处理结束", "已关闭", "已撤回"))
+            if mine:
+                parts.append(f"🔧 您的报修：{open_n} 条处理中")
+        except Exception:  # noqa: BLE001
+            pass
+
+        reply = ("社区最近的情况：\n" + "\n".join(parts)) if parts else \
+            "社区最近比较平稳，暂时没有需要特别提醒的新情况。"
+        actions = [{"type": "navigate", "to": "/resident/notices", "label": "查看通知"}]
+        self._log("receptionist", "社区动态", "返回社区动态快照（通知+天气+我的报修）")
+        audit = self.agents["compliance_auditor"].process({
+            "output_text": reply, "role": ctx.get("role"), "uid": ctx.get("uid"),
+            "user_input": ctx.get("user_input", ""), "intent": "community_pulse",
+            "related_id": None, "status": "成功",
+        })
+        return self._finish(ctx, audit.get("reply", reply), "成功", "community_pulse", actions, None)
+
     def _community_or_withdraw(self, ctx: dict, intent: str) -> dict:
         """联系社区 / 撤回引导 / 老年通知查询（接待员直答，仍过审计）。"""
         if intent == "community":
@@ -515,20 +584,23 @@ class Orchestrator:
             actions = [{"type": "navigate", "to": "/resident/work-orders", "label": "去我的报修"}]
             self._log("receptionist", "撤回引导", "引导到工单详情")
         elif intent == "notification":
-            # 老年端通知查询 → 直接返回老年端可见通知列表（大字）
+            # 通知查询 → 直接返回该角色可见的通知列表（居民/老年大字；不再让居民看到负责人口吻）
+            role = ctx.get("role") if ctx.get("role") in ("elderly", "resident") else "resident"
             try:
                 from data.db_notice import get_visible_notices
-                rows = get_visible_notices("elderly", ctx.get("uid"), limit=5)
+                rows = get_visible_notices(role, ctx.get("uid"), limit=5)
                 if rows:
                     lines = [f"· {n.get('title', '')}" for n in rows]
                     reply = "🔔 最近通知：\n" + "\n".join(lines)
                 else:
                     reply = "最近没有新通知。"
-                actions = [{"type": "navigate", "to": "/elderly/notices", "label": "去听通知"}]
+                to = "/elderly/notices" if role == "elderly" else "/resident/notices"
+                label = "去听通知" if role == "elderly" else "查看通知"
+                actions = [{"type": "navigate", "to": to, "label": label}]
             except Exception:
                 reply = "通知查询暂时不可用。"
                 actions = []
-            self._log("receptionist", "通知查询", "返回老年端通知列表")
+            self._log("receptionist", "通知查询", f"返回{role}可见通知列表")
         else:
             reply = "正在为您处理。"
             actions = []

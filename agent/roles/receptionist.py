@@ -12,12 +12,27 @@ INTENT_KEY_MAP = {
     "提案": "proposal",
     "政策问答": "policy",
     "通知查询": "notification",
+    "社区动态": "community_pulse",   # 修复：自然问句「今天社区有什么新鲜事」原先回"我没太理解"
     "天气查询": "weather",
     "身体不适": "health",
     "联系社区": "community",
     "待办提醒": "grid", "导出数据": "grid", "统计查询": "grid",
     "搜索资料": "grid", "页面跳转": "grid",
 }
+
+# 「报修查询」判定词（查询类）与「报修名词」：两者同时命中才算"问数字"，而不是"报故障"
+_QUERY_MARKERS = ("统计", "多少", "几条", "数量", "总数", "汇总", "列表", "有哪些",
+                  "情况", "记录", "进度", "都报了什么", "报过")
+_REPAIR_NOUNS = ("报修", "工单", "维修", "我的报修")
+
+
+def _looks_like_repair_query(text: str) -> bool:
+    """是不是在**查**报修情况（而不是报一个新的故障）。
+
+    纯规则、无副作用：只对「报修/工单」这类名词 + 查询词同时出现时判定，
+    真实报修描述（"我家水管漏水了"）不含查询词，不会误判。
+    """
+    return any(m in text for m in _QUERY_MARKERS) and any(n in text for n in _REPAIR_NOUNS)
 
 
 class ReceptionistAgent(BaseAgent):
@@ -40,6 +55,37 @@ class ReceptionistAgent(BaseAgent):
     def _help(self, role):
         entries = "、".join(A.quick_entries(role))
         return f"我可以帮您：{entries}。直接对我说就行，或点击下方快捷按钮。"
+
+    # ---- 我的报修概览（查询类，不建草稿） ----
+
+    def _my_issue_summary(self, ctx: dict) -> dict:
+        """用**真实数据**回答「报修统计有多少」这类查询。
+
+        只读自己名下的工单（按 reporter_id / author 过滤），不建草稿、不进状态机；
+        取数失败时降级为「打开我的报修列表」引导，绝不让用户卡在原地。
+        """
+        uid = ctx.get("uid")
+        try:
+            from data.db_repair import get_issues
+            rows = get_issues(reporter_id=uid, limit=200) if uid else []
+            if not rows:
+                rows = []
+            total = len(rows)
+            doing = sum(1 for r in rows if r.get("status") in ("待审核", "已审核待派单", "已派单", "处理中", "待居民反馈"))
+            done = sum(1 for r in rows if r.get("status") == "处理结束")
+            recent = "；".join(f"#{r.get('id')} {r.get('title', '')[:12]}（{r.get('status')}）"
+                              for r in rows[:3])
+            reply = f"您名下共有 {total} 条报修：处理中 {doing} 条、已办结 {done} 条。"
+            if recent:
+                reply += f"\n最近：{recent}"
+        except Exception:  # noqa: BLE001 — 查询失败不阻塞，降级引导
+            reply = "报修统计暂时查不到，已为您打开我的报修列表。"
+        # 留痕到黑板（供执行链/审计查看），与其它接待员分支一致
+        self._write("intent_note", "报修查询：直答本人报修概览，未建草稿")
+        return self._reply(reply, intent="报修查询",
+                           actions=[{"type": "navigate", "to": "/resident/work-orders",
+                                     "label": "查看我的报修"}],
+                           chain_note="查询类输入 → 直答概览，不走报修状态机")
 
     def process(self, ctx: dict) -> dict:
         text = (ctx.get("user_input") or "").strip()[:200]
@@ -100,6 +146,14 @@ class ReceptionistAgent(BaseAgent):
 
         # 意图识别（多意图取第一个主要意图；紧急语义默认联想报修）
         intent = A.detect_intent(text, role)
+
+        # 查询 vs 报修 消歧（第八轮终审衍生 BUG）：
+        # legacy 人设路由早就写明「分析类关键词压过报修类——"统计报修数量"是查询，不是报修」，
+        # 但主线原先缺这条规则：「报修统计有多少」被判成**新报修**，追问"是您家里还是公共区域"，
+        # 用户问数字却被要求描述位置。这里补上：命中「报修/工单 + 统计类词」→ 直接答他自己的报修概览。
+        if intent == "报修" and _looks_like_repair_query(text):
+            return self._my_issue_summary(ctx)
+
         if not intent:
             if ctx["state"].get("urgent"):
                 intent = "repair"

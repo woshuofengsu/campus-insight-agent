@@ -13,6 +13,8 @@ import json
 import logging
 from datetime import datetime
 
+from utils.timeutil import utcnow   # 与主服务同一实现（naive UTC），替代弃用的 datetime.utcnow
+
 import streamlit as st
 
 from ui.guard import require_role
@@ -132,7 +134,7 @@ def _consult_remaining(c: dict) -> str:
         base_dt = datetime.strptime(str(base), "%Y-%m-%d %H:%M:%S")
     except (ValueError, TypeError):
         return ""
-    remaining = REPLY_HOURS - (datetime.utcnow() - base_dt).total_seconds() / 3600.0
+    remaining = REPLY_HOURS - (utcnow() - base_dt).total_seconds() / 3600.0
     if remaining < 0:
         return f'<span style="color:{TOKEN["danger"]};">已超时 {abs(remaining):.1f} 小时</span>'
     color = TOKEN["danger"] if remaining < 1 else TOKEN["success"]

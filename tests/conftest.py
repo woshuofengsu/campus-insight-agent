@@ -9,7 +9,28 @@ import os
 os.environ.setdefault("WEB_JWT_SECRET", "test-only-jwt-secret-not-for-prod")
 os.environ.setdefault("CRYPTO_KEY", "test-only-crypto-key-not-for-prod")
 
+import warnings  # noqa: E402
+
 import pytest  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# 受控预热导入：把**第三方模块导入期**的弃用告警在此处消耗掉
+#
+# 背景（第八轮终审 N1 的目标是「pytest 输出零告警」）：
+#   FastAPI 的 `testclient` 在**首次导入时**就会发 StarletteDeprecationWarning
+#   （"Using `httpx` with `starlette.testclient` is deprecated"），这是上游依赖问题、与自有代码无关。
+#   它发生在**收集期**而不是用例执行期，所以：
+#     · 写进 pytest.ini 的 filterwarnings 对它有类别解析限制（基类不匹配，实测无效）；
+#     · 写成本用例级 simplefilter 也来不及（告警在导入时就发了）。
+#   这里在 conftest 里**先于任何测试模块**导入一次，用局部 catch_warnings 吃掉这条告警；
+#   之后 test 模块再 import 时命中 sys.modules 缓存，不会再触发。
+# ---------------------------------------------------------------------------
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    try:
+        import starlette.testclient  # noqa: F401  （预热导入，仅为消耗导入期告警）
+    except Exception:  # noqa: BLE001 — 未安装 fastapi/starlette 时不影响测试
+        pass
 
 
 @pytest.fixture(autouse=True)

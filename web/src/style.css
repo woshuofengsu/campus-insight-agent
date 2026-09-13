@@ -384,6 +384,14 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
   60%      { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
 }
 .pulse-danger { animation: glow-ring 2s ease-out infinite; }
+
+/* 老年端弹窗（紧急通知 / 确认框）：Naive 弹窗会 teleport 到 body，
+   所以用 ElderlyLayout 在 body 上加的 .role-elderly 类来命中；
+   字号按适老下限 20px 兜底（移动端审计在种了紧急通知数据后实测抓到 14/18px） */
+body.role-elderly .n-dialog__title { font-size: 1.35rem; }
+body.role-elderly .n-dialog__content { font-size: 1.25rem; line-height: 1.7; }
+body.role-elderly .n-dialog .n-button { min-height: 56px; }
+body.role-elderly .n-dialog .n-button .n-button__content { font-size: 1.25rem; }
 @keyframes glow-ring-primary {
   0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.40); }
   60%      { box-shadow: 0 0 0 12px rgba(45, 91, 255, 0); }

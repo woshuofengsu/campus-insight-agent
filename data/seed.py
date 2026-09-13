@@ -578,18 +578,77 @@ def _seed_care_events():
         return 0
 
 
+def _seed_notices():
+    """种演示用通知（修复演示数据缺口：notices 表为空 → 三处通知功能都演示不出来）。
+
+    缺口证据：全项目审查时实测 `SELECT COUNT(*) FROM notices` = **0**，导致
+      ① 居民端「通知」页永远空列表；② 老年端「听通知」空列表（适老旗舰功能之一）；
+      ③ 网格端「通知管理」无历史可管；④ 对话里问「最近有什么通知」只能答"最近没有新通知"。
+    这里种 6 条覆盖四种类型 + 两种状态（已发布/草稿），**全部为虚构演示内容，不含任何真实个人信息**。
+    幂等：`notices` 已有 ≥3 条就跳过（不覆盖真实使用中积累的数据）。
+    """
+    from datetime import datetime, timedelta
+
+    rows = [
+        # (标题, 类型, 范围, 正文, 老年版摘要, 状态, 是否紧急, 是否置顶, 发布天数前)
+        ("关于3号楼电梯停运检修的通知", "停水停电通知", "全体居民",
+         "3号楼2单元电梯因年检停运检修，时间为本周六 09:00-16:00，期间请使用楼梯。行动不便的居民可联系社区协助。",
+         "3号楼电梯周六白天检修，坐不了电梯，请走楼梯。", "已发布", 0, 1, 1),
+        ("小区夏季灭蚊蝇消杀安排", "社区公告", "全体居民",
+         "本周四上午对小区绿化带、垃圾驿站、楼道进行消杀，请居民关好门窗，看管好宠物与儿童。",
+         "周四上午小区打药，请关好门窗、看好孩子和宠物。", "已发布", 0, 0, 2),
+        ("老旧小区加装电梯政策宣讲会", "活动通知", "全体居民",
+         "下周三 14:00 在社区服务中心二楼举办加装电梯政策宣讲，介绍申请条件、表决比例与补贴标准，欢迎有需求的居民参加。",
+         "下周三下午两点，社区讲装电梯的政策，欢迎大家来听。", "已发布", 0, 0, 3),
+        ("海淀小区垃圾分类驿站正式启用", "社区公告", "全体居民",
+         "小区东门垃圾分类驿站已完成改造并启用，开放时间 06:30-20:30，支持厨余、可回收、有害、其他四类投放。",
+         "东门垃圾分类站已经开了，早上六点半到晚上八点半可以用。", "已发布", 0, 0, 5),
+        ("【紧急】暴雨橙色预警，请减少外出", "紧急通知", "全体居民",
+         "气象台发布暴雨橙色预警，预计今日 16:00-22:00 有强降雨并伴短时大风。请减少外出、收好窗外物品；如遇积水或房屋漏水请及时在平台报修。",
+         "今天下午到晚上有暴雨，尽量别出门，屋外东西收进来。有漏水就点报修。", "已发布", 1, 0, 0),
+        ("社区老年助餐点试运行征求意见", "政策通知", "全体居民",
+         "社区拟在服务中心一层设立老年助餐点（试运行），现征求居民意见，可在本平台「邻里议事」提交建议。",
+         "社区想办老年助餐点，正在问大家意见。", "草稿", 0, 0, 0),
+    ]
+    try:
+        with get_db() as conn:
+            existing = conn.execute("SELECT COUNT(*) FROM notices").fetchone()[0]
+            if existing >= 3:
+                return 0
+            now = datetime.now()
+            for title, ntype, scope, body, summary, status, urgent, pinned, days_ago in rows:
+                ts = (now - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
+                conn.execute(
+                    "INSERT INTO notices (title, notice_type, publish_scope, body, elderly_summary, "
+                    "publisher, scheduled_at, published_at, is_pinned, pinned_at, is_urgent, "
+                    "scope_target_json, attachment_json, status, created_at, updated_at) "
+                    "VALUES (?,?,?,?,?,'社区服务中心',?,?,?,?,?,'[]','[]',?,?,?)",
+                    (title, ntype, scope, body, summary, ts,
+                     ts if status == "已发布" else None,
+                     pinned, ts if pinned else None, urgent, status, ts, ts),
+                )
+            conn.commit()
+            return len(rows)
+    except Exception as e:  # noqa: BLE001
+        _log.debug("种演示通知失败：%s", e, exc_info=True)
+        return 0
+
+
 def seed_all(db_path: str):
     """往库里种治理演示数据。只在库空的时候种——绝不删已有数据。"""
     init_db(db_path)
     with get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM community_issues").fetchone()[0]
     if count > 0:
-        # 已有数据：只确保 demo 账号 + 老年档案 + 演示用关怀事件存在（幂等），绝不重灌工单
+        # 已有数据：只确保 demo 账号 + 老年档案 + 演示用关怀事件/通知存在（幂等），绝不重灌工单
         _seed_users()
         _seed_elderly_profile()
         n = _seed_care_events()
         if n:
             print(f"[seed] Care events seeded: {n} rows")
+        m = _seed_notices()
+        if m:
+            print(f"[seed] Notices seeded: {m} rows")
         print(f"[seed] Database already has {count} issues, ensuring demo accounts only")
         return
     print("[seed] Empty database — seeding community governance demo data (narrative edition)...")
@@ -601,6 +660,7 @@ def seed_all(db_path: str):
     _seed_topics()
     _seed_feedback()
     _seed_care_events()
+    _seed_notices()
     # 疾控监测数据（国家疾控局月度公报）
     try:
         from data.db_surveillance import seed_surveillance

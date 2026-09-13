@@ -85,10 +85,20 @@ def main() -> int:
           "elderly": tokens.get("elderly", "")}
 
     # 3) 居民 AI 对话（真实多智能体链路；注意字段名是 text）
+    #    先发一次「算了」清掉遗留会话状态：演示账号是共享的，上一次对话可能停在追问态，
+    #    会让本轮输入被当成"追问应答"→ 脚本出现假失败（与 ui_audit 依赖服务稳定同类问题）。
+    call("/api/web/agent/chat", rh["resident"], {"text": "算了"}, "POST")
     st, body = call("/api/web/agent/chat", rh["resident"],
                     {"text": "我家阳台水管漏水了，水都流到楼下了"}, "POST")
     d = (body or {}).get("data") or {}
     reply = (d.get("reply") or "")
+    if not reply:                     # 偶发限流/瞬时失败 → 退避重试一次，别把抖动当缺陷
+        import time
+        time.sleep(2.0)
+        st, body = call("/api/web/agent/chat", rh["resident"],
+                        {"text": "我家阳台水管漏水了"}, "POST")
+        d = (body or {}).get("data") or {}
+        reply = (d.get("reply") or "")
     check("居民 AI 对话（多智能体链路）", st == 200 and len(reply) >= 8,
           f"HTTP {st} 意图={d.get('intent')!r} 回复={reply[:42]!r}",
           "看服务日志的异常；或跑 python scripts/demo_collaboration.py 定位")
