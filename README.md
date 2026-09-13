@@ -37,6 +37,17 @@
 
 **主入口（FastAPI + Vue3）：** 自部署后用浏览器访问 `http://<服务器IP>:8000/login`（见下「快速启动」）。
 
+**想让评委/同学用自己手机打开（0 成本）：**
+
+```bash
+python scripts/serve_public.py     # 起服务 + 公网 HTTPS 隧道 + 刷新扫码页 + 地址进剪贴板
+python scripts/probe_public.py     # 公网入口端到端探测（8 项：健康/登录页/PWA/三角色/智能体对话）
+python scripts/serve_public.py --stop   # 演示结束立刻关掉公网入口
+```
+
+方案说明、电脑常开设置、5 个已知坑与安全口径：`docs/演示常开-本机方案.md`
+（临时域名每次重启会变；**隧道无访问控制，拿到链接即可进入，演示完请 `--stop`**）。
+
 > 备用演示（旧链路，Streamlit `app.py`，:8501）不再作为主入口，仅存档参考。
 
 > ⚠️ **数据说明**：线上为演示环境，SQLite 数据库可在部署时挂载持久卷；`DEMO_MODE=true` 且 `DEMO_AUTO_WORKER=true` 时工单由闭环机器人推进，**仅用于演示流程，不代表真实治理成效**，生产务必关闭。

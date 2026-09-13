@@ -91,7 +91,10 @@ elderly:  demo_elderly（免登录）
 | `data/db_core.py` | schema + 迁移注册（**v46**）|
 | `web/src/views/{resident,grid,elderly}/` | 三端页面 |
 | `docs/mobile-deploy.md` | 移动端部署 + 发布检查清单 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 三十八 节**为第七轮复审收口）|
+| `scripts/serve_public.py` | **本机常开一键工具**：起服务 + 公网 HTTPS 隧道 + 抓新域名 + 刷新扫码页（`--status` / `--stop` / `--autostart`）|
+| `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项）|
+| `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、5 个已知坑、安全口径、成本对照 |
+| `docs/spec/dev-log.md` | 开发日志（**最新 四十二 节**为本机常开方案收口）|
 
 ## 已完成的大改动（截至最终版）
 
@@ -104,4 +107,4 @@ elderly:  demo_elderly（免登录）
 - **第七轮复审收口**：v46 手机号加密全量补齐（提案/草稿/user_profile 残留）/ 运行时裸 ALTER 收回迁移链 /
   utcnow 弃用清理 / 异常文案脱敏 / 录屏素材（见 dev-log 三十七～三十八节）
 
-详见 `docs/spec/dev-log.md`（最新 **三十八** 节）。
+详见 `docs/spec/dev-log.md`（最新 **四十二** 节）。

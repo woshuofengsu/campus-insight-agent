@@ -1112,3 +1112,74 @@ FastAPI TestClient 提示改用 httpx2、LangChain 弃用 `ConversationBufferMem
 | `ruff` / `npm run build` | 0 / ✓ |
 
 **提交**：本轮。
+
+---
+
+## 四十二、「维持本机方案」收口：一键起停 + 公网入口端到端 + 一轮真实对比度回归 ✅
+
+**背景**：决策明确「不买云服务器」（本机 + Cloudflare 免费隧道，成本 0）。于是本轮不再铺部署，
+而是把**现状的代价**逐个消掉：域名每次都变、进程被杀、忘了关隧道、以及"手机到底能不能用"。
+
+**① 新增 `scripts/serve_public.py`：一条命令 = 服务 + 公网 HTTPS 隧道 + 扫码页刷新**
+`python scripts/serve_public.py` / `--status` / `--stop [--all]` / `--no-tunnel` / `--autostart` / `--no-autostart`。
+四条**实测**结论都写进了脚本（不是推测）：
+
+1. **Windows DNS 负缓存**：隧道域名是刚创建的，本机解析器缓存了 NXDOMAIN →
+   `nslookup` 能解析、`curl` 报 `Could not resolve host`，很像"手机打不开"。
+   实测 `ipconfig /flushdns` **前 `http=000`、后 `http=200`（1.47s）**。脚本在公网校验失败时自动
+   flush 并重试 3 次。
+2. **计划任务在本机不可用**：`schtasks /Create` 返回 `ERROR: Access is denied.`（无管理员权限）
+   → 脚本**自动回退到「启动文件夹」隐藏脚本**（`%APPDATA%\...\Startup\CommunityInsight-Serve.vbs`），
+   注册 → 文件落地（224 字节）→ 移除**全链路实测通过**。注意：**默认保持关闭**——自启等于
+   "一登录就对外开隧道"，属安全副作用，要用再显式打开。
+3. **域名先打印、边缘连接后注册**：只等域名会拿到"还没生效"的地址 →
+   改为同时等 `Registered tunnel connection`。
+4. **端口被占要指名道姓**：8000 被非本服务占用时打印占用 PID 与 `taskkill` 命令，
+   不静默失败；`--status` 在隧道已停时也不再误报"不可达"，而是明确说"上次地址已失效"。
+
+**② 新增 `scripts/probe_public.py`：公网入口端到端（8/8）**
+不看 `/health` 一个点，而是打**公网地址**走完整链路：健康身份 → 登录页 HTML(1525B) →
+PWA manifest/图标 → 三角色进入（网格员密码登录 200 role=grid / 居民·老年演示登录）→
+**智能体对话「我家水管漏水了」→ 路由 `repair_dispatch`**。这一条是答辩最有说服力的一击：
+评委在自己手机上发一句话，多智能体编排是通的。
+（首轮写这个脚本时我把接口契约猜错了——`/api/web/login`、`{"message":...}` 都是 401；
+真实契约是 `/api/web/auth/login`、`/api/web/auth/demo`、`{"text":...}`，已按代码改正。）
+
+**③ 本轮最值钱的收获：审计门禁真的抓到了 4 处对比度回归（我自己的）**
+`ui_audit.py` 从"0 违规"变成"4 处"，逐页 JSON 定位到 3 个根因：
+
+| 根因 | 实测 | 修法 |
+|---|---|---|
+| Naive **弹窗确认按钮会被自动聚焦**，focus 态取 `errorColorHover` | 白字 #DE576D = **3.69:1**（Naive 默认 hover，我们只覆盖了 errorColor） | 亮色补 `errorColorHover:#C0223B`(5.94) / `errorColorPressed:#A11C33`(7.69) / `errorColorSuppl` |
+| 未读红点徽标写死 `#ef4444` | 白字 **3.76:1** | 新增令牌 `--danger-solid:#DC2626` = **4.83:1**（亮/暗同值） |
+| success **幽灵按钮**文字用亮绿 | #10B981 在白/淡绿底 **2.42:1** | 新增令牌 `--success-ink`（亮 #047857=5.3:1 / 暗 #6EE7B7=9.5:1），只作用于 ghost/text 按钮 |
+
+定位手法值得记下：写了个 10 行的 Playwright 探针（放 `.shots/` 不入库）直接 dump
+按钮 `computedStyle.backgroundColor` 与祖先链底色，**"鼠标移开 vs 显式 hover"两态对比**，
+从而确认不是 hover 而是 focus。修完复测：按钮 `rgb(192,34,59)` ✓ → `ui_audit` 重回 0 违规。
+
+**④ 电源实测（"电脑要一直开着"到底影响多大）**
+`powercfg /q`：交流电**睡眠 0x0 / 休眠 0x0 / 合盖 LIDACTION 0x0**（都不动作）→
+插电后**屏幕可关、盖子可合，服务与隧道都不断**；但**电池 180 秒会睡** → 演示期必须插电。
+恢复命令与"更新自动重启"提醒都写进文档。
+
+**⑤ 新增 `docs/演示常开-本机方案.md`**：原理图、三条命令、自启两条路线对照、
+**五个已知坑**（DNS 负缓存 / 边缘生效延迟 / 域名会变 / 端口占用 / 日志位置）、
+安全与合规口径（**临时隧道无访问控制，拿到链接就能进 → 演示完 `--stop`**；库里是虚构种子数据 + 手机号全加密）、
+成本对照表（0 元 vs 云服务器 9–40 元/月 vs 免费 PaaS）、以及 8 项可现场复算的验收口径。
+
+**⑥ 最终验证（全绿）**
+
+| 门禁 | 结果 |
+|---|---|
+| `pytest` | **581 passed / 1 skipped / 0 warnings**（可运行 582） |
+| `ruff check .` / `npm run build` | 0 / ✓ |
+| `demo_preflight.py --fast` | **9/9** |
+| `ui_audit.py` | 26 页 × 9 类 **0 违规**（本轮从 4 处修回 0） |
+| `mobile_audit.py` | 21 页 × 7 类 **0 违规** |
+| `audit_phone_encryption.py` | 8 表、明文计数 **0** |
+| `probe_public.py`（公网） | **8/8** |
+| `serve_public.py` 四条子命令 | **逐条实测通过** |
+
+**提交**：本轮。
+

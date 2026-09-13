@@ -37,6 +37,12 @@
   --st-danger: #EF4444;
   --st-info: #2D5BFF;
   --st-success: #10B981;
+  /* —— 无障碍补充：白字/深字必须达 AA 4.5:1 的两个专用色 ——
+     · --danger-solid：红底白字的**实心**徽标（#EF4444 只有 3.76:1，#DC2626 为 4.83:1）
+     · --success-ink：浅绿底上的**绿色文字**（#10B981 在 #f0fdf4 上只有 2.42:1，
+       #047857 为 5.30:1；暗色主题下换成亮绿 #6EE7B7 以适配深色卡片） */
+  --danger-solid: #DC2626;
+  --success-ink: #047857;
   /* —— 字体 —— */
   --font: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei",
           "Inter", "Roboto", -apple-system, "Segoe UI", sans-serif;
@@ -82,6 +88,9 @@ body.dark {
   --ink-purple: #C4B5FD;
   --ink-warning: #FCD34D;
   --primary-ink: #8FA8FF;
+  /* 暗色下浅绿卡片变深绿底 → 绿字改用亮绿，白字红底仍用 #DC2626（4.83:1） */
+  --success-ink: #6EE7B7;
+  --danger-solid: #DC2626;
 }
 
 * { box-sizing: border-box; }
@@ -392,6 +401,15 @@ body.role-elderly .n-dialog__title { font-size: 1.35rem; }
 body.role-elderly .n-dialog__content { font-size: 1.25rem; line-height: 1.7; }
 body.role-elderly .n-dialog .n-button { min-height: 56px; }
 body.role-elderly .n-dialog .n-button .n-button__content { font-size: 1.25rem; }
+
+/* 无障碍：Naive 的 success 幽灵/文字按钮用亮绿 #10B981 作文字色，
+   在浅色（白底 2.42:1、淡绿底 #f0fdf4 2.42:1）下不达 AA 4.5:1。
+   改成令牌 --success-ink（亮色 #047857 = 5.3:1，暗色 #6EE7B7 = 9.5:1），
+   实心 success 按钮不受影响（走 Button.colorSuccess=#047857 + 白字）。 */
+.n-button.n-button--success-type.n-button--ghost,
+.n-button.n-button--success-type.n-button--text { color: var(--success-ink); }
+.n-button.n-button--success-type.n-button--ghost:hover,
+.n-button.n-button--success-type.n-button--text:hover { color: var(--success-ink); filter: brightness(0.92); }
 @keyframes glow-ring-primary {
   0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.40); }
   60%      { box-shadow: 0 0 0 12px rgba(45, 91, 255, 0); }

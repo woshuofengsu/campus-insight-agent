@@ -60,6 +60,10 @@ const themeOverrides = computed(() => theme.isDark
         primaryColorSuppl: '#6A8DFF',
         // errorColor 由 #EF4444 调深：白字配 #EF4444 只有 3.76:1，不达 AA；#DC2626 为 4.84:1
         successColor: '#10B981', warningColor: '#F59E0B', errorColor: '#DC2626', infoColor: '#0EA5E9',
+        // 无障碍修正（第九轮）：Naive 的 errorColorHover 默认是 #de576d，而**弹窗确认按钮会被自动聚焦**
+        // （focus 态取 errorColorHover），实测白字只有 3.69:1。这里把 hover/pressed/focus 也一起调深：
+        // hover #C0223B = 5.94:1，pressed #A11C33 = 7.69:1。
+        errorColorHover: '#C0223B', errorColorPressed: '#A11C33', errorColorSuppl: '#C0223B',
         textColorBase: '#16233B', textColor1: '#16233B', textColor2: '#334155', textColor3: '#64748B',
         borderColor: '#E7ECF3', dividerColor: '#E7ECF3',
         borderRadius: '10px', borderRadiusSmall: '8px',
