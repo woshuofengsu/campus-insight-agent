@@ -106,7 +106,7 @@
 <body>
 <h1>社区先知 CommunityInsight Agent — 技术实现报告</h1>
 
-<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体 OPC 创新大赛 · <strong>基层治理赛道</strong>（人文赋能特别奖）<br><strong>项目</strong>：社区先知 CommunityInsight Agent（接诉即办多智能体平台）<br><strong>技术负责人 / 唯一开发者</strong>：步承泽<br><strong>版本</strong>：v2.0（2026-09-14） · 对应当前代码库：schema <strong>v46</strong> · HTTP 路由 <strong>130</strong> · Agent 角色 <strong>9</strong> · 业务表 <strong>50</strong> · 可运行用例 <strong>632</strong><br><strong>数字口径</strong>：本文所有数字由 <code>python scripts/check_claims.py</code> 现场核对，可一键复算。<br><strong>配套材料</strong>：<a href="创意说明书-提交版.md"><code>创意说明书-提交版.md</code></a>（方案）、<a href="最终版交付说明.md"><code>最终版交付说明.md</code></a>（怎么跑/怎么验）、<a href="答辩问答手册.md"><code>答辩问答手册.md</code></a>（怎么答）</div>
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体 OPC 创新大赛 · <strong>基层治理赛道</strong>（人文赋能特别奖）<br><strong>项目</strong>：社区先知 CommunityInsight Agent（接诉即办多智能体平台）<br><strong>技术负责人 / 唯一开发者</strong>：步承泽<br><strong>版本</strong>：v2.0（2026-09-14） · 对应当前代码库：schema <strong>v46</strong> · HTTP 路由 <strong>130</strong> · Agent 角色 <strong>9</strong> · 业务表 <strong>50</strong> · 可运行用例 <strong>634</strong><br><strong>数字口径</strong>：本文所有数字由 <code>python scripts/check_claims.py</code> 现场核对，可一键复算。<br><strong>配套材料</strong>：<a href="创意说明书-提交版.md"><code>创意说明书-提交版.md</code></a>（方案）、<a href="最终版交付说明.md"><code>最终版交付说明.md</code></a>（怎么跑/怎么验）、<a href="答辩问答手册.md"><code>答辩问答手册.md</code></a>（怎么答）</div>
 
 <hr>
 
@@ -169,7 +169,7 @@ campus-insight-agent/
 ├── utils/                # region / crypto / jwt / embedding / retry / logger
 ├── web/src/              # Vue3 三端（views/{resident,grid,elderly}）+ 设计令牌
 ├── scripts/              # 自检 / 评测 / 审计 / 录屏 / 迁移 / 公网隧道
-└── tests/                # 632 项可运行用例（单元 / 集成 / e2e / 安全 / 口径门禁）
+└── tests/                # 634 项可运行用例（单元 / 集成 / e2e / 安全 / 口径门禁）
 </pre>
 
 <hr>
@@ -495,7 +495,7 @@ LLM 不可用 → 纯规则路径（意图关键词、模板回复、SQL 直查�
 
 <table>
 <th>#</th><th>门禁</th><th>覆盖</th>
-<tr><td>1</td><td><code>pytest tests/ -q</code></td><td><strong>632 项可运行</strong>（631 通过 / 1 需外部服务跳过 / 0 警告）：单元、集成、e2e、多智能体协商、安全负向、加密、口径一致性</td></tr>
+<tr><td>1</td><td><code>pytest tests/ -q</code></td><td><strong>634 项可运行</strong>（633 通过 / 1 需外部服务跳过 / 0 警告）：单元、集成、e2e、多智能体协商、安全负向、加密、口径一致性</td></tr>
 <tr><td>2</td><td><code>demo_acceptance.py</code></td><td><strong>12 项真实 HTTP 端到端</strong>（三角色登录、多智能体对话、政策命中、老年天气、工作台指标、图谱反查、留痕、属地化两社区对比）</td></tr>
 <tr><td>3</td><td><code>demo_preflight.py</code></td><td><strong>9 项演示前自检</strong>（schema / 密钥姿态 / 加密覆盖 / 演示账号 / 服务身份 / 前端产物 / 登录页口径）</td></tr>
 <tr><td>4</td><td><code>ui_audit.py</code></td><td><strong>34 个路由页 / 54 个页面视口 × 9 类检查 0 违规</strong>（对比度/溢出/热区/字号/暗色/动效/残缺文本，320–1920 五档）</td></tr>
@@ -510,9 +510,9 @@ LLM 不可用 → 纯规则路径（意图关键词、模板回复、SQL 直查�
 
 <p>只证明"测试是绿的"不够，还要证明"出问题时会红"。本轮做了<strong>故障注入验证</strong>：<br>故意埋入典型缺陷（越权、明文手机号、跨社区政策串味、静默吞异常返回成功、审计阈值失效等），<br><strong>8 次注入 8 次被门禁拦下</strong>；属地化专项 4 次注入 4 次拦下（详见 <code>docs/spec/dev-log.md</code> 四十七节）。</p>
 
-<h3>10.3 关于"632 项测试"的口径（主动说明）</h3>
+<h3>10.3 关于"634 项测试"的口径（主动说明）</h3>
 
-<p><code>632 = 631 通过 + 1 需外部服务跳过</code>。其中 <code>tests/test_ablation.py</code> 的 6 项是给消融报告<strong>供数的冒烟项</strong>（只跑通、不断言）；<br>对外引用的两个指标另有<strong>硬断言</strong>守住：<code>test_persona_routing_is_accurate</code>（断言路由准确率 <code>== 100.0</code>）、<br><code>test_tool_discovery_covers_expected</code>。新增任何不做断言的 <code>test_*</code> 都会被门禁拦下——<strong>不给数字留注水空间</strong>。</p>
+<p><code>634 = 633 通过 + 1 需外部服务跳过</code>。其中 <code>tests/test_ablation.py</code> 的 6 项是给消融报告<strong>供数的冒烟项</strong>（只跑通、不断言）；<br>对外引用的两个指标另有<strong>硬断言</strong>守住：<code>test_persona_routing_is_accurate</code>（断言路由准确率 <code>== 100.0</code>）、<br><code>test_tool_discovery_covers_expected</code>。新增任何不做断言的 <code>test_*</code> 都会被门禁拦下——<strong>不给数字留注水空间</strong>。</p>
 
 <h3>10.4 测试隔离踩过的坑（工程真实感）</h3>
 

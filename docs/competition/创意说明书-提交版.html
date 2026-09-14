@@ -106,7 +106,7 @@
 <body>
 <h1>智能体创意说明书</h1>
 
-<div class="meta">版本：2026-09-14 定稿（与代码库实时对齐，所有数字可用 <code>python scripts/check_claims.py</code> 复算）<br>赛道：<strong>基层治理</strong> · 申报特别奖：<strong>人文赋能</strong>（适老化 + 数据最小化 + 人机协同留痕）</div>
+<div class="meta">版本：2026-09-14 定稿（与代码库实时对齐，所有数字可用 <code>python scripts/check_claims.py</code> 复算）<br>赛道：<strong>基层治理</strong> · 申报特别奖：<strong>人文赋能</strong>（适老化 + 数据最小化 + 人机协同留痕）<br><strong>形态说明（先看这句）</strong>：本项目是<strong>可运行的演示级原型（Demo）</strong>，<strong>不是已上线的生产项目</strong>；演示库为程序生成的虚构数据，<br><strong>尚无真实社区试点与真实用户</strong>——能证明的是"机制有效、可审计"，不是"治理成效已提升"。形态边界与移动端适配的让步见 §5.1。</div>
 
 <hr>
 
@@ -351,13 +351,43 @@ flowchart LR
 
 <h3>1. 原型状态</h3>
 
-<p><strong>可运行的完整原型（演示级）</strong>：<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌演示种子数据（约 15 秒）；三端功能闭环可现场操作；已有公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，<strong>演示结束一键关闭</strong>）。</p>
+<p><strong>形态声明（先说清楚"这是什么"）</strong>：本项目是一个<strong>可运行的演示级原型（Demo / 原型验证版）</strong>，不是已上线的生产项目、也不是已商用的产品。三端功能闭环、数据链路、安全机制都是<strong>真实在跑</strong>的，但：</p>
+
+<table>
+<th>是（真实在跑）</th><th>不是（我们不宣称）</th>
+<tr><td>FastAPI 主服务 + Vue3 三端，<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌种子数据（约 15 秒）</td><td><strong>不是生产系统</strong>：单进程 + SQLite，多社区/多副本需 Redis + PostgreSQL（路径见 <code>docs/scaling.md</code>）</td></tr>
+<tr><td>9 智能体角色、16 工具、双层防线、留痕、加密、属地化，全部可现场操作与复算</td><td><strong>不是已落地项目</strong>：<strong>无真实社区试点、无真实用户数据</strong>（演示库为程序生成的虚构种子数据）</td></tr>
+<tr><td>12 项端到端验收、634 项可运行用例、54 页视口 + 21 页移动端审计、7 段真实录屏</td><td><strong>成效未验证</strong>：能证明"机制有效、可审计"，不能证明"治理效率提升了多少"</td></tr>
+<tr><td>已有公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，<strong>演示结束一键关闭</strong>）</td><td><strong>不是安全上线状态</strong>：<code>DEMO_MODE</code> / <code>DEMO_AUTO_WORKER</code> 必须关闭，密钥需换正式值（本机现为演示占位密钥）</td></tr>
+</table>
+
+<div class="meta">一句话：<strong>"演示级原型 + 可复算的工程证据"</strong>——这是我们能负责地宣称的范围，也是我们在材料里反复标注"演示数据"的原因。</div>
+
+<p><strong>移动端适配：我们主动做的让步（不藏）</strong></p>
+
+<p>移动端不是"缩小版桌面"，也不是"原生 App"，这是刻意的取舍。以下是明确放弃或降级的部分：</p>
+
+<table>
+<th>#</th><th>让步</th><th>原因与现状</th>
+<tr><td>1</td><td><strong>不做原生 App / 小程序</strong>，只做 Web + PWA（可添加到主屏幕、standalone 全屏）</td><td>单社区推广场景下 App 安装成本过高；<strong>无 service worker，也不宣称离线</strong>——接诉即办强依赖实时数据，缓存到过期政策/工单反而误导居民</td></tr>
+<tr><td>2</td><td><strong>治理大屏在手机上不做适配</strong>，直接出提示层（<code><900px</code> 显示"请在电脑/投屏查看" + 返回/仍要查看）</td><td>大屏是桌面与投屏场景，挤压重排毫无意义；宁可不显示错误布局</td></tr>
+<tr><td>3</td><td><strong>老年端横屏不做重排</strong>，改为"请竖屏使用"提示层</td><td>浏览器无法强制竖屏，与其在横屏下排版错乱，不如明确引导（触发条件：横屏 + 触屏 + ≤1024px；竖屏与桌面不受影响）</td></tr>
+<tr><td>4</td><td><strong>触屏热区放大换来信息密度下降</strong>（通用 ≥44px、老年端 ≥72px）</td><td>老人点得准优先于一屏看得多；代价是手机上一屏信息量明显少于桌面</td></tr>
+<tr><td>5</td><td><strong>不做平板/大屏手机专属布局</strong>：断点体系为 359 / 360–427 / 428–767 / ≥768 四档</td><td>以"手机"与"桌面"两端为主，中间档位只做不破版，不做重新设计</td></tr>
+<tr><td>6</td><td><strong>语音是增强项、不是承诺</strong>（端侧 Web Speech）</td><td>非 HTTPS／浏览器不支持／拒绝授权 → <strong>显式降级为打字 + 预置短语并自动聚焦输入框</strong>（不静默失败）；方言、噪音、语速未做专项；<strong>iOS Safari 与微信内置浏览器大概率不可用</strong>，服务端 ASR 是规划项</td></tr>
+<tr><td>7</td><td><strong>手机上主动削减视觉动效</strong>（<code>backdrop-filter</code> 18px → 10px、页面不可见全站暂停、<code>prefers-reduced-motion</code> 可关）</td><td>保低端机流畅与省电；代价是观感弱于桌面</td></tr>
+<tr><td>8</td><td><strong>复杂表格/多列视图折叠为卡片与抽屉</strong>（网格端手机端为抽屉导航）</td><td>窄屏横向表格不可用，改用卡片保可读性</td></tr>
+<tr><td>9</td><td><strong>未做"低内存设备纯色降级"</strong></td><td>没有可靠的浏览器信号（<code>navigator.deviceMemory</code> 仅部分 Chromium 支持），硬做等于猜——<strong>宁可不做，也不假装做了</strong></td></tr>
+<tr><td>10</td><td><strong>真机验证尚未完成</strong></td><td>21 页移动端审计是<strong>按 iPhone UA / DPR=3 / 触屏事件仿真</strong>跑的，不是真机；iOS Safari / 微信内置浏览器待真机复验（已在"已知边界"中列明）</td></tr>
+</table>
+
+<div class="meta">一句话：移动端我们<strong>优先保证"能点准、看得清、不误导、不白屏"</strong>，把"信息密度、动效观感、原生体验"排在其后；对做不到的部分（离线、真机语音、平板布局）<strong>选择明说而不是含糊</strong>。</div>
 
 <h3>2. 已完成验证</h3>
 
 <ul>
 <li>[ ] 未测试</li>
-<li>[x] <strong>内部测试</strong>（<strong>632 项可运行用例</strong>：631 通过 + 1 项需外部服务默认跳过；含单元/集成/端到端/多智能体协商/安全负向/数据加密/属地化/适老前端卫生）</li>
+<li>[x] <strong>内部测试</strong>（<strong>634 项可运行用例</strong>：633 通过 + 1 项需外部服务默认跳过；含单元/集成/端到端/多智能体协商/安全负向/数据加密/属地化/适老前端卫生）</li>
 <li>[ ] 小范围试用（<strong>尚无真实用户试用</strong>）</li>
 <li>[ ] 场景试点（<strong>尚无真实社区试点</strong>）</li>
 </ul>
@@ -368,7 +398,7 @@ flowchart LR
 
 <table>
 <th>#</th><th>验证项</th><th>命令</th><th>实测结果</th>
-<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>631 通过 / 1 跳过 / 0 告警</strong>（可运行 632）</td></tr>
+<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>633 通过 / 1 跳过 / 0 告警</strong>（可运行 634）</td></tr>
 <tr><td>2</td><td>端到端验收（真实 HTTP）</td><td><code>python scripts/demo_acceptance.py</code></td><td><strong>12/12 全过</strong>（含属地化两社区对比）</td></tr>
 <tr><td>3</td><td>演示前一键自检</td><td><code>python scripts/demo_preflight.py</code></td><td><strong>9/9 通过</strong></td></tr>
 <tr><td>4</td><td>UI 与无障碍客观审计</td><td><code>python scripts/ui_audit.py</code></td><td><strong>54 个页面/视口 × 9 类检查 0 违规</strong>（对比度/溢出/热区/字号/暗色/动效/残缺文本）</td></tr>
@@ -451,7 +481,7 @@ flowchart LR
 <ul>
 <li><strong>1.</strong> 智能体架构图 / 工作流程图（见第三章 Mermaid，可转图片导出）</li>
 <li><strong>2.</strong> 原型界面截图（三角色：居民端 / 网格员工作台 / 老年关怀版 —— <strong>附件待附</strong>，素材已备于 <code>.recordings/</code>，可一键重录）</li>
-<li><strong>3.</strong> 测试数据 / 效果对比（<strong>632 项可运行用例</strong>（631 通过 + 1 跳过）+ 端到端 12/12 + 检索 hit@1 100% + UI 审计 54 页视口 0 违规，复算命令见 §5.2）</li>
+<li><strong>3.</strong> 测试数据 / 效果对比（<strong>634 项可运行用例</strong>（633 通过 + 1 跳过）+ 端到端 12/12 + 检索 hit@1 100% + UI 审计 54 页视口 0 违规，复算命令见 §5.2）</li>
 <li><strong>4.</strong> 知识产权证明（可选，待办）</li>
 <li><strong>5.</strong> 其他支撑材料（README / CHANGELOG / 技术文档 / 开发日志）</li>
 </ul>
