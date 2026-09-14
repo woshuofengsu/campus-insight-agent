@@ -113,7 +113,7 @@
 <h2>〇、开场 30 秒与收尾 30 秒（背下来）</h2>
 
 <p><strong>开场 30 秒</strong></p>
-<div class="meta">"社区先知是一套面向基层治理的多智能体平台，服务三类人：居民、网格员、老年人。<br>居民用一句话就能报修、议事、问政策；网格员用 SLA 工单和督办看板提效率；老年人用大字关怀版和一键 SOS。<br>技术上它有三个和别人不一样的地方：<strong>九个智能体是真实通过消息队列协商的</strong>，<br><strong>每一条输出都过合规审计和冲突仲裁并留痕</strong>，<br>而且<strong>所有对外数字都能当场跑脚本复算</strong>——625 项测试、12 项端到端验收、54 个页面视口的无障碍审计，全部是绿的。"</div>
+<div class="meta">"社区先知是一套面向基层治理的多智能体平台，服务三类人：居民、网格员、老年人。<br>居民用一句话就能报修、议事、问政策；网格员用 SLA 工单和督办看板提效率；老年人用大字关怀版和一键 SOS。<br>技术上它有三个和别人不一样的地方：<strong>九个智能体是真实通过消息队列协商的</strong>，<br><strong>每一条输出都过合规审计和冲突仲裁并留痕</strong>，<br>而且<strong>所有对外数字都能当场跑脚本复算</strong>——632 项测试、12 项端到端验收、54 个页面视口的无障碍审计，全部是绿的。"</div>
 
 <p><strong>收尾 30 秒</strong></p>
 <div class="meta">"最后说一句我们的取舍：我们<strong>没有</strong>追求让 AI 全自主办事。<br>涉及安全、费用、政策依据、反复协商的情况，系统一律转人工并留下可追的处理包。<br>因为我们相信基层治理里 AI 的价值不是替代人，而是<strong>把人的注意力省下来</strong>——<br>这也是我们把'人文赋能'做成可复算指标，而不是一句口号的原因。"</div>
@@ -155,7 +155,7 @@
 <h3>Q4. 和你看到的其他参赛作品比，你的差异点是什么？</h3>
 
 <ul>
-<li><strong>30 秒答法</strong>：三点：①<strong>多智能体是真的</strong>（黑板消息队列 + 跨角色多轮往返 + 仲裁留痕，不是"一个 Agent 换四个提示词"）；②<strong>安全和责任链是真的</strong>（Verifier + Arbiter 双层防线，转人工有处理包编号）；③<strong>质量是可复算的</strong>（625 项测试、12 项端到端、54 个页面视口审计、故障注入 8/8 拦下）。</li>
+<li><strong>30 秒答法</strong>：三点：①<strong>多智能体是真的</strong>（黑板消息队列 + 跨角色多轮往返 + 仲裁留痕，不是"一个 Agent 换四个提示词"）；②<strong>安全和责任链是真的</strong>（Verifier + Arbiter 双层防线，转人工有处理包编号）；③<strong>质量是可复算的</strong>（632 项测试、12 项端到端、54 个页面视口审计、故障注入 8/8 拦下）。</li>
 <li><strong>加分话术</strong>：第三点最容易被低估。很多项目"说自己做得不错"，我们是<strong>把'不错'变成了脚本</strong>——评委可以当场跑，红了就是我们的问题。</li>
 <li><strong>避坑话术</strong>：❌ 不要贬低其他作品（"别人都是套壳"）。说"我们的差异点"而不是"别人的问题"。</li>
 <li><strong>现场证据</strong>：<code>python scripts/check_claims.py</code>、<code>python scripts/demo_acceptance.py</code>。</li>
@@ -332,10 +332,10 @@
 
 <h2>七、工程与质量（Q21–Q22）</h2>
 
-<h3>Q21. 625 项测试说明什么？有多少是真断言？</h3>
+<h3>Q21. 632 项测试说明什么？有多少是真断言？</h3>
 
 <ul>
-<li><strong>30 秒答法</strong>：先说口径，不藏：<strong>625 项可运行 = 624 通过 + 1 项需要外部服务默认跳过</strong>。其中 6 项是给消融报告供数的冒烟项（只保证能跑通、不做断言）；<strong>对外引用的两个指标另有硬断言测试守住</strong>——角色路由准确率断言等于 100.0、工具无缺失断言。也就是说，<strong>数字是可以被质疑的，而我们的门禁专门防止"注水"</strong>：新增任何不断言的测试都会让 CI 变红。</li>
+<li><strong>30 秒答法</strong>：先说口径，不藏：<strong>632 项可运行 = 631 通过 + 1 项需要外部服务默认跳过</strong>。其中 6 项是给消融报告供数的冒烟项（只保证能跑通、不做断言）；<strong>对外引用的两个指标另有硬断言测试守住</strong>——角色路由准确率断言等于 100.0、工具无缺失断言。也就是说，<strong>数字是可以被质疑的，而我们的门禁专门防止"注水"</strong>：新增任何不断言的测试都会让 CI 变红。</li>
 <li><strong>加分话术</strong>：比"测试多"更有说服力的是<strong>我们验证过门禁真的会红</strong>：这一轮做了故障注入，故意埋了越权、明文手机号、跨社区政策串味、吞异常返回成功等缺陷，<strong>8 次注入 8 次被拦下</strong>，属地化专项 4 次注入 4 次拦下。绿不代表有效，<strong>会红才代表有效</strong>。</li>
 <li><strong>避坑话术</strong>：❌ 不要说"我们测试覆盖率 100%"。我们有测试<strong>数量</strong>和<strong>门禁</strong>，不做覆盖率吹牛。</li>
 <li><strong>现场证据</strong>：<code>pytest tests/ -q</code>；<code>python scripts/check_claims.py</code>；<code>docs/spec/dev-log.md</code> 四十七节（故障注入）。</li>
@@ -418,7 +418,7 @@
 
 <table>
 <th>项目</th><th>值</th>
-<tr><td>可运行用例</td><td><strong>625</strong>（624 通过 / 1 需外部服务跳过）</td></tr>
+<tr><td>可运行用例</td><td><strong>632</strong>（631 通过 / 1 需外部服务跳过）</td></tr>
 <tr><td>schema / 表 / 迁移</td><td><strong>v46</strong> / 50 张业务表 / 46 个版本化迁移</td></tr>
 <tr><td>路由 / 智能体角色 / 工具</td><td><strong>130</strong> / <strong>9</strong> / <strong>16</strong></td></tr>
 <tr><td>知识库</td><td><strong>62</strong> 条（61 已发布 / 55 公开政策 / 43 带适用地区）</td></tr>

@@ -147,11 +147,11 @@
 
 <h2>二、项目概述（≤300 字）</h2>
 
-<p>基层"接诉即办"有三个长期痛点：<strong>诉求处理不透明</strong>（上报后无人跟进、进度不可见）、<strong>时效无保障</strong>（无分级与超时预警）、<strong>独居老人安全真空</strong>（失联数日只能靠邻居偶然发现）。</p>
+<p>基层"接诉即办"三大痛点：诉求处理不透明、时效无保障、独居老人安全真空（失联数日无人知晓）。</p>
 
-<p>本项目是<strong>多智能体协同的社区治理 Agent</strong>：感知层定时监测工单热点、极端天气与老人活跃度；理解层先用确定性规则识别诉求（同义词/方言归一），模糊时由大模型闭集兜底；协作层由 <strong>9 个声明式角色在黑板上多轮真协商</strong>（如"极端天气 → 健康顾问 → 通知管理员"），调用 <strong>16 个工具</strong>；反馈层每轮必过 <strong>Verifier（幻觉/诊断/隐私拦截）+ Arbiter（合规优先·安全·专业·转人工）双层防线</strong>并全程留痕。三端差异化服务：居民一句话上报并追踪闭环、网格员处理 SLA 工单、老人用大字关怀版一键呼叫与 SOS。</p>
+<p>本项目是多智能体协同的社区治理 Agent：感知层监测工单热点、恶劣天气与老人活跃度；理解层用确定性规则识别诉求，模糊时由大模型兜底；协作层由 <strong>9 个声明式角色在黑板上多轮真协商</strong>，调用 <strong>16 个工具</strong>；反馈层每轮必过 <strong>Verifier（幻觉/诊断/隐私拦截）+ Arbiter（合规·安全·专业·转人工）双层防线</strong>并全程留痕。三端差异化：居民一句话上报并追踪闭环，网格员办 SLA 工单，老人用大字版一键呼叫与 SOS。</p>
 
-<p><strong>属地化</strong>是基层治理的领域刚需：政策按行政区划<strong>本地优先、全国兜底</strong>，天气按居民所属社区取数——<strong>属地来自账号网格归属，不采集任何设备位置</strong>。</p>
+<p>属地化按基层刚需实现：政策<strong>本地优先、全国兜底</strong>，天气按所属社区取数；属地来自账号网格归属，<strong>不采集设备位置</strong>。</p>
 
 <hr>
 
@@ -244,27 +244,70 @@ flowchart LR
 
 <h3>3. 人机协同边界设计</h3>
 
-<p><strong>① 智能体自动执行</strong>：意图识别、工单分类与紧急度评估、部门/网格派单、提案状态流转、通知分级草稿、政策问答（带引用）、天气与健康提示、老人未打卡预警、SLA 超时升级。</p>
+<p><strong>① 智能体自动执行环节</strong></p>
 
-<p><strong>② 必须人工确认（人在环）</strong>：</p>
 <ul>
-<li><strong>健康建议涉及"需线下就医"</strong> → 二次确认后才下发；</li>
-<li><strong>医疗诊断类 / 法律纠纷类提问</strong> → 系统不自动回答，直接转人工；</li>
-<li><strong>提案不予执行、违规下架、批量操作</strong> → 需负责人确认并留痕；</li>
-<li><strong>紧急求助（SOS）</strong> → 仅通知联系人与社区，<strong>不自动拨打 110/120</strong>；</li>
-<li><strong>政策弱命中</strong> → 转人工（或 LLM 生成但<strong>引用必须校验通过</strong>，否则回退转人工）。</li>
+<li>居民诉求的意图理解、自动分类定级、工单生成</li>
+<li>主动派单（按类别 → 责任部门 → 网格员，自动写入 assignee）</li>
+<li>SLA 超时/升级自动识别与预警</li>
+<li>独居老人超过 24 小时未互动 → 自动通知网格员</li>
+<li>用药提醒到点推送、"我已吃"确认记录</li>
+<li>属地自适应：政策按行政区划<strong>本地优先、全国兜底</strong>，天气按所属社区取数（<strong>属地只改排序、不改"能不能自动回答"</strong>）</li>
 </ul>
 
-<p><strong>③ 全程可追责</strong>：每次仲裁决策、每轮协商消息、每次拦截都落库；管理端可查"处理留痕"时间线。</p>
+<p><strong>② 人类监督 / 审核 / 决策环节</strong></p>
+
+<ul>
+<li>网格员确认工单处理、填写处理备注、指派处理人</li>
+<li>满意度「不满意」进入<strong>待复核</strong>状态，由网格员确认重开或驳回（防刷单）</li>
+<li>SOS 紧急求助由网格员处置并标记"已处理"</li>
+<li>老人健康档案、用药提醒设置由家属/网格员协助录入</li>
+<li><strong>系统不自动作答、一律转人工的五类情形</strong>（并生成带编号的人工处理包，居民可见 <code>handoff_id</code>）：</li>
+</ul>
+<p>  合规审计不通过 / Verifier 判定高风险 / 协商超过 2 轮 / 政策检索无任何达标材料 / Arbiter 兜底裁决</p>
+
+<p><strong>③ 安全与合规校验机制</strong></p>
+
+<ul>
+<li><strong>双层防线（每轮必过）</strong>：<code>Verifier</code> 校验（幻觉/敏感词/手机号泄露/医疗诊断句式拦截）→ <code>Arbiter</code> 仲裁（合规优先 → 安全 → 专业 → 费用或不可逆需人工 → 数据版本），决策落 <code>agent_logs</code> 留痕</li>
+<li><strong>注入防护</strong>：提示注入规则拦截（"忽略之前所有指令"等变体）+ LLM 输出闭集校验</li>
+<li><strong>政策回答不编造</strong>：仅基于检索片段生成，返回引用下标并校验在检索集内；无材料时转人工而非生成</li>
+<li><strong>权限与鉴权</strong>：JWT（HS256，生产强制密钥）+ 角色权限守卫（越权 fail-closed）+ 演示登录生产模式硬关</li>
+<li><strong>数据安全</strong>：手机号 <strong>AES-256-GCM 加密落库（<code>g1$</code> 前缀）</strong>，全库 8 张含手机号表<strong>明文计数为 0</strong>（有自动体检与自检项）；<strong>属地识别不采集设备位置</strong></li>
+<li><strong>可观测与降级</strong>：trace_id 全链路（请求→业务留痕→Agent 留痕→异常）；LLM 不可用时自动回落规则链路，绝不影响业务可用性</li>
+</ul>
 
 <h3>4. 架构创新点</h3>
 
+<p><strong>① 对比通用方案的创新</strong></p>
+
+<table>
+<th>维度</th><th>通用方案</th><th>本项目</th>
+<tr><td>意图理解</td><td>纯关键词 or 纯大模型</td><td><strong>规则为骨、LLM 为脑</strong>：同义词/方言语义归一 + 规则识别，模糊时 LLM 兜底（闭集输出）</td></tr>
+<tr><td>多智能体协作</td><td>单一 Agent 反复调用</td><td><strong>9 个声明式角色 + 黑板消息队列</strong>，跨角色多轮真协商（天气⇄健康→通知），<strong>协商能改变执行链</strong>，非伪多智能体</td></tr>
+<tr><td>输出可信度</td><td>无校验</td><td><strong>Verifier + Arbiter 双层防线</strong>：幻觉/诊断/手机号拦截，仲裁决策留痕可查</td></tr>
+<tr><td>知识回答</td><td>直接问大模型</td><td><strong>仅基于检索片段生成 + 引用下标校验</strong>，无材料绝不编造（转人工）</td></tr>
+<tr><td>地区适配</td><td>一份全国口径</td><td><strong>属地化"一区一策"</strong>：本地政策优先、全国兜底，跨区兜底会标注适用地区；<strong>不采定位</strong></td></tr>
+<tr><td>数据安全</td><td>明文存储</td><td><strong>手机号 AES-256-GCM 加密落库，明文计数 0</strong>（自动体检可现场跑）</td></tr>
+<tr><td>可靠性</td><td>单一大模型</td><td>LLM 不可用自动回落规则链路；安全响应头/鉴权/限流成体系，演示有 9 项启动自检</td></tr>
+<tr><td>角色适配</td><td>单一界面</td><td><strong>三端差异化</strong>（居民 14 页 / 网格 9 页 / 老年 8 页），老年端大字 ≥20px、热区 ≥72px、只留 SOS 呼吸动效</td></tr>
+<tr><td>适老无障碍</td><td>仅放大字号</td><td>字号/热区/对比度<strong>用真实浏览器客观审计卡阈值</strong>（34 个路由页 / 54 个页面视口 × 9 类检查 0 违规，另 21 页移动端审计 0 违规，含暗色与投影分辨率）</td></tr>
+</table>
+
+<p><strong>② 可复用、可迁移、可规模化</strong></p>
+
 <ul>
-<li><strong>1.</strong> <strong>真协商而非流水线</strong>：黑板消息队列 + 多轮链式消费 + 循环防护（单目标 2 轮 / 总 5 轮上限），协商能<strong>改变执行链</strong>（天气预警会真的把工单升级并生成通知草稿）。</li>
-<li><strong>2.</strong> <strong>双层防线可解释</strong>：Verifier 负责"内容安全与幻觉"，Arbiter 负责"合规优先级的冲突裁决"，两者决策都留痕，可现场投屏复算。</li>
-<li><strong>3.</strong> <strong>属地化不越界</strong>：属地只作<strong>排序信号</strong>，不作准入门槛；全国政策永远兜底；<strong>不采集位置</strong>——既是合规选择，也是基层治理的真实工作方式（人属于哪个网格是确定的）。</li>
-<li><strong>4.</strong> <strong>规则与 LLM 显式分层</strong>：把"哪些必须用 LLM（开放式诉求意图、政策生成、跨角色联动）、哪些该留规则（状态机、权限、脱敏、风控）"写成代码里的开关与分级函数，而不是口号。</li>
-<li><strong>5.</strong> <strong>质量可现场复算</strong>：625 项测试、54 个页面视口的客观视觉审计、21 页真机口径移动审计、12 项真实 HTTP 端到端验收、公开数字一致性门禁——<strong>每一项都能当场跑给你看</strong>。</li>
+<li>工具注册自动化（<code>tools/__init__.py</code> 自动扫描），新增能力零配置接入</li>
+<li><strong>版本化数据库迁移 v46</strong>（<code>data/db_core.py</code> 的 <code>_mN_</code> 注册表，幂等可重跑；全新建库与存量升级<strong>走同一条路径</strong>，不再有运行时裸 ALTER）</li>
+<li>场景耦合只在五处（角色声明 / 工具集 / 政策语料 / 属地映射 / 页面文案），核心引擎不动，可复制到其他街道与社区</li>
+</ul>
+
+<p><strong>③ AI 原生与智能体规范符合性</strong></p>
+
+<ul>
+<li>符合"感知-决策-执行-反思"的自主 Agent 范式，且<strong>规则与 LLM 的分工写进代码</strong>（四个开关可一键关回纯规则）</li>
+<li>人机协同边界清晰（自动 vs 人工审核），符合基层治理的权责要求</li>
+<li>数据合规遵循《个人信息保护法》：最小采集（不采定位）、加密存储、展示脱敏、可导出可注销；演示数据无真实个人信息</li>
 </ul>
 
 <hr>
@@ -310,12 +353,23 @@ flowchart LR
 
 <p><strong>可运行的完整原型（演示级）</strong>：<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌演示种子数据（约 15 秒）；三端功能闭环可现场操作；已有公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，<strong>演示结束一键关闭</strong>）。</p>
 
-<h3>2. 已完成验证（全部实跑，命令可现场复算）</h3>
+<h3>2. 已完成验证</h3>
+
+<ul>
+<li>[ ] 未测试</li>
+<li>[x] <strong>内部测试</strong>（<strong>632 项可运行用例</strong>：631 通过 + 1 项需外部服务默认跳过；含单元/集成/端到端/多智能体协商/安全负向/数据加密/属地化/适老前端卫生）</li>
+<li>[ ] 小范围试用（<strong>尚无真实用户试用</strong>）</li>
+<li>[ ] 场景试点（<strong>尚无真实社区试点</strong>）</li>
+</ul>
+
+<div class="meta">说明：后两项<strong>未勾选是事实陈述</strong>——本项目目前只有内部测试与演示验证，治理成效需靠试点验证。我们把它写清楚，而不是含糊过去。</div>
+
+<p><strong>可验证性（全部可现场复算，不是自评）</strong></p>
 
 <table>
 <th>#</th><th>验证项</th><th>命令</th><th>实测结果</th>
-<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>624 通过 / 1 跳过 / 0 告警</strong>（可运行 625）</td></tr>
-<tr><td>2</td><td>端到端验收（真实 HTTP）</td><td><code>python scripts/demo_acceptance.py</code></td><td><strong>12/12 全过</strong></td></tr>
+<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>631 通过 / 1 跳过 / 0 告警</strong>（可运行 632）</td></tr>
+<tr><td>2</td><td>端到端验收（真实 HTTP）</td><td><code>python scripts/demo_acceptance.py</code></td><td><strong>12/12 全过</strong>（含属地化两社区对比）</td></tr>
 <tr><td>3</td><td>演示前一键自检</td><td><code>python scripts/demo_preflight.py</code></td><td><strong>9/9 通过</strong></td></tr>
 <tr><td>4</td><td>UI 与无障碍客观审计</td><td><code>python scripts/ui_audit.py</code></td><td><strong>54 个页面/视口 × 9 类检查 0 违规</strong>（对比度/溢出/热区/字号/暗色/动效/残缺文本）</td></tr>
 <tr><td>5</td><td>移动端真机口径审计</td><td><code>python scripts/mobile_audit.py</code></td><td><strong>21 页 × 7 类检查 0 违规</strong>（iOS 聚焦放大/底栏遮挡/横屏/安全区）</td></tr>
@@ -394,16 +448,28 @@ flowchart LR
 
 <h2>七、附件材料</h2>
 
+<ul>
+<li><strong>1.</strong> 智能体架构图 / 工作流程图（见第三章 Mermaid，可转图片导出）</li>
+<li><strong>2.</strong> 原型界面截图（三角色：居民端 / 网格员工作台 / 老年关怀版 —— <strong>附件待附</strong>，素材已备于 <code>.recordings/</code>，可一键重录）</li>
+<li><strong>3.</strong> 测试数据 / 效果对比（<strong>632 项可运行用例</strong>（631 通过 + 1 跳过）+ 端到端 12/12 + 检索 hit@1 100% + UI 审计 54 页视口 0 违规，复算命令见 §5.2）</li>
+<li><strong>4.</strong> 知识产权证明（可选，待办）</li>
+<li><strong>5.</strong> 其他支撑材料（README / CHANGELOG / 技术文档 / 开发日志）</li>
+</ul>
+
+<p><strong>补充索引（本仓库内的完整材料，便于评委按需查阅）</strong></p>
+
 <table>
 <th>附件</th><th>位置</th><th>说明</th>
 <tr><td>最终版交付说明</td><td><code>docs/competition/最终版交付说明.md</code></td><td>5 分钟跑起来 / 怎么验证 / 已知边界 / 答辩速答</td></tr>
 <tr><td>技术实现报告</td><td><code>docs/competition/技术实现报告.md</code></td><td>架构与实现细节（与本说明书口径一致）</td></tr>
 <tr><td>答辩问答手册</td><td><code>docs/competition/答辩问答手册.md</code></td><td>25 问 + 加分话术 / 避坑话术 + 证据命令</td></tr>
-<tr><td>演示脚本 / 录屏分镜</td><td><code>docs/competition/演示脚本.md</code>、<code>答辩录屏分镜.md</code></td><td>现场演示流程与兜底视频</td></tr>
-<tr><td>开发日志（48 节）</td><td><code>docs/spec/dev-log.md</code></td><td>每轮"问题→修复→证据"，含未修复项与理由</td></tr>
-<tr><td>外部复审报告与回执</td><td><code>docs/review/</code></td><td>10 轮独立复审 + 逐条处理回执</td></tr>
+<tr><td>演示脚本 / 提词器 / 录屏分镜</td><td><code>docs/competition/演示脚本.md</code>、<code>演示提词器.html</code>、<code>答辩录屏分镜.md</code></td><td>现场演示流程与兜底视频</td></tr>
+<tr><td>五维自查报告</td><td><code>docs/competition/评委评审报告.md</code></td><td>按官方权重自查 + 扣分理由 + 答辩前清单</td></tr>
+<tr><td>开发日志（49 节）</td><td><code>docs/spec/dev-log.md</code></td><td>每轮"问题→修复→证据"，含未修复项与理由</td></tr>
+<tr><td>外部复审报告与回执</td><td><code>docs/review/</code></td><td>多轮独立复审 + 逐条处理回执（含未修复项与理由）</td></tr>
 <tr><td>移动端 / 常开方案</td><td><code>docs/mobile-deploy.md</code>、<code>docs/演示常开-本机方案.md</code></td><td>手机访问与 0 成本公网演示</td></tr>
-<tr><td>属地化方案</td><td><code>docs/spec/地区识别落地方案.md</code></td><td>属地化设计 v2（含安全底线与不做清单）</td></tr>
+<tr><td>属地化方案</td><td><code>docs/spec/地区识别落地方案.md</code></td><td>属地化设计 v2（含安全底线与"不做清单"）</td></tr>
+<tr><td>合规 / 落地 / 商业一页</td><td><code>docs/competition/合规路线-一页.md</code>、<code>落地路径-一页.md</code>、<code>商业画布-一页.md</code></td><td>合规差距、试点计划、商业画布</td></tr>
 </table>
 
 <div class="meta"><strong>一句话定位</strong>：这是一个<strong>工程完成度高、可现场复算、但尚无真实试点数据</strong>的基层治理多智能体原型——<br>我们选择把"可验证"做成核心能力，而不是把"成效"讲成已完成的事实。</div>

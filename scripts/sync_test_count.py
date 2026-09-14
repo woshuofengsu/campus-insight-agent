@@ -28,7 +28,7 @@ META = os.path.join(ROOT, "web", "src", "config", "meta.js")
 
 # 会写测试数的文档（当前状态文档；历史日志如 dev-log/CHANGELOG 历史条目不动）
 DOCS = [
-    "README.md", "AGENTS.md", "开发约定.md",
+    "README.md", "AGENTS.md", "开发约定.md", "PRODUCT.md",
     "docs/competition/最终版交付说明.md",
     "docs/competition/创意说明书-提交版.md",
     "docs/competition/技术实现报告.md",
