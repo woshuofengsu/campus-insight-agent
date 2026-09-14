@@ -196,12 +196,28 @@ def _level_of(token: str, region: Region) -> str | None:
 
 
 _LEVEL_ORDER = (LEVEL_STREET, LEVEL_DISTRICT, LEVEL_CITY, LEVEL_PROVINCE)
+# 区/县级后缀：用于判断"这条政策写的是别的区"（更具体的地名一旦对不上，就应按外地处理）
+_DISTRICT_LIKE = re.compile(r"(区|县|旗)$")
+# 但「XX小区 / XX社区 / XX园区 / XX地区」不是行政区划 —— 小区名恰好以"区"结尾，
+# 若不做这个排除，「海淀小区」会被误判成"别区的行政区"而被打成外地（复查时踩到）。
+_NOT_DISTRICT_SUFFIX = ("小区", "社区", "园区", "学区", "景区", "地区")
+
+
+def _is_district_token(t: str) -> bool:
+    if t.endswith(_NOT_DISTRICT_SUFFIX):
+        return False
+    return bool(_DISTRICT_LIKE.search(t))
 
 
 def policy_region_boost(applicable_area: str, region: Region | None) -> tuple[float, str]:
     """返回 (加分, 级别)。`region=None` 或"全国" → (0.0, national)，调用方排序完全不变。
 
     取**最具体**的命中级别（同时命中"北京市"和"海淀区" → 按区级算）。
+
+    ⚠ 关键规则（复查时补的 BUG 修复）：**更具体的地名一旦对不上，就按外地降权**。
+    例：政策写「北京市海淀区」，对**海淀**用户是区级命中（+1.5）；
+    但对**朝阳**用户只因为"北京市"匹配就给市级 +1.0 是错的 —— 这条政策根本不适用于朝阳。
+    现在：只要条目里出现"别的区/县"，一律判 other（软降权、仍可见，不做过滤）。
     """
     if region is None or region.is_empty():
         return 0.0, LEVEL_NATIONAL
@@ -212,6 +228,11 @@ def policy_region_boost(applicable_area: str, region: Region | None) -> tuple[fl
     tokens = normalize_area(raw)
     if NATIONAL in tokens:
         return 0.0, LEVEL_NATIONAL
+    # ① 别的区/县 → 外地（避免"沾了同城就算本地"）
+    if region.district:
+        for t in tokens:
+            if _is_district_token(t) and t != region.district:
+                return REGION_BOOST[LEVEL_OTHER], LEVEL_OTHER
     matched = [lv for lv in (_level_of(t, region) for t in tokens) if lv in _LEVEL_ORDER]
     if matched:
         level = min(matched, key=_LEVEL_ORDER.index)

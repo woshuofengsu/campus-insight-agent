@@ -34,7 +34,8 @@ class WeatherGuardianAgent(BaseAgent):
         """天气查询（用户问）或自动预警检查（调度器调）。返回天气 + 生活建议 + 预警。"""
         from agent.web_agent_service import _exec_weather
         text = ctx.get("user_input") or ""
-        r_text, status, _ = _exec_weather(text)
+        # 属地化（WS4）：会话语境里带的 region 优先；调度器自动巡检时无 ctx.region → 用全局默认城市
+        r_text, status, _ = _exec_weather(text, region=ctx.get("region"))
         # 预警标签（若当前生效预警）→ 主动协商：通知健康顾问与通知管理员
         try:
             from data.db_weather import get_active_alerts

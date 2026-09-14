@@ -99,19 +99,50 @@ def _exec_proposal(uid: int, name: str, data: dict) -> tuple[str, str, int | Non
     return f"已为您提交提案，提案编号：P{pid:08d}，进入审核流程。", "成功", pid
 
 
-def _exec_policy(uid: int, text: str) -> tuple[str, str, int | None]:
-    """政策问答（路由到知识库匹配）。"""
+def _region_for(uid: int):
+    """会话级属地（地区识别 WS4）：按 uid 解析并缓存，避免每轮查库。
+
+    属地来自账号里的 `community`（不做 GPS 定位）；解析失败一律回落全局默认，绝不阻断对话。
+    """
+    global _REGION_CACHE
+    key = int(uid or 0)
+    if key in _REGION_CACHE:
+        return _REGION_CACHE[key]
+    reg = None
+    try:
+        from data.db_user import get_user_by_id
+        from utils.region import resolve_region
+        u = get_user_by_id(key) or {}
+        reg = resolve_region(u.get("community"))
+    except Exception:  # noqa: BLE001
+        reg = None
+    if reg is None:
+        from utils.region import Region
+        reg = Region()
+    if len(_REGION_CACHE) > 500:      # 简单容量保护（演示量级足够）
+        _REGION_CACHE.clear()
+    _REGION_CACHE[key] = reg
+    return reg
+
+
+_REGION_CACHE: dict[int, object] = {}
+
+
+def _exec_policy(uid: int, text: str, region=None) -> tuple[str, str, int | None]:
+    """政策问答（路由到知识库匹配）。`region`：属地优先（地区识别 WS2）。"""
     from data.db_policy import ask_question
-    r = ask_question(uid, text, source="Agent")
+    r = ask_question(uid, text, source="Agent", region=region)
     if r.get("matched"):
         return f"✅ 已为您找到答案：\n{r.get('auto_answer', '')}", "成功", r.get("question_id")
     return f"暂未找到答案。{r.get('manual_text', '')}", "未匹配", r.get("question_id")
 
 
-def _exec_weather(text: str) -> tuple[str, str, None]:
-    """天气查询 + 生活建议。"""
+def _exec_weather(text: str, region=None) -> tuple[str, str, None]:
+    """天气查询 + 生活建议。`region`：属地（地区识别 WS4），默认全局城市。"""
     from data.db_weather import get_weather_for_display
-    w = get_weather_for_display("")
+    city = getattr(region, "district", "") or getattr(region, "city", "")
+    city_id = getattr(region, "city_id", "")
+    w = get_weather_for_display(city, city_id)
     days = w.get("days") or []
     d = days[0] if days else {}
     tip = A.weather_tip(text)
@@ -323,7 +354,7 @@ def handle_chat(role: str, uid: int, name: str, text: str,
 
     # 直接执行类
     if intent == "政策问答":
-        r_text, st, qid = _exec_policy(eff_uid, text)
+        r_text, st, qid = _exec_policy(eff_uid, text, region=_region_for(eff_uid))
         actions = []
         if st == "未匹配":
             actions = [{"type": "confirm_transfer", "label": "转人工咨询", "related_id": qid}]
@@ -332,7 +363,7 @@ def handle_chat(role: str, uid: int, name: str, text: str,
         return _reply(s, intent, r_text, st, actions, uid, role, text, related_id=qid)
 
     if intent == "天气查询":
-        r_text, st, _ = _exec_weather(text)
+        r_text, st, _ = _exec_weather(text, region=_region_for(uid))
         return _reply(s, intent, r_text, st, [], uid, role, text)
 
     if intent == "通知查询":

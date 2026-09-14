@@ -13,7 +13,7 @@
 export const BRAND_METRICS = [
   {
     key: 'tests',
-    value: 596,
+    value: 621,
     suffix: '',
     label: '自动化测试',
     // pytest 收集用例数（= 575 passed / 1 skipped）；全量模式由 preflight 跑 --collect-only 核对
@@ -21,7 +21,7 @@ export const BRAND_METRICS = [
   },
   {
     key: 'rag_golden',
-    value: 42,
+    value: 48,
     suffix: '',
     label: '检索评测集',
     source: 'tests/llm_eval/rag_golden.jsonl 去注释行数（preflight 核对）',
@@ -31,7 +31,7 @@ export const BRAND_METRICS = [
     value: 100,
     suffix: '%',
     label: '命中率 hit@1',
-    source: 'scripts/rag_eval.py（CI 门禁步骤核对，实测混合检索 42/42）',
+    source: 'scripts/rag_eval.py（CI 门禁步骤核对，实测混合检索 48/48）',
   },
   {
     key: 'agents',

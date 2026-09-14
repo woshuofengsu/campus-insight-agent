@@ -49,24 +49,31 @@ def web_weather_exception_logs(request: Request, limit: int = 100):
 @router.get("/forecast")
 def web_weather_forecast(request: Request, days: int = 3):
     from data.db_weather import get_weather_for_display
-    w = get_weather_for_display("")
-    return _ok({"forecast": (w.get("days") or [])[:days], "is_degraded": w.get("is_degraded")})
+    from api_routes.deps import _region
+    r = _region(request)
+    w = get_weather_for_display(r.district or r.city, r.city_id)
+    return _ok({"forecast": (w.get("days") or [])[:days], "is_degraded": w.get("is_degraded"),
+                "location": w.get("location") or r.label(),
+                "region_label": r.label(), "city_id": r.city_id})
 
 
 @router.get("/current")
 def web_weather_current(request: Request):
     from data.db_weather import get_weather_for_display, get_daily_advice
-    from config import COMMUNITY_CITY, COMMUNITY_DISTRICT
-    w = get_weather_for_display("")
+    from api_routes.deps import _region
+    r = _region(request)
+    w = get_weather_for_display(r.district or r.city, r.city_id)
     days = w.get("days") or []
     today = days[0] if days else {}
     advice = {}
     try:
-        advice = get_daily_advice(city="") or {}
+        advice = get_daily_advice(city=r.district or r.city, city_id=r.city_id) or {}
     except Exception:
         pass
     return _ok({
-        "location": COMMUNITY_CITY + COMMUNITY_DISTRICT,
+        # 属地化（WS4）：location 用解析到的属地，而不是写死的全局常量
+        "location": w.get("location") or r.label(),
+        "region_label": r.label(), "city_id": r.city_id,
         "temp_high": today.get("temp_high"), "temp_low": today.get("temp_low"),
         "condition": today.get("condition"), "emoji": today.get("emoji"),
         "wind": today.get("wind"), "rain_prob": today.get("rain_prob"),

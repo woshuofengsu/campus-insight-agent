@@ -42,6 +42,42 @@ def _reset_runtime_guards():
     _agent_mod._chat_rate.clear()
 
 
+@pytest.fixture(autouse=True, scope="module")
+def _isolate_db_path():
+    """模块级兜底：测试文件动了全局 DB 状态后，模块结束时把整套状态复位。
+
+    为什么需要（2026-09-14 实测踩到，且**三连跑必现、单跑/两两全过**）：
+    `data/db_core._DB_PATH` 是模块级全局，个别测试文件会 `init_db(自己的临时库)` 再在
+    teardown 删库；而 `api_web._ensure_db()` 用 `config.DB_PATH` 做"每个库只初始化一次"的
+    守卫（`_db_path_seeded`）—— 它看到路径没变就**直接早返回**，于是下一个测试文件拿到的
+    是一个指向"已删除文件"或空字符串的全局状态：
+      · 指向已删除路径 → sqlite 就地新建空库 → `no such table: user_profile`；
+      · 被写回空串 → `RuntimeError: Database not initialized`。
+
+    复位三件事：① `_DB_PATH`/`config.DB_PATH` 回滚到进入本模块前的值（**空值不写回**，
+    否则会把"未初始化"状态传染给下一个文件）；② 清掉 `api_web._db_path_seeded`，
+    让下一次进入 TestClient 时**重新建表 + 幂等灌种子**（种子本身幂等）。
+    """
+    import config
+    from data import db_core
+
+    saved_cfg = getattr(config, "DB_PATH", None)
+    saved_core = getattr(db_core, "_DB_PATH", None)
+    yield
+    try:
+        if saved_cfg:
+            config.DB_PATH = saved_cfg
+        # 空值不写回：宁可让它回落到 config.DB_PATH，也不要把"未初始化"状态传给下一个文件
+        db_core._DB_PATH = saved_core or saved_cfg or db_core._DB_PATH
+        try:
+            import api_web
+            api_web._db_path_seeded = None      # 强制下次进 App 时重新 ensure_db
+        except Exception:  # noqa: BLE001
+            pass
+    except Exception:  # noqa: BLE001  兜底失败不影响测试结果
+        pass
+
+
 def _purge_stale_test_dbs() -> list[str]:
     """删除 tests/ 下遗留的固定名临时库（含 -wal/-shm）。返回被删文件名。
 

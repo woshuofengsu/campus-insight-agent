@@ -145,12 +145,17 @@ def _dense_scores(query: str, rows: list[dict]) -> list[tuple[int, float]] | Non
     return out or None
 
 
-def search_hybrid(query: str, top_k: int = 5, category: str | None = None) -> list[dict]:
+def search_hybrid(query: str, top_k: int = 5, category: str | None = None,
+                  region=None) -> list[dict]:
     """混合检索（U1）：词法 + 语义双路召回 → RRF 融合排序。
 
     - 语义路不可用（未配 provider / 未建索引 / 调用失败）→ 自动只用词法（等价于升级前行为）
     - 两路都无结果 → 回退关键词 LIKE 搜索
     返回 [{id,title,content,keywords,category,score,source_route}]，score 为 RRF 分。
+
+    属地化（地区识别 WS3）：传 `region` 后按 `applicable_area` 做**小幅**属地重排
+    （RRF 以排名为本，加权限要小，只掰平近同分；级别与权重来自 `utils.region`，
+    与线上 `data/db_policy` 共用同一套定义）。`region=None` → 顺序与升级前完全一致。
 
     ⚠️ 排序口径说明（两套并存、各有用途，勿混用）：
       - **本函数（RRF 融合）**：用于 Agent 侧上下文注入与离线评测（`scripts/rag_eval.py`），
@@ -164,6 +169,7 @@ def search_hybrid(query: str, top_k: int = 5, category: str | None = None) -> li
         with get_db() as conn:
             _ensure_embedding_table(conn)
             base_sql = ("SELECT k.id, k.title, k.content, k.keywords, k.category, "
+                        "k.applicable_area, "
                         "e.ngrams_json, e.dense_json "
                         "FROM knowledge_base k "
                         "LEFT JOIN kb_embeddings e ON k.id = e.kb_id")
@@ -194,6 +200,14 @@ def search_hybrid(query: str, top_k: int = 5, category: str | None = None) -> li
             return _fallback_keyword_search(query, top_k, category)
 
         by_id = {r["id"]: r for r in rows}
+        region_level: dict[int, str] = {}
+        if region is not None:
+            from utils.region import policy_region_boost, rrf_region_bonus
+            for kid in list(fused):
+                row = by_id.get(kid) or {}
+                _b, level = policy_region_boost(row.get("applicable_area", ""), region)
+                region_level[kid] = level
+                fused[kid] += rrf_region_bonus(level)
         ordered = sorted(fused.items(), key=lambda x: -x[1])[:top_k]
         results = []
         for kid, fscore in ordered:
@@ -204,6 +218,8 @@ def search_hybrid(query: str, top_k: int = 5, category: str | None = None) -> li
             results.append({
                 "id": r["id"], "title": r["title"], "content": r["content"],
                 "keywords": r["keywords"], "category": r["category"],
+                "applicable_area": r.get("applicable_area") or "",
+                "region_level": region_level.get(kid, "national"),
                 "score": round(fscore, 6), "source_route": route,
             })
         return results or _fallback_keyword_search(query, top_k, category)
@@ -315,12 +331,13 @@ def _fallback_keyword_search(query: str, top_k: int = 5,
 
 
 def get_rag_context(query: str, top_k: int = 3,
-                    category: str | None = None) -> str:
+                    category: str | None = None, region=None) -> str:
     """把检索结果拼成一段上下文，注入 LLM 的 prompt。
 
     标准 RAG 套路：检索相关文档（U1 混合检索：词法+语义 RRF）→ 格式化成上下文 → 塞进 prompt。
+    `region`：属地小幅重排（地区识别 WS3），默认 None 与升级前一致。
     """
-    results = search_hybrid(query, top_k=top_k, category=category)
+    results = search_hybrid(query, top_k=top_k, category=category, region=region)
     if not results:
         return ""
 
@@ -335,12 +352,12 @@ def get_rag_context(query: str, top_k: int = 3,
 
 
 def rag_search(query: str, top_k: int = 5,
-               category: str | None = None) -> str:
+               category: str | None = None, region=None) -> str:
     """把搜索结果格式化成给人看的字符串（Agent / UI 用）。
 
-    返回 markdown 格式，直接能展示。
+    返回 markdown 格式，直接能展示。`region`：属地小幅重排，默认 None 与升级前一致。
     """
-    results = search_hybrid(query, top_k=top_k, category=category)
+    results = search_hybrid(query, top_k=top_k, category=category, region=region)
     if not results:
         return f"未找到与「{query}」相关的社区知识信息。"
 

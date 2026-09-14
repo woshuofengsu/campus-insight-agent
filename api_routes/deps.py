@@ -88,6 +88,20 @@ def _user(request: Request) -> dict:
     return getattr(request.state, "user", {})
 
 
+def _region(request: Request):
+    """当前请求用户的属地（地区识别）：由 `community` 解析，未登录/未命中回落全局默认。
+
+    集中在这里的原因：居民端/老年端/网格端多处以同一口径取属地（天气、政策问答），
+    避免各写一份、口径漂移。
+    """
+    try:
+        from utils.region import resolve_region
+        return resolve_region((_user(request) or {}).get("community"))
+    except Exception:  # noqa: BLE001  属地解析失败绝不能影响业务
+        from utils.region import Region
+        return Region()
+
+
 def _require_role(request: Request, role: str):
     u = _user(request)
     if u.get("role") != role:

@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、596 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、621 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 596 项：595 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 621 项：620 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 596 项测试**（595 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 621 项测试**（620 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
 - `config.DEFAULT_TENANT` 为多租户默认值（演示级，仅预留字段不改查询）；`AGENT_CLASSES` 角色 id 不得随意改（有状态）。
@@ -92,6 +92,14 @@ elderly:  demo_elderly（免登录）
   尤其**绝不能"吞掉异常后返回成功"**（`tests/test_silent_exceptions.py` 会红）。
   分诊工具：`python scripts/audit_silent_exceptions.py`（HIGH/MID 基线只减不增）；
   安全/隐私类校验（敏感词、脱敏、权限）一律 **fail-closed**——组件坏了要拒绝，不许放行。
+- **属地化（地区识别）统一口径**：所有"按地区"的能力都必须走 `utils/region.py`（`resolve_region` /
+  `policy_region_boost` / `normalize_area`），**不要各写一份**。三条硬规则：
+  ① **属地只影响"选谁"，绝不影响"能不能自动回答"**（政策阈值永远只看 `base_score`；选答取
+     「final 排序里第一条 base 达标者」——早期"只看 top1"的写法会把本来能答的变成转人工）；
+  ② `applicable_area` 写「全国 / 北京市 / 北京市海淀区 / 社区名」；社区名必须与 `user_profile.community`
+     真值一致并登记进 `config.REGION_BY_COMMUNITY`（未命中会 warning + 回落全局默认，不许静默失效）；
+  ③ 天气缓存键统一用 **adcode**，且 `get_daily_advice` 的每日缓存 action 必须带 key（否则跨社区串味）。
+  三端（居民 / 老年 / Agent 文本链路）**必须同批接入**，别只改居民端（同场演示口径会不一致）。
 - CSP `script-src 'self'` **禁止内联脚本**：调试入口已改为同源外部文件 `web/public/debug.js`（`?debug=1` 生效），
   不要再往 `index.html` 里写内联 `<script>`（会在每个页面报 CSP 错、评委开 DevTools 就能看到）。
   WebSocket `/ws/notify` 用内存连接池（单机够用，多进程需 Redis）。
@@ -112,7 +120,9 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 四十七 节**：故障注入量化门禁 + 静默异常分诊）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 四十八 节**：地区识别属地化全量落地 WS1–WS8）|
+| `utils/region.py` | **属地解析统一入口**：`Region`/`normalize_area`/`resolve_region`/`policy_region_boost` + 级别与权重常量（政策与 RAG 共用）|
+| `docs/spec/地区识别落地方案.md` | 属地化方案 **v2 定稿**（含 v1 的 7 处偏差记录，勿照 v1 实施）|
 | `tests/test_silent_exceptions.py` | 静默吞异常门禁：「静默假成功」必须为 0 + HIGH/MID 基线只减不增（工具 `scripts/audit_silent_exceptions.py`）|
 | `tests/test_claims_consistency.py` | 材料口径门禁：过时表述 / 测试数口径 / **PWA 只能宣称"可安装"、不得宣称离线能力** / 消融供数冒烟项白名单 |
 
@@ -127,4 +137,8 @@ elderly:  demo_elderly（免登录）
 - **第七轮复审收口**：v46 手机号加密全量补齐（提案/草稿/user_profile 残留）/ 运行时裸 ALTER 收回迁移链 /
   utcnow 弃用清理 / 异常文案脱敏 / 录屏素材（见 dev-log 三十七～三十八节）
 
-详见 `docs/spec/dev-log.md`（最新 **四十七** 节）。
+- **地区识别/属地化落地**：政策按行政区划属地优先（线上加性分 + Agent RRF 重排双口径）、天气按社区城市
+  （三端一致、缓存键 adcode）、知识库新增「适用地区」、金标 48 条含 6 条属地用例（属地 Top-1 4/4）
+  （见 dev-log 四十八节 + `docs/spec/地区识别落地方案.md` v2）
+
+详见 `docs/spec/dev-log.md`（最新 **四十八** 节）。

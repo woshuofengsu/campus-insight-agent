@@ -112,6 +112,23 @@ def test_foreign_area_soft_penalized_not_filtered():
     assert level == R.LEVEL_OTHER and boost < 0
 
 
+def test_other_district_is_treated_as_foreign():
+    """别区的政策对本地用户应判"外地"（软降权），不能因为"同城"就白拿市级加分。
+
+    复查时发现的真实 BUG：「北京市海淀区」对**朝阳**用户曾因"北京市"匹配而拿到 local_city(+1.0)，
+    但这条政策根本不适用于朝阳。
+    """
+    chaoyang = R.resolve_region("朝阳试点社区")
+    boost, level = R.policy_region_boost("北京市海淀区", chaoyang)
+    assert level == R.LEVEL_OTHER, f"别区政策不应算本地：{level}"
+    assert boost < 0
+    # 同城的纯市级政策仍然是市级命中（+1.0）
+    assert R.policy_region_boost("北京市", chaoyang)[1] == R.LEVEL_CITY
+    # 本区细则对海淀用户仍是区级
+    haidian = R.resolve_region("海淀小区")
+    assert R.policy_region_boost("北京市海淀区", haidian)[1] == R.LEVEL_DISTRICT
+
+
 def test_region_none_returns_zero():
     """region=None 时加分必须恒为 0 —— 这是"默认行为逐字节不变"的地基。"""
     for area in ("", "全国", "北京市", "北京市海淀区", "上海市浦东新区", "乱七八糟"):

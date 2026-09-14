@@ -296,14 +296,20 @@ def _fallback_weather(reason: str = "") -> str:
     return "\n".join(lines)
 
 
-def get_today_weather() -> tuple[list[dict] | None, str, bool]:
+def get_today_weather(city: str = "", city_id: str = "") -> tuple[list[dict] | None, str, bool]:
     """统一天气入口 — 返回 (days, location_name, is_real)。
 
     先试真实 API，不行退回模拟。感知监控、脉搏页、天气工具都用它，
     逻辑集中起来免得各写一份。
+
+    属地化（地区识别 WS4）：`city`（区/市名，用于和风 GeoAPI 查 location id）与
+    `city_id`（adcode，兜底）由调用方按用户属地传入；不传则用全局默认城市
+    （定时任务等无用户上下文的场景保持原行为）。
     """
     from config import COMMUNITY_CITY, COMMUNITY_DISTRICT, COMMUNITY_CITY_ID
-    location_name = f"{COMMUNITY_CITY}{COMMUNITY_DISTRICT}"
+    city = (city or "").strip()
+    city_id = (city_id or "").strip()
+    location_name = city or f"{COMMUNITY_CITY}{COMMUNITY_DISTRICT}"
     is_real = False
     days = None
 
@@ -312,7 +318,7 @@ def get_today_weather() -> tuple[list[dict] | None, str, bool]:
         if HEFENG_API_KEY:
             try:
                 days, api_location = fetch_real_weather_days(
-                    HEFENG_API_KEY, COMMUNITY_CITY_ID, COMMUNITY_CITY,
+                    HEFENG_API_KEY, city_id or COMMUNITY_CITY_ID, city or COMMUNITY_CITY,
                 )
                 location_name = api_location
                 is_real = True

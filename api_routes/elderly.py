@@ -86,9 +86,12 @@ def web_elderly_home(request: Request):
     from data.db_notice import get_notice_unread_count
     from data.db_elderly_care import get_latest_sos
     from data.db_weather import get_simplified_weather
+    from api_routes.deps import _region
     from datetime import datetime
     from agent import tone
     u = _user(request)
+    # 属地化（WS4）：老年端也必须带属地，否则与居民端口径不一致（演示一切屏就露馅）
+    r = _region(request)
     uid = _resolve_elder_uid(request) or u.get("uid")
     elderly = get_profile(uid) or {}
     health = elderly.get("health_info", {})
@@ -98,7 +101,7 @@ def web_elderly_home(request: Request):
         due = len(get_due_medications(uid))
     except Exception:
         pass
-    weather = get_simplified_weather("")
+    weather = get_simplified_weather(r.district or r.city, r.city_id)
     # M1：称呼（优先 preferences.display_name，再退回 name）；语速（preferences.speech_rate）
     prefs = {}
     try:

@@ -83,7 +83,7 @@ function playWeather() {
   const wt = home.value?.weather
   if (!wt) return
   const tags = (wt.alert_tags || []).map((a) => `${a.type}${a.level}预警`).join('，')
-  const txt = `当前天气${wt.condition || ''}，气温${wt.temp_low || ''}度到${wt.temp_high || ''}度${tags ? '，' + tags : ''}。${wt.advice || ''}`
+  const txt = `这里是${wt.region_label || '您所在社区'}的天气。当前${wt.condition || ''}，气温${wt.temp_low || ''}度到${wt.temp_high || ''}度${tags ? '，' + tags : ''}。${wt.advice || ''}`
   speak(txt, vol.value, rate.value)
 }
 
@@ -203,6 +203,10 @@ function cancelCall() {
         <n-tag v-for="(a, i) in home.weather.alert_tags" :key="i" size="large" type="error" style="margin:0 4px;">⚠️ {{ a.type }}{{ a.level }}</n-tag>
       </div>
       <div v-if="home.weather.advice" class="muted" style="margin-top:8px;">💬 {{ home.weather.advice }}</div>
+      <!-- 属地（地区识别 WS7）：老年端与居民端口径一致（都来自账号所属社区，不用定位权限） -->
+      <div v-if="home.weather.region_label" class="muted" style="margin-top:6px;font-size:1.15rem;">
+        📍 {{ home.weather.region_label }}
+      </div>
       <div class="muted" style="margin-top:4px;">更新于 {{ (home.weather.updated_at || '').slice(11, 16) || home.weather.updated_at }}</div>
       <n-button size="large" type="primary" ghost style="margin-top:10px;min-height:56px;font-size:1.25rem;" @click="playWeather">🔊 播放天气</n-button>
     </div>

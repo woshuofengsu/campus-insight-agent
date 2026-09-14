@@ -20,6 +20,10 @@ const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
     <p class="page-sub">实时天气 · 未来 3 天预报 · 极端天气预警</p>
 
     <div v-if="w" class="card">
+      <!-- 属地（地区识别 WS7）：显示"这份天气是按哪个社区/区取的"，来自账号所属社区，不采集定位 -->
+      <div v-if="w.region_label" style="margin-bottom:8px;font-size:0.85rem;color:var(--muted);">
+        📍 {{ w.region_label }}<span v-if="w.city_id" class="muted">（按所属社区自动匹配）</span>
+      </div>
       <div style="display:flex;align-items:center;gap:20px;">
         <div style="font-size:4rem;">{{ w.emoji }}</div>
         <div>

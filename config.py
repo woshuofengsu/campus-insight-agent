@@ -82,6 +82,12 @@ _DEFAULT_REGION_MAP = {
         "province": "北京市", "city": COMMUNITY_CITY, "city_id": COMMUNITY_CITY_ID,
         "district": COMMUNITY_DISTRICT, "street": "社区服务中心街道",
     },
+    # 第二演示社区（用于演示"同一句话、换属地结果不同"与"本地无政策→市级兜底"）：
+    # 故意**不放**区级政策，所以朝阳用户会看到"北京市"级政策优先、海淀条目被软降权。
+    "朝阳试点社区": {
+        "province": "北京市", "city": COMMUNITY_CITY, "city_id": "101010300",
+        "district": "朝阳区", "street": "望京街道",
+    },
 }
 
 

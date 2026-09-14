@@ -196,19 +196,26 @@ def get_cached_weather(city: str = "") -> dict | None:
         return d
 
 
-def _fetch_days(city: str = "") -> tuple[list[dict] | None, str, bool]:
-    """取天气数据（真实 API 优先，失败退回模拟）。返回 (days, location, is_real)。"""
+def _fetch_days(city: str = "", city_id: str = "") -> tuple[list[dict] | None, str, bool]:
+    """取天气数据（真实 API 优先，失败退回模拟）。返回 (days, location, is_real)。
+
+    属地化（地区识别 WS4）：`city`/`city_id` 必须**真的传下去** ——
+    此前这个参数收了却完全没用（只当缓存键），换社区也只会拿到全局默认城市的天气。
+    """
     try:
         from tools.query_weather import get_today_weather
-        days, location, is_real = get_today_weather()
+        days, location, is_real = get_today_weather(city=city, city_id=city_id)
         return days, location, bool(is_real)
     except Exception:
         _log.warning("获取天气数据失败", exc_info=True)
         return None, "", False
 
 
-def refresh_weather(city: str = "") -> dict:
+def refresh_weather(city: str = "", city_id: str = "") -> dict:
     """刷新天气：真实成功 → 写缓存 + 留痕；失败 → 读缓存降级；无缓存 → 返回不可用。
+
+    `city`/`city_id`：属地（区/市名 + adcode）。**缓存键统一用 adcode（无则城市名）**，
+    保证多社区各自缓存互不串味。
 
     返回：
       {
@@ -217,9 +224,10 @@ def refresh_weather(city: str = "") -> dict:
         "data_updated_at": str, "note": str,
       }
     """
-    days, location, is_real = _fetch_days(city)
+    key = (city_id or city or "").strip()
+    days, location, is_real = _fetch_days(city, city_id)
     if days is not None and is_real:
-        save_weather_cache(city, days, location)
+        save_weather_cache(key, days, location)
         log_activity("系统", "天气数据更新", "weather_cache", module=MODULE,
                      detail=f"社区天气数据获取成功（{location or city}）")
         return {
@@ -229,7 +237,7 @@ def refresh_weather(city: str = "") -> dict:
             "note": "",
         }
     # 真实 API 失败：优先用上次成功的缓存数据降级（spec：保留上次成功数据）
-    cache = get_cached_weather(city)
+    cache = get_cached_weather(key)
     if cache and cache.get("days"):
         log_activity("系统", "缓存降级", "weather_cache", module=MODULE,
                      detail=f"天气API故障，使用缓存数据（更新于{cache['updated_at']}）")
@@ -254,8 +262,8 @@ def refresh_weather(city: str = "") -> dict:
     }
 
 
-def _cache_age_minutes(city: str = "") -> int | None:
-    cache = get_cached_weather(city)
+def _cache_age_minutes(city: str = "", city_id: str = "") -> int | None:
+    cache = get_cached_weather((city_id or city or "").strip())
     if not cache or not cache.get("updated_at"):
         return None
     try:
@@ -265,12 +273,12 @@ def _cache_age_minutes(city: str = "") -> int | None:
     return int((_now() - updated).total_seconds() // 60)
 
 
-def check_cache_freshness(city: str = "") -> dict:
+def check_cache_freshness(city: str = "", city_id: str = "") -> dict:
     """数据更新时间戳监测：>15 分钟提示延迟；>30 分钟按 API 故障处理（缓存降级）。
 
     状态变化才留痕，避免每轮监测刷日志。
     """
-    age = _cache_age_minutes(city)
+    age = _cache_age_minutes(city, city_id)
     state = "fresh"
     note = ""
     if age is None:
@@ -300,10 +308,13 @@ def _log_once(action: str, detail: str, target_type: str, target_id) -> None:
     log_activity("系统", action, target_type, module=MODULE, detail=detail)
 
 
-def get_weather_for_display(city: str = "") -> dict:
-    """统一展示入口：先尝试刷新，失败走缓存降级；附加延迟/降级状态。"""
-    result = refresh_weather(city)
-    freshness = check_cache_freshness(city)
+def get_weather_for_display(city: str = "", city_id: str = "") -> dict:
+    """统一展示入口：先尝试刷新，失败走缓存降级；附加延迟/降级状态。
+
+    `city`/`city_id`：属地（地区识别 WS4），缓存键内部统一用 adcode/城市名。
+    """
+    result = refresh_weather(city, city_id)
+    freshness = check_cache_freshness(city, city_id)
     if freshness["state"] in ("delayed", "degraded"):
         result["delay"] = freshness["state"] == "delayed"
         result["degraded"] = freshness["state"] == "degraded"
@@ -315,15 +326,21 @@ def get_weather_for_display(city: str = "") -> dict:
     return result
 
 
-def get_daily_advice(force: bool = False, city: str = "") -> dict:
-    """穿衣/出行建议：按当天天气自动生成，每天生成一次，不使用 AI 自由发挥。"""
+def get_daily_advice(force: bool = False, city: str = "", city_id: str = "") -> dict:
+    """穿衣/出行建议：按当天天气自动生成，每天生成一次，不使用 AI 自由发挥。
+
+    属地化（WS4）：缓存 action 里带上缓存键 —— 否则**A 社区先生成，B 社区会拿到同一份建议**
+    （此前按天全局缓存，与"属地化天气"直接冲突）。action 变了 → 老记录不会命中，自动重算一次。
+    """
     today = _fmt(_now())[:10]
+    key = (city_id or city or "").strip()
+    action = "生成穿衣出行建议" + (f"[{key}]" if key else "")
     # 已生成过就直接返回（幂等；force=True 强制重算）
     with get_db() as conn:
         row = conn.execute(
             "SELECT detail FROM activity_log WHERE module=? AND action=? "
             "AND substr(created_at,1,10)=? ORDER BY id DESC LIMIT 1",
-            (MODULE, "生成穿衣出行建议", today),
+            (MODULE, action, today),
         ).fetchone()
         if row and not force:
             try:
@@ -331,9 +348,11 @@ def get_daily_advice(force: bool = False, city: str = "") -> dict:
             except (ValueError, TypeError):
                 pass
 
-    result = refresh_weather(city)
+    result = refresh_weather(city, city_id)
     days = result.get("days") or []
     advice = {"date": today, "dress": "", "travel": "", "generated_at": _fmt(_now())}
+    if key:
+        advice["city_key"] = key
     if days:
         d = days[0]
         cond = d.get("condition", "")
@@ -369,19 +388,22 @@ def get_daily_advice(force: bool = False, city: str = "") -> dict:
             advice["travel"] = "早晚寒冷，出行注意添衣保暖。"
         else:
             advice["travel"] = "天气适宜出行。"
-    log_activity("系统", "生成穿衣出行建议", "weather_cache", module=MODULE,
+    log_activity("系统", action, "weather_cache", module=MODULE,
                  detail=json.dumps(advice, ensure_ascii=False))
     return advice
 
 
-def get_simplified_weather(city: str = "") -> dict:
+def get_simplified_weather(city: str = "", city_id: str = "") -> dict:
     """老年端大字版简化天气：只返回温度、天气现象、预警标签、一句建议。
 
     ⚠ 键名一致性（外部评审 B1 修复）：原先只返回 `temp`（=最高温）与 `temp_low`，**没有 `temp_high`**，
     而老年端首页模板与语音播报都读 `temp_high` → 页面渲染成 "晴 17°~°"、播报漏最高温（只在适老旗舰页，
     答辩演示一眼可见）。现在同时给出 `temp_high`（保留 `temp` 兼容既有引用）。
+
+    属地化（WS4）：**老年端必须和居民端一样带属地** —— 否则同一场演示里
+    居民端显示"北京市海淀区"、老年端还是默认城市，一切屏就露馅。
     """
-    result = get_weather_for_display(city)
+    result = get_weather_for_display(city, city_id)
     days = result.get("days") or []
     d = days[0] if days else None
     alerts = get_active_alerts()
@@ -393,10 +415,12 @@ def get_simplified_weather(city: str = "") -> dict:
         "condition": d.get("condition", "") if d else "",
         "emoji": d.get("emoji", "") if d else "",
         "alert_tags": [{"type": a["alert_type"], "level": a["level"]} for a in alerts],
-        "advice": (get_daily_advice(city=city).get("dress", "") or "")[:40],
+        "advice": (get_daily_advice(city=city, city_id=city_id).get("dress", "") or "")[:40],
         "updated_at": result.get("data_updated_at", ""),
         "is_degraded": result.get("is_degraded", False),
         "note": result.get("note", ""),
+        "city_id": city_id or "",
+        "region_label": result.get("location") or city or "",
     }
 
 

@@ -64,10 +64,17 @@ def _run_cases(topk: int = 3, verbose: bool = False) -> dict:
 
     cases = load_golden()
     hits, top1_hits, details = 0, 0, []
+    region_cases = region_ok = 0
     for c in cases:
         q = c["query"]
         expects = c.get("expect_any") or []
-        results = search_published_knowledge(q, top_k=topk)
+        # 属地用例（地区识别 WS6）：case 里可选带 "region": "<社区名>"，
+        # 用来证明"同一句话在给定属地下，本地条目优先、且全国条目仍可兜底"。
+        region = None
+        if c.get("region"):
+            from utils.region import resolve_region
+            region = resolve_region(c["region"])
+        results = search_published_knowledge(q, top_k=topk, region=region)
         blob = " ".join(
             f"{r.get('title', '')} {r.get('keywords', '')} {r.get('content', '')}"
             for r in results)
@@ -78,10 +85,17 @@ def _run_cases(topk: int = 3, verbose: bool = False) -> dict:
             r0 = results[0]
             blob1 = f"{r0.get('title', '')} {r0.get('keywords', '')} {r0.get('content', '')}"
         hit1 = bool(results) and any(k in blob1 for k in expects) if expects else False
+        # "expect_top1": true 的用例要求 Top-1 命中（属地用例用它来断言"本地优先"）
+        if c.get("expect_top1"):
+            region_cases += 1
+            if hit1:
+                region_ok += 1
         route = results[0].get("retrieval") if results else "none"
         hits += 1 if hit else 0
         top1_hits += 1 if hit1 else 0
         details.append({"query": q, "hit": hit, "hit_at_1": hit1, "route": route,
+                        "region": c.get("region", ""),
+                        "region_level": results[0].get("region_level", "") if results else "",
                         "top": [r.get("title") for r in results]})
         if verbose:
             mark = "✓" if hit1 else ("~" if hit else "✗")
@@ -90,6 +104,7 @@ def _run_cases(topk: int = 3, verbose: bool = False) -> dict:
     return {"cases": n, "hits": hits, "hit1": top1_hits,
             "hit_rate": round(hits * 100 / n, 1) if n else 0.0,
             "hit1_rate": round(top1_hits * 100 / n, 1) if n else 0.0,
+            "region_cases": region_cases, "region_top1_ok": region_ok,
             "topk": topk, "embedding": describe(), "details": details}
 
 
@@ -122,6 +137,9 @@ def main():
         print(f"模式：{mode} | 用例 {r['cases']} 条")
         print(f"  top-{r['topk']} 命中率：{r['hit_rate']}%（{r['hits']}/{r['cases']}）")
         print(f"  hit@1（Top-1 正确率）：{r['hit1_rate']}%（{r['hit1']}/{r['cases']}）")
+        if r.get("region_cases"):
+            print(f"  属地用例 Top-1 优先命中：{r['region_top1_ok']}/{r['region_cases']}"
+                  "（同一句话在给定属地下本地条目优先）")
         if args.no_embedding:
             print("（对比基线：不加 --no-embedding 即混合检索模式，可量化语义向量增益）")
         else:

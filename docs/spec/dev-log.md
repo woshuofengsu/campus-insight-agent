@@ -1503,3 +1503,72 @@ O1「PWA 无 SW，别说离线」、O2「581 里有 6 条供数冒烟项，关�
 
 **提交**：本轮。
 
+---
+
+## 四十八、地区识别（属地化）全量落地：政策按行政区划、天气按社区（WS1–WS8）✅
+
+**背景**：用户给了一份《地区识别落地方案》，问"要不要做、方案行不行"。我先**逐条对代码与真实库实测**，
+发现 7 处会坑人的偏差（3 处致命），把方案重写为 v2 定稿，然后按 v2 **一次做完全部 WS1–WS8**。
+
+### 修正掉的关键偏差（照 v1 实施会做出"看着做了、实际静默无效"的功能）
+
+1. **映射键写「示例社区」**，而库里 `user_profile.community` 真值是**「海淀小区」** → 永远命中不了；
+   且 v1 说 community 在 `community_issues`，**该表根本没有这个列**（全库只有 user_profile + kg_entity）。
+2. **漏了老年端天气**（`api_routes/elderly.py:101`）→ 只改居民端会导致"居民显示属地、老年还是默认城市"。
+3. **v1 的"阈值改看 base_score"有反效果**：本地条目被属地抬到第一但 base 不达标时，会把**本来能自动回答**的
+   变成转人工（比现状更差）。v2 改为 **answer_entry 规则**：在 final 排序里取**第一条 base 达标**的作答 ——
+   "都能回答时本地优先；答不了时绝不因属地降门槛"。
+4. `_fetch_days(city)` **收了 city 却完全没用**（只是缓存键）；`get_daily_advice` 的"当天已生成"缓存
+   **按天全局、不含城市** → 换社区会串味。
+5. 前端知识库表单**根本没有** `applicable_area` 字段（v1 说"改为下拉"不成立，是**新增**）。
+6. 行号/路径修正：`get_daily_advice` 无 `city_id` 参数、`query_weather.py` 在 `tools/`、`agent/pulse.py` 不存在。
+7. 数据现状：`applicable_area` 是 北京市×39 / 空×19 / 北京市海淀区**仅 1 条** → 不补数据功能不可见。
+
+### 交付（WS1–WS8）
+
+| WS | 内容 | 关键点 |
+|---|---|---|
+| WS1 | `utils/region.py` + `config.REGION_BY_COMMUNITY` | 纯函数；归一化支持**复合串**「北京市海淀区」→{北京市,海淀区}、真实社区名优先、外地判 other、看不懂按 national（不惩罚）；未命中回落默认**并告警**；两个演示社区（海淀小区 / 朝阳试点社区） |
+| WS2 | `data/db_policy.py` 双分 + 选答规则 | `base_score`（阈值用）/`score`=final（排序用）；属地加分只在 `base>0` 时生效；`region=None` 顺序逐字节不变；返回体带 `region_level`（可解释） |
+| WS3 | `agent/rag.py` RRF 属地重排 | select 增加 `applicable_area`；RRF 后按 `utils.region` 的权重**小幅**重排再截断；两个包装透传 |
+| WS4 | 天气**三端** + Agent 文本链路 | `get_today_weather(city, city_id)` 真正透传；缓存键统一 **adcode**；**每日建议 action 带 key**（修掉跨社区串味）；`/weather/current`、`/weather/forecast`、**`/elderly/home`** 都带 `region_label`；`orchestrator` 建会话 ctx 时解析一次 region，`_exec_weather`/`_exec_policy` 复用 |
+| WS5 | 种 3 条属地政策（区/社区/市三级） | 关键词按**真实口语**调准；分布变为 北京市40/空19/海淀2/海淀小区1 |
+| WS6 | 金标 42 → **48** 条（+6 条属地用例） | 新增可选字段 `region`/`expect_top1`；**属地用例 Top-1 4/4**，总体 hit@1 仍 **100%** |
+| WS7 | 前端三处 | 知识库表单**新增**「适用地区」下拉（可创建）+ 列表地区标签；居民天气卡属地标签；**老年端天气属地标签 + 语音播报带上属地** |
+| WS8 | 测试 13 + 11 条 | 含**安全底线断言**：本地弱命中 + 全国强命中 → 必须仍自动回答（用全国那条），不得转人工 |
+
+### 顺带修掉一个测试隔离真 BUG（这轮最有价值的意外收获）
+
+现象：`pytest tests/test_agent.py tests/test_dispatch.py tests/test_api_web.py` **三连跑 21 failed**，
+而**单跑、两两组合全过**。根因是三方叠加：
+1. `test_dispatch` 把全局 `db_core._DB_PATH` 指向自己的临时库，teardown 删库却**不还原**；
+2. `api_web._ensure_db()` 用 `config.DB_PATH` 做"每个库只初始化一次"的守卫（`_db_path_seeded`），路径没变就**早返回**；
+3. 于是下一个测试文件拿到"指向已删除文件的全局" → sqlite 就地新建空库 → `no such table: user_profile`。
+
+修法（三层，防御纵深）：① `test_dispatch` teardown 还原 `_DB_PATH`/`config.DB_PATH`；
+② `conftest` 增加**模块级兜底**：模块结束把 DB 状态复位（**空值不写回**，否则会把"未初始化"传染下去）；
+③ 兜底里**重置 `api_web._db_path_seeded`**，让下次进 App 时重新建表 + 幂等灌种子。
+验证：三连跑 **21 failed → 84 passed**。
+
+### 我这轮犯的两个错（如实记录）
+
+1. **并发跑了两个 pytest 会话**（全量放后台 + 三连放前台）→ 两边的 `pytest_sessionstart` 会**互相清理对方的测试库**，
+   一度让我误判"全量有 2 个 e2e 失败"。教训：**pytest 不要并发跑**（本项目测试库是共享文件名）。
+2. 一条命令里混了 PowerShell 不支持的 heredoc → 整条命令解析失败，`sync_test_count` **没执行**，
+   数字口径短暂不一致。已单独重跑。
+
+### 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `pytest tests/ -q` | 全绿（可运行 **620**，新增 24 条属地测试） |
+| `ruff check .` / `npm run build` | 0 / ✓ |
+| `rag_eval.py` | 48 条 **hit@1 100%**；属地用例 Top-1 **4/4** |
+| `ui_audit` / `mobile_audit` | 54 页视口 / 21 页 0 违规（前端有改动，已先 build） |
+| `demo_preflight --fast` | **9/9**（含登录页 `rag_golden=48` 口径核对） |
+| `check_claims.py` | 通过（620 用例口径一致） |
+| 静默异常门禁 | 假成功 0、未超基线 |
+| `probe_public.py` | 公网入口仍 8/8 |
+
+**提交**：本轮。
+

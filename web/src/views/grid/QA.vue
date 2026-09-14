@@ -16,10 +16,14 @@ const kForm = ref({
   title: '', category: '社保医保', plain_interpretation: '', content: '',
   summary: '', source: '社区整理', keywords: '', effective_date: '', expire_date: '',
   policy_number: '', attachment: '',
+  // 属地（地区识别 WS7）：适用地区，决定"属地优先"时这条政策为谁优先
+  applicable_area: '全国',
 })
 const kOp = ref({}) // kid -> {opinion, reason}
 
 const KB_CATS = ['社保医保', '养老服务', '住房保障', '办事指引', '社区规定']
+// 适用地区候选（可自由输入，兼容存量自由文本）：全国 = 无属地偏好，越具体越优先
+const AREA_OPTIONS = ['全国', '北京市', '北京市海淀区', '北京市朝阳区', '海淀小区'].map(v => ({ label: v, value: v }))
 
 onMounted(async () => {
   try { kb.value = (await knowledge.list()) || [] } catch { /* 忽略 */ }
@@ -75,7 +79,7 @@ async function createKb() {
   try {
     await knowledge.create(f)
     message.success('已创建并提交审核')
-    kForm.value = { title: '', category: '社保医保', plain_interpretation: '', content: '', summary: '', source: '社区整理', keywords: '', effective_date: '', expire_date: '', policy_number: '', attachment: '' }
+    kForm.value = { title: '', category: '社保医保', plain_interpretation: '', content: '', summary: '', source: '社区整理', keywords: '', effective_date: '', expire_date: '', policy_number: '', attachment: '', applicable_area: '全国' }
     kb.value = (await knowledge.list()) || []
   } catch (e) {
     message.error(e.message)
@@ -167,6 +171,18 @@ async function kgSearch() {
                 <n-select v-model:value="kForm.category" :options="KB_CATS.map(v=>({label:v,value:v}))" />
               </n-form-item-gi>
             </n-grid>
+            <n-grid :cols="2" :x-gap="12">
+              <n-form-item-gi label="适用地区（属地优先）">
+                <n-select v-model:value="kForm.applicable_area" filterable tag
+                          :options="AREA_OPTIONS" placeholder="全国 / 北京市 / 北京市海淀区 / 海淀小区" />
+              </n-form-item-gi>
+              <n-form-item-gi label="说明">
+                <span class="muted" style="font-size:0.8rem;line-height:1.6;">
+                  越具体越优先：本社区 &gt; 区 &gt; 市 &gt; 全国。填「全国」表示对所有社区一致；
+                  属地只影响排序，不会屏蔽其他地区的政策。
+                </span>
+              </n-form-item-gi>
+            </n-grid>
             <n-form-item label="通俗解读（必填）">
               <n-input v-model:value="kForm.plain_interpretation" type="textarea" :rows="2" placeholder="给居民看的一句话解读" />
             </n-form-item>
@@ -200,7 +216,11 @@ async function kgSearch() {
             <b>{{ k.title }}</b>
             <n-tag size="small" :type="k.status === '已发布' ? 'success' : k.status === '待审核' ? 'warning' : 'default'">{{ k.status }}</n-tag>
           </div>
-          <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ k.category }} · {{ (k.updated_at || '').slice(0, 16) }}</div>
+          <div class="muted" style="font-size:0.85rem;margin-top:4px;">
+            {{ k.category }} · {{ (k.updated_at || '').slice(0, 16) }}
+            <!-- 属地（地区识别 WS7）：让"这条政策为谁优先"一眼可见 -->
+            <n-tag v-if="k.applicable_area" size="tiny" :bordered="false" style="margin-left:6px;">📍 {{ k.applicable_area }}</n-tag>
+          </div>
           <div style="margin-top:8px;font-size:0.9rem;">{{ k.plain_interpretation }}</div>
           <div v-if="k.audit_opinion" class="muted" style="font-size:0.8rem;margin-top:4px;">审核意见：{{ k.audit_opinion }}</div>
           <div v-if="['待审核', '已发布'].includes(k.status)" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">

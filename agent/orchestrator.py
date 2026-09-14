@@ -92,8 +92,18 @@ class Orchestrator:
                     self.bb.write(key, d["content"], "system_restore")
         except Exception:
             pass
+        # 属地（地区识别 WS4）：会话建立时解析一次放进 ctx，天气/政策等工具复用，避免每轮重复查库。
+        # 没有属地（调度器自动巡检、无 uid）时留空 → 各工具回落全局默认城市，行为与升级前一致。
+        region = None
+        try:
+            from utils.region import resolve_region
+            from data.db_user import get_user_by_id
+            region = resolve_region((get_user_by_id(uid) or {}).get("community")) if uid else None
+        except Exception:  # noqa: BLE001
+            region = None
         ctx = {"role": role, "uid": uid, "name": name, "user_input": text,
                "elder_uid": elder_uid,
+               "region": region,
                "state": st}
 
         # 协商循环计数按用户轮次重置（P2 扩展前置修复：此前跨轮累计，

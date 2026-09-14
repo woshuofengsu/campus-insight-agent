@@ -23,8 +23,12 @@ class AskQuestion(BaseModel):
 @router.post("/ask")
 def web_qa_ask(req: AskQuestion, request: Request):
     from data.db_policy import ask_question
+    from api_routes.deps import _region
     u = _user(request)
-    r = ask_question(u.get("uid"), req.question, source=req.source, category=req.category or None)
+    # 属地（地区识别 WS2）：由用户所属社区解析 —— 属地只影响"选谁"，不改变自动回答阈值
+    reg = _region(request)
+    r = ask_question(u.get("uid"), req.question, source=req.source,
+                     category=req.category or None, region=reg)
     # U3：记录每次检索尝试（含未命中）→ 知识库健康度可量化
     try:
         from data.db_kb_metrics import log_kb_query
@@ -42,6 +46,10 @@ def web_qa_ask(req: AskQuestion, request: Request):
             "answer": r.get("auto_answer"), "score": r.get("score"),
             "title": (r.get("knowledge") or {}).get("title"),
             "rag": r.get("rag", False),
+            # 属地可解释性：前端可显示"已按海淀区属地优先"
+            "region_level": r.get("region_level", "national"),
+            "region_label": reg.label(),
+            "applicable_area": r.get("applicable_area", ""),
         }, "已自动回答")
     # 未匹配/敏感/医疗 → 转人工提示
     return _ok({

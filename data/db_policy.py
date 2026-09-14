@@ -288,19 +288,29 @@ def _is_effective(entry: dict) -> bool:
 
 
 def search_published_knowledge(query: str, top_k: int = 5,
-                               category: str | None = None) -> list[dict]:
+                               category: str | None = None,
+                               region=None) -> list[dict]:
     """只检索「已发布且未失效」的条目，按匹配度降序返回（带 score 字段）。
 
     U1 混合检索：词法分（同义词扩展）+ 语义余弦加分（provider 可用时），
     provider=none / 无向量 / 调用失败 → 纯词法，行为与升级前一致。
+
+    属地化（地区识别 WS2）：传入 `region`（`utils.region.Region`）后，
+    按 `applicable_area` 做**属地优先**：
+      - `base_score` = 词法+语义（**业务阈值只看它**，决定自动回答/转人工）；
+      - `score`（= final）= base + 属地加分，**仅用于排序**；
+      - 属地加分只在 `base > 0`（主题已相关）时生效 → 防止"属地很近但无关"的条目被抬进结果。
+    `region=None` → 加分恒为 0，排序与升级前**逐字节一致**（向后兼容的关键）。
 
     ⚠️ 排序口径说明（两套并存、各有用途，勿混用）：
       - **本函数（词法分 + 语义加性加分）**：线上答题路径（`web_qa_ask` → `ask_question`），
         输出连续分并与业务阈值 `_match_threshold` 比较，决定自动回答 / 弱命中转人工。
       - **`agent/rag.search_hybrid()`（RRF 融合）**：Agent 侧上下文注入与离线评测
         （`scripts/rag_eval.py`）使用，只依据两路排名融合，不做阈值判定。
-      - 二者共享同一批数据与 `utils.embedding`，仅融合算子不同（加权和 vs RRF）。
+      - 二者共享同一批数据与 `utils.embedding`，仅融合算子不同（加权和 vs RRF）；
+        属地加权也共用 `utils.region` 的级别与权重定义（避免两套口径打架）。
     """
+    from utils.region import policy_region_boost
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM knowledge_base").fetchall()
     scored: list[tuple[dict, float]] = []
@@ -321,15 +331,19 @@ def search_published_knowledge(query: str, top_k: int = 5,
         d = dense.get(e.get("id"))
         if d is not None:
             s += _DENSE_WEIGHT * max(0.0, d)
-        if s > 0:
-            scored.append((e, s))
-    scored.sort(key=lambda x: -x[1])
-    out = []
-    for e, s in scored[:top_k]:
-        e["score"] = round(s, 4)
+        if s <= 0:
+            continue
+        boost, level = policy_region_boost(e.get("applicable_area", ""), region)
+        final = s + boost
+        if final <= 0:          # 明确外地 + 主题很弱 → 不召回（本就不该出现）
+            continue
+        e["base_score"] = round(s, 4)
+        e["score"] = round(final, 4)
+        e["region_level"] = level
         e["retrieval"] = "hybrid" if dense else "lexical"
-        out.append(e)
-    return out
+        scored.append((e, final))
+    scored.sort(key=lambda x: -x[1])
+    return [e for e, _ in scored[:top_k]]
 
 
 def format_knowledge_answer(entry: dict) -> str:
@@ -895,11 +909,13 @@ def get_question(question_id: int) -> dict | None:
 
 
 def ask_question(user_id: int, question: str, source: str = "居民端",
-                 category: str | None = None, actor: str | None = None) -> dict:
+                 category: str | None = None, actor: str | None = None,
+                 region=None) -> dict:
     """提问并自动回答。匹配成功落提问记录（已自动回答），失败只留痕不落记录。
 
     返回 dict：matched=True 时含 question_id/auto_answer/knowledge/score；
     matched=False 时 reason 为 no_knowledge / low_score / empty / too_long。
+    `region`（`utils.region.Region`）：属地化排序 + 属地优先选答，默认 None = 与升级前行为一致。
     """
     q = (question or "").strip()
     if not q:
@@ -940,9 +956,9 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
                 "summary": summary, "q_type": q_type,
                 "manual_text": "安全校验暂时不可用，已转人工审核处理。"}
 
-    results = search_published_knowledge(q, top_k=5, category=category)
+    results = search_published_knowledge(q, top_k=5, category=category, region=region)
     if not results and category:
-        results = search_published_knowledge(q, top_k=5)  # 指定分类没命中，放宽全库
+        results = search_published_knowledge(q, top_k=5, region=region)  # 指定分类没命中，放宽全库
     if not results:
         # R39：存在同题过期条目时给「可能已更新」提示
         expired_hint = ""
@@ -964,7 +980,15 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
         return {"matched": False, "reason": "no_knowledge", "question": q,
                 "summary": summary, "q_type": q_type, "expired_hint": expired_hint}
     best = results[0]
-    if best["score"] < _match_threshold:
+    # 属地化选答规则（WS2 关键设计）：**属地只决定"在都达标的条目里优先谁"，绝不降低安全门槛**。
+    # 若只看 results[0]，会出现"本地弱命中(base 1.9) 把全国强命中(base 2.5) 挤到第二 →
+    # 阈值判 1.9<2.0 → 本来能答的反而转人工"的反效果。这里改为：在 final 排序里取**第一条 base 达标**的。
+    answer_entry = next(
+        (e for e in results
+         if float(e.get("base_score", e.get("score", 0.0))) >= _match_threshold),
+        None,
+    )
+    if answer_entry is None:
         # WS3：弱命中尝试真 RAG（开关关闭 / 无片段 / 引用校验失败 → 维持原转人工逻辑，行为不变）
         rag_out = None
         try:
@@ -1004,6 +1028,8 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
         return {"matched": False, "reason": "low_score", "question": q,
                 "summary": summary, "q_type": q_type, "best_score": best["score"]}
 
+    # 走到这里说明存在 base 达标的条目：用**final 排序里第一条达标者**作答（属地优先在此生效）
+    best = answer_entry
     auto_answer = format_knowledge_answer(best)
     with get_db() as conn:
         cur = conn.execute(
@@ -1022,6 +1048,10 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
         "matched": True, "question_id": qid, "question": q, "summary": summary,
         "q_type": q_type, "auto_answer": auto_answer, "knowledge_id": best["id"],
         "knowledge": _knowledge_view(best), "score": best["score"],
+        # 属地可解释性：前端可显示"已按海淀区属地优先"；region=None 时恒为 national
+        "region_level": best.get("region_level", "national"),
+        "base_score": best.get("base_score", best["score"]),
+        "applicable_area": best.get("applicable_area") or "",
     }
 
 

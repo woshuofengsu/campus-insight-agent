@@ -9,6 +9,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from data.db_core import init_db
 from data.db_user import create_user
 
+# 全局 DB 路径的"上一个值"：本文件会 init_db(临时库) 并在 teardown 删库，
+# **必须把全局还原**，否则后续测试文件里的 get_db() 会打到"已删除的路径"上
+# （sqlite 会新建一个空库 → `no such table: user_profile`）。
+# 实测：`pytest tests/test_agent.py tests/test_dispatch.py tests/test_api_web.py` 三连跑必现，
+# 而两两组合/单跑都过 —— 典型的"跑子集出假失败"陷阱。
+_orig_db_path: str | None = None
+
 
 def _init_test_db(name: str) -> str:
     """建测试库：**先清残留**（db + -wal + -shm），保证重复运行/中断后可重入。
@@ -16,6 +23,11 @@ def _init_test_db(name: str) -> str:
     踩坑记录：原先只 `init_db()` 不清理，残留库会让 `create_user` 抛
     `Username 'grid_mgmt' already taken` → 单独跑通过、全量跑 error 的偶发失败。
     """
+    global _orig_db_path
+    import config
+    from data import db_core
+    if _orig_db_path is None:
+        _orig_db_path = db_core._DB_PATH or config.DB_PATH
     db_path = os.path.join(os.path.dirname(__file__), f"_test_dispatch_{name}.db")
     for suffix in ("", "-wal", "-shm"):
         try:
@@ -27,7 +39,7 @@ def _init_test_db(name: str) -> str:
 
 
 def _cleanup(db_path: str, retries: int = 5):
-    """清理临时库（含 -wal/-shm）；Windows 下句柄占用会短暂拒绝删除 → 重试后放弃。"""
+    """清理临时库（含 -wal/-shm），并把全局 DB 路径**还原**回进入本文件前的值。"""
     import time
 
     for suffix in ("", "-wal", "-shm"):
@@ -39,6 +51,12 @@ def _cleanup(db_path: str, retries: int = 5):
                 break
             except PermissionError:
                 time.sleep(0.2 * (i + 1))
+    global _orig_db_path
+    if _orig_db_path:
+        import config
+        from data import db_core
+        db_core._DB_PATH = _orig_db_path
+        config.DB_PATH = _orig_db_path
 
 
 class TestDispatchByDepartment(unittest.TestCase):

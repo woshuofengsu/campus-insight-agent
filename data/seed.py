@@ -634,6 +634,55 @@ def _seed_notices():
         return 0
 
 
+def _seed_region_policies() -> int:
+    """种 3 条**属地政策**（地区识别 WS5），与全国/北京市条目形成"本地优先、全国兜底"对照。
+
+    为什么必须有：库里现有 `applicable_area` 分布是 北京市×39 / 空×19 / 北京市海淀区×1 ——
+    区级条目只有 1 条，属地优先的效果**几乎看不见**。这里补 3 条不同层级，让演示能一眼看出差别。
+
+    幂等：按标题判重（已存在则跳过）；不动 schema。
+    """
+    entries = [
+        # 区级：与"北京市/全国"的养老政策同主题，用于演示"本区细则排前面"
+        ("北京市海淀区高龄老人津贴申领实施细则",
+         "海淀区户籍、年满 80 周岁老人可申领高龄津贴：80-89 岁每人每月 200 元，90-99 岁 500 元，"
+         "100 岁以上 800 元。办理材料：身份证、户口簿、本人名下银行卡（可他人代办，需代办人身份证）。"
+         "办理地点：海淀小区社区服务站（工作日 9:00-17:00，电话 62310001），也可在「北京通」APP 线上申请。"
+         "注意：津贴按季度发放，跨区迁入的从迁入当季起算。",
+         "高龄,津贴,补贴,老人,80岁,海淀,申领,办理,材料,养老,季度,高龄补贴,养老补贴,高龄津贴,怎么领,多少钱",
+         "北京市海淀区"),
+        # 社区级（本社区）：最具体一级
+        ("海淀小区社区助餐补贴与代办服务指引",
+         "本小区 60 岁以上居民在中心花园助餐点就餐可享社区补贴 2 元/餐（每人每日限 2 餐），"
+         "需携带身份证到助餐点登记一次；行动不便可申请送餐上门（每餐加收 1 元，电话 62310086）。"
+         "另：社区服务站可代办公交老年卡年审、高龄津贴材料代收，每周二、四上午办理。",
+         "助餐,补贴,送餐,代办,登记,老年卡,社区,老人,就餐,驿站",
+         "海淀小区"),
+        # 市级：中间层级
+        ("北京市老旧小区加装电梯财政补贴办法",
+         "北京市对老旧小区增设电梯项目给予财政补贴：每部电梯市级补贴 24 万元，区级按 1:1 配套，"
+         "居民自筹部分可按楼层系数分摊（一层不出资、二层 5%、逐层递增）。"
+         "申请须经本单元 2/3 以上业主同意，由街道办统一受理并公示 7 天。",
+         "加装电梯,电梯,补贴,增设电梯,分摊,申请,老旧小区,费用",
+         "北京市"),
+    ]
+    added = 0
+    with get_db() as conn:
+        for title, content, keywords, area in entries:
+            hit = conn.execute("SELECT id FROM knowledge_base WHERE title=?", (title,)).fetchone()
+            if hit:
+                continue
+            conn.execute(
+                "INSERT INTO knowledge_base (category, title, content, keywords, "
+                "audit_status, applicable_area, source) VALUES (?,?,?,?,?,?,?)",
+                ("社保医保" if "津贴" in title or "电梯" in title else "社区服务",
+                 title, content, keywords, "已发布", area, "社区整理"),
+            )
+            added += 1
+        conn.commit()
+    return added
+
+
 def seed_all(db_path: str):
     """往库里种治理演示数据。只在库空的时候种——绝不删已有数据。"""
     init_db(db_path)
@@ -649,6 +698,9 @@ def seed_all(db_path: str):
         m = _seed_notices()
         if m:
             print(f"[seed] Notices seeded: {m} rows")
+        r = _seed_region_policies()
+        if r:
+            print(f"[seed] Region policies seeded: {r} rows")
         print(f"[seed] Database already has {count} issues, ensuring demo accounts only")
         return
     print("[seed] Empty database — seeding community governance demo data (narrative edition)...")
@@ -661,6 +713,7 @@ def seed_all(db_path: str):
     _seed_feedback()
     _seed_care_events()
     _seed_notices()
+    _seed_region_policies()
     # 疾控监测数据（国家疾控局月度公报）
     try:
         from data.db_surveillance import seed_surveillance
