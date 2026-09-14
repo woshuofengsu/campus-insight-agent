@@ -24,7 +24,7 @@
 - **政策回答不编造**：只基于检索片段生成并校验引用下标；无材料时转人工而不是硬答
 - **知识可检索**：59 条知识条目（含 40 条公开政策摘要）+ 词法/语义向量混合检索（RRF），48 条口语金标实测 **hit@1 100%**（纯词法基线 85.7%）
 - **数据安全**：手机号 **AES-256-GCM 加密落库**，全库 8 张含手机号表**明文计数为 0**（`scripts/audit_phone_encryption.py` 可现场复核）
-- **降本**：LLM 默认按需调用（特性开关控制），20 次真实调用实测 **¥0.0053**，记账可查
+- **降本**：LLM 默认按需调用（特性开关控制），**单次均价 ¥0.0002**（2026-09-14 快照：57 次调用合计 ¥0.0139），记账可查（`python scripts/llm_cost.py`）
 
 ### 👥 三端系统（Vue3 三端，页面数以路由表为准）
 
@@ -91,10 +91,10 @@ elderly:  demo_elderly（免登录）
 | 前端 | Vue3 + Vite + Naive UI，三端（居民/网格/老年）|
 | 后端 | FastAPI（`api_web.py`，:8000），JWT 鉴权 + WebSocket + 安全响应头 |
 | 多智能体 | 9 个声明式 Agent + 黑板消息队列 + 仲裁器/校验器（`agent/`）|
-| 模型 | DeepSeek（deepseek-chat），默认规则优先（降本），20 次调用实测 ¥0.0053 |
+| 模型 | DeepSeek（deepseek-chat），默认规则优先（降本），**单次均价 ¥0.0002**（2026-09-14 快照：57 次调用合计 ¥0.0139） |
 | 数据库 | SQLite（**schema v46**，WAL），版本化迁移（`_mN_` 注册表），可演进 PostgreSQL |
 | 知识检索 | 词法（同义/方言扩展）+ 语义向量（text-embedding-v3, 1024 维）混合检索 + RRF 融合 |
-| 质量门禁 | 634 项测试 / ruff 0 / 54 页视口 UI 客观审计（全站 34 个路由页）/ 9 项演示前自检 / 检索评测（CI 门禁）|
+| 质量门禁 | 638 项测试 / ruff 0 / 54 页视口 UI 客观审计（全站 34 个路由页）/ 9 项演示前自检 / 检索评测（CI 门禁）|
 | 移动端 | 响应式/安全区/老年大字/语音（PWA 可选）|
 
 ## 📁 项目结构
@@ -117,13 +117,13 @@ campus-insight-agent/
 
 | 验证项 | 命令 | 实测 |
 |---|---|---|
-| 功能与回归 | `python -m pytest tests/ -q` | **633 passed / 1 skipped**（可运行 634） |
+| 功能与回归 | `python -m pytest tests/ -q` | **637 passed / 1 skipped**（可运行 638） |
 | **端到端验收（真实服务）** | `python scripts/demo_acceptance.py` | **12/12 通过**（三角色登录、AI 对话、政策命中、老年天气、工作台指标、图谱反查、留痕、属地化两社区对比） |
 | 演示前一键自检 | `python scripts/demo_preflight.py` | **9/9 通过**（schema、手机号加密覆盖、演示账号、服务身份…） |
 | UI 无障碍/一致性 | `python scripts/ui_audit.py` | **54 页/视口 × 9 类检查 0 违规**（**覆盖全部 34 个路由页**：三端 + 大屏 + 详情/表单页 + 暗色 + 320/390/1366/1440/1920 档） |
 | 检索命中率 | `python scripts/rag_eval.py` | 混合 **hit@1 48/48 = 100%**（纯词法 85.7%） |
 | 数据安全 | `python scripts/audit_phone_encryption.py` | 8 张含手机号表**明文计数 0** |
-| LLM 质量与成本 | `python scripts/llm_eval.py --provider llm` | 20/20 满分，**¥0.0053 / 20 次** |
+| LLM 质量与成本 | `python scripts/llm_eval.py --provider llm`（评测 20 题满分）· `python scripts/llm_cost.py`（成本实况） | **评测 20/20**；成本 **单次均价 ¥0.0002**（2026-09-14 快照：57 次调用合计 ¥0.0139） |
 | 数字一致性 | `python scripts/check_claims.py` | 材料数字与代码实时一致 |
 
 ## 🧪 测试

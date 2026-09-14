@@ -332,7 +332,7 @@ flowchart LR
 
 <ul>
 <li><strong>提效</strong>：诉求从"看到消息→手工登记→口头转派"变为"一句话→自动分类/派单/通知"，全流程线上留痕。</li>
-<li><strong>降本</strong>：<strong>规则优先 + LLM 按需</strong>，日常诉求零 LLM 成本；实测 LLM 单轮约 <strong>¥0.0002</strong>（30 次调用合计 ¥0.0069，含开发期探测，可现场查 <code>llm_usage</code>）。</li>
+<li><strong>降本</strong>：<strong>规则优先 + LLM 按需</strong>，日常诉求零 LLM 成本；实测 LLM 单轮约 <strong>¥0.0002</strong>（库内记账快照（2026-09-14）：<strong>57 次调用 / ¥0.0139</strong>（评测 40 题 ¥0.0109 + 跨角色协商 15 次 ¥0.0030；稳定口径是单次均价 <strong>¥0.0002</strong>），可现场用 <code>python scripts/llm_cost.py</code> 复核）。</li>
 <li><strong>提质</strong>：政策问答<strong>强制引用</strong>可溯源（"依据：XX 政策（V1）"），弱命中转人工而非硬答；SLA 分级与超时升级。</li>
 <li><strong>风控</strong>：手机号等敏感字段<strong>加密落库 + 展示脱敏</strong>；医疗/法律类不自动回答；敏感词与完整手机号在输出前拦截；所有 AI 决策留痕可审计。</li>
 </ul>
@@ -357,7 +357,7 @@ flowchart LR
 <th>是（真实在跑）</th><th>不是（我们不宣称）</th>
 <tr><td>FastAPI 主服务 + Vue3 三端，<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌种子数据（约 15 秒）</td><td><strong>不是生产系统</strong>：单进程 + SQLite，多社区/多副本需 Redis + PostgreSQL（路径见 <code>docs/scaling.md</code>）</td></tr>
 <tr><td>9 智能体角色、16 工具、双层防线、留痕、加密、属地化，全部可现场操作与复算</td><td><strong>不是已落地项目</strong>：<strong>无真实社区试点、无真实用户数据</strong>（演示库为程序生成的虚构种子数据）</td></tr>
-<tr><td>12 项端到端验收、634 项可运行用例、54 页视口 + 21 页移动端审计、7 段真实录屏</td><td><strong>成效未验证</strong>：能证明"机制有效、可审计"，不能证明"治理效率提升了多少"</td></tr>
+<tr><td>12 项端到端验收、638 项可运行用例、54 页视口 + 21 页移动端审计、7 段真实录屏</td><td><strong>成效未验证</strong>：能证明"机制有效、可审计"，不能证明"治理效率提升了多少"</td></tr>
 <tr><td>已有公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，<strong>演示结束一键关闭</strong>）</td><td><strong>不是安全上线状态</strong>：<code>DEMO_MODE</code> / <code>DEMO_AUTO_WORKER</code> 必须关闭，密钥需换正式值（本机现为演示占位密钥）</td></tr>
 </table>
 
@@ -387,7 +387,7 @@ flowchart LR
 
 <ul>
 <li>[ ] 未测试</li>
-<li>[x] <strong>内部测试</strong>（<strong>634 项可运行用例</strong>：633 通过 + 1 项需外部服务默认跳过；含单元/集成/端到端/多智能体协商/安全负向/数据加密/属地化/适老前端卫生）</li>
+<li>[x] <strong>内部测试</strong>（<strong>638 项可运行用例</strong>：637 通过 + 1 项需外部服务默认跳过；含单元/集成/端到端/多智能体协商/安全负向/数据加密/属地化/适老前端卫生）</li>
 <li>[ ] 小范围试用（<strong>尚无真实用户试用</strong>）</li>
 <li>[ ] 场景试点（<strong>尚无真实社区试点</strong>）</li>
 </ul>
@@ -398,7 +398,7 @@ flowchart LR
 
 <table>
 <th>#</th><th>验证项</th><th>命令</th><th>实测结果</th>
-<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>633 通过 / 1 跳过 / 0 告警</strong>（可运行 634）</td></tr>
+<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>637 通过 / 1 跳过 / 0 告警</strong>（可运行 638）</td></tr>
 <tr><td>2</td><td>端到端验收（真实 HTTP）</td><td><code>python scripts/demo_acceptance.py</code></td><td><strong>12/12 全过</strong>（含属地化两社区对比）</td></tr>
 <tr><td>3</td><td>演示前一键自检</td><td><code>python scripts/demo_preflight.py</code></td><td><strong>9/9 通过</strong></td></tr>
 <tr><td>4</td><td>UI 与无障碍客观审计</td><td><code>python scripts/ui_audit.py</code></td><td><strong>54 个页面/视口 × 9 类检查 0 违规</strong>（对比度/溢出/热区/字号/暗色/动效/残缺文本）</td></tr>
@@ -481,7 +481,7 @@ flowchart LR
 <ul>
 <li><strong>1.</strong> 智能体架构图 / 工作流程图（见第三章 Mermaid，可转图片导出）</li>
 <li><strong>2.</strong> 原型界面截图（三角色：居民端 / 网格员工作台 / 老年关怀版 —— <strong>附件待附</strong>，素材已备于 <code>.recordings/</code>，可一键重录）</li>
-<li><strong>3.</strong> 测试数据 / 效果对比（<strong>634 项可运行用例</strong>（633 通过 + 1 跳过）+ 端到端 12/12 + 检索 hit@1 100% + UI 审计 54 页视口 0 违规，复算命令见 §5.2）</li>
+<li><strong>3.</strong> 测试数据 / 效果对比（<strong>638 项可运行用例</strong>（637 通过 + 1 跳过）+ 端到端 12/12 + 检索 hit@1 100% + UI 审计 54 页视口 0 违规，复算命令见 §5.2）</li>
 <li><strong>4.</strong> 知识产权证明（可选，待办）</li>
 <li><strong>5.</strong> 其他支撑材料（README / CHANGELOG / 技术文档 / 开发日志）</li>
 </ul>
