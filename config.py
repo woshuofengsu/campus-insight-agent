@@ -73,6 +73,33 @@ COMMUNITY_DISTRICT = _secret("COMMUNITY_DISTRICT", "") or _secret("CAMPUS_DISTRI
 DEFAULT_TENANT = _secret("DEFAULT_TENANT", "") or COMMUNITY_DISTRICT or "default"
 COMMUNITY_BG_IMAGE = _secret("COMMUNITY_BG_IMAGE", "") or _secret("CAMPUS_BG_IMAGE", "")  # URL 或本地路径
 
+# 属地化（地区识别）：社区名 → 属地。天气按社区城市、政策按行政区划做"属地优先"。
+# ⚠ 键必须与库里 `user_profile.community` 的**真实值**一致（当前种子数据是「海淀小区」）；
+#    写错键不会报错，只会静默回落到全局默认城市（utils/region.resolve_region 会打 warning）。
+# 可用环境变量 REGION_BY_COMMUNITY 传 JSON 覆盖（多社区/多租户时）。
+_DEFAULT_REGION_MAP = {
+    "海淀小区": {
+        "province": "北京市", "city": COMMUNITY_CITY, "city_id": COMMUNITY_CITY_ID,
+        "district": COMMUNITY_DISTRICT, "street": "社区服务中心街道",
+    },
+}
+
+
+def _load_region_map() -> dict:
+    raw = _secret("REGION_BY_COMMUNITY", "")
+    if raw:
+        try:
+            import json as _json
+            data = _json.loads(raw)
+            if isinstance(data, dict) and data:
+                return data
+        except Exception:  # noqa: BLE001
+            _log.warning("REGION_BY_COMMUNITY 不是合法 JSON，改用内置演示映射")
+    return _DEFAULT_REGION_MAP
+
+
+REGION_BY_COMMUNITY = _load_region_map()
+
 # 真实 API 密钥
 HEFENG_API_KEY = _secret("HEFENG_API_KEY", "")
 HEFENG_API_HOST = _secret("HEFENG_API_HOST", "")
