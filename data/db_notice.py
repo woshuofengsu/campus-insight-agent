@@ -135,8 +135,10 @@ def _validate(title: str, notice_type: str, publish_scope: str, body: str,
             hit, word = check_sensitive(_f or "")
             if hit:
                 return f"内容包含敏感词「{word}」，请修改后重试"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        # 内容安全校验**不允许静默放行**：组件异常时拒绝发布并留告警（fail-closed）
+        _log.warning("敏感词校验组件异常，出于内容安全拒绝发布：%s", e)
+        return "内容安全检查暂时不可用，请稍后重试（已记录告警）"
     return ""
 
 
@@ -225,8 +227,9 @@ def create_notice(title: str, notice_type: str, publish_scope: str, body: str,
             _hit, _w = check_sensitive(_f or "")
             if _hit:
                 return 0
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        _log.warning("敏感词校验组件异常，拒绝写入通知（fail-closed）：%s", e)
+        return 0
     with get_db() as conn:
         cur = conn.execute(
             "INSERT INTO notices (title, notice_type, publish_scope, body, elderly_summary, "

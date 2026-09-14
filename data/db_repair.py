@@ -7,9 +7,12 @@
 安全隐患走 safety_reminders 表，不进工单状态机。
 """
 import json
+import logging
 import re
 from data.db_core import get_db
 from data.db_notifications import log_activity
+
+_log = logging.getLogger(__name__)
 from utils.timeutil import utcnow
 
 MODULE = "报修"
@@ -457,8 +460,10 @@ def close_issue(issue_id: int, reason: str, actor: str = "负责人") -> tuple[b
             create_notification(row["reporter_id"], "issue",
                                 "工单已关闭",
                                 f"工单 #{issue_id}（{row['title'][:20]}）已关闭，原因：{reason}")
-    except Exception:
-        pass  # 通知不是硬依赖
+    except Exception as _e:  # noqa: BLE001
+        # 通知不是硬依赖（主流程已提交），但**发不出去必须可见**：
+        # 否则居民永远不知道工单状态变了（这两处分别是「已关闭」与「补充信息」通知）
+        _log.warning("工单通知发送失败（主流程已提交，issue_id=%s）：%s", issue_id, _e)
     return True, ""
 
 
@@ -546,8 +551,10 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
                 f"{row['title'][:20]}：居民补充了信息，请确认是否影响紧急程度/分类（影响则重新计时或重新分派）。",
                 related_id=issue_id,
             )
-    except Exception:
-        pass  # 通知不是硬依赖
+    except Exception as _e:  # noqa: BLE001
+        # 通知不是硬依赖（主流程已提交），但**发不出去必须可见**：
+        # 否则居民永远不知道工单状态变了（这两处分别是「已关闭」与「补充信息」通知）
+        _log.warning("工单通知发送失败（主流程已提交，issue_id=%s）：%s", issue_id, _e)
     return True, ""
 
 

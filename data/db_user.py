@@ -275,8 +275,9 @@ def bind_elderly(guardian_id: int, elderly_id: int) -> tuple[bool, str]:
         _e_name = e["name"] if e["name"] else "（无姓名）"
         log_activity(g["name"] or "家属", "绑定老人", "elderly_binding", elderly_id,
                      _e_name, module="老年端", after_value=str(elderly_id))
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        # 绑定本身已提交，但**审计留痕失败**必须可见（涉 PII 的授权关系变更）
+        _log.warning("绑定老人的留痕写入失败（绑定已生效）：%s", _e)
     return True, f"已绑定老人：{e['name'] if e['name'] else '（无姓名）'}"
 
 

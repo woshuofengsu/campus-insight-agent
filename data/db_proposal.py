@@ -369,8 +369,8 @@ def audit_proposal(pid: int, approve: bool, opinion: str = "",
                  detail=f"{opinion}{attach_note}")
     try:
         notify_proposal_status_change(pid, new_status, opinion or "")
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 
@@ -479,8 +479,8 @@ def remind_confirm(pid: int, actor: str = "负责人") -> tuple[bool, str]:
                  module=MODULE, after_value=row["status"])
     try:
         notify_proposal_status_change(pid, "待确认公示/私有", "请尽快在审核通过后 7 天内确认公开/私有，逾期将按提交时选择执行。")
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 
@@ -515,8 +515,8 @@ def auto_confirm_overdue(actor: str = "系统") -> list[int]:
             try:
                 notify_proposal_status_change(r["id"], new_status,
                                               f"您的提案已按{'公开' if r['is_public'] else '私有'}执行。")
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
             done.append(r["id"])
     return done
 
@@ -606,8 +606,9 @@ def add_proposal_comment(pid: int, user_id: int, content: str) -> tuple[bool, st
         hit, word = check_sensitive(content)
         if hit:
             return False, f"议论包含敏感词「{word}」"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        _log.warning("议论敏感词校验异常，拒绝发布（fail-closed）：%s", e)
+        return False, "内容安全检查暂时不可用，请稍后重试（已记录告警）"
     with get_db() as conn:
         row = conn.execute(
             "SELECT status, title FROM proposals WHERE id=?", (pid,)
@@ -762,8 +763,8 @@ def extend_voting(pid: int, minutes: int, actor: str = "系统") -> tuple[bool, 
         from data.db_notifications import broadcast_notification
         broadcast_notification("proposal_update", "⏳ 公示顺延",
                                f"「{row['title'][:30]}」投票功能故障已恢复，公示期顺延 {minutes} 分钟。")
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案公示顺延广播失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 
@@ -827,8 +828,8 @@ def decide_execute(pid: int, execute: bool, reason: str = "",
                  before_value=row["status"], after_value="不予执行", detail=reason)
     try:
         notify_proposal_status_change(pid, "不予执行", reason)
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 
@@ -876,8 +877,8 @@ def resolve_proposal(pid: int, result: str, actor: str = "负责人") -> tuple[b
                  before_value=old, after_value="待提案人反馈", detail=result)
     try:
         notify_proposal_status_change(pid, "待提案人反馈", result)
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 
@@ -965,8 +966,8 @@ def handle_reopen(pid: int, close: bool = False, reason: str = "",
                          module=MODULE, before_value=old, after_value="已关闭", detail=reason)
             try:
                 notify_proposal_status_change(pid, "已关闭", reason)
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
             return True, ""
 
         # 继续重新执行（次数在反馈时已统一累加，这里不再动）
@@ -1019,8 +1020,8 @@ def auto_end_unfeedback(actor: str = "系统") -> list[int]:
                          detail="7 天未反馈满意度，视为满意")
             try:
                 notify_proposal_status_change(r["id"], "已结束", "7 天未反馈，系统自动视为满意，提案已结束。")
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
             done.append(r["id"])
     return done
 
@@ -1089,8 +1090,8 @@ def close_proposal(pid: int, reason: str, actor: str = "负责人") -> tuple[boo
                  before_value=old, after_value="已关闭", detail=reason)
     try:
         notify_proposal_status_change(pid, "已关闭", reason)
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 
@@ -1112,8 +1113,8 @@ def take_down_proposal(pid: int, reason: str, actor: str = "负责人") -> tuple
                  before_value=old, after_value="违规下架", detail=reason)
     try:
         notify_proposal_status_change(pid, "违规下架", reason)
-    except Exception:
-        pass
+    except Exception as _e:  # noqa: BLE001
+        _log.warning("提案状态通知失败（主流程已提交，不影响返回值）：%s", _e)
     return True, ""
 
 

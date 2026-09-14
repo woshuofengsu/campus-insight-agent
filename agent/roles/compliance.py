@@ -6,10 +6,13 @@
 - 权限校验（角色与意图匹配，由 Orchestrator 前置；这里做兜底）
 - 留痕（模块来源=Agent，落 agent_logs）
 """
+import logging
 import re
 
 from agent.roles.base import BaseAgent
 from utils.text import check_sensitive
+
+_log = logging.getLogger(__name__)
 
 # 完整手机号模式（11 位 1 开头）
 _PHONE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
@@ -43,8 +46,8 @@ class ComplianceAuditorAgent(BaseAgent):
             try:
                 log_agent(uid, role, user_input, intent, routed=f"审计拦截-敏感词",
                           status="拦截", error=f"命中敏感词「{word}」", related_id=related_id)
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("审计拦截留痕失败（主流程已提交，不影响返回值）：%s", _e)
             return {"passed": False, "reason": f"敏感词「{word}」", "reply": "该内容需人工审核后再展示。"}
 
         # 2. 脱敏：回复中不应出现完整手机号（业务回复只给脱敏或工单号）
@@ -54,8 +57,8 @@ class ComplianceAuditorAgent(BaseAgent):
             try:
                 log_agent(uid, role, user_input, intent, routed="审计拦截-完整手机号",
                           status="拦截", error="回复包含完整手机号", related_id=related_id)
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("审计拦截留痕失败（主流程已提交，不影响返回值）：%s", _e)
             return {"passed": False, "reason": "包含完整手机号", "reply": "该内容涉及隐私，需人工审核。"}
 
         # 2.5 身份证检测（数据安全 v3.0）
@@ -65,8 +68,8 @@ class ComplianceAuditorAgent(BaseAgent):
             try:
                 log_agent(uid, role, user_input, intent, routed="审计拦截-完整身份证号",
                           status="拦截", error="回复包含完整身份证号", related_id=related_id)
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("审计拦截留痕失败（主流程已提交，不影响返回值）：%s", _e)
             return {"passed": False, "reason": "包含完整身份证号", "reply": "该内容涉及隐私，需人工审核。"}
 
         # 3. 留痕（正常通过）
@@ -74,6 +77,6 @@ class ComplianceAuditorAgent(BaseAgent):
         try:
             log_agent(uid, role, user_input, intent, routed=f"{intent}/{status}",
                       status=status, related_id=related_id)
-        except Exception:
-            pass
+        except Exception as _e:  # noqa: BLE001
+            _log.warning("审计拦截留痕失败（主流程已提交，不影响返回值）：%s", _e)
         return {"passed": True, "reason": "", "reply": text}

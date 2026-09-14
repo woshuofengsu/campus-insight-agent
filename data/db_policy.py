@@ -932,8 +932,13 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
             return {"matched": False, "reason": "manual", "question": q,
                     "summary": summary, "q_type": q_type,
                     "manual_text": "该问题可能涉及医疗诊断或法律事务，系统不自动回答，已转人工审核。"}
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        # 这里包着「敏感词拦截 + 医疗/法律类转人工」两道判断：一旦异常被静默吞掉，
+        # 系统会**继续自动回答**（内容安全 fail-open）。改为转人工并告警。
+        _log.warning("提问安全预处理异常，保守转人工：%s", e)
+        return {"matched": False, "reason": "manual", "question": q,
+                "summary": summary, "q_type": q_type,
+                "manual_text": "安全校验暂时不可用，已转人工审核处理。"}
 
     results = search_published_knowledge(q, top_k=5, category=category)
     if not results and category:
@@ -1179,8 +1184,8 @@ def feedback_question(question_id: int, satisfied: bool, reason: str = "",
                 _notify_managers("🧭 政策提问需线下沟通",
                                  f"提问「{row['summary'][:20]}」超过 3 次循环未解决，已标记需线下沟通。",
                                  related_id=question_id)
-            except Exception:
-                pass
+            except Exception as _e:  # noqa: BLE001
+                _log.warning("「需线下沟通」通知发送失败（状态已更新）：%s", _e)
             return True, "offline", question_id
         new_loop = row["loop_count"] + 1
         with get_db() as conn:
@@ -1506,8 +1511,9 @@ def set_match_threshold(value: float, actor: str = "负责人") -> tuple[bool, s
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(v),),
             )
             conn.commit()
-    except Exception:
-        pass  # 持久化失败不影响进程内生效
+    except Exception as _e:  # noqa: BLE001
+        # 进程内已生效，但**重启后会回退**——必须告警，否则用户以为永久改了
+        _log.warning("自动回答阈值持久化失败（重启后会回退到旧值）：%s", _e)
     log_activity(actor, "调整自动回答阈值", "knowledge", None, "",
                  module=MODULE, before_value=str(old), after_value=str(v))
     return True, ""

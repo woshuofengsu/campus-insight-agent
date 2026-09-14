@@ -107,8 +107,10 @@ def web_qa_questions(request: Request, status: str = "", limit: int = 50):
             try:
                 from data.db_policy import masked_nickname
                 v["nickname_masked"] = masked_nickname(v.get("user_id") or 0, "老人" if v.get("source") == "老年端" else "居民")
-            except Exception:
-                v["nickname_masked"] = v.get("nickname") or ""
+            except Exception as e:  # noqa: BLE001
+                # 隐私方向必须保守：脱敏失败**不能回退成原昵称**（那等于泄露），用通用掩码兜底
+                _log.warning("昵称脱敏失败，改用通用掩码：%s", e)
+                v["nickname_masked"] = "居民***"
         if u.get("role") == "grid" and v.get("status") in ("待人工回复", "处理中", "已转人工", "超时未回复"):
             try:
                 deadline = get_question_deadline_info(r["id"])
