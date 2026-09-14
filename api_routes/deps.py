@@ -46,13 +46,22 @@ def _b64d(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + pad)
 
 
-def make_token(user_id: int, role: str, name: str, expires_hours: int = 12) -> str:
-    """签发 JWT（HS256）。"""
+def make_token(user_id: int, role: str, name: str, expires_hours: int = 12,
+               community: str = "") -> str:
+    """签发 JWT（HS256）。`community`：用户所属社区（属地化的来源，地区识别 WS2）。
+
+    ⚠ 为什么必须带在 token 里：`_region(request)` 靠它解析属地；不带的话**所有用户都会回落到
+    全局默认城市**（实测踩到：属地化功能"做了但不生效"）。老 token 没有该字段 → `_region` 会
+    回退到按 uid 查库，保证兼容。
+    """
     header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-    payload = _b64(json.dumps({
+    payload_obj = {
         "uid": user_id, "role": role, "name": name,
         "exp": int(time.time()) + expires_hours * 3600,
-    }, ensure_ascii=False).encode())
+    }
+    if community:
+        payload_obj["community"] = community
+    payload = _b64(json.dumps(payload_obj, ensure_ascii=False).encode())
     sig = _b64(hmac.new(_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest())
     return f"{header}.{payload}.{sig}"
 
@@ -88,16 +97,47 @@ def _user(request: Request) -> dict:
     return getattr(request.state, "user", {})
 
 
+_COMMUNITY_CACHE: dict[int, str] = {}
+
+
+def _community_of(uid) -> str:
+    """按 uid 查社区（带缓存）。用于**老 token 不带 community** 的兼容路径。"""
+    try:
+        key = int(uid or 0)
+    except (TypeError, ValueError) as e:
+        _log.debug("uid 非法，跳过按 uid 查社区：%r（%s）", uid, e)
+        return ""
+    if not key:
+        return ""
+    if key in _COMMUNITY_CACHE:
+        return _COMMUNITY_CACHE[key]
+    community = ""
+    try:
+        from data.db_user import get_user_by_id
+        community = ((get_user_by_id(key) or {}).get("community") or "").strip()
+    except Exception as e:  # noqa: BLE001
+        _log.warning("按 uid 查社区失败（属地将回落全局默认）：%s", e)
+        community = ""
+    if len(_COMMUNITY_CACHE) > 500:
+        _COMMUNITY_CACHE.clear()
+    _COMMUNITY_CACHE[key] = community
+    return community
+
+
 def _region(request: Request):
     """当前请求用户的属地（地区识别）：由 `community` 解析，未登录/未命中回落全局默认。
 
+    两级来源：① JWT 里的 community（新 token）；② 老 token 没带 → 按 uid 查库（带缓存）。
     集中在这里的原因：居民端/老年端/网格端多处以同一口径取属地（天气、政策问答），
     避免各写一份、口径漂移。
     """
     try:
-        from utils.region import resolve_region
-        return resolve_region((_user(request) or {}).get("community"))
-    except Exception:  # noqa: BLE001  属地解析失败绝不能影响业务
+        from utils.region import resolve_region, Region
+        u = _user(request) or {}
+        community = (u.get("community") or "").strip() or _community_of(u.get("uid"))
+        return resolve_region(community)
+    except Exception as e:  # noqa: BLE001  属地解析失败绝不能影响业务
+        _log.warning("属地解析失败，回落全局默认：%s", e)
         from utils.region import Region
         return Region()
 

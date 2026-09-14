@@ -101,7 +101,7 @@ def web_elderly_home(request: Request):
         due = len(get_due_medications(uid))
     except Exception:
         pass
-    weather = get_simplified_weather(r.district or r.city, r.city_id)
+    weather = get_simplified_weather(r.district or r.city, r.city_id, region_label=r.label())
     # M1：称呼（优先 preferences.display_name，再退回 name）；语速（preferences.speech_rate）
     prefs = {}
     try:

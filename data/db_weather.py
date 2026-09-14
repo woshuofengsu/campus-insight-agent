@@ -393,7 +393,7 @@ def get_daily_advice(force: bool = False, city: str = "", city_id: str = "") -> 
     return advice
 
 
-def get_simplified_weather(city: str = "", city_id: str = "") -> dict:
+def get_simplified_weather(city: str = "", city_id: str = "", region_label: str = "") -> dict:
     """老年端大字版简化天气：只返回温度、天气现象、预警标签、一句建议。
 
     ⚠ 键名一致性（外部评审 B1 修复）：原先只返回 `temp`（=最高温）与 `temp_low`，**没有 `temp_high`**，
@@ -402,6 +402,8 @@ def get_simplified_weather(city: str = "", city_id: str = "") -> dict:
 
     属地化（WS4）：**老年端必须和居民端一样带属地** —— 否则同一场演示里
     居民端显示"北京市海淀区"、老年端还是默认城市，一切屏就露馅。
+    `region_label`：由调用方传入解析出的属地全称（如"北京市海淀区·海淀小区"）；
+    不传则退回天气接口返回的地名（旧行为）。
     """
     result = get_weather_for_display(city, city_id)
     days = result.get("days") or []
@@ -420,7 +422,7 @@ def get_simplified_weather(city: str = "", city_id: str = "") -> dict:
         "is_degraded": result.get("is_degraded", False),
         "note": result.get("note", ""),
         "city_id": city_id or "",
-        "region_label": result.get("location") or city or "",
+        "region_label": region_label or result.get("location") or city or "",
     }
 
 

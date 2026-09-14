@@ -99,7 +99,9 @@ class Orchestrator:
             from utils.region import resolve_region
             from data.db_user import get_user_by_id
             region = resolve_region((get_user_by_id(uid) or {}).get("community")) if uid else None
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            # 属地解析失败不能影响对话，但**必须留痕**（静默吞异常会让"属地化没生效"查不出来）
+            _log.warning("会话属地解析失败，回落全局默认：%s", e)
             region = None
         ctx = {"role": role, "uid": uid, "name": name, "user_input": text,
                "elder_uid": elder_uid,

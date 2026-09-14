@@ -102,7 +102,9 @@ def _fallback_region(community: str = "") -> Region:
     """回落：全局城市配置（保证单社区/未知社区行为与现状一致）。"""
     from config import COMMUNITY_CITY, COMMUNITY_CITY_ID, COMMUNITY_DISTRICT
 
-    province = COMMUNITY_CITY if f"{COMMUNITY_CITY}市" in _MUNICIPALITIES else ""
+    # 直辖市：市即省级；展示用全称（"北京市"而非"北京"），否则标签会显示成"北京海淀区"
+    _municipality = f"{COMMUNITY_CITY}市"
+    province = _municipality if _municipality in _MUNICIPALITIES else ""
     return Region(community=community, province=province, city=COMMUNITY_CITY,
                   city_id=COMMUNITY_CITY_ID, district=COMMUNITY_DISTRICT, source="fallback")
 
@@ -119,7 +121,8 @@ def resolve_region(community: str | None) -> Region:
     key = (community or "").strip()
     try:
         from config import REGION_BY_COMMUNITY
-    except Exception:  # config 未提供（单测/老版本）→ 用回落
+    except Exception as e:  # config 未提供（单测/老版本）→ 用回落
+        _log.warning("读取 config.REGION_BY_COMMUNITY 失败，改用回落策略：%s", e)
         REGION_BY_COMMUNITY = {}
     table = REGION_BY_COMMUNITY if isinstance(REGION_BY_COMMUNITY, dict) else {}
     if key and key in table:
@@ -157,8 +160,8 @@ def normalize_area(text: str) -> set[str]:
         from config import REGION_BY_COMMUNITY as _tbl
         if isinstance(_tbl, dict) and raw in _tbl:
             return {raw}
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        _log.debug("读取社区映射失败（继续按别名归一）：%s", e)
 
     tokens: set[str] = set()
     for alias, canon in _DISTRICT_ALIASES.items():

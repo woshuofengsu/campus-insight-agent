@@ -53,7 +53,8 @@ def login(req: LoginRequest, request: Request):
         record_fail(req.username, ip)
         return _fail(1002, "用户名或密码错误")
     reset(req.username, ip)
-    user["_token"] = make_token(user["id"], user["role"], user.get("name") or user.get("username") or "")
+    user["_token"] = make_token(user["id"], user["role"], user.get("name") or user.get("username") or "",
+                               community=user.get("community") or "")
     return _ok(_user_payload(user))
 
 
@@ -68,7 +69,8 @@ def demo_login(req: DemoLoginRequest):
         return _fail(1003, "演示登录未开启")
     from data.db_user import list_users
     for u in list_users(role=req.role):
-        u["_token"] = make_token(u["id"], u["role"], u.get("name") or u.get("username") or "")
+        u["_token"] = make_token(u["id"], u["role"], u.get("name") or u.get("username") or "",
+                                 community=u.get("community") or "")
         return _ok(_user_payload(u))
     return _fail(1004, "没有可用的演示账号")
 

@@ -176,7 +176,7 @@ data/
 3. **最后拆 export**：CSV/报表拼装独立（它是最容易与业务读混淆的一块）。
 4. **`db_<mod>.py` 保留为 re-export 垫片**（项目已有先例：`ui/cache.py` 迁 `utils/cache.py` 时留了重导出垫片），
    保证 `api_routes/`、`agent/`、`tests/` 的既有 `from data.db_policy import ...` **零改动**。
-5. **每步跑全量**：`python -m pytest -q`（基线 620 passed）+ `ruff check .` = 0；每步一个 commit。
+5. **每步跑全量**：`python -m pytest -q`（基线 621 passed）+ `ruff check .` = 0；每步一个 commit。
 
 ### 6.4 单测策略（拆分后的新增能力）
 
@@ -193,7 +193,7 @@ def test_score_entry_keyword_and_title():
 ### 6.5 执行时机与验收
 
 - **比赛期（现在）**：**零代码改动**。理由：答辩前重构核心数据层 = 用「确定的回归风险」换「不确定的可维护性收益」，
-  且当前 621 项测试已覆盖主要路径，评委看到的是「有测试 + 有清晰演进路径」，而非「正在重构」。
+  且当前 622 项测试已覆盖主要路径，评委看到的是「有测试 + 有清晰演进路径」，而非「正在重构」。
 - **答辩后（试点前）**：按 6.3 顺序执行，优先 `db_policy.py`（最大、最常用）→ `db_elderly_care.py` → `db_proposal.py`。
 - **验收标准**：① 每个新模块 <300 行；② `db_*.py` 垫片 re-export 齐全（外部 import 零改动）；
   ③ 为 `_logic.py` 新增纯函数单测 ≥15 项；④ 全量测试数不减、全绿；⑤ `ruff` = 0。

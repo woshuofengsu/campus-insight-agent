@@ -144,6 +144,8 @@ def web_knowledge_list(request: Request, category: str = "", limit: int = 50):
         "audit_opinion": k.get("audit_opinion") or "",
         "auditor": k.get("auditor") or "",
         "version": k.get("version") or 1,
+        # 属地（地区识别 WS7）：前端知识库列表要显示"这条政策为谁优先"，漏了字段标签就是空的
+        "applicable_area": k.get("applicable_area") or "",
     } for k in rows])
 
 

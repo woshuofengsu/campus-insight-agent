@@ -229,7 +229,11 @@ def _mock_weather(monkeypatch):
 
 
 def test_weather_endpoints_return_region_label(client, monkeypatch):
-    """端到端：居民端 /weather/current 与 /forecast 带属地标签（居民账号所属社区）。"""
+    """端到端：居民端 /weather/current 与 /forecast 带属地标签，且**属地来自账号社区**。
+
+    关键断言（live 验证踩到的 BUG）：`region_label` 必须包含**社区名**，而不只是一个"回落到全局默认"
+    的城市名 —— JWT 里没带 community 时，属地化会静默退化成"所有用户都看默认城市"。
+    """
     _mock_weather(monkeypatch)
     r = client.post("/api/web/auth/demo", json={"role": "resident"})
     token = r.json()["data"]["token"]
@@ -239,6 +243,9 @@ def test_weather_endpoints_return_region_label(client, monkeypatch):
         assert resp.status_code == 200, resp.text
         data = resp.json()["data"]
         assert data.get("region_label"), f"{path} 缺 region_label：{data}"
+        assert "海淀小区" in data["region_label"], (
+            f"{path} 的属地应来自账号社区（海淀小区），实际 {data['region_label']}"
+            "——若只剩城市名说明 token 没带 community（属地静默失效）")
         assert data.get("city_id"), f"{path} 缺 city_id：{data}"
 
 
@@ -251,7 +258,24 @@ def test_elderly_home_weather_has_region_label(client, monkeypatch):
     assert resp.status_code == 200, resp.text
     w = (resp.json()["data"] or {}).get("weather") or {}
     assert w.get("region_label"), f"老年端天气缺属地：{w}"
+    assert "海淀小区" in w["region_label"], f"老年端属地应来自账号社区，实际 {w['region_label']}"
     assert w.get("city_id"), f"老年端天气缺 city_id：{w}"
+
+
+def test_knowledge_list_exposes_applicable_area(client):
+    """端到端：网格端知识库列表必须返回 `applicable_area`（前端地区标签靠它显示）。
+
+    live 验证踩到：列表路由做了字段白名单，漏掉该字段 → 前端标签永远为空（看着做了、其实没数据）。
+    """
+    r = client.post("/api/web/auth/demo", json={"role": "grid"})
+    token = r.json()["data"]["token"]
+    resp = client.get("/api/web/knowledge", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()["data"] or []
+    assert rows, "知识库不应为空"
+    assert all("applicable_area" in k for k in rows), "列表缺 applicable_area 字段"
+    areas = {k["applicable_area"] for k in rows if k.get("applicable_area")}
+    assert areas, f"列表里应至少有带属地的条目，实际 {list(areas)[:3]}"
 
 
 def test_policy_qa_endpoint_passes_region(client, monkeypatch):

@@ -114,7 +114,9 @@ def _region_for(uid: int):
         from utils.region import resolve_region
         u = get_user_by_id(key) or {}
         reg = resolve_region(u.get("community"))
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        # 静默会掩盖"属地化没生效"这类问题，统一留痕（本轮新增门禁要求）
+        _log.warning("会话属地解析失败，回落全局默认：%s", e)
         reg = None
     if reg is None:
         from utils.region import Region
