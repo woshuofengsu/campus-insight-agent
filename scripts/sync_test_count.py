@@ -32,6 +32,8 @@ DOCS = [
     "docs/competition/最终版交付说明.md",
     "docs/competition/创意说明书-提交版.md",
     "docs/competition/技术实现报告.md",
+    "docs/competition/答辩问答手册.md",
+    "docs/competition/演示脚本.md",
     "docs/scaling.md", "docs/mobile-deploy.md",
 ]
 
@@ -98,6 +100,11 @@ def main() -> int:
         s = re.sub(r"\b\d{3}(\s*项\s*自动化\s*测试|\s*项\s*测试|\s*测试|\s*项(?=\s*[（(]))",
                    lambda m: f"{new}{m.group(1)}", s)
         s = re.sub(r"(可运行\s*)\d{3}", lambda m: f"{m.group(1)}{new}", s)
+        # 踩过的坑（本轮实测）：只覆盖上面两条会漏掉「NNN 项可运行」「可运行用例 NNN」「NNN = MMM 通过」
+        # 三种写法，导致文档出现「622 项可运行（624 通过）」这种自相矛盾 → 补齐。
+        s = re.sub(r"\b\d{3}(\s*项\s*可运行)", lambda m: f"{new}{m.group(1)}", s)
+        s = re.sub(r"(可运行用例[\s|*]*)\d{3}", lambda m: f"{m.group(1)}{new}", s)
+        s = re.sub(r"\b\d{3}(\s*=\s*\d{3}\s*通过)", lambda m: f"{new}{m.group(1)}", s)
         s = re.sub(r"\b\d{3}(\s*passed)", lambda m: f"{new - 1}{m.group(1)}", s)
         s = re.sub(r"\b\d{3}(\s*通过)", lambda m: f"{new - 1}{m.group(1)}", s)
         if s != orig:

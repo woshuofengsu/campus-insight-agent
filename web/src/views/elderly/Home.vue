@@ -203,8 +203,9 @@ function cancelCall() {
         <n-tag v-for="(a, i) in home.weather.alert_tags" :key="i" size="large" type="error" style="margin:0 4px;">⚠️ {{ a.type }}{{ a.level }}</n-tag>
       </div>
       <div v-if="home.weather.advice" class="muted" style="margin-top:8px;">💬 {{ home.weather.advice }}</div>
-      <!-- 属地（地区识别 WS7）：老年端与居民端口径一致（都来自账号所属社区，不用定位权限） -->
-      <div v-if="home.weather.region_label" class="muted" style="margin-top:6px;font-size:1.15rem;">
+      <!-- 属地（地区识别 WS7）：老年端与居民端口径一致（都来自账号所属社区，不用定位权限）
+           ⚠️ 字号必须 ≥20px（`mobile_audit` 对老年端卡 20px 下限，1.15rem=18.4px 会被判不合格） -->
+      <div v-if="home.weather.region_label" class="muted" style="margin-top:6px;font-size:1.3rem;">
         📍 {{ home.weather.region_label }}
       </div>
       <div class="muted" style="margin-top:4px;">更新于 {{ (home.weather.updated_at || '').slice(11, 16) || home.weather.updated_at }}</div>

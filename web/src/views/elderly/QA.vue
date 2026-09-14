@@ -116,6 +116,10 @@ async function doTransfer() {
     <div v-if="result" class="card" style="font-size:1.25rem;">
       <template v-if="result.matched">
         <div style="font-weight:700;color:#2E7D32;">✅ 已回答</div>
+        <!-- 属地可解释性（三端口径一致）：大字告知这条政策适用于哪里 -->
+        <div v-if="result.applicable_area" style="margin-top:6px;font-size:1.15rem;">
+          📍 适用地区：<b>{{ result.applicable_area }}</b>
+        </div>
         <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
         <n-button type="primary" ghost block size="large" style="margin-top:12px;min-height:56px;" @click="playAnswer">🔊 播放回答</n-button>
       </template>

@@ -156,6 +156,28 @@ def main() -> int:
           f"最近 {len(logs)} 条 agent_logs",
           "正常：有对话后才会产生留痕；先跑一次居民对话")
 
+    # 9) 属地化对比（演示最重要的场景）：同一句话，两个社区必须拿到不同适用地区
+    #    这条门禁的价值：演示脚本场景 2 全靠它；种子账号缺失 / 属地静默失效 / 选答被跨区文件抢走，
+    #    三种翻车方式都会在这里被拦住（live 实测踩到过第三种：朝阳居民被海淀区文件回答）。
+    QA_Q = "我们社区高龄老人有什么补贴？"
+    area = {}
+    for uname, pw in (("demo_resident", ""), ("demo_resident_cy", "demo123")):
+        st, body = call("/api/web/auth/login", body={"username": uname, "password": pw}, method="POST")
+        tk = ((body or {}).get("data") or {}).get("token") or ""
+        if not tk:
+            area[uname] = None
+            continue
+        st, body = call("/api/web/qa/ask", tk, {"question": QA_Q, "source": "验收"}, "POST")
+        d = (body or {}).get("data") or {}
+        area[uname] = (d.get("applicable_area"), d.get("region_level")) if d.get("matched") else None
+    hd, cy = area.get("demo_resident"), area.get("demo_resident_cy")
+    ok_region = bool(hd and cy and hd[0] != cy[0] and "海淀区" not in (cy[0] or ""))
+    check("属地化对比（两社区同一问题不同口径）", ok_region,
+          f"海淀={hd} / 朝阳={cy}",
+          "① 种子缺 demo_resident_cy（跑 python -c \"import config;from data.seed import seed_all;seed_all(config.DB_PATH)\"）；"
+          "② 属地静默失效（utils/region.resolve_region 未命中社区会 warning）；"
+          "③ 选答被跨区文件抢走（db_policy.ask_question 应优先属地适用条目）")
+
     print(f"\n结果：{'全部通过，可以演示' if not FAILS else f'{len(FAILS)} 项待修复'}")
     for f in FAILS:
         print("  →", f)

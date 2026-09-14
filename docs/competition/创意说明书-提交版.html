@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 创意说明书（提交版） — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>智能体创意说明书</h1>
+
+<div class="meta">版本：2026-09-14 定稿（与代码库实时对齐，所有数字可用 <code>python scripts/check_claims.py</code> 复算）<br>赛道：<strong>基层治理</strong> · 申报特别奖：<strong>人文赋能</strong>（适老化 + 数据最小化 + 人机协同留痕）</div>
+
+<hr>
+
+<h2>一、项目基本信息</h2>
+
+<h3>1. 项目名称</h3>
+
+<p><strong>社区先知 CommunityInsight Agent</strong>（基层治理智能体）</p>
+
+<h3>2. 团队成员信息表</h3>
+
+<table>
+<th>序号</th><th>姓名</th><th>身份证号</th><th>专业 / 学历</th><th>院校</th><th>团队职责</th><th>学生证扫描件</th><th>备注</th>
+<tr><td>1</td><td>步承泽</td><td>110113200604194512</td><td>大数据管理与应用 / 本科</td><td>北京工商大学</td><td>项目负责人（架构设计 / Agent 内核 / 全栈开发 / 数据与测试）</td><td>（附件待附）</td><td>单人参赛，独立完成</td></tr>
+</table>
+
+<div class="meta">本项目为<strong>单人参赛</strong>（2-5 人组队允许范围内独立完成全部研发工作）。</div>
+
+<h3>3. 参赛方向（勾选）</h3>
+
+<ul>
+<li>[ ] 产业赋能</li>
+<li>[ ] 政企服务</li>
+<li>[x] <strong>基层治理</strong></li>
+<li>[ ] 文创艺术</li>
+<li>[ ] 科教创新</li>
+</ul>
+
+<h3>4. 项目负责人信息</h3>
+
+<ul>
+<li>姓名：步承泽</li>
+<li>联系电话：15313950893</li>
+<li>电子邮箱：1803801843@qq.com</li>
+</ul>
+
+<hr>
+
+<h2>二、项目概述（≤300 字）</h2>
+
+<p>基层"接诉即办"有三个长期痛点：<strong>诉求处理不透明</strong>（上报后无人跟进、进度不可见）、<strong>时效无保障</strong>（无分级与超时预警）、<strong>独居老人安全真空</strong>（失联数日只能靠邻居偶然发现）。</p>
+
+<p>本项目是<strong>多智能体协同的社区治理 Agent</strong>：感知层定时监测工单热点、极端天气与老人活跃度；理解层先用确定性规则识别诉求（同义词/方言归一），模糊时由大模型闭集兜底；协作层由 <strong>9 个声明式角色在黑板上多轮真协商</strong>（如"极端天气 → 健康顾问 → 通知管理员"），调用 <strong>16 个工具</strong>；反馈层每轮必过 <strong>Verifier（幻觉/诊断/隐私拦截）+ Arbiter（合规优先·安全·专业·转人工）双层防线</strong>并全程留痕。三端差异化服务：居民一句话上报并追踪闭环、网格员处理 SLA 工单、老人用大字关怀版一键呼叫与 SOS。</p>
+
+<p><strong>属地化</strong>是基层治理的领域刚需：政策按行政区划<strong>本地优先、全国兜底</strong>，天气按居民所属社区取数——<strong>属地来自账号网格归属，不采集任何设备位置</strong>。</p>
+
+<hr>
+
+<h2>三、智能体架构与技术实现（核心）</h2>
+
+<h3>1. 整体架构逻辑</h3>
+
+<p><strong>① 架构范式：多智能体协作（非单 Agent 套壳）</strong></p>
+
+<p>主干为 <strong>OODA 自主循环</strong>（Observe→Orient→Decide→Act→Reflect），叠加<strong>角色化多智能体分工 + 黑板消息队列真协商</strong>：角色之间通过 <code>task_request / task_response / notify / error / handoff</code> 五类消息在共享黑板上往返，<strong>一次用户输入可以触发多轮跨角色协商并改变执行链</strong>（不是"把 9 个 prompt 串起来"）。</p>
+
+<p><strong>② 核心模块（六层 + 交互层）</strong></p>
+
+<table>
+<th>层</th><th>模块</th><th>职责</th><th>代码位置</th>
+<tr><td>感知层</td><td>天气守护 / 网格助手 / 关怀巡检</td><td>天气与预警、工单热点、老人活跃度与久未互动、SLA 超时升级（定时任务）</td><td><code>agent/roles/auto_agents.py</code>、<code>scripts/scheduler.py</code></td></tr>
+<tr><td>理解层</td><td>接待员（规则为骨 + LLM 兜底）</td><td>同义词/方言归一 + 指代与否定处理；模糊时 LLM 闭集兜底</td><td><code>agent/roles/business_agents.py</code>、<code>agent/intent_llm.py</code></td></tr>
+<tr><td><strong>属地层</strong></td><td><strong>地区识别（属地化）</strong></td><td>由账号所属社区解析属地链（社区→区→市→省）；政策属地优先、天气按社区城市；<strong>不采 GPS</strong></td><td><code>utils/region.py</code>、<code>data/db_policy.py</code></td></tr>
+<tr><td>协作层</td><td>黑板 + 编排器</td><td>9 个声明式角色共享黑板收发消息，多轮真协商；锁 + 版本 + 历史（封顶 500）</td><td><code>agent/blackboard.py</code>、<code>agent/orchestrator.py</code></td></tr>
+<tr><td>决策层</td><td>业务角色（5）+ 专家角色（4）</td><td>报修调度、提案协商、政策专员、健康顾问、通知管理、天气守护、网格助手、合规审计、接待员</td><td><code>agent/roles/</code></td></tr>
+<tr><td>执行层</td><td><strong>16 个工具（自动发现 + 按角色裁剪）</strong></td><td>上报/查询工单、我的工单、派单、提案与附议、议题、天气、社区脉搏、治理统计、知识库问答</td><td><code>tools/</code></td></tr>
+<tr><td>反馈层</td><td><strong>Verifier + Arbiter 双层防线</strong></td><td>幻觉/敏感词/完整手机号/医疗诊断句式拦截 → 合规优先·安全·专业·转人工，决策落 <code>agent_logs</code></td><td><code>agent/verifier.py</code>、<code>agent/arbiter.py</code></td></tr>
+<tr><td>交互层</td><td><strong>Vue3 三端</strong></td><td>居民端 14 页 / 网格端 9 页 / 老年端 8 页（大字高对比 + 语音 + TTS + 免登录）</td><td><code>web/src/views/{resident,grid,elderly}/</code></td></tr>
+</table>
+
+<p><strong>③ 整体运行逻辑与数据流向</strong></p>
+
+<pre>
+用户输入 → 上下文注入（属地 / 天气 / 热点 / 会话实体）
+        → 接待员识别意图（同义·方言归一 → 规则优先 → LLM 闭集兜底）
+        → 编排器派发到对应角色；黑板消息队列驱动跨角色多轮协商
+        → 角色调用治理工具写 SQLite（工单/提案/派单/通知/关怀记录）
+        → Verifier 校验（幻觉/敏感词/手机号/诊断）→ Arbiter 仲裁（必要时转人工）
+        → 主动闭环（未解决提醒 / 老人未打卡预警 / SLA 升级 / 办结回访）
+        → 回复（文本 / TTS 播报）+ trace_id 全链路留痕
+</pre>
+
+<h3>2. 智能体工作流设计</h3>
+
+<p><strong>① 输入源（合规说明）</strong></p>
+
+<table>
+<th>输入源</th><th>说明</th><th>合规</th>
+<tr><td>文本</td><td>居民自然语言诉求与对话</td><td>演示库为<strong>虚构种子数据</strong>，无真实个人信息</td></tr>
+<tr><td>语音</td><td>老年端浏览器语音识别 → 文本</td><td>浏览器本地识别，不上传音频；<strong>https 下可用，否则自动降级为打字 + 预置短语</strong></td></tr>
+<tr><td>知识库</td><td>社区政策 / 指南</td><td><strong>62 条（61 已发布）</strong>，其中 <strong>55 条为公开权威政策摘要（可溯源）</strong></td></tr>
+<tr><td>感知数据</td><td>工单表 / 天气 API / 老人活跃度</td><td>天气用和风天气公开 API（免费授权）</td></tr>
+<tr><td><strong>属地</strong></td><td>账号所属社区（<code>user_profile.community</code>）</td><td><strong>不使用 GPS/IP 定位</strong> → 符合数据最小化</td></tr>
+</table>
+
+<p><strong>② 处理流程</strong></p>
+
+<ul>
+<li><strong>大模型选型</strong>：DeepSeek（OpenAI 兼容）。<strong>默认"规则为骨、LLM 为脑"</strong>：意图、状态机、权限、风控、脱敏全部走确定性规则；LLM 只用于模糊意图兜底、政策生成与跨角色协商。四项能力开关（<code>LLM_ORCHESTRATION</code> / <code>POLICY_LLM_RAG</code> / <code>RECEPTION_LLM_FALLBACK</code> / <code>LLM_NEGOTIATION</code>）可一键开关。</li>
+</ul>
+<p>  实测代价：<strong>每轮对话约 +0.9 秒 / +¥0.0002</strong>（真实调用，<code>llm_usage</code> 可查）。</p>
+<ul>
+<li><strong>提示词工程</strong>：系统提示注入角色上下文与工具原则；LLM 输出走<strong>闭集校验</strong>（意图白名单、引用下标必须落在检索片段内、协商目标必须在 6 个可联动角色白名单内）。</li>
+<li><strong>知识库构建</strong>：59→<strong>62 条</strong>知识条目；<strong>词法（同义词/方言扩展）+ 语义向量（text-embedding-v3, 1024 维）混合检索 + RRF 融合</strong>。</li>
+<li><strong>检索质量</strong>：<strong>48 条口语金标 hit@1 = 100%</strong>（纯词法基线 85.7%），含 6 条属地用例（属地 Top-1 4/4）。</li>
+<li><strong>属地化检索</strong>：<code>applicable_area</code> 归一（支持"北京市海淀区"这类复合串）→ 本地条目加分、<strong>全国条目永不过滤</strong>（兜底）；<strong>属地只影响"选谁"，绝不改变"能不能自动回答"的阈值</strong>（安全底线有专门测试）。</li>
+<li><strong>工具调用</strong>：自研多智能体编排（9 角色 + 黑板真协商 + 16 工具 + 角色化工具裁剪）。</li>
+<li><strong>自动化节点</strong>：感知周期触发 → 自动派单 → SLA 升级 → 老人平安打卡检测 → 办结回访。</li>
+</ul>
+
+<p><strong>③ 输出形态</strong></p>
+
+<p>对话文本 / TTS 语音播报 / 工单与提案落库 / 状态流转与派单指令 / 天气与属地标签 / 治理看板与 KPI 图表 / 全链路留痕（<code>activity_log</code> + <code>agent_logs</code>）。</p>
+
+<p><strong>④ 架构图</strong></p>
+
+<pre>
+flowchart LR
+    U[居民 / 网格员 / 独居老人] --&gt; UI[Vue3 三端&lt;br/&gt;居民 14 页 / 网格 9 页 / 老年 8 页]
+    UI --&gt; API[FastAPI 主服务&lt;br/&gt;130 条路由 · JWT · 安全响应头 · WebSocket]
+    API --&gt; R[属地解析&lt;br/&gt;账号社区 → 区/市/省链&lt;br/&gt;不采 GPS]
+    API --&gt; O[多智能体编排&lt;br/&gt;黑板消息队列 · 真协商]
+    O --&gt; A1[接待员 / 报修调度 / 提案协商]
+    O --&gt; A2[政策专员 / 健康顾问 / 天气守护]
+    O --&gt; A3[通知管理 / 网格助手 / 合规审计]
+    A1 &amp; A2 &amp; A3 --&gt; V[Verifier 校验&lt;br/&gt;幻觉 / 敏感词 / 手机号 / 诊断]
+    V --&gt; AR[Arbiter 仲裁&lt;br/&gt;合规优先 → 安全 → 专业 → 转人工]
+    AR --&gt; T[16 个工具]
+    T --&gt; DB[(SQLite v46 · 50 张业务表&lt;br/&gt;手机号 AES-256-GCM 加密)]
+    KB[知识库混合检索&lt;br/&gt;词法 + 语义 RRF · 属地优先] --&gt; O
+    KG[轻量知识图谱&lt;br/&gt;88 实体 / 199 关系 / 760 提及] --&gt; O
+    DB --&gt; S[治理大屏 / 工作台 / 关怀看板]
+    AR -.留痕.-&gt; LOG[(activity_log / agent_logs&lt;br/&gt;trace_id 全链路)]
+</pre>
+
+<h3>3. 人机协同边界设计</h3>
+
+<p><strong>① 智能体自动执行</strong>：意图识别、工单分类与紧急度评估、部门/网格派单、提案状态流转、通知分级草稿、政策问答（带引用）、天气与健康提示、老人未打卡预警、SLA 超时升级。</p>
+
+<p><strong>② 必须人工确认（人在环）</strong>：</p>
+<ul>
+<li><strong>健康建议涉及"需线下就医"</strong> → 二次确认后才下发；</li>
+<li><strong>医疗诊断类 / 法律纠纷类提问</strong> → 系统不自动回答，直接转人工；</li>
+<li><strong>提案不予执行、违规下架、批量操作</strong> → 需负责人确认并留痕；</li>
+<li><strong>紧急求助（SOS）</strong> → 仅通知联系人与社区，<strong>不自动拨打 110/120</strong>；</li>
+<li><strong>政策弱命中</strong> → 转人工（或 LLM 生成但<strong>引用必须校验通过</strong>，否则回退转人工）。</li>
+</ul>
+
+<p><strong>③ 全程可追责</strong>：每次仲裁决策、每轮协商消息、每次拦截都落库；管理端可查"处理留痕"时间线。</p>
+
+<h3>4. 架构创新点</h3>
+
+<ul>
+<li><strong>1.</strong> <strong>真协商而非流水线</strong>：黑板消息队列 + 多轮链式消费 + 循环防护（单目标 2 轮 / 总 5 轮上限），协商能<strong>改变执行链</strong>（天气预警会真的把工单升级并生成通知草稿）。</li>
+<li><strong>2.</strong> <strong>双层防线可解释</strong>：Verifier 负责"内容安全与幻觉"，Arbiter 负责"合规优先级的冲突裁决"，两者决策都留痕，可现场投屏复算。</li>
+<li><strong>3.</strong> <strong>属地化不越界</strong>：属地只作<strong>排序信号</strong>，不作准入门槛；全国政策永远兜底；<strong>不采集位置</strong>——既是合规选择，也是基层治理的真实工作方式（人属于哪个网格是确定的）。</li>
+<li><strong>4.</strong> <strong>规则与 LLM 显式分层</strong>：把"哪些必须用 LLM（开放式诉求意图、政策生成、跨角色联动）、哪些该留规则（状态机、权限、脱敏、风控）"写成代码里的开关与分级函数，而不是口号。</li>
+<li><strong>5.</strong> <strong>质量可现场复算</strong>：625 项测试、54 个页面视口的客观视觉审计、21 页真机口径移动审计、12 项真实 HTTP 端到端验收、公开数字一致性门禁——<strong>每一项都能当场跑给你看</strong>。</li>
+</ul>
+
+<hr>
+
+<h2>四、产业 / 场景应用说明</h2>
+
+<h3>1. 精准应用场景（垂直细分）</h3>
+
+<p><strong>城市社区 / 街道的"接诉即办"日常治理</strong>，尤其是<strong>老龄化程度较高、网格员人手紧张的老旧小区</strong>。典型用户：① 居民（尤其不会用 App 的中老年居民）；② 网格员（一人管多网格、靠微信群和纸笔）；③ 独居/高龄老人及其家属。</p>
+
+<h3>2. 目标问题与现有方案痛点</h3>
+
+<table>
+<th>现有做法</th><th>痛点</th><th>本项目怎么解</th>
+<tr><td>微信群上报 + 人工台账</td><td>消息沉底、无状态、无法追责</td><td>一句话自动生成工单，状态机 + 留痕 + 时限</td></tr>
+<tr><td>政务 App / 小程序</td><td>表单冗长、老年用户放弃；地区政策混在一起</td><td>三端差异化；<strong>NLU 口语/方言归一</strong>；政策<strong>属地优先</strong></td></tr>
+<tr><td>通用大模型直接答政策</td><td>幻觉、政策过期、地区不符</td><td>强制引用 + Verifier/Arbiter + 弱命中转人工 + 属地优先/全国兜底</td></tr>
+<tr><td>老人关怀靠定期上门</td><td>空档期长、异常发现晚</td><td>活跃度巡检 + 未打卡预警 + 大字 SOS + 家属绑定</td></tr>
+</table>
+
+<h3>3. 智能体提效 / 降本 / 提质 / 风控价值</h3>
+
+<ul>
+<li><strong>提效</strong>：诉求从"看到消息→手工登记→口头转派"变为"一句话→自动分类/派单/通知"，全流程线上留痕。</li>
+<li><strong>降本</strong>：<strong>规则优先 + LLM 按需</strong>，日常诉求零 LLM 成本；实测 LLM 单轮约 <strong>¥0.0002</strong>（30 次调用合计 ¥0.0069，含开发期探测，可现场查 <code>llm_usage</code>）。</li>
+<li><strong>提质</strong>：政策问答<strong>强制引用</strong>可溯源（"依据：XX 政策（V1）"），弱命中转人工而非硬答；SLA 分级与超时升级。</li>
+<li><strong>风控</strong>：手机号等敏感字段<strong>加密落库 + 展示脱敏</strong>；医疗/法律类不自动回答；敏感词与完整手机号在输出前拦截；所有 AI 决策留痕可审计。</li>
+</ul>
+
+<h3>4. 适配区域 / 社区落地路径</h3>
+
+<ul>
+<li><strong>1.</strong> <strong>单社区试点（最小可用闭环）</strong>：报修 + 通知 + 政策问答 + 适老 SOS 四项先跑通，用真实工单验证"平均受理时长 / 一次派单成功率 / 回访满意度"三个指标；</li>
+<li><strong>2.</strong> <strong>多社区接入</strong>：属地映射表（<code>REGION_BY_COMMUNITY</code>）从配置迁到 <code>community_regions</code> 表，租户维度隔离（代码已预留 <code>tenant_id</code>，<strong>当前仅 3 张主表预留、查询层未隔离</strong>——见"已知边界"）；</li>
+<li><strong>3.</strong> <strong>与街道现有系统对接</strong>：12345 / 街道工单系统的字段映射（<strong>当前未对接</strong>，接口层已预留）。</li>
+</ul>
+
+<hr>
+
+<h2>五、可运行性与落地可行性</h2>
+
+<h3>1. 原型状态</h3>
+
+<p><strong>可运行的完整原型（演示级）</strong>：<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌演示种子数据（约 15 秒）；三端功能闭环可现场操作；已有公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，<strong>演示结束一键关闭</strong>）。</p>
+
+<h3>2. 已完成验证（全部实跑，命令可现场复算）</h3>
+
+<table>
+<th>#</th><th>验证项</th><th>命令</th><th>实测结果</th>
+<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>624 通过 / 1 跳过 / 0 告警</strong>（可运行 625）</td></tr>
+<tr><td>2</td><td>端到端验收（真实 HTTP）</td><td><code>python scripts/demo_acceptance.py</code></td><td><strong>12/12 全过</strong></td></tr>
+<tr><td>3</td><td>演示前一键自检</td><td><code>python scripts/demo_preflight.py</code></td><td><strong>9/9 通过</strong></td></tr>
+<tr><td>4</td><td>UI 与无障碍客观审计</td><td><code>python scripts/ui_audit.py</code></td><td><strong>54 个页面/视口 × 9 类检查 0 违规</strong>（对比度/溢出/热区/字号/暗色/动效/残缺文本）</td></tr>
+<tr><td>5</td><td>移动端真机口径审计</td><td><code>python scripts/mobile_audit.py</code></td><td><strong>21 页 × 7 类检查 0 违规</strong>（iOS 聚焦放大/底栏遮挡/横屏/安全区）</td></tr>
+<tr><td>6</td><td>检索质量</td><td><code>python scripts/rag_eval.py</code></td><td><strong>48 条金标 hit@1 100%</strong>（纯词法 85.7%；属地用例 Top-1 4/4）</td></tr>
+<tr><td>7</td><td>数据安全</td><td><code>python scripts/audit_phone_encryption.py</code></td><td>8 张含手机号表 <strong>明文计数 0</strong></td></tr>
+<tr><td>8</td><td>代码规范</td><td><code>python -m ruff check .</code></td><td><strong>0 错误</strong></td></tr>
+<tr><td>9</td><td>前端构建</td><td><code>cd web && npm run build</code></td><td>构建成功</td></tr>
+<tr><td>10</td><td>数字一致性</td><td><code>python scripts/check_claims.py</code></td><td>材料数字与代码实时一致</td></tr>
+<tr><td>11</td><td>公网入口可用性</td><td><code>python scripts/probe_public.py</code></td><td><strong>8/8</strong>（评委手机扫码可进入，含智能体对话）</td></tr>
+<tr><td>12</td><td>门禁有效性（故障注入）</td><td>见 <code>docs/spec/dev-log.md</code> 四十七节</td><td><strong>8 次注入 8 次被门禁拦下</strong></td></tr>
+</table>
+
+<h3>3. 核心技术栈与依赖工具</h3>
+
+<ul>
+<li>后端：<strong>Python 3.12 + FastAPI</strong>（130 条路由）· 数据层：<strong>SQLite（WAL，schema v46，50 张业务表）</strong>，迁移走版本化注册表（禁止运行时裸 ALTER）· 前端：<strong>Vue3 + Vite + Naive UI</strong>（三端）· LLM：DeepSeek（可关）· 嵌入：阿里云百炼 <code>text-embedding-v3</code>（1024 维）· 天气：和风天气公开 API · 密码学：<code>cryptography</code>（AES-256-GCM）· 测试与审计：pytest + Playwright。</li>
+<li><strong>依赖克制</strong>：JWT、加密调用封装、聚类、DNS 兜底解析等均以标准库实现，避免第三方锁定。</li>
+</ul>
+
+<h3>4. 落地所需条件</h3>
+
+<table>
+<th>项</th><th>要求</th><th>当前状态</th>
+<tr><td>算力</td><td>1 台能跑 Python 的机器（演示级 2 核 4G 足够）/ 或云服务器</td><td>✅ 本机已跑通</td></tr>
+<tr><td>数据库</td><td>单社区 SQLite 足够；多社区需 PostgreSQL</td><td>⚠️ 迁 PG 仅有方案与路径</td></tr>
+<tr><td>LLM</td><td>DeepSeek API Key（可选，无 Key 自动降级纯规则）</td><td>✅ 已接</td></tr>
+<tr><td>HTTPS</td><td>老年端语音与"添加到主屏幕"需要 https</td><td>✅ 临时隧道 https；⚠️ 正式域名+证书未部署</td></tr>
+<tr><td>人工兜底</td><td>至少 1 名网格员/社区工作人员处理转人工事项</td><td>试点必备</td></tr>
+</table>
+
+<h3>5. 风险点与应对方案</h3>
+
+<table>
+<th>风险</th><th>应对（已做 / 计划）</th>
+<tr><td>政策答错误导居民</td><td>强制引用 + Verifier 校验 + 弱命中转人工；<strong>属地优先但不屏蔽其他地区</strong></td></tr>
+<tr><td>老年端语音在部分浏览器不可用</td><td>页面给出<strong>打字 + 预置短语</strong>降级路径；答辩现场真机演示并说明边界</td></tr>
+<tr><td>AI 越权代替人决策</td><td>明确"人在环"清单（就医建议/SOS/不予执行/批量操作必须人工确认）</td></tr>
+<tr><td>隐私与合规</td><td>不采位置、手机号加密、展示脱敏、留痕不含完整手机号；医疗/法律不自动回答</td></tr>
+<tr><td>单机扩展性</td><td><strong>当前仅支持单进程</strong>（黑板/限流/WebSocket 在进程内）；扩容路径已写进 <code>docs/scaling.md</code></td></tr>
+<tr><td>无真实试点数据</td><td><strong>如实声明</strong>：当前验证集中在"机制可验证"，治理成效需试点验证（见下）</td></tr>
+</table>
+
+<hr>
+
+<h2>六、合规与知识产权</h2>
+
+<h3>1. 数据来源与合规说明</h3>
+
+<ul>
+<li><strong>演示数据为虚构种子数据</strong>：工单 225 条、提案 201 条、通知 6 条均为程序生成的演示数据，<strong>不含任何真实居民信息</strong>；</li>
+<li><strong>政策语料为公开政策摘要</strong>（55 条，可溯源到发布机关），仅作检索与引用演示；</li>
+<li><strong>不采集设备位置</strong>：属地来自账号所属社区（网格归属）；不使用 GPS / IP 地理库；</li>
+<li><strong>个人信息保护</strong>：手机号等敏感字段 <strong>AES-256-GCM 加密落库</strong>（密文带算法版本前缀），列表/日志<strong>脱敏展示</strong>，8 张含手机号表<strong>明文计数 0</strong>（可脚本复算）；日志留痕不含完整手机号；</li>
+<li><strong>AI 输出治理</strong>：敏感词、完整手机号、医疗诊断句式在输出前拦截；医疗/法律类提问不自动回答；合规审计员角色对每轮输出做脱敏与留痕检查。</li>
+</ul>
+
+<h3>2. 第三方资源授权情况</h3>
+
+<table>
+<th>资源</th><th>用途</th><th>授权/来源</th>
+<tr><td>DeepSeek API</td><td>LLM 能力（可关闭）</td><td>商业 API，按量付费（个人 Key）</td></tr>
+<tr><td>阿里云百炼 text-embedding-v3</td><td>语义向量</td><td>商业 API（个人 Key）</td></tr>
+<tr><td>和风天气 API</td><td>天气数据</td><td>官方免费额度</td></tr>
+<tr><td>公开政策文本</td><td>知识库语料</td><td>政府公开发布信息（标注来源与发布机关）</td></tr>
+<tr><td>开源依赖</td><td>FastAPI / Vue3 / Naive UI 等</td><td>MIT / Apache-2.0 等宽松许可</td></tr>
+</table>
+
+<h3>3. 知识产权规划</h3>
+
+<ul>
+<li>代码与文档为团队原创；<strong>鼓励开源（MIT）</strong>用于教学与公益场景，商标/名称保留；</li>
+<li>不涉及专利主张；引用政策文本仅作摘要与索引，不生成长篇原文复制。</li>
+</ul>
+
+<hr>
+
+<h2>七、附件材料</h2>
+
+<table>
+<th>附件</th><th>位置</th><th>说明</th>
+<tr><td>最终版交付说明</td><td><code>docs/competition/最终版交付说明.md</code></td><td>5 分钟跑起来 / 怎么验证 / 已知边界 / 答辩速答</td></tr>
+<tr><td>技术实现报告</td><td><code>docs/competition/技术实现报告.md</code></td><td>架构与实现细节（与本说明书口径一致）</td></tr>
+<tr><td>答辩问答手册</td><td><code>docs/competition/答辩问答手册.md</code></td><td>25 问 + 加分话术 / 避坑话术 + 证据命令</td></tr>
+<tr><td>演示脚本 / 录屏分镜</td><td><code>docs/competition/演示脚本.md</code>、<code>答辩录屏分镜.md</code></td><td>现场演示流程与兜底视频</td></tr>
+<tr><td>开发日志（48 节）</td><td><code>docs/spec/dev-log.md</code></td><td>每轮"问题→修复→证据"，含未修复项与理由</td></tr>
+<tr><td>外部复审报告与回执</td><td><code>docs/review/</code></td><td>10 轮独立复审 + 逐条处理回执</td></tr>
+<tr><td>移动端 / 常开方案</td><td><code>docs/mobile-deploy.md</code>、<code>docs/演示常开-本机方案.md</code></td><td>手机访问与 0 成本公网演示</td></tr>
+<tr><td>属地化方案</td><td><code>docs/spec/地区识别落地方案.md</code></td><td>属地化设计 v2（含安全底线与不做清单）</td></tr>
+</table>
+
+<div class="meta"><strong>一句话定位</strong>：这是一个<strong>工程完成度高、可现场复算、但尚无真实试点数据</strong>的基层治理多智能体原型——<br>我们选择把"可验证"做成核心能力，而不是把"成效"讲成已完成的事实。</div>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>

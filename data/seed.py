@@ -27,6 +27,10 @@ def _seed_users():
         ("demo_grid", "demo123", "grid", "海淀小区", "网格一组", "", "刘网格员", "G2026001", "13900139000"),
         ("demo_grid2", "demo123", "grid", "海淀小区", "物业", "", "王物业", "G2026002", "13900139001"),
         ("demo_elderly", "", "elderly", "海淀小区", "11号楼", "3单元301", "张大爷", "HD1103301", "13700137000"),
+        # 第二演示社区（属地化对比用）：同一句话在朝阳试点社区会命中「北京市」级政策，
+        # 而海淀小区用户会命中社区/区级指引 —— 见 docs/competition/演示脚本.md 场景 2。
+        # ⚠ 必须放在海淀账号之后：/auth/demo 取该角色第一个账号，顺序变了演示首页就换人了。
+        ("demo_resident_cy", "demo123", "resident", "朝阳试点社区", "2号楼", "1单元101", "李叔", "CY0201101", "13600136000"),
     ]
     with get_db() as conn:
         try:
@@ -730,9 +734,20 @@ def seed_all(db_path: str):
     except Exception as e:
         _log.debug("回填活动日志失败：%s", e, exc_info=True)
         print(f"[seed] Activity log backfill skipped: {e}")
-    print("[seed] Done! Seeded: 14 knowledge entries, 38 community issues, "
-          "19 proposals, 7 discussion topics, 28 opinions, 28 feedback items, "
-          "39 health surveillance records")
+    # 汇报**实际入库量**（从库里数，不写死——写死的数字迟早和库内容对不上）
+    rows = [("knowledge_base", "条知识"), ("community_issues", "条工单"),
+            ("proposals", "条提案"), ("discussion_topics", "个议题"),
+            ("topic_opinions", "条意见"), ("feedback_items", "条反馈"),
+            ("health_surveillance", "条疾控监测")]
+    parts: list[str] = []
+    with get_db() as conn:
+        for table, unit in rows:
+            try:
+                n = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                parts.append(f"{n} {unit}")
+            except Exception as e:  # noqa: BLE001 — 统计失败不该影响种子结果
+                _log.debug("统计 %s 失败：%s", table, e, exc_info=True)
+    print("[seed] Done! 实际入库：" + "，".join(parts))
 
 
 if __name__ == "__main__":

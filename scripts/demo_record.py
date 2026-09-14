@@ -156,6 +156,44 @@ def scene_chat(ctx, page, still):
     page.wait_for_timeout(2600)          # 收尾停留（凑够 ~15s）
 
 
+def _login_cred(page, username: str, password: str):
+    """从登录页用账号密码进入（属地对比演示必须换账号，不能用免密角色按钮）。"""
+    page.goto(f"{BASE}/login", wait_until="networkidle")
+    page.wait_for_timeout(700)
+    page.get_by_placeholder("如 demo_grid").first.fill(username)
+    page.get_by_placeholder("demo_grid / demo123").first.fill(password)
+    page.get_by_text("登 录", exact=False).first.click()
+    page.wait_for_url(lambda u: "/login" not in u, timeout=20000)
+    page.wait_for_timeout(800)
+
+
+def _ask_policy(page, question: str):
+    """在政策问答页提问并等结果（居民端 /resident/qa）。"""
+    page.goto(f"{BASE}/resident/qa", wait_until="networkidle")
+    page.wait_for_timeout(1200)
+    page.get_by_placeholder("输入您想问的政策问题", exact=False).first.fill(question)
+    page.get_by_text("提问", exact=False).last.click()
+    page.wait_for_timeout(3500)          # 检索 + 属地打分 + 渲染
+
+
+def scene_region(ctx, page, still):
+    """属地化对比（演示最重要的场景）：同一句话，海淀小区 vs 朝阳试点社区 → 不同适用地区。"""
+    q = "我们社区高龄老人有什么补贴？"
+    try:
+        _login_cred(page, "demo_resident", "")
+        _ask_policy(page, q)
+        still("01-属地-海淀小区")
+        page.wait_for_timeout(2600)
+        # 换第二演示社区账号（属地来自账号的网格归属，不是定位）
+        page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} }")
+        _login_cred(page, "demo_resident_cy", "demo123")
+        _ask_policy(page, q)
+        still("02-属地-朝阳试点社区")
+    except Exception as e:  # noqa: BLE001
+        print(f"      （属地场景降级：{type(e).__name__}: {e}）")
+    page.wait_for_timeout(3000)
+
+
 SCENES = [
     ("01-login", "登录页 · 粒子/数字滚动/流光", "1440x900", 14, scene_login),
     ("02-resident", "居民端 · 横幅/磁贴悬停", "390x844", 16, scene_resident),
@@ -163,6 +201,7 @@ SCENES = [
     ("04-elderly", "老年端 · 大字/SOS 长按", "390x844", 17, scene_elderly),
     ("05-screen", "治理大屏 · 八卡滚动/呼吸", "1920x1080", 15, scene_screen),
     ("06-agent-chat", "居民端 · 多智能体对话", "390x844", 15, scene_chat),
+    ("07-region", "属地化 · 两社区同一问题对比", "1280x900", 24, scene_region),
 ]
 
 

@@ -120,13 +120,18 @@ CURRENT_DOCS = [
     "安装说明.md", "开发约定.md", "docs/DEPLOY.md",
     "docs/mobile-deploy.md", "docs/scaling.md", "docs/deploy-keys.md",
     "docs/competition/创意说明书-提交版.md", "docs/competition/最终版交付说明.md",
+    "docs/competition/技术实现报告.md", "docs/competition/答辩问答手册.md",
+    "docs/competition/演示脚本.md",
 ]
+
+# 测试数「口径自检」的豁免名单：这两份是**历史记录**，里面的数字是当时的真实基线，
+# 改成今天的数字反而是篡改历史（CHANGELOG 按版本记录；HANDOFF 是那次交接时的快照）。
+COUNT_EXEMPT = {"CHANGELOG.md", "HANDOFF.md"}
 
 # 历史文档：正文允许保留原型阶段的数字（328 测试 / Streamlit / LangChain / 16 工具），
 # **但必须在开头明确标注**是历史实现，否则会误导评委 → 门禁检查「标注存在」。
 LEGACY_BANNER_DOCS = {
     "docs/TECHNICAL.md": "历史实现",
-    "docs/competition/技术实现报告.md": "状态更正声明",
     "docs/competition/创意说明书.md": "历史实现",
 }
 
@@ -136,6 +141,9 @@ STALE = [
     "schema **v41**", "schema **v42**", "schema **v43**", "schema **v44**", "schema **v45**",
     "328 测试", "328 项", "457 项", "495 passed", "538 项", "555 项", "564 passed",
     "16 个治理工具", "16 个函数工具", "Streamlit 三角色", "LangChain AgentExecutor",
+    # ↑ 「16 个治理工具」是 LangChain 时代的旧措辞（当时是 16 个 LangChain Tool）。
+    #   当前工具数仍是 16，但写法统一为「16 个工具（自动发现 + 按角色裁剪）」——命中即要求改写，
+    #   避免读者以为还在用 LangChain。
     # 第九轮：UI 审计从 26 页扩到全站 34 个路由页 / 54 个页面视口，旧页数不得回流
     "26 页", "26 个页面",
     # 第十轮观察项 O1：PWA **没有 service worker**，只能宣称「可添加到主屏幕」，
@@ -168,11 +176,31 @@ def _cross_check(collected: int) -> int:
         p = os.path.join(_PROJ, doc)
         if not os.path.exists(p):
             continue
-        for i, ln in enumerate(io.open(p, encoding="utf-8").read().splitlines(), 1):
+        txt = io.open(p, encoding="utf-8").read()
+        for i, ln in enumerate(txt.splitlines(), 1):
             for s in STALE:
                 if s in ln:
                     bad.append(f"{doc}:{i} 含过时表述「{s}」→ {ln.strip()[:70]}")
                     break
+        # 测试数口径自检（本轮新增）：光核对 meta.js 不够——文档里可能一处写新的、另一处写旧的
+        # （实测踩到「625 项可运行（624 通过）」这种自相矛盾，因为 sync_test_count 的替换规则漏了写法）。
+        # 规则：凡出现「可运行 [用例] NNN」必须 == 可运行数；「NNN 通过 / NNN passed」必须 == 可运行数 − 1。
+        if collected <= 0:
+            continue
+        if doc in COUNT_EXEMPT:
+            continue          # 历史快照/变更日志：按当时的真实数字记录，不该被改成今天的数字
+        passed = max(0, collected - 1)
+        for i, ln in enumerate(txt.splitlines(), 1):
+            if "scripts/sync_test_count" in ln or "check_claims" in ln:
+                continue          # 命令示例/提示行不参与核对
+            for m in re.finditer(r"可运行(?:用例)?[\s|*]*(\d{3})", ln):
+                if int(m.group(1)) != collected:
+                    bad.append(f"{doc}:{i} 写「可运行 {m.group(1)}」，实测可运行 {collected}"
+                               f"（跑 `python scripts/sync_test_count.py {collected}` 同步）")
+            for m in re.finditer(r"(\d{3})\s*(?:通过|passed)", ln):
+                if int(m.group(1)) != passed:
+                    bad.append(f"{doc}:{i} 写「{m.group(1)} 通过」，实测应为 {passed}"
+                               f"（跑 `python scripts/sync_test_count.py {collected}` 同步）")
 
     # 历史文档必须带「这是历史实现」标注
     for doc, banner in LEGACY_BANNER_DOCS.items():
@@ -189,6 +217,8 @@ def _cross_check(collected: int) -> int:
             print("  -", b)
         return 1
     print("  ✅ 当前状态文档无过时表述（历史快照 docs/review、dev-log 不在此列）")
+    print(f"  ✅ 测试数口径自检：可运行 {collected} / 通过 {max(0, collected - 1)}，"
+          f"文档与 meta.js 一致（CHANGELOG、HANDOFF 属历史记录，豁免）")
     return 0
 
 

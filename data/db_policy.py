@@ -356,6 +356,11 @@ def format_knowledge_answer(entry: dict) -> str:
     if entry.get("policy_number"):
         ref += f" · {entry['policy_number']}"
     lines.append(ref)
+    # 属地兜底要**说清楚**：本条是"跨区"当选（本地没有达标的属地适用政策），
+    # 不标注的话居民会以为这就是本社区口径（属地错配的隐性危害比不回答更大）。
+    if (entry.get("region_level") or "") == "other" and (entry.get("applicable_area") or "").strip():
+        lines.append(f"提示：该依据的适用地区是「{entry['applicable_area']}」，"
+                     f"本社区口径可能有差异，可转人工确认。")
     if (entry.get("source") or "").strip() == SELF_MADE_SOURCE:
         lines.append(SELF_MADE_FOOTER)
     return "\n\n".join(lines)
@@ -980,14 +985,18 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
         return {"matched": False, "reason": "no_knowledge", "question": q,
                 "summary": summary, "q_type": q_type, "expired_hint": expired_hint}
     best = results[0]
-    # 属地化选答规则（WS2 关键设计）：**属地只决定"在都达标的条目里优先谁"，绝不降低安全门槛**。
-    # 若只看 results[0]，会出现"本地弱命中(base 1.9) 把全国强命中(base 2.5) 挤到第二 →
-    # 阈值判 1.9<2.0 → 本来能答的反而转人工"的反效果。这里改为：在 final 排序里取**第一条 base 达标**的。
-    answer_entry = next(
-        (e for e in results
-         if float(e.get("base_score", e.get("score", 0.0))) >= _match_threshold),
-        None,
-    )
+    # 属地化选答规则（WS2 关键设计 + WS9 修正）：
+    #   ① **安全门槛只看 base_score**（属地绝不降低门槛）：若只看 results[0]，会出现"本地弱命中(base 1.9)
+    #      把全国强命中(base 2.5) 挤到第二 → 阈值判 1.9<2.0 → 本来能答的反而转人工"的反效果；
+    #   ② 在**都达标**的候选里，优先选"属地适用"的（region_level != "other"）——否则会出现
+    #      **属地错配**：朝阳居民被《北京市海淀区…细则》回答（跨区只扣 0.5，压不过主题分的差距，
+    #      live 实测 final 12.14 vs 10.16，海淀文件照样排第一）。市级/全国条目只要达标就应优先；
+    #   ③ 若一个属地适用条目都没达标，**仍回落到达标的跨区条目**（宁可给一份适用地区不同的政策，
+    #      也不把"能答"变成"不答"），并在正文里显式标注它的适用地区（见 format_knowledge_answer）。
+    qualified = [e for e in results
+                 if float(e.get("base_score", e.get("score", 0.0))) >= _match_threshold]
+    applicable = [e for e in qualified if (e.get("region_level") or "national") != "other"]
+    answer_entry = (applicable or qualified or [None])[0]
     if answer_entry is None:
         # WS3：弱命中尝试真 RAG（开关关闭 / 无片段 / 引用校验失败 → 维持原转人工逻辑，行为不变）
         rag_out = None

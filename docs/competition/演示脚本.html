@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 演示脚本 — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>社区先知 CommunityInsight Agent — 演示脚本（现场版）</h1>
+
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体 OPC 创新大赛 · <strong>基层治理赛道</strong>（人文赋能特别奖）<br><strong>形态</strong>：FastAPI 主服务 + Vue3 三端（居民 / 网格员 / 老年） · <strong>总时长</strong>：约 5 分 30 秒（另附 3 分钟精简版）<br><strong>版本</strong>：v7.0（2026-09-14） · 与当前代码库对齐（schema v46 / 可运行用例 625）<br><strong>配套</strong>：<a href="答辩问答手册.md"><code>答辩问答手册.md</code></a>（怎么答）· <a href="最终版交付说明.md"><code>最终版交付说明.md</code></a>（怎么验）· <a href="答辩录屏分镜.md"><code>答辩录屏分镜.md</code></a>（怎么兜底）</div>
+
+<hr>
+
+<h2>一、演示前 5 分钟（必须逐条打勾）</h2>
+
+<pre>
+python scripts/demo_preflight.py     # 9 项自检必须全绿（schema/密钥姿态/加密覆盖/账号/服务身份/前端产物/登录页口径）
+python scripts/demo_acceptance.py    # 12 项真实 HTTP 端到端（约 1 分钟，建议演示前跑一次）
+</pre>
+
+<ul>
+<li>[ ] 浏览器已打开 <code>http://127.0.0.1:8000/login</code>，<strong>窗口全屏</strong>（F11），缩放 100%</li>
+<li>[ ] 手机演示时才起公网：<code>python scripts/serve_public.py</code> → 打开 <code>.shots/手机访问.html</code> 扫码页；<strong>演示完 <code>--stop</code></strong></li>
+<li>[ ] 手机用 <strong>4G/5G</strong>（校园网 DNS 对新隧道域名可能不解析）</li>
+<li>[ ] 万一现场网络/服务出问题 → 直接播 <code>.recordings/</code> 里的录屏（浏览器全屏最稳）</li>
+<li>[ ] 动过 <code>web/src</code> 就先 <code>cd web && npm run build</code>（两个审计脚本有 dist 新鲜度闸，忘了会直接报错）</li>
+</ul>
+
+<p><strong>演示账号</strong></p>
+
+<table>
+<th>角色</th><th>入口</th><th>账号</th>
+<tr><td>居民（海淀小区）</td><td><code>/resident/home</code></td><td>点登录页「居民」按钮（免密）</td></tr>
+<tr><td>居民（朝阳试点社区）</td><td><code>/resident/qa</code></td><td><code>demo_resident_cy</code> / <code>demo123</code> ← <strong>场景 2 属地对比用</strong></td></tr>
+<tr><td>网格员</td><td><code>/grid/dashboard</code></td><td><code>demo_grid</code> / <code>demo123</code></td></tr>
+<tr><td>老年关怀</td><td><code>/elderly/home</code></td><td>点登录页「老年」按钮（免登录）</td></tr>
+</table>
+
+<p><strong>预置数据（程序生成，演示前请口头说明）</strong>：工单 225 / 提案 201 / 通知 6 / 知识 62 条（含 55 条公开政策摘要）；<br><code>DEMO_AUTO_WORKER=true</code> 时闭环机器人会推进工单——<strong>模拟数据不代表真实治理成效</strong>。</p>
+
+<hr>
+
+<h2>二、完整版（5 分 30 秒）</h2>
+
+<h3>场景 0 · 开场（20 秒）</h3>
+
+<table>
+<th>操作</th><th>停在登录页，不点任何按钮</th>
+</table>
+
+<div class="meta">🎤 "社区先知，一套面向基层治理的多智能体平台，服务三类人：居民、网格员、老年人。<br>左边是居民端入口，中间是网格员端，右边是老年关怀端——三个端不是三套界面，是三种<strong>服务关系</strong>。<br>今天我用五分钟演示一条完整的治理闭环，以及我们和普通对话机器人最不一样的两件事：<br><strong>多智能体是真的在协商</strong>，以及<strong>对老人和隐私是真的有底线</strong>。"</div>
+
+<table>
+<th>操作</th><th>滑到登录页底部的口径说明</th>
+</table>
+<div class="meta">🎤 "顺带一提，页面上这些数字——625 项可运行用例、130 条接口、9 个智能体角色——不是写死在文档里的，<br>是页面启动时从代码库读的，跑一个脚本就能复算。<strong>我们不喜欢用形容词描述质量。</strong>"</div>
+
+<hr>
+
+<h3>场景 1 · 居民端：一句话报修（60 秒）</h3>
+
+<table>
+<th>操作</th><th>点「居民」进入 <code>/resident/home</code></th>
+</table>
+
+<div class="meta">🎤 "居民端首页就是四个字：知、报、议、督。最上面是他所在社区——海淀小区的实时脉搏。"</div>
+
+<table>
+<th>操作</th><th>点右下角对话入口，输入并发送</th>
+</table>
+
+<pre>
+3号楼2单元电梯又坏了，停在5楼不动了，家里老人下不来楼
+</pre>
+
+<table>
+<th>预期</th><th>自动分类「设施维修」→ 定级「紧急」→ 生成工单号 → 回复带操作按钮</th>
+</table>
+
+<div class="meta">🎤 "一句人话，不选分类、不填表单。系统自动分到设施维修、自动判定紧急，因为这户家里有老人下不来楼。<br>这不是关键词匹配，是<strong>接待员智能体把任务派给报修调度智能体</strong>，由它建单。"</div>
+
+<table>
+<th>操作</th><th>点开回复下方的「🤖 多智能体执行链（N 步）」</th>
+</table>
+
+<table>
+<th>展示</th><th>每一步：哪个角色、做了什么、Verifier 校验、Arbiter 仲裁、是否协商</th>
+</table>
+
+<div class="meta">🎤 "这是关键。普通产品到这里就给你一句话；我们给你<strong>这一轮到底发生了什么</strong>——<br>接待员定性、报修调度建单、合规审计过一遍、有冲突就仲裁，每一步都有记录，可以回查。<br>这就是我们说的'可追责'，不是口号，是这一列步骤。"</div>
+
+<table>
+<th>操作</th><th>进 <code>/resident/work-orders</code>，点刚提交的工单</th>
+</table>
+
+<div class="meta">🎤 "报修单里能看到处理留痕和时间戳。<strong>居民不需要打电话问进度</strong>，这就是'报'的闭环。"</div>
+
+<hr>
+
+<h3>场景 2 · 属地化：同一句话，两个社区（60 秒）⭐ 本场最重要</h3>
+
+<table>
+<th>操作</th><th>进 <code>/resident/qa</code>，输入</th>
+</table>
+
+<pre>
+我们社区高龄老人有什么补贴？
+</pre>
+
+<table>
+<th>预期</th><th>命中《北京市海淀区高龄老人津贴申领实施细则》，标注「适用地区：北京市海淀区」，属地级别 <code>local_district</code></th>
+</table>
+
+<div class="meta">🎤 "注意这里的关键词：<strong>海淀区的细则</strong>。因为这位居民属于海淀小区，系统按他的<strong>社区归属</strong>优先给了区级文件。"</div>
+
+<table>
+<th>操作</th><th>右上角退出登录 → 输入账号 <code>demo_resident_cy</code> / <code>demo123</code> → 进 <code>/resident/qa</code>，<strong>问同一句话</strong></th>
+</table>
+
+<table>
+<th>预期</th><th>命中《北京市老年人养老服务补贴津贴管理实施办法》，标注「适用地区：北京市」，属地级别 <code>local_city</code></th>
+</table>
+
+<div class="meta">🎤 "同一个人问同一句话——现在这位居民属于朝阳试点社区，系统<strong>不再给海淀区的文件</strong>，<br>而是给北京市级的办法。因为海淀那份只适用海淀区，拿它回答朝阳居民是错的。"</div>
+
+<table>
+<th>操作</th><th>指着页面上的「适用地区」标签</th>
+</table>
+
+<div class="meta">🎤 "这里有三点我想说清楚，也是我们和很多'智慧社区'方案的区别：<br><strong>第一，我们不采定位。</strong> 属地来自账号的网格归属——网格是确定的，不需要也不应该为一个政策排序去采 GPS，老人家里定位既不准也不必要。<br><strong>第二，属地只影响'选谁'，绝不影响'能不能答'。</strong> 打分里相关度决定能不能自动回答，属地只决定在都达标的候选里优先谁。<br>我们有一条专门的测试会<strong>故意制造排序倒挂</strong>，断言系统仍然照常作答——否则就会出现'因为本地政策分低就把能答的变成转人工'。<br><strong>第三，真的没有本地政策时，我们不会硬凑。</strong> 会给市级/全国的依据，并且在正文里明确写它的适用地区，让居民知道这不是本社区口径。"</div>
+
+<div class="meta">💡 若评委追问技术细节：<code>pytest tests/test_region_policy.py -q</code>（14 条属地用例，含两条端到端对比）。</div>
+
+<hr>
+
+<h3>场景 3 · 议事与提案（45 秒）</h3>
+
+<table>
+<th>操作</th><th>回居民端 <code>/resident/proposals</code></th>
+</table>
+
+<div class="meta">🎤 "20 条提案按附议数排序——加装电梯 89 人、增设停车位 73 人，状态都是已采纳。<br>居民用附议表达诉求，社区用行动回应，不是空谈。"</div>
+
+<table>
+<th>操作</th><th>点开任一提案详情 → 看「处理留痕」</th>
+</table>
+
+<div class="meta">🎤 "每个提案都有处理留痕：谁在什么时候回复、采纳、实施。<strong>公开留痕本身就是信任。</strong>"</div>
+
+<hr>
+
+<h3>场景 4 · 网格员端：管理与留痕（60 秒）</h3>
+
+<table>
+<th>操作</th><th>退出 → 用 <code>demo_grid</code> / <code>demo123</code> 登录 → <code>/grid/dashboard</code></th>
+</table>
+
+<div class="meta">🎤 "换成网格员视角。工作台是治理侧的仪表盘：待处理、紧急、SLA 超期、健康度，还有 LLM 用量费用卡——<br>花了多少钱是<strong>逐笔记账</strong>的，不是估的。"</div>
+
+<table>
+<th>操作</th><th>进 <code>/grid/work-orders</code>，把刚才居民报修的工单从「待处理」改成「处理中」→「已解决」</th>
+</table>
+
+<div class="meta">🎤 "网格员处理工单，状态变更会推给居民端。刚才居民报的电梯故障，现在已解决。"</div>
+
+<table>
+<th>操作</th><th>回到网格端工作台，点开「Agent 日志 / 留痕」，筛「仲裁」</th>
+</table>
+
+<table>
+<th>展示</th><th>353 条 <code>agent_logs</code> 中的仲裁记录：规则名、决策、时间</th>
+</table>
+
+<div class="meta">🎤 "这就是我们的<strong>双层防线</strong>：Verifier 负责事实与安全（幻觉、隐私、医疗诊断句式），<br>Arbiter 负责冲突裁决——按<strong>合规优先 → 安全 → 专业 → 费用/不可逆需人工 → 数据版本</strong>的顺序，<br>第一条命中的规则生效，并且<strong>每次裁决都落库</strong>。所以智能体之间不一致时，不是'谁声音大听谁的'，是有规则、有记录。"</div>
+
+<table>
+<th>操作</th><th>进 <code>/grid/qa</code>，展示知识库管理页的「适用地区」列</th>
+</table>
+
+<div class="meta">🎤 "知识库 62 条，55 条是可溯源的公开政策摘要，每条都标了适用地区。<strong>政策问答不是让模型背条文，是检索到材料再作答。</strong>"</div>
+
+<hr>
+
+<h3>场景 5 · 老年关怀端：底线在哪（60 秒）⭐ 人文赋能加分点</h3>
+
+<table>
+<th>操作</th><th>退出 → 点登录页「老年」→ <code>/elderly/home</code></th>
+</table>
+
+<div class="meta">🎤 "现在请评委看一下字号和按钮大小——老年端不是把居民端放大，是<strong>重做</strong>：<br>字号不小于 20 像素、热区不小于 72 像素、层级砍到最少、支持语音播报和一键拨号。"</div>
+
+<table>
+<th>操作</th><th>点一个预置短语（如「我不舒服」）</th>
+</table>
+
+<div class="meta">🎤 "老人不需要打字。语音说得清就说，说不清就点一下。"</div>
+
+<table>
+<th>操作</th><th>点 SOS / 联系家属（弹二次确认，说明会留痕）</th>
+</table>
+
+<div class="meta">🎤 "紧急联系是两步：确认、拨打。拨了会留痕，家属和社区都能看到。<br>这里我要主动说两条底线：<br><strong>第一，健康顾问不做诊断。</strong> 诊断句式会被专门规则拦下来，它只给建议和就医引导——这是合规，也是对老人负责。<br><strong>第二，任何答不了的情况都不是冷冰冰的报错</strong>，而是转人工并给居民一个处理编号。"</div>
+
+<table>
+<th>操作</th><th>进 <code>/elderly/notices</code>（听通知）</th>
+</table>
+
+<div class="meta">🎤 "通知支持朗读。老人不用看屏幕也能知道社区这周有什么安排。"</div>
+
+<hr>
+
+<h3>场景 6 · 治理大屏与收尾（45 秒）</h3>
+
+<table>
+<th>操作</th><th>退出 → <code>demo_grid</code> 登录 → <code>/screen</code> 治理大屏</th>
+</table>
+
+<div class="meta">🎤 "最后是全屏治理大屏：工单流转、类别分布、趋势、关怀指标，30 秒自动刷新。"</div>
+
+<table>
+<th>操作</th><th>回到登录页（或停在任一页面）收尾</th>
+</table>
+
+<div class="meta">🎤 "总结一下我们的取舍：我们<strong>没有</strong>追求让 AI 全自主办事。<br>涉及安全、费用、政策依据、反复协商的情况，系统一律转人工并留下可追的处理包。<br>我们也不宣称离线能力、不宣称治理成效，因为<strong>没有试点就没有成效</strong>——这些边界都写在交付说明里。<br>我们相信基层治理里 AI 的价值不是替代人，而是<strong>把人的注意力省下来</strong>。<br>这就是我们理解的'人文赋能'：不是把字放大，而是<strong>不越界、不采集、不静默失败</strong>。"</div>
+
+<hr>
+
+<h2>三、3 分钟精简版（时间紧张时）</h2>
+
+<table>
+<th>顺序</th><th>内容</th><th>时长</th>
+<tr><td>1</td><td>开场 + 三端一览（登录页）</td><td>20 秒</td></tr>
+<tr><td>2</td><td>居民一句话报修 → <strong>点开多智能体执行链</strong></td><td>50 秒</td></tr>
+<tr><td>3</td><td><strong>属地对比：海淀小区 vs 朝阳试点社区同一句话</strong></td><td>50 秒</td></tr>
+<tr><td>4</td><td>网格端：工单状态流转 + <strong>仲裁留痕</strong></td><td>40 秒</td></tr>
+<tr><td>5</td><td>老年端：字号/热区 + 预置短语 + SOS（讲两条底线）</td><td>30 秒</td></tr>
+<tr><td>6</td><td>收尾（取舍与边界）</td><td>20 秒</td></tr>
+</table>
+
+<hr>
+
+<h2>四、现场应急</h2>
+
+<table>
+<th>情况</th><th>处理</th>
+<tr><td>服务起不来 / 白屏</td><td>跑 <code>python scripts/demo_preflight.py</code>（会指出具体哪项不合格）；来不及就播录屏</td></tr>
+<tr><td>Agent 回复不符合预期</td><td>刷新重试一次；仍不行就直接讲执行链与留痕（内容次要，机制是重点）</td></tr>
+<tr><td>大屏没数据</td><td>检查是否用网格员身份登录（指标端点按角色锁定）</td></tr>
+<tr><td>手机扫码打不开</td><td>让评委用 4G/5G；或口述 URL + 打开 <code>.shots/手机访问.html</code> 展示完整链接</td></tr>
+<tr><td>网络完全不可用</td><td>全程用本机服务（<code>http://127.0.0.1:8000</code>），不依赖公网</td></tr>
+<tr><td>评委要现场验证数字</td><td><code>python scripts/demo_acceptance.py</code>（12 项，约 1 分钟）最稳；数字口径用 <code>python scripts/check_claims.py</code></td></tr>
+</table>
+
+<hr>
+
+<h2>五、演示时说与不说（重要）</h2>
+
+<table>
+<th>✅ 要说</th><th>❌ 不要说</th>
+<tr><td>"多智能体通过黑板消息队列真协商，每步留痕可查"</td><td>"我们的 AI 完全自主、自己决定一切"</td></tr>
+<tr><td>"属地来自账号网格归属，<strong>不采 GPS</strong>"</td><td>"我们用了定位会更准"</td></tr>
+<tr><td>"属地只改排序，不改能不能自动回答"</td><td>"本地政策优先，外地的就不答了"</td></tr>
+<tr><td>"答不了就转人工，并给处理编号"</td><td>"我们的准确率 100%"</td></tr>
+<tr><td>"600 多项用例里 6 项是供数冒烟、其余有硬断言"</td><td>"测试全绿所以没有 BUG"</td></tr>
+<tr><td>"没有真实试点，所以治理成效未验证"</td><td>"已在社区落地使用"</td></tr>
+<tr><td>"PWA 只做到可添加到主屏幕"</td><td>"宣称离线能力（断网仍可用）"</td></tr>
+</table>
+
+<hr>
+
+<div class="meta">演示脚本版本：v7.0 | 更新：2026-09-14 | 上一版（v6.0）描述的是 Streamlit 单页形态，已作废。</div>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>

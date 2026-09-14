@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、622 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、625 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 622 项：621 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 625 项：624 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -46,7 +46,7 @@ python -m uvicorn api_web:app --host 0.0.0.0 --port 8000
 cd web && npm run build   # 产物 web/dist/
 
 # 演示账号（DEMO_MODE=true）
-resident: demo_resident（无密码）
+resident: demo_resident（无密码，海淀小区）· demo_resident_cy / demo123（朝阳试点社区，属地化对比用）
 grid:     demo_grid / demo123
 elderly:  demo_elderly（免登录）
 ```
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 622 项测试**（621 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 625 项测试**（624 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
 - `config.DEFAULT_TENANT` 为多租户默认值（演示级，仅预留字段不改查询）；`AGENT_CLASSES` 角色 id 不得随意改（有状态）。
@@ -94,8 +94,10 @@ elderly:  demo_elderly（免登录）
   安全/隐私类校验（敏感词、脱敏、权限）一律 **fail-closed**——组件坏了要拒绝，不许放行。
 - **属地化（地区识别）统一口径**：所有"按地区"的能力都必须走 `utils/region.py`（`resolve_region` /
   `policy_region_boost` / `normalize_area`），**不要各写一份**。三条硬规则：
-  ① **属地只影响"选谁"，绝不影响"能不能自动回答"**（政策阈值永远只看 `base_score`；选答取
-     「final 排序里第一条 base 达标者」——早期"只看 top1"的写法会把本来能答的变成转人工）；
+  ① **属地只影响"选谁"，绝不影响"能不能自动回答"**（政策阈值永远只看 `base_score`；选答规则 =
+     「达标候选中优先**属地适用**者，一个都没有才回落到达标的跨区条目」——早期"只看 top1"会把本来能答的变成转人工，
+     而"只看 final 排序第一条"又会让**朝阳居民被海淀区文件回答**（跨区只扣 0.5，压不过主题分差距，live 实测 final
+     12.14 vs 10.16）；跨区兜底时正文必须标注「该依据的适用地区是…」，见 `format_knowledge_answer`）；
   ② `applicable_area` 写「全国 / 北京市 / 北京市海淀区 / 社区名」；社区名必须与 `user_profile.community`
      真值一致并登记进 `config.REGION_BY_COMMUNITY`（未命中会 warning + 回落全局默认，不许静默失效）；
   ③ 天气缓存键统一用 **adcode**，且 `get_daily_advice` 的每日缓存 action 必须带 key（否则跨社区串味）。

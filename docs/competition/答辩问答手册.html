@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 答辩问答手册 — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>社区先知 CommunityInsight Agent — 答辩问答手册</h1>
+
+<div class="meta"><strong>用途</strong>：答辩现场照着说。每问四件套——<strong>30 秒答法</strong>（先说完）、<strong>加分话术</strong>（值得主动补的）、<strong>避坑话术</strong>（绝不要说的话）、<strong>现场证据</strong>（能立刻跑/投屏的命令或文件）。<br><strong>项目</strong>：社区先知 CommunityInsight Agent · 基层治理赛道 · 目标<strong>人文赋能特别奖</strong> · 单人参赛（步承泽）<br><strong>一句话主线</strong>（所有回答最终都绕回它）：<br><strong>"我们不是把大模型接进社区，而是把社区的办事规则做成了可验证、可追责、对老人真的友好的智能体系统。"</strong></div>
+
+<hr>
+
+<h2>〇、开场 30 秒与收尾 30 秒（背下来）</h2>
+
+<p><strong>开场 30 秒</strong></p>
+<div class="meta">"社区先知是一套面向基层治理的多智能体平台，服务三类人：居民、网格员、老年人。<br>居民用一句话就能报修、议事、问政策；网格员用 SLA 工单和督办看板提效率；老年人用大字关怀版和一键 SOS。<br>技术上它有三个和别人不一样的地方：<strong>九个智能体是真实通过消息队列协商的</strong>，<br><strong>每一条输出都过合规审计和冲突仲裁并留痕</strong>，<br>而且<strong>所有对外数字都能当场跑脚本复算</strong>——625 项测试、12 项端到端验收、54 个页面视口的无障碍审计，全部是绿的。"</div>
+
+<p><strong>收尾 30 秒</strong></p>
+<div class="meta">"最后说一句我们的取舍：我们<strong>没有</strong>追求让 AI 全自主办事。<br>涉及安全、费用、政策依据、反复协商的情况，系统一律转人工并留下可追的处理包。<br>因为我们相信基层治理里 AI 的价值不是替代人，而是<strong>把人的注意力省下来</strong>——<br>这也是我们把'人文赋能'做成可复算指标，而不是一句口号的原因。"</div>
+
+<hr>
+
+<h2>一、项目定位与理解（Q1–Q4）</h2>
+
+<h3>Q1. 用一句话说清你们在做什么？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：把社区里"知事、报事、议事、督事"四件事做进一个多智能体平台：居民端说一句人话就能上报并追踪进度；网格端按 SLA 处理工单与提案；老年端大字版支持平安打卡、用药提醒和一键 SOS。核心是<strong>把治理闭环里的重复劳动交给智能体，把判断和温度留给人</strong>。</li>
+<li><strong>加分话术</strong>：我们不叫它"AI 客服"。客服是回答问题的，我们是<strong>推进流程的</strong>——一次对话能真的产生工单号、真的派单、真的推动一个提案进入办理。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们要替代社区工作者""实现全自动治理"——这是评委最反感的姿态，也会直接损害人文赛道印象。</li>
+<li><strong>现场证据</strong>：居民端 <code>/resident/home</code> 现场输入"3 号楼 2 单元楼道灯不亮"→ 出现工单号并可追踪。</li>
+</ul>
+
+<h3>Q2. 为什么做基层治理赛道？这个题目的"人文"在哪？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：因为我们观察到基层治理里最耗人的不是"没系统"，而是<strong>同一件事要在居民、网格员、街道之间反复翻译</strong>：居民说人话，系统要结构化；政策是条文，居民要人话；老人不会打字，更需要有人先想到他。我们做的是<strong>替三方做翻译，同时不丢掉责任链</strong>。</li>
+<li><strong>加分话术</strong>（人文赋能特别奖的关键一击）：我们把"人文"拆成了<strong>可验证的四件事</strong>：</li>
+</ul>
+<p>  ① <strong>老人优先</strong>：老年端口径独立——字号 ≥20px、热区 ≥72px、只保留 SOS 一个呼吸动效、支持语音播报与一键拨号；<br>  ② <strong>不采位置</strong>：属地判断来自网格归属，<strong>不用 GPS</strong>（后面 Q14 会详说）；<br>  ③ <strong>不越界</strong>：健康顾问只做建议与就医引导，<strong>不做诊断</strong>（有专门的拦截规则），涉费用/安全一律转人工；<br>  ④ <strong>不让老人被系统甩掉</strong>：任何"答不了"的情况都不是冷冰冰的报错，而是生成人工处理包并留下编号。</p>
+<ul>
+<li><strong>避坑话术</strong>：❌ 不要只说"我们界面做得大、字做大"——那只是适老的最低标准，评委听腻了。要说到<strong>不做诊断、不采位置、不静默失败</strong>这些底线。</li>
+<li><strong>现场证据</strong>：老年端 <code>/elderly/home</code>；<code>python scripts/mobile_audit.py</code>（21 页 × 7 类检查 0 违规）。</li>
+</ul>
+
+<h3>Q3. 真实社区能直接用吗？现在到什么程度？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>不能直接用，我们也从不这么说。</strong> 现在是一个<strong>功能闭环完整、质量可验证、但没有真实试点数据</strong>的系统。能证明的是"机制有效且可审计"，不能证明"治理成效提升了多少"——后者必须靠试点。</li>
+<li><strong>加分话术</strong>：所以我们把"能证明什么"写在了材料里：<code>最终版交付说明.md</code> 第五节有一张 12 行的<strong>已知边界表</strong>，包括"无真实试点""未做非 Chromium 真机验证""单进程架构"等等。<strong>我们宁可让你看到边界，也不想让你事后发现。</strong></li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们已经在社区用了/街道已经在用"——一旦被追问细节就崩。</li>
+<li><strong>现场证据</strong>：<code>docs/competition/最终版交付说明.md</code> 第五节（边界表）。</li>
+</ul>
+
+<h3>Q4. 和你看到的其他参赛作品比，你的差异点是什么？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：三点：①<strong>多智能体是真的</strong>（黑板消息队列 + 跨角色多轮往返 + 仲裁留痕，不是"一个 Agent 换四个提示词"）；②<strong>安全和责任链是真的</strong>（Verifier + Arbiter 双层防线，转人工有处理包编号）；③<strong>质量是可复算的</strong>（625 项测试、12 项端到端、54 个页面视口审计、故障注入 8/8 拦下）。</li>
+<li><strong>加分话术</strong>：第三点最容易被低估。很多项目"说自己做得不错"，我们是<strong>把'不错'变成了脚本</strong>——评委可以当场跑，红了就是我们的问题。</li>
+<li><strong>避坑话术</strong>：❌ 不要贬低其他作品（"别人都是套壳"）。说"我们的差异点"而不是"别人的问题"。</li>
+<li><strong>现场证据</strong>：<code>python scripts/check_claims.py</code>、<code>python scripts/demo_acceptance.py</code>。</li>
+</ul>
+
+<hr>
+
+<h2>二、多智能体的真实性（Q5–Q8）</h2>
+
+<h3>Q5. 你这算真多智能体吗？还是工作流套壳？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：判断标准是"执行链在运行时会不会被智能体自己改变、以及变更能不能追责"。我们两条都满足：智能体之间通过<strong>黑板消息队列</strong>（<code>task_request</code>/<code>task_response</code>/<code>notify</code>/<code>handoff</code>）真往返；一次用户输入里可以完成<strong>跨角色链式协商</strong>（如高温预警 → 天气守护 → 健康顾问 → 通知管理员）；每一步协商和仲裁都落 <code>agent_logs</code>，可以按 <code>intent</code> 查。</li>
+<li><strong>加分话术</strong>：工作流是"人写死调用顺序"；我们是"编排器给出入口，后续由角色按消息决定"，并且有<strong>循环防护</strong>（同一目标累计协商 ≥2 轮强制转人工）——一个纯工作流不需要防这个。</li>
+<li><strong>避坑话术</strong>：❌ 不要吹"完全自主"或"智能体自己决定一切"。准确说法是：<strong>编排框架确定、角色级决策自主、关键节点人确认</strong>。</li>
+<li><strong>现场证据</strong>：投屏网格端 Agent 留痕（353 条 <code>agent_logs</code>，含 <code>negotiation</code>/<code>仲裁</code> 记录）；<code>pytest tests/test_dispatch.py -q</code>。</li>
+</ul>
+
+<h3>Q6. 九个角色是怎么分工的？会不会互相打架？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：九个角色是<strong>声明式</strong>的（<code>agent/roles/AGENT_CLASSES</code>）：接待员、报修调度、提案协商、政策专员、健康顾问、天气守护、通知管理员、网格助手、合规审计。分工靠<strong>工具范围裁剪</strong>（一个角色只看自己该用的工具）+ 意图路由。</li>
+<li><strong>加分话术</strong>：打架的可能是存在的，所以第五个机制就是<strong>仲裁器</strong>：按<strong>合规优先 → 安全优先 → 专业优先 → 费用/不可逆需人工 → 数据版本冲突</strong>的顺序裁决，第一个命中的规则生效，<strong>每一次裁决都写库</strong>（含规则名），网格端能按"仲裁"筛选出来看。这就是"有冲突也能追责"。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"智能体之间会自动达成共识"——没有共识机制的自称是危险的；我们靠<strong>明确优先级的仲裁</strong>而不是"投票"。</li>
+<li><strong>现场证据</strong>：<code>agent/arbiter.py</code> 的 5 条规则表；<code>agent_logs</code> 里 <code>routed=仲裁/<规则名></code>。</li>
+</ul>
+
+<h3>Q7. 会不会出现两个智能体来回踢皮球、死循环？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：会，所以做了三层防护：①<strong>单目标协商轮次上限</strong>（≥2 轮强制转人工）；②<strong>链式协商遍历上限</strong>（最多 5 轮，且路由汇总终点不参与业务协商，避免计数误累加）；③<strong>兜底</strong>：任何异常都不静默，转人工并生成处理包。</li>
+<li><strong>加分话术</strong>：这不是理论设计，是我们把"链式真协商"做出来之后<strong>主动加的防护</strong>——因为不加的话，"天气→健康→通知"确实可能来回触发。这类细节比功能清单更能说明我们真的跑过。</li>
+<li><strong>避坑话术</strong>：❌ 不要回答"我们的设计不会出现死循环"——正确回答是"可能出现，所以我们有上限和兜底"。</li>
+<li><strong>现场证据</strong>：<code>agent/orchestrator.py::_handle_negotiations</code> / <code>_drain_negotiations</code>。</li>
+</ul>
+
+<h3>Q8. 转人工之后呢？人怎么接得住？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：转人工不是弹个"请联系工作人员"。系统会生成<strong>人工处理包</strong>（<code>handoff_id</code> 可追）+ 站内消息 + 明确的下一步动作按钮（如"查看消息""一键拨打"），居民能看到"已转人工、编号是多少"，网格端能看到这条待办。</li>
+<li><strong>加分话术</strong>：触发转人工的情形我们也写清楚了：合规审计不通过、Verifier 判定高风险、协商超轮次、政策检索无任何达标材料、仲裁兜底——<strong>五类情形，无一例外都不给居民一个可能错的答案</strong>。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"转人工率越低越好"。正确态度是：<strong>该转就转，转得清楚</strong>。</li>
+<li><strong>现场证据</strong>：<code>agent/orchestrator.py::_transfer_to_human</code>；端到端验收里的留痕断言。</li>
+</ul>
+
+<hr>
+
+<h2>三、大模型与知识增强（Q9–Q12）</h2>
+
+<h3>Q9. 大模型到底用在哪？是不是在关键判断上也依赖它？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>规则为骨、LLM 为脑。</strong> 状态机、权限、脱敏、风控、阈值判定这些"不能错"的部分全是确定性代码；LLM 只做三件模糊的事：模糊意图兜底、政策问答生成（闭集 + 引用强制）、跨角色协商决策。而且<strong>四个开关（编排/政策 RAG/接待兜底/协商）可以一键全关</strong>，关掉后系统仍是完整可用的规则版。</li>
+<li><strong>加分话术</strong>：现场可以对比给你看：同一句模糊提问，开关全开时走 LLM 兜底，全关时走规则——两种姿态都有明确行为，不会"关了就崩"。代码默认全关（确定性优先、成本可控），演示姿态全开。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们全靠大模型"（显得不确定），也❌不要说"我们基本不用大模型"（显得没用 AI）。</li>
+<li><strong>现场证据</strong>：<code>python scripts/demo_preflight.py</code> 的姿态行；<code>llm_usage</code> 表；<code>.env</code> 的四个开关。</li>
+</ul>
+
+<h3>Q10. 会不会编造政策、编造工单号？怎么防幻觉？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：三道闸。①<strong>检索约束</strong>：政策回答必须带检索片段，并校验<strong>引用下标</strong>，无材料一律转人工（不允许"凭记忆答政策"）；②<strong>Verifier 事实校验</strong>：回复里出现本次工具结果中不存在的编号/数字 → 判定为幻觉；③<strong>Arbiter 合规否决权</strong>：合规审计不通过直接拦输出并转人工。</li>
+<li><strong>加分话术</strong>：还有一个容易被忽略的细节——<strong>健康问题不做诊断</strong>。诊断句式（"你患了…"）会被专门规则拦截，只输出建议与就医引导。这既是合规，也是人文。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们有 100% 的防幻觉能力"。正确说法：<strong>"在可判定的范围内拦截，判不了就转人工。"</strong></li>
+<li><strong>现场证据</strong>：<code>agent/verifier.py</code>（<code>_policy_checks</code>/<code>_health_checks</code>/<code>_general_checks</code>）；负向测试用例。</li>
+</ul>
+
+<h3>Q11. RAG 命中率 100% 是不是自己出题自己考？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>是自建金标，所以我们不把它当泛化结论。</strong> 它的价值是<strong>可复算的消融对比</strong>：同一批 48 条口语化提问，纯词法 hit@1 是 85.7%，加上语义向量并做 RRF 融合后是 100%——这证明的是"这次升级有用"，不是"我们在任何场景都 100%"。</li>
+<li><strong>加分话术</strong>：48 条里有 <strong>6 条属地用例</strong>，专门验证"同一个问题在不同社区应该命中不同政策"，属地 Top-1 正确 4/4。这是自建金标里最贴近真实治理的一部分。</li>
+<li><strong>避坑话术</strong>：❌ 绝对不要说"我们的 RAG 准确率 100%，业界领先"。一旦这么说，评委必然追问泛化性，你会站不住。</li>
+<li><strong>现场证据</strong>：<code>python scripts/rag_eval.py</code>（一次跑完，含基线对比与属地行）。</li>
+</ul>
+
+<h3>Q12. 知识库有多大？政策从哪来？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：62 条知识，其中 61 条已发布、55 条是<strong>可溯源的公开政策摘要</strong>、43 条带"适用地区"标记。来源是公开渠道的政策原文摘要，不掺虚构条款。</li>
+<li><strong>加分话术</strong>：配套还有一张<strong>轻量知识图谱</strong>：88 个实体、199 条关系、760 次提及，用途不是画图好看，而是<strong>按实体反查</strong>——从一条工单里的地址/设施/类别，反查历史同类工单和相关政策，网格员办单时能"看到来龙去脉"。</li>
+<li><strong>避坑话术</strong>：❌ 不要把图谱说成"我们做了知识图谱推理"。我们做的是<strong>可查的关联检索</strong>，说清楚反而更可信。</li>
+<li><strong>现场证据</strong>：知识库管理页；网格端图谱反查（端到端验收第 6 项覆盖）。</li>
+</ul>
+
+<hr>
+
+<h2>四、属地化与人文落点（Q13–Q15）</h2>
+
+<h3>Q13. "一区一策"你们怎么落地的？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：所有"按地区"的能力统一走 <code>utils/region.py</code> 一个入口，产出<strong>社区 → 街道 → 区 → 市 → 省</strong>的行政区划链。政策问答按属地加权排序：街道/区 1.5、市 1.0、省 0.5、全国 0，<strong>跨区给 −0.5</strong>。所以同样问"高龄老人有什么补贴"，海淀小区的居民会命中社区级助餐与代办指引，朝阳的居民会拿到北京市级津贴细则。</li>
+<li><strong>加分话术</strong>：这里有一条<strong>我们特意守住的底线</strong>：<strong>属地只影响"选谁"，绝不影响"能不能自动回答"。</strong></li>
+</ul>
+<p>  打分是 <code>base_score</code>（相关度，决定能不能答）+ <code>region_boost</code>（属地，决定优先选谁），选答只认 <code>base_score</code>。<br>  有一条专门的测试（<code>test_answer_entry_never_downgrades_answerability</code>）会<strong>故意制造排序倒挂</strong>，断言系统仍然自动作答——<br>  否则就会出现"因为本地政策分低，就把本来能答的问题变成转人工"这种最糟糕的体验。</p>
+<ul>
+<li><strong>避坑话术</strong>：❌ 不要说"用得越多越准的自学习"；❌ 不要把属地加权说成"AI 自动判断该用哪个政策"——它是<strong>确定的规则</strong>。</li>
+<li><strong>现场证据</strong>：<code>pytest tests/test_region_policy.py -q</code>；现场切两个演示社区对比同一问题。</li>
+</ul>
+
+<h3>Q14. 你们采集居民位置吗？隐私怎么保证？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>不采集。</strong> 属地的来源是<strong>账号对应的社区/网格</strong>（登记事实），不是设备定位。理由是：网格归属本来就是确定的，<strong>不需要也不应该</strong>为一个政策排序去采 GPS；而且老人在家里用手机，定位既不准也不必要。</li>
+<li><strong>加分话术</strong>：这一点可以主动讲——很多"智慧社区"方案默认开定位，我们从设计上就把它排除了，并且把这条写进了"已知边界"里的合规说明。这就是人文赋能赛道的价值观落点：<strong>能不采的数据就不采。</strong></li>
+<li><strong>避坑话术</strong>：❌ 不要说"以后会加定位会更准"。方向反了。</li>
+<li><strong>现场证据</strong>：<code>utils/region.py</code>（无任何定位 API）；<code>config.REGION_BY_COMMUNITY</code>（社区登记映射）。</li>
+</ul>
+
+<h3>Q15. 政策答错了责任谁负？居民按错的说法去办事怎么办？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：三层降低风险：①<strong>引用可溯</strong>——政策回答基于检索到的政策摘要并显示来源与适用地区；②<strong>无依据不答</strong>——检索不到达标材料直接转人工，不"猜一个"；③<strong>留痕可倒查</strong>——每一轮问答的意图、命中的知识、仲裁决策都在 <code>agent_logs</code>/<code>activity_log</code> 里。</li>
+<li><strong>加分话术</strong>：我们从来没打算让 AI 单独承担政策解释责任。形态上它是<strong>"政策助手 + 人工兜底"</strong>：它负责让居民听懂、让网格员少翻文件，<strong>最终解释权仍在街道/居委会</strong>。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"AI 答的就是准确的"。要说"<strong>答得出来给依据，答不出来给人</strong>"。</li>
+<li><strong>现场证据</strong>：政策问答链路（居民端/网格端）+ 留痕页面。</li>
+</ul>
+
+<hr>
+
+<h2>五、数据安全与合规（Q16–Q18）</h2>
+
+<h3>Q16. 手机号这类个人信息你们怎么存？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>AES-256-GCM 真加密落库</strong>，不是 base64；密文带算法版本前缀（<code>g1$</code>），所以以后换算法还能平滑迁移。8 张含手机号的表<strong>明文计数为 0</strong>，展示时统一脱敏，操作留痕里不出现完整手机号，账号注销级联清理。</li>
+<li><strong>加分话术</strong>：这条<strong>可以当场验</strong>——<code>python scripts/audit_phone_encryption.py</code> 直接扫全库，输出 8 张表明文 0 条；<code>demo_preflight</code> 第 8 项每次演示前自动核对。<strong>"加密了"这句话，在我们这里是可执行的。</strong></li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们做了加密"就完事——评委追问"哪张表、什么算法、怎么验证、有没有明文字段"，我们要一条条答得出来。</li>
+<li><strong>现场证据</strong>：<code>python scripts/audit_phone_encryption.py</code>；<code>utils/crypto.py</code>。</li>
+</ul>
+
+<h3>Q17. 密钥丢了/泄露了会怎样？现在怎么管？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>fail-closed</strong>：生产姿态（<code>DEMO_MODE=false</code>）下，密钥缺失、或还是仓库里的示例占位值，服务<strong>直接拒绝启动</strong>，而不是"用默认密钥凑合跑"。<code>.env</code> 不入版本控制，<code>.env.example</code> 只给变量名。</li>
+<li><strong>加分话术</strong>：我们也在材料里承认了当前不足：<strong>密钥派生用的是 <code>SHA-256(CRYPTO_KEY)</code>，没有加盐迭代，也没有信封加密</strong>，下一步是 HKDF + 每条记录独立 DEK + 轮换演练。这是"已知边界"里的一条，不是被问出来的。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们的加密绝对安全"。要主动说清楚"现在的强度够比赛和单社区，但生产需要 KMS/信封加密"。</li>
+<li><strong>现场证据</strong>：<code>python scripts/demo_preflight.py</code>（姿态行显示密钥状态）；<code>docs/deploy-keys.md</code>。</li>
+</ul>
+
+<h3>Q18. 个人信息保护法（PIPL）相关你怎么考虑的？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：四条：①<strong>最小采集</strong>——不采位置、不采与办事无关的字段；②<strong>存储加密 + 展示脱敏</strong>；③<strong>可追溯</strong>——谁在什么时候查了什么留痕；④<strong>可删除</strong>——账号注销级联清理密文与关联记录。</li>
+<li><strong>加分话术</strong>：还有一个诚实的缺口我们写着：<strong>居民在工单正文里手写的他人手机号目前不做脱敏</strong>（自由文本 PII 未治理），已列入近期计划（入库前正则脱敏 + 提示）。<strong>这类问题我们选择自己先说出来。</strong></li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们完全符合 PIPL 所有要求"——没有人能这么保证；说"我们做到了哪四条，还差哪一条"。</li>
+<li><strong>现场证据</strong>：边界清单第 6 条；审计脚本输出。</li>
+</ul>
+
+<hr>
+
+<h2>六、适老与无障碍（Q19–Q20）</h2>
+
+<h3>Q19. 适老化是不是就是字号放大？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：不是。我们在四个维度做：<strong>看得清</strong>（≥20px 字号、对比度达标）、<strong>点得到</strong>（≥72px 热区）、<strong>看得懂</strong>（少层级、口语化、支持语音播报）、<strong>不害怕</strong>（只保留 SOS 一个呼吸动效，全站尊重 <code>prefers-reduced-motion</code>）。</li>
+<li><strong>加分话术</strong>：更重要的是<strong>把"适老"变成可审计的数字</strong>：<code>mobile_audit.py</code> 按 21 个页面 × 7 类检查（含 iOS 输入框聚焦放大、底栏遮挡、横屏遮罩）跑真实浏览器，全绿；<code>ui_audit.py</code> 覆盖 34 个路由页 / 54 个页面视口 × 9 类检查，也是 0 违规。<strong>"对老人友好"不该是一句主观评价。</strong></li>
+<li><strong>避坑话术</strong>：❌ 不要说"老人只要字大就行"。也❌不要声称"我们做过老人用户测试"——我们<strong>没有</strong>，这是明确的边界。</li>
+<li><strong>现场证据</strong>：<code>python scripts/mobile_audit.py</code>、<code>python scripts/ui_audit.py</code>；老年端现场演示。</li>
+</ul>
+
+<h3>Q20. 老年人不会用智能手机，你的设计解决了吗？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：部分解决，而且我们不夸大。做了三件事：①<strong>语音输入 + 播报</strong>（不用打字）；②<strong>预置短语</strong>（"我不舒服""帮我叫人""我要买药"点一下就发出）；③<strong>一键拨号/SOS</strong>（最长路径两步，紧急联系人和社区电话都能直接拨）。</li>
+<li><strong>加分话术</strong>：我们很清楚一个边界：<strong>语音能力依赖浏览器</strong>，iOS Safari 和微信内置浏览器上不一定可用——所以<strong>打字和预置短语这两条不依赖语音的路径必须始终可用</strong>，这是我们设计时的硬约束。真正要验证这一条，只能靠非 Chromium 真机测试，目前<strong>还没做</strong>。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"老人用我们的系统完全无障碍"。正确说法：<strong>"我们把不依赖语音的路径做成了保底。"</strong></li>
+<li><strong>现场证据</strong>：老年端 <code>/elderly/home</code> 的预置短语与 SOS；边界清单第 2 条。</li>
+</ul>
+
+<hr>
+
+<h2>七、工程与质量（Q21–Q22）</h2>
+
+<h3>Q21. 625 项测试说明什么？有多少是真断言？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：先说口径，不藏：<strong>625 项可运行 = 624 通过 + 1 项需要外部服务默认跳过</strong>。其中 6 项是给消融报告供数的冒烟项（只保证能跑通、不做断言）；<strong>对外引用的两个指标另有硬断言测试守住</strong>——角色路由准确率断言等于 100.0、工具无缺失断言。也就是说，<strong>数字是可以被质疑的，而我们的门禁专门防止"注水"</strong>：新增任何不断言的测试都会让 CI 变红。</li>
+<li><strong>加分话术</strong>：比"测试多"更有说服力的是<strong>我们验证过门禁真的会红</strong>：这一轮做了故障注入，故意埋了越权、明文手机号、跨社区政策串味、吞异常返回成功等缺陷，<strong>8 次注入 8 次被拦下</strong>，属地化专项 4 次注入 4 次拦下。绿不代表有效，<strong>会红才代表有效</strong>。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们测试覆盖率 100%"。我们有测试<strong>数量</strong>和<strong>门禁</strong>，不做覆盖率吹牛。</li>
+<li><strong>现场证据</strong>：<code>pytest tests/ -q</code>；<code>python scripts/check_claims.py</code>；<code>docs/spec/dev-log.md</code> 四十七节（故障注入）。</li>
+</ul>
+
+<h3>Q22. 这些"审计脚本"是不是自己给自己打分？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：审计脚本是<strong>客观测量</strong>，不是主观打分：UI 审计用真实浏览器量对比度/字号/热区/溢出；加密审计直接扫全库数明文条数；检索评测跑金标算 hit@1；数字一致性门禁把材料和代码对账。<strong>阈值与规则都写在代码里，你可以改阈值重跑，结果会变——这说明它是真的在测。</strong></li>
+<li><strong>加分话术</strong>：我们甚至让审计"抓自己人"：有一次审计发现 6 处内联 hex 颜色在暗色主题下不跟着切换，还有一次发现 <code>web/dist</code> 没重新构建导致审计测的是旧包——两处都修了，并且给审计脚本加了"dist 落后于源码直接报错退出"的闸门。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们自己审计过了所以没问题"。要说"<strong>你可以自己跑一遍</strong>"。</li>
+<li><strong>现场证据</strong>：任选一个审计脚本现场跑；<code>docs/spec/dev-log.md</code> 第九轮/第十轮记录。</li>
+</ul>
+
+<hr>
+
+<h2>八、落地、成本与商业（Q23–Q24）</h2>
+
+<h3>Q23. 单社区能省多少人？成本多少？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>治理成效我们没有实测数据，不编。</strong> 可以给的是<strong>可计量的成本</strong>：演示姿态下一轮对话的 LLM 增量成本约 ¥0.0002、增量延迟约 0.9 秒，开发+测试+演示累计 30 次调用共 ¥0.0069（<code>llm_usage</code> 逐笔可查）。也就是说<strong>这套东西的边际成本低到可以在社区规模下忽略</strong>。</li>
+<li><strong>加分话术</strong>：比成本更重要的是<strong>降本设计</strong>：规则优先、四个开关、分级路由——不需要模型的地方绝不调模型。我们把它做成开关而不是"写死"，就是为了让街道自己选"要多智能、花多少钱"。</li>
+<li><strong>避坑话术</strong>：❌ 绝不要编"能省 3 个人力""效率提升 60%"这类没有依据的数字。评委会问怎么测的。</li>
+<li><strong>现场证据</strong>：工作台费用卡；<code>llm_usage</code> 表；<code>python scripts/llm_eval.py --provider llm</code>。</li>
+</ul>
+
+<h3>Q24. 怎么在街道落地？上线还差什么？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：落地路径三步：①单社区试点四项（报修、通知、政策问答、适老 SOS），用真实数据跑通闭环；②补齐生产化（Redis 支持多 worker、PostgreSQL、正式域名与访问控制、与街道工单系统对接）；③扩展到多社区多租户隔离。<strong>第一步的试点方案和验收指标我们已经写好了。</strong></li>
+<li><strong>加分话术</strong>：我们刻意<strong>没有</strong>在比赛期做大重构。扩容清单写在 <code>docs/scaling.md</code> 里，包括"黑板与限流目前是进程内的，多 worker 需要 Redis"这种偏难听但必须说的事实。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"我们的架构天然支持千万级"。当前是<strong>单进程 + SQLite</strong>，如实说，再给路径。</li>
+<li><strong>现场证据</strong>：<code>docs/scaling.md</code>；<code>落地路径-一页.md</code>。</li>
+</ul>
+
+<hr>
+
+<h2>九、危险问题（Q25 及补充弹药）</h2>
+
+<h3>Q25. 如果我现在给你一个真实社区的数据，你多久能用起来？</h3>
+
+<ul>
+<li><strong>30 秒答法</strong>：<strong>两段</strong>。第一段"能跑"：把数据按现有表结构导入（工单/提案/用户/知识），约 1–2 天能出闭环；第二段"能用"：需要本地政策语料梳理（属地字段）、网格与账号映射、SLA 规则校准、真机与老人试用，这不是写代码的时间，而是<strong>和街道一起定义规则的时间</strong>，估计 2–4 周。</li>
+<li><strong>加分话术</strong>：我特别想把第二段说清楚——<strong>社区智能体最难的不是模型，是把街道的办事规则写进系统</strong>。我们现在的架构把规则做成了声明式配置（角色、工具范围、属地映射、阈值），迁移一个场景不需要改核心代码。</li>
+<li><strong>避坑话术</strong>：❌ 不要说"一天就能上线"。这会让评委怀疑你没做过真实项目。</li>
+<li><strong>现场证据</strong>：<code>docs/competition/技术实现报告.md</code> 第十三节（可迁移性）；<code>config.REGION_BY_COMMUNITY</code>。</li>
+</ul>
+
+<h3>补充弹药（被追问时用）</h3>
+
+<table>
+<th>追问</th><th>一句话回答</th>
+<tr><td>为什么不用 LangChain/LlamaIndex？</td><td>主链路需要精确控制执行链、留痕与降级，自研编排只有 700 行左右，可控性远高于引入框架；备线 <code>app.py</code> 保留了早期 LangChain 实现作对照。</td></tr>
+<tr><td>为什么用 SQLite 不用 PostgreSQL？</td><td>单社区、单进程场景下 SQLite（WAL）足够，零运维；演进路径和前置条件写在 <code>docs/scaling.md</code>，比赛期不做大重构。</td></tr>
+<tr><td>前端为什么不用现成后台模板？</td><td>三端差异化（尤其老年端）和设计令牌体系必须自己控，模板改不动无障碍指标。</td></tr>
+<tr><td>断网能用吗？</td><td><strong>不能，也不宣称。</strong> PWA 只做到"可添加到主屏幕"，业务强依赖后端实时数据；政策/工单缓存过期会误导居民。</td></tr>
+<tr><td>大屏指标是真的吗？</td><td>指标全部来自库内实时聚合；但<strong>演示数据是程序生成的</strong>，只代表流程通了，不代表治理成效。</td></tr>
+<tr><td>你一个人做的？</td><td>是，单人全栈：架构、数据、前后端、测试与交付材料；AI 工具用于加速重复性编码与测试编写，架构决策和质量口径由我定。</td></tr>
+<tr><td>最大的不足是什么？</td><td><strong>没有真实试点和非 Chromium 真机验证。</strong> 机制可验证，成效未验证——这是下一步唯一重要的事。</td></tr>
+<tr><td>你觉得评委可能不认同哪一点？</td><td>我们主动转人工的比例偏高（宁可不答也不答错）。如果评委更看重自动化率，这会被认为保守；但基层治理里我认为保守是对的。</td></tr>
+</table>
+
+<hr>
+
+<h2>十、现场应急</h2>
+
+<table>
+<th>情况</th><th>处理</th>
+<tr><td>演示时服务起不来</td><td>跑 <code>python scripts/demo_preflight.py</code>（9 项自检，会直接指出哪一项不合格）；兜底播 <code>.recordings/</code> 的录屏</td></tr>
+<tr><td>网络/校园 DNS 出问题</td><td>手机用 4G/5G；服务侧有 <code>scripts/net_probe.py</code> 做 DNS 绕行</td></tr>
+<tr><td>评委要看代码</td><td>优先打开 <code>agent/orchestrator.py</code>（编排与协商）、<code>agent/arbiter.py</code>（5 条仲裁规则）、<code>utils/region.py</code>（属地）</td></tr>
+<tr><td>评委要现场跑验证</td><td><code>python scripts/demo_acceptance.py</code>（12 项端到端，约 1 分钟）最稳；数字类问题用 <code>python scripts/check_claims.py</code></td></tr>
+<tr><td>被问到不会的东西</td><td><strong>"这个我没验证过，不能给你结论。"</strong> 然后说它属于哪条已知边界 —— 比编一个答案安全得多，也更符合这个项目的调性</td></tr>
+</table>
+
+<hr>
+
+<h2>附：数字速查卡（答辩前扫一眼）</h2>
+
+<table>
+<th>项目</th><th>值</th>
+<tr><td>可运行用例</td><td><strong>625</strong>（624 通过 / 1 需外部服务跳过）</td></tr>
+<tr><td>schema / 表 / 迁移</td><td><strong>v46</strong> / 50 张业务表 / 46 个版本化迁移</td></tr>
+<tr><td>路由 / 智能体角色 / 工具</td><td><strong>130</strong> / <strong>9</strong> / <strong>16</strong></td></tr>
+<tr><td>知识库</td><td><strong>62</strong> 条（61 已发布 / 55 公开政策 / 43 带适用地区）</td></tr>
+<tr><td>检索金标</td><td><strong>48</strong> 条 hit@1 <strong>100%</strong>（词法基线 85.7%，属地 Top-1 4/4）</td></tr>
+<tr><td>知识图谱</td><td>88 实体 / 199 关系 / 760 提及</td></tr>
+<tr><td>端到端验收 / 演示自检</td><td><strong>12/12</strong> / <strong>9/9</strong></td></tr>
+<tr><td>UI 审计 / 移动审计</td><td>34 路由页·54 视口 × 9 类 <strong>0 违规</strong> / 21 页 × 7 类 <strong>0 违规</strong></td></tr>
+<tr><td>加密</td><td>8 张表<strong>明文 0</strong>，AES-256-GCM</td></tr>
+<tr><td>静默异常</td><td>「吞异常仍返回成功」<strong>0</strong></td></tr>
+<tr><td>故障注入</td><td><strong>8/8 拦下</strong>（属地专项 4/4）</td></tr>
+<tr><td>LLM 成本</td><td>累计 30 次 <strong>¥0.0069</strong>；单轮 +¥0.0002 / +0.9s</td></tr>
+<tr><td>演示数据</td><td>工单 225 / 提案 201 / 通知 6 / 留痕 353（agent_logs）</td></tr>
+</table>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>

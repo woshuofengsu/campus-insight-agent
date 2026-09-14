@@ -167,6 +167,63 @@ def test_answer_entry_never_downgrades_answerability(kb_db, monkeypatch):
     assert res["base_score"] >= dp._match_threshold
 
 
+def test_answer_entry_prefers_applicable_over_cross_district(kb_db, monkeypatch):
+    """属地适用优先（WS9 修正）：跨区条目**即使 final 更高**，只要存在属地适用的达标条目，就不得当选答。
+
+    live 实测缺陷：朝阳试点社区居民问「我们社区高龄老人有什么补贴？」时，海淀区文件 base 12.64
+    （final 12.14，跨区只扣 0.5）压过市级文件 base 9.16（final 10.16）→ 居民被一份**只适用海淀区**的
+    文件回答。跨区惩罚压不过主题分差距，所以必须靠"选答规则"而不是"打分"来兜。
+    用受控结果集直接钉住规则本身（打分与加成另有 test_region.py / 上面的用例覆盖）。
+    """
+    import data.db_policy as dp
+
+    foreign = {"id": 60, "title": "北京市海淀区高龄老人津贴申领实施细则",
+               "content": "海淀区口径", "version": 1, "audit_status": "已发布",
+               "base_score": 12.6, "score": 12.1, "region_level": "other",
+               "applicable_area": "北京市海淀区"}
+    city = {"id": 44, "title": "北京市老年人养老服务补贴津贴管理实施办法",
+            "content": "北京市口径", "version": 1, "audit_status": "已发布",
+            "base_score": 9.1, "score": 10.1, "region_level": "local_city",
+            "applicable_area": "北京市"}
+    assert foreign["score"] > city["score"], "前提：跨区条目 final 更高（这样才需要规则兜）"
+
+    monkeypatch.setattr(dp, "search_published_knowledge",
+                        lambda *a, **k: [dict(foreign), dict(city)])
+    reg = resolve_region("朝阳试点社区")
+
+    res = dp.ask_question(99993, "高龄老人补贴怎么领", source="测试", region=reg)
+    assert res["matched"], f"有属地适用条目达标时必须自动回答（reason={res.get('reason')}）"
+    assert res["knowledge"]["title"] == city["title"], (
+        f"属地用户不得被跨区文件回答（实际 {res['knowledge']['title']}）")
+    assert res["region_level"] == "local_city"
+
+
+def test_cross_district_policy_used_as_last_resort_with_notice(kb_db, monkeypatch):
+    """可答性优先（安全底线）：**没有任何属地适用条目达标**时，仍用达标的跨区条目作答，
+    但正文必须显式标注它的适用地区（否则居民会误以为这是本社区口径）。"""
+    import data.db_policy as dp
+
+    foreign = {"id": 60, "title": "北京市海淀区高龄老人津贴申领实施细则",
+               "content": "海淀区口径", "version": 1, "audit_status": "已发布",
+               "base_score": 12.6, "score": 12.1, "region_level": "other",
+               "applicable_area": "北京市海淀区"}
+    city = {"id": 44, "title": "北京市老年人养老服务补贴津贴管理实施办法",
+            "content": "北京市口径", "version": 1, "audit_status": "已发布",
+            "base_score": 1.2, "score": 2.2, "region_level": "local_city",
+            "applicable_area": "北京市"}
+    assert city["base_score"] < dp._match_threshold, "前提：市级条目不达标（只剩跨区条目可选）"
+
+    monkeypatch.setattr(dp, "search_published_knowledge",
+                        lambda *a, **k: [dict(foreign), dict(city)])
+    reg = resolve_region("朝阳试点社区")
+
+    res = dp.ask_question(99994, "高龄老人补贴怎么领", source="测试", region=reg)
+    assert res["matched"], "属地不得把『本来能回答』变成转人工"
+    assert res["knowledge"]["title"] == foreign["title"], "兜底应选唯一达标的跨区条目"
+    assert "适用地区" in res["auto_answer"], (
+        f"跨区兜底必须在正文标注适用地区，实际正文：{res['auto_answer'][:120]}")
+
+
 def test_rag_hybrid_region_rerank(kb_db):
     """Agent RAG（RRF 融合）也吃属地：本地小幅前置，region=None 顺序不变。"""
     from agent.rag import search_hybrid
@@ -276,6 +333,38 @@ def test_knowledge_list_exposes_applicable_area(client):
     assert all("applicable_area" in k for k in rows), "列表缺 applicable_area 字段"
     areas = {k["applicable_area"] for k in rows if k.get("applicable_area")}
     assert areas, f"列表里应至少有带属地的条目，实际 {list(areas)[:3]}"
+
+
+def test_two_communities_get_different_policy_e2e(client):
+    """端到端（演示脚本场景 2）：同一句话，两个社区的居民得到**不同属地口径**的政策。
+
+    - 海淀小区（demo_resident）→ 命中海淀区/本社区级文件；
+    - 朝阳试点社区（demo_resident_cy）→ 命中北京市级文件，且**不得**被海淀区文件回答。
+    这条用例同时守着演示账号种子（demo_resident_cy 必须在库里，否则演示当场翻车）。
+    """
+    q = "我们社区高龄老人有什么补贴？"
+    out = {}
+    for username, pw in (("demo_resident", ""), ("demo_resident_cy", "demo123")):
+        resp = client.post("/api/web/auth/login", json={"username": username, "password": pw})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["success"], f"{username} 登录失败：{body}"
+        token = body["data"]["token"]
+        assert body["data"]["community"], f"{username} 的账号没带社区（属地会静默退化）"
+        r = client.post("/api/web/qa/ask", json={"question": q},
+                        headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200, r.text
+        data = r.json()["data"] or {}
+        assert data.get("matched"), f"{username} 应能自动回答，实际 {data.get('reason')}"
+        out[username] = data
+
+    hd, cy = out["demo_resident"], out["demo_resident_cy"]
+    assert "海淀区" in (hd.get("applicable_area") or "") or "海淀小区" in (hd.get("applicable_area") or ""), \
+        f"海淀小区用户应命中属地内文件，实际 {hd.get('applicable_area')} / {hd.get('title')}"
+    assert hd["applicable_area"] != cy["applicable_area"], "两个社区不应拿到同一份属地口径"
+    assert "海淀区" not in (cy.get("applicable_area") or ""), \
+        f"朝阳用户不应被海淀区文件回答（属地错配），实际 {cy.get('applicable_area')} / {cy.get('title')}"
+    assert cy.get("region_level") in ("local_city", "local_province", "national"), cy.get("region_level")
 
 
 def test_policy_qa_endpoint_passes_region(client, monkeypatch):

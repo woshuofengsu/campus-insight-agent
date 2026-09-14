@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 最终版交付说明 — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>社区先知 CommunityInsight Agent · 最终版交付说明</h1>
+
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体 OPC 创新大赛 · <strong>基层治理赛道</strong>（人文赋能特别奖）<br><strong>版本</strong>：v2.0 定稿（2026-09-14） · 单人参赛（步承泽） · schema v46 · 可运行用例 625<br><strong>一句话</strong>：让居民 <strong>知社区事、报社区修、议社区政、督社区治</strong> 的多智能体接诉即办平台——三端分离、属地自适应、数据全加密、指标全可复算。</div>
+
+<p><strong>先读这份。</strong> 它只回答四个问题：<strong>怎么跑起来</strong>、<strong>怎么验证我说的都是真的</strong>、<strong>材料在哪</strong>、<strong>被追问怎么答</strong>。</p>
+
+<hr>
+
+<h2>一、5 分钟跑起来</h2>
+
+<pre>
+# 1) 依赖（后端 + 前端）
+pip install -r requirements.txt
+cd web &amp;&amp; npm ci &amp;&amp; npm run build &amp;&amp; cd ..
+
+# 2) 配置（.env 不进 git；演示姿态可 cp .env.demo.example .env.demo 后填 key）
+cp .env.example .env      # 可最小只配 DEEPSEEK_API_KEY（留空则自动降级纯规则，仍可完整演示）
+                          # 生产另配 WEB_JWT_SECRET / CRYPTO_KEY / CORS_ORIGINS
+
+# 3) 起主服务（首次启动自动迁移到 schema v46 并灌演示种子，约 15 秒）
+python -m uvicorn api_web:app --host 127.0.0.1 --port 8000
+</pre>
+
+<p>浏览器打开 <code>http://127.0.0.1:8000/login</code>。</p>
+
+<table>
+<th>角色</th><th>入口</th><th>账号</th>
+<tr><td>居民端（14 页）</td><td><code>/resident/home</code></td><td><code>demo_resident</code>（免密）</td></tr>
+<tr><td>网格员端（9 页）</td><td><code>/grid/dashboard</code></td><td><code>demo_grid</code> / <code>demo123</code></td></tr>
+<tr><td>老年关怀端（8 页）</td><td><code>/elderly/home</code></td><td><code>demo_elderly</code>（免登录）</td></tr>
+<tr><td>治理大屏</td><td><code>/screen</code></td><td>需网格员身份（指标端点按角色锁定）</td></tr>
+</table>
+
+<div class="meta">⚠️ <strong>数据说明</strong>：演示库为<strong>程序生成</strong>的种子数据（225 工单 / 201 提案 / 6 通知 / 62 条知识）＋ 演示闭环机器人推进，<br><strong>不代表真实治理成效</strong>；生产环境务必关闭 <code>DEMO_MODE</code> / <code>DEMO_AUTO_WORKER</code>。</div>
+
+<p><strong>想让人用手机扫码访问（0 成本，评委扫自己的手机）</strong></p>
+
+<pre>
+python scripts/serve_public.py     # 起服务（默认只绑 127.0.0.1）+ 公网 HTTPS 隧道 + 刷新扫码页 + 地址进剪贴板
+python scripts/probe_public.py     # 对公网入口做 8 项端到端探测
+python scripts/serve_public.py --status     # 看当前域名/进程/最近一次探测
+python scripts/serve_public.py --stop       # 演示结束立刻关闭公网入口
+</pre>
+
+<div class="meta">方案、6 个已知坑与安全口径见 <code>docs/演示常开-本机方案.md</code>。<br><strong>临时隧道无访问控制，拿到链接即可进入，演示完请务必 <code>--stop</code>。</strong><br>校园网 DNS 对新隧道域名可能返回 NXDOMAIN（已内置 DNS 绕行 <code>scripts/net_probe.py</code>），手机用 4G/5G 最稳。</div>
+
+<hr>
+
+<h2>二、怎么验证（全部可现场复算，不是自评）</h2>
+
+<table>
+<th>#</th><th>验证项</th><th>命令</th><th>实测结果（2026-09-14）</th>
+<tr><td>1</td><td>功能与回归</td><td><code>python -m pytest tests/ -q</code></td><td><strong>624 passed / 1 skipped / 0 warnings</strong>（可运行 625）</td></tr>
+<tr><td>2</td><td><strong>端到端验收（真实 HTTP + 真实数据）</strong></td><td><code>python scripts/demo_acceptance.py</code></td><td><strong>12/12</strong>（三角色登录、多智能体对话、政策命中、老年天气、工作台指标、图谱反查、留痕、属地化两社区对比；连跑两次结果一致）</td></tr>
+<tr><td>3</td><td>演示前一键自检</td><td><code>python scripts/demo_preflight.py</code></td><td><strong>9/9 通过</strong>（schema 版本、密钥姿态、手机号加密覆盖、演示账号、服务身份、前端产物、登录页口径）</td></tr>
+<tr><td>4</td><td>UI 无障碍与一致性</td><td><code>python scripts/ui_audit.py</code></td><td><strong>54 个页面/视口 × 9 类检查 0 违规</strong>（覆盖全部 34 个路由页：三端 + 大屏 + 详情/表单；对比度/溢出/热区/字号/暗色/动效/残缺文本，含 320/390/1366/1440/1920 档）</td></tr>
+<tr><td>5</td><td><strong>移动端适配</strong></td><td><code>python scripts/mobile_audit.py</code></td><td><strong>21 页 × 7 类检查 0 违规</strong>（iOS 输入框 <16px 聚焦放大、底栏遮挡、横屏遮罩、大屏手机降级）</td></tr>
+<tr><td>6</td><td>检索命中率</td><td><code>python scripts/rag_eval.py</code></td><td>混合检索 <strong>hit@1 48/48 = 100%</strong>（纯词法基线 85.7%；含 6 条属地用例，属地 Top-1 4/4）</td></tr>
+<tr><td>7</td><td>数据安全</td><td><code>python scripts/audit_phone_encryption.py</code></td><td>8 张含手机号表 <strong>明文计数 0</strong></td></tr>
+<tr><td>8</td><td>代码规范</td><td><code>python -m ruff check .</code></td><td><strong>All checks passed</strong>（0 错误）</td></tr>
+<tr><td>9</td><td>前端构建</td><td><code>cd web && npm run build</code></td><td>构建成功</td></tr>
+<tr><td>10</td><td>数字与材料一致</td><td><code>python scripts/check_claims.py</code></td><td><strong>通过</strong>（材料数字与代码实时核对，含登录页 <code>meta.js</code>）</td></tr>
+<tr><td>11</td><td><strong>手机端公网可用</strong></td><td><code>python scripts/probe_public.py</code></td><td><strong>8/8</strong>（公网地址上的健康身份、登录页、PWA、三角色进入、智能体对话 → <code>repair_dispatch</code>）</td></tr>
+<tr><td>12</td><td>静默失效排查</td><td><code>python scripts/audit_silent_exceptions.py</code></td><td><strong>「吞异常后返回成功」= 0</strong>；静默吞异常未超基线（HIGH 133 / MID 29 只减不增）</td></tr>
+<tr><td>13</td><td>故障注入（可复算的"门禁真的会红"）</td><td><code>python scripts/demo_acceptance.py</code> + 注入补丁</td><td><strong>8 次故意埋 BUG，8 次被门禁拦下</strong>（另属地化专项 4/4 拦下），见 <code>docs/spec/dev-log.md</code> 四十七节</td></tr>
+</table>
+
+<p><strong>方法学提示（评委常问"你怎么保证质量"）</strong>：本项目把「质量」做成了<strong>可执行的数字</strong>而不是形容词——<br>UI 用真实浏览器量对比度/热区/字号并卡阈值；检索用 48 条口语金标算 hit@1；数据安全用脚本扫全库；<br>对外数字用门禁核对代码库；关键路径还做过故障注入验证门禁本身有效。<strong>每一条都能当场跑给你看。</strong></p>
+
+<div class="meta"><strong>关于「625 项测试」这个数字的口径（主动说明，别等人问）</strong>：<br><code>625 = 624 通过 + 1 需外部服务默认跳过</code>。其中 <code>tests/test_ablation.py</code> 有 <strong>6 项是给消融报告供数的冒烟项</strong><br>（只跑通、不做断言）；<strong>对外材料真正引用的两个指标另有硬断言测试守住</strong>：<br><code>test_persona_routing_is_accurate</code>（断言角色路由准确率 <code>== 100.0</code>）与<br><code>test_tool_discovery_covers_expected</code>（断言工具无缺失）—— 这两条正是把准确率从 91.67% 拉回 100% 的原因。<br>该口径由 <code>tests/test_claims_consistency.py</code> 的白名单门禁守着：<strong>新增任何不做断言的 <code>test_*</code> 都会让 CI 变红</strong>。</div>
+
+<hr>
+
+<h2>三、架构一页</h2>
+
+<pre>
+Vue3 + Vite + Naive UI 三端（居民 14 页 / 网格 9 页 / 老年 8 页）
+        │  HTTP + WebSocket（JWT 鉴权、安全响应头、SPA 托管）
+        ▼
+FastAPI 主服务 api_web.py（:8000，130 条路由）  ── 另有 api.py 扣子插件入口（:18800，独立）
+        ▼
+多智能体编排 agent/orchestrator.py
+  ├─ 黑板（agent/blackboard.py）：共享上下文 + 消息队列 + 锁 + 历史 → **真协商，非伪多智能体**
+  ├─ 9 个声明式角色：接待员 / 报修调度 / 提案协商 / 政策专员 / 健康顾问
+  │                  / 天气守护 / 通知管理 / 网格助手 / 合规审计
+  ├─ 16 个工具（自动发现 + 按角色裁剪）
+  ├─ Verifier（agent/verifier.py）：幻觉、敏感词、手机号泄露、医疗诊断句式拦截
+  └─ Arbiter（agent/arbiter.py）：合规优先 → 安全 → 专业 → 转人工，决策落 agent_logs 留痕
+        ▼
+属地解析 utils/region.py（**唯一入口，不采 GPS**）
+  ├─ 政策：本地优先 + 全国兜底；**属地只改排序，不改"能不能自动回答"**
+  └─ 天气：按社区 adcode 取数，居民/老年/Agent 三端口径一致
+        ▼
+数据与检索
+  ├─ SQLite（WAL，schema **v46** 版本化迁移，50 张业务表）：手机号 **AES-256-GCM 加密落库**
+  ├─ 知识库混合检索：62 条（61 条已发布，55 条公开政策摘要）× 词法(同义/方言扩展) + 语义向量 RRF
+  └─ 轻量知识图谱：88 实体 / 199 关系 / 760 提及
+</pre>
+
+<p><strong>关键目录</strong>：<code>agent/</code>（多智能体）、<code>api_routes/</code>（14 路由模块）、<code>data/</code>（数据层 + 46 个版本化迁移）、<br><code>web/src/views/{resident,grid,elderly}/</code>（三端）、<code>scripts/</code>（自检/评测/审计/录屏/迁移）、<code>tests/</code>。</p>
+
+<hr>
+
+<h2>四、这一版做了什么（相对早期原型的变化）</h2>
+
+<ul>
+<li><strong>1.</strong> <strong>架构主线迁移</strong>：Streamlit/LangChain 原型 → <strong>FastAPI + Vue3 三端</strong>（<code>app.py</code> 仅存档，非主线）。</li>
+<li><strong>2.</strong> <strong>多智能体从"单 Agent 反复调用"改为"9 角色 + 黑板真协商"</strong>，并加 <strong>Verifier + Arbiter 双层防线</strong>与全程留痕（353 条 <code>agent_logs</code>）。</li>
+<li><strong>3.</strong> <strong>数据安全收口</strong>：手机号全库加密（v46 补齐提案/两张草稿表/<code>user_profile</code> 的遗漏面），<strong>明文计数 0</strong>，</li>
+</ul>
+<p>   密钥生产姿态 <strong>fail-closed</strong>（缺失或仍是仓库占位值直接拒绝启动），账号注销级联清密文。</p>
+<ul>
+<li><strong>4.</strong> <strong>检索从纯词法升级为混合检索</strong>（语义向量 <code>text-embedding-v3</code> 1024 维 + RRF），口语金标 hit@1 85.7% → <strong>100%</strong>；</li>
+</ul>
+<p>   知识库补到 62 条（55 条可溯源公开政策）。</p>
+<ul>
+<li><strong>5.</strong> <strong>属地化自适应（本轮新增）</strong>：政策按行政区划本地优先、天气按社区城市、知识库带「适用地区」，</li>
+</ul>
+<p>   <strong>三端统一走 <code>utils/region.py</code></strong>，<strong>不采集定位</strong>（网格归属是确定的，不需要也不应该采 GPS）。</p>
+<ul>
+<li><strong>6.</strong> <strong>可观测</strong>：知识库健康度、关怀量化（情绪/触达率）、LLM 用量记账（<code>llm_usage</code> 可逐笔查）、trace_id 全链路、轻量知识图谱。</li>
+<li><strong>7.</strong> <strong>视觉系统 v2 + 无障碍</strong>：设计令牌、三端差异化（老年端大字 ≥20px／热区 ≥72px／只留 SOS 呼吸动效）、暗色达标，</li>
+</ul>
+<p>   并用<strong>客观审计</strong>把「好看」变成可复算的数字（34 个路由页 / 54 个页面视口 0 违规）。</p>
+<ul>
+<li><strong>8.</strong> <strong>工程纪律</strong>：v46 把历史遗留的运行时裸 ALTER 全部收回迁移链；对外数字由门禁核对；</li>
+</ul>
+<p>   静默吞异常门禁（含"假成功必须为 0"）；演示前 9 项自检；7 段兜底录屏（含属地化两社区对比）。</p>
+
+<hr>
+
+<h2>五、已知边界（诚实清单，不藏）</h2>
+
+<table>
+<th>#</th><th>边界</th><th>影响</th><th>现状/计划</th>
+<tr><td>1</td><td><strong>无真实街道试点、无真实用户数据</strong></td><td>治理成效<strong>未经验证</strong>，能证明的是"机制有效、可审计"</td><td>试点方案已写清（报修/通知/政策问答/适老 SOS 四项）</td></tr>
+<tr><td>2</td><td><strong>未做非 Chromium 真机测试</strong></td><td>iOS Safari / 微信内置浏览器表现未知；老年端语音在这些环境大概率不可用</td><td>有降级路径（打字 + 预置短语 + 一键拨号），<strong>待真机验证</strong></td></tr>
+<tr><td>3</td><td><strong>单进程形态</strong></td><td>黑板/限流/WebSocket 均在进程内，多 worker 不成立</td><td>扩容清单见 <code>docs/scaling.md</code>（Redis + PG + 会话粘性）</td></tr>
+<tr><td>4</td><td><strong>多租户仅预留</strong></td><td>3 张主表有 <code>tenant_id</code> 字段，查询层未按租户过滤</td><td>明确声明"预留，未做隔离"</td></tr>
+<tr><td>5</td><td><strong>HTTPS 仅临时隧道</strong></td><td>正式域名 + 证书 + 访问控制未部署</td><td><code>docs/deploy-https.md</code> 有方案；演示隧道用完即 <code>--stop</code></td></tr>
+<tr><td>6</td><td><strong>自由文本 PII 未治理</strong></td><td>居民在工单正文手写他人手机号时不脱敏</td><td>已列入近期计划（入库前正则脱敏 + 提示）</td></tr>
+<tr><td>7</td><td><strong>PWA 只做到"可添加到主屏幕"</strong></td><td><strong>无 service worker</strong>，不做离网能力，也不宣称</td><td>刻意取舍：政策/工单缓存过期会误导居民</td></tr>
+<tr><td>8</td><td><strong>外部系统未对接</strong></td><td>12345、媒体舆情、真实街道工单系统均为占位/框架</td><td>已预留接口层，比赛期不接真实系统</td></tr>
+<tr><td>9</td><td><strong>演示数据是虚构的</strong></td><td>不代表真实治理成效</td><td>见上文数据说明</td></tr>
+<tr><td>10</td><td><strong>密钥派生偏弱</strong></td><td><code>SHA-256(CRYPTO_KEY)</code> 无盐无迭代，无信封加密/轮换</td><td>计划 HKDF + 每记录 DEK + 轮换演练</td></tr>
+<tr><td>11</td><td><strong>知识图谱不做可视化</strong></td><td>只做「能查得出东西」的链路（按实体反查历史工单/政策）</td><td>避免"图谱解决了什么"的追问</td></tr>
+<tr><td>12</td><td><strong>视觉审计是抽样</strong></td><td>34 个路由页 / 54 个页面视口，不是逐像素比对</td><td>覆盖三端主页 + 列表 + 详情 + 暗色 + 5 档分辨率</td></tr>
+</table>
+
+<hr>
+
+<h2>六、材料在哪、给谁看</h2>
+
+<table>
+<th>材料</th><th>位置</th><th>给谁</th>
+<tr><td><strong>本文（最终版交付说明）</strong></td><td><code>docs/competition/最终版交付说明.md</code></td><td>第一入口：跑起来 + 验证 + 架构 + 边界</td></tr>
+<tr><td>创意说明书（提交版）</td><td><a href="创意说明书-提交版.md"><code>创意说明书-提交版.md</code></a></td><td><strong>正式提交件</strong>，评委初筛</td></tr>
+<tr><td>技术实现报告</td><td><a href="技术实现报告.md"><code>技术实现报告.md</code></a></td><td>技术评委</td></tr>
+<tr><td><strong>答辩问答手册（25 问）</strong></td><td><a href="答辩问答手册.md"><code>答辩问答手册.md</code></a></td><td>答辩现场：加分话术 / 避坑话术 / 证据命令</td></tr>
+<tr><td>演示脚本 · 录屏分镜 · 旁白</td><td><a href="演示脚本.md"><code>演示脚本.md</code></a>、<a href="答辩录屏分镜.md"><code>答辩录屏分镜.md</code></a>、<a href="演示旁白.md"><code>演示旁白.md</code></a></td><td>演示与兜底</td></tr>
+<tr><td>开发日志（48 节）</td><td><code>docs/spec/dev-log.md</code></td><td>想深挖"怎么迭代、怎么纠错"的评委</td></tr>
+<tr><td>外部复审报告与回执</td><td><code>docs/review/</code></td><td>想验证"是否真的接受批评"的评委（含<strong>未修复项与理由</strong>）</td></tr>
+<tr><td>属地化 / 移动端 / 常开方案</td><td><code>docs/spec/地区识别落地方案.md</code>、<code>docs/mobile-deploy.md</code>、<code>docs/演示常开-本机方案.md</code></td><td>追问落地细节</td></tr>
+<tr><td>仓库首页</td><td><a href="../../README.md"><code>../../README.md</code></a></td><td>快速开始 + 质量清单</td></tr>
+</table>
+
+<hr>
+
+<h2>七、答辩速答（最可能被追问的问题 → 证据）</h2>
+
+<table>
+<th>问题</th><th>一句话回答</th><th>现场可出示</th>
+<tr><td>多智能体是真的吗？跟工作流有什么差别？</td><td>9 个声明式角色 + 黑板消息队列，跨角色多轮协商（天气⇄健康→通知）<strong>能真的改变执行链</strong>，每条协商与仲裁落 <code>agent_logs</code> 可追责；工作流是静态编排</td><td>投屏 <code>agent_logs</code>；<code>pytest tests/test_dispatch.py -q</code></td></tr>
+<tr><td>LLM 到底用在哪？是不是套壳？</td><td>规则为骨、LLM 为脑：状态机/权限/脱敏/风控全在规则；LLM 只做模糊意图、政策生成、跨角色协商，<strong>四个开关可一键关回纯规则</strong></td><td><code>python scripts/demo_preflight.py</code>（姿态行）+ <code>llm_usage</code> 表</td></tr>
+<tr><td>会不会编造？</td><td>Verifier + Arbiter 双层防线；政策回答<strong>只依据检索片段并校验引用下标</strong>，无材料转人工</td><td><code>agent/verifier.py</code>、<code>agent/arbiter.py</code></td></tr>
+<tr><td>RAG 100% 是不是自己考自己？</td><td>是自建金标，所以<strong>不拿它当泛化结论</strong>；能给的是词法 85.7% → 混合 100% 的<strong>消融对比</strong>与属地用例</td><td><code>python scripts/rag_eval.py</code></td></tr>
+<tr><td>属地化怎么做的？会不会拿外地政策误导居民？</td><td>属地来自<strong>账号网格</strong>（不采 GPS）；本地优先、<strong>全国永不过滤</strong>；<strong>属地只改排序、不改自动回答阈值</strong>，有专门测试守</td><td><code>pytest tests/test_region_policy.py -q</code>；现场切两个社区对比</td></tr>
+<tr><td>手机号真的加密了吗？</td><td>AES-256-GCM 真加密（密文带算法版本前缀 <code>g1$</code>），8 表明文计数 0，注销级联清密文；生产姿态缺密钥/占位密钥<strong>拒绝启动</strong></td><td><code>python scripts/audit_phone_encryption.py</code></td></tr>
+<tr><td>适老是不是就放大字号？</td><td>字号 ≥20px、热区 ≥72px、只留 SOS 呼吸动效、<code>prefers-reduced-motion</code> 全站可关，且<strong>用浏览器客观审计卡阈值</strong></td><td><code>python scripts/mobile_audit.py</code></td></tr>
+<tr><td>老年端真机上能用吗？</td><td>数值达标已审计；<strong>语音取决于浏览器</strong>，有打字+预置短语降级；<strong>目前无真实老人测试</strong>——这是下一步</td><td>真机录屏 + 边界清单第 2 条</td></tr>
+<tr><td>有没有测试？</td><td>625 项（624 通过 + 1 需外部服务跳过），含协商、安全负向、加密、口径门禁；<strong>还做过故障注入</strong></td><td><code>pytest tests/ -q</code></td></tr>
+<tr><td>成本多少？</td><td>20 次真实 LLM 调用 ¥0.0053；单轮对话约 +0.9 秒 / +¥0.0002；规则优先进一步降本</td><td><code>python scripts/llm_eval.py --provider llm</code>、工作台费用卡</td></tr>
+<tr><td>有真实试点吗？</td><td><strong>没有。</strong> 能证明的是"机制可验证"（门禁可复算、链路可留痕、成本可计量），成效需要试点</td><td>边界清单第 1 条</td></tr>
+<tr><td>5000 户的街道扛得住吗？</td><td>当前<strong>仅支持单进程</strong>，单社区与演示够用；扩容路径已写清</td><td><code>docs/scaling.md</code></td></tr>
+<tr><td>断网能用吗？</td><td><strong>不能，也不宣称</strong>；PWA 只做"可添加到主屏幕、全屏类 App"，业务强依赖后端实时数据</td><td><code>tests/test_claims_consistency.py</code>（口径门禁）</td></tr>
+<tr><td>现场设备带不动动效怎么办？</td><td>全部动效遵守 <code>prefers-reduced-motion</code>；另备 7 段真实录屏可直出（含属地化两社区对比）</td><td><code>docs/competition/答辩录屏分镜.md</code></td></tr>
+<tr><td>上线还差什么？</td><td>Redis（多进程）/ PostgreSQL / 与真实接诉即办系统对接；路径见 <code>scaling.md</code>，比赛期刻意不做大重构</td><td><code>docs/scaling.md</code></td></tr>
+</table>
+
+<div class="meta">更完整的 25 问（含<strong>加分话术</strong>与<strong>避坑话术</strong>）见 <a href="答辩问答手册.md"><code>答辩问答手册.md</code></a>。</div>
+
+<hr>
+
+<h2>八、演示前 10 分钟 Checklist</h2>
+
+<pre>
+python scripts/demo_preflight.py        # 9 项自检必须全绿（含 schema/密钥姿态/加密覆盖/账号/服务身份/前端产物）
+python scripts/demo_acceptance.py       # 12 项真实 HTTP 端到端（可选，约 1 分钟）
+python scripts/ui_audit.py              # 34 路由页 / 54 页面视口 0 违规（可选，约 10 分钟）
+python scripts/probe_public.py          # 用手机演示时：公网入口 8 项
+</pre>
+
+<div class="meta"><strong>动过 <code>web/src</code> 就必须先 <code>cd web && npm run build</code></strong>（复审 F4）：<code>web/dist</code> 不进 git，忘记构建的话<br>审计与演示测的都是旧包。两个审计脚本已内置"dist 落后于源码直接红字退出"的闸门，不用记规矩。</div>
+
+<ul>
+<li>演示顺序：登录页 → 居民报修 → <strong>属地化对比（两个社区同一问题不同结果）</strong> → 网格工作台 → 老年端 SOS → 治理大屏（见 <code>演示脚本.md</code>）</li>
+<li>兜底：<code>.recordings/</code> 里 7 段 webm（含 <code>07-region</code> 属地对比，浏览器全屏播放最稳）</li>
+<li>被追问数字时：<strong>直接跑第二节的命令，别口头解释</strong></li>
+</ul>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>

@@ -106,546 +106,492 @@
 <body>
 <h1>社区先知 CommunityInsight Agent — 技术实现报告</h1>
 
-<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体OPC创新大赛<br><strong>赛道</strong>：基层治理<br><strong>项目</strong>：社区先知 CommunityInsight Agent<br><strong>技术负责人</strong>：步承泽<br><strong>日期</strong>：2026年8月6日<br><strong>在线体验</strong>：https://campus-insight-agent-cvz9ksymt3liqrhghujdzf.streamlit.app/<br><strong>扫码体验</strong>：打开 <a href="扫码体验.html"><code>扫码体验.html</code></a>，手机扫二维码即可访问（推荐横屏操作）</div>
-
-<hr>
-
-<h3>📍 当前阶段</h3>
-
-<p>本项目为 <strong>Demo 版本</strong>，以预置种子数据（39 条工单、20 条提案、15 条百科条目）运行完整治理闭环。<strong>下一步计划：与社区居委会、物业部门合作，接入真实接诉即办工单系统</strong>，从验证阶段进入实际社区运营。</p>
+<div class="meta"><strong>比赛</strong>："京彩AI·智汇全球"首都大学生智能体 OPC 创新大赛 · <strong>基层治理赛道</strong>（人文赋能特别奖）<br><strong>项目</strong>：社区先知 CommunityInsight Agent（接诉即办多智能体平台）<br><strong>技术负责人 / 唯一开发者</strong>：步承泽<br><strong>版本</strong>：v2.0（2026-09-14） · 对应当前代码库：schema <strong>v46</strong> · HTTP 路由 <strong>130</strong> · Agent 角色 <strong>9</strong> · 业务表 <strong>50</strong> · 可运行用例 <strong>625</strong><br><strong>数字口径</strong>：本文所有数字由 <code>python scripts/check_claims.py</code> 现场核对，可一键复算。<br><strong>配套材料</strong>：<a href="创意说明书-提交版.md"><code>创意说明书-提交版.md</code></a>（方案）、<a href="最终版交付说明.md"><code>最终版交付说明.md</code></a>（怎么跑/怎么验）、<a href="答辩问答手册.md"><code>答辩问答手册.md</code></a>（怎么答）</div>
 
 <hr>
 
 <h2>一、技术栈总览</h2>
 
 <table>
-<th>层</th><th>技术选型</th><th>版本要求</th><th>说明</th>
-<tr><td><strong>UI 框架</strong></td><td>Streamlit</td><td>>=1.28.0</td><td>多页面导航 + 居民/网格员双角色路由</td></tr>
-<tr><td><strong>对话引擎</strong></td><td>LangChain + DeepSeek</td><td>langchain>=0.3.0</td><td><code>return_intermediate_steps=True</code> 捕获完整工具调用链</td></tr>
-<tr><td><strong>大语言模型</strong></td><td>DeepSeek (deepseek-chat)</td><td>—</td><td>兼容 OpenAI API 格式，支持 tools/functions 调用</td></tr>
-<tr><td><strong>LLM 适配层</strong></td><td>langchain-openai</td><td>>=0.2.0</td><td>ChatOpenAI 适配 DeepSeek base_url</td></tr>
-<tr><td><strong>关联分析 LLM</strong></td><td>DeepSeek (独立 client)</td><td>—</td><td>反射器专用，独立于主对话链路</td></tr>
-<tr><td><strong>数据库</strong></td><td>SQLite</td><td>Python 内置 sqlite3</td><td>WAL 模式 + 外键约束，单文件零配置</td></tr>
-<tr><td><strong>数据可视化</strong></td><td>Altair</td><td>>=5.0.0</td><td>治理趋势图、类别分布、KPI 仪表盘</td></tr>
-<tr><td><strong>配置管理</strong></td><td>python-dotenv</td><td>>=1.0.0</td><td>环境变量管理，密钥不入版本控制</td></tr>
-<tr><td><strong>外部数据</strong></td><td>和风天气 API</td><td>—</td><td>实时天气数据，支持模拟降级</td></tr>
-<tr><td><strong>运行时</strong></td><td>Python</td><td>>=3.10</td><td>支持 <code>dict</code>/<code>list</code> 类型标注</td></tr>
+<th>层</th><th>选型</th><th>说明</th>
+<tr><td>主服务</td><td><strong>FastAPI + Uvicorn</strong>（<code>api_web.py</code>，:8000）</td><td>130 条路由，14 个路由模块；同时托管 Vue3 构建产物</td></tr>
+<tr><td>前端</td><td><strong>Vue3 + Vite + Naive UI</strong></td><td>三端分离：居民 14 页 / 网格员 9 页 / 老年 8 页；设计令牌体系；移动端适配</td></tr>
+<tr><td>多智能体</td><td>自研编排（<code>agent/orchestrator.py</code>）+ 黑板（<code>agent/blackboard.py</code>）</td><td>9 个声明式角色、消息队列真协商、双层防线、全程留痕</td></tr>
+<tr><td>大模型</td><td>DeepSeek（<code>deepseek-chat</code>，OpenAI 兼容协议）</td><td>四个特性开关可独立控制；规则优先以保确定性并降本</td></tr>
+<tr><td>向量模型</td><td>阿里云百炼 <code>text-embedding-v3</code>（1024 维）</td><td>与词法检索经 RRF 融合（<code>agent/rag.py</code>）</td></tr>
+<tr><td>数据层</td><td><strong>SQLite（WAL）</strong> + 原生 <code>sqlite3</code></td><td>schema <strong>v46</strong>，46 个版本化迁移，50 张业务表；演进路径见 <code>docs/scaling.md</code></td></tr>
+<tr><td>安全</td><td>标准库实现 HS256 JWT + <strong>AES-256-GCM</strong> 字段加密 + 脱敏 + 安全响应头</td><td>密钥生产姿态 <strong>fail-closed</strong></td></tr>
+<tr><td>外部数据</td><td>和风天气 API（按社区 adcode 取数）</td><td>不可用时降级模拟数据，降级有留痕</td></tr>
+<tr><td>备线/插件</td><td><code>app.py</code>（Streamlit，:8501）为历史备线；<code>api.py</code>（:18800）为扣子插件入口</td><td>二者仅共用 <code>data/</code> 服务层，<strong>均非主线</strong></td></tr>
 </table>
+
+<p><strong>为什么主链路从 Streamlit 迁到 FastAPI + Vue3</strong>：Streamlit 适合单用户演示，但做不了三端差异化、角色级权限、WebSocket 实时通知、移动端适配与无障碍达标。比赛要展示的是"基层治理平台"，不是"一个能对话的页面"，所以把主链路重做成真正的服务端 + 三端前端；Streamlit 版仅作为历史备线存档。</p>
 
 <hr>
 
-<h2>二、项目目录结构</h2>
+<h2>二、系统架构</h2>
+
+<pre>
+浏览器（居民 / 网格员 / 老年 / 大屏）
+   │  HTTPS + JWT（HS256）· WebSocket /ws/notify 实时通知 · 安全响应头
+   ▼
+FastAPI 主服务 api_web.py
+   ├─ 中间件：JWT 鉴权 · 角色权限 · 安全头（CSP/HSTS/X-Frame-Options…）· 审计
+   ├─ api_routes/  14 模块：auth · issues · proposals · notices · policy · weather
+   │                        · health · elderly · agent · grid · knowledge · screen · …
+   └─ 静态托管：web/dist（SPA 回退）
+   ▼
+智能体层
+   ├─ agent/orchestrator.py  编排：接待 → 派单/协商 → 合规审计 → 仲裁 → 留痕
+   ├─ agent/roles/           9 个声明式角色的 AGENT_CLASSES 注册表
+   ├─ agent/blackboard.py    黑板：共享上下文 + 消息队列 + 锁 + 历史（上限 500）
+   ├─ agent/verifier.py      事实校验：幻觉 / 敏感词 / 诊断句式 / 手机号泄露
+   └─ agent/arbiter.py       冲突仲裁：5 条规则顺序裁决 + 决策落库
+   ▼
+能力层
+   ├─ tools/                 16 个工具（pkgutil 自动发现，按角色裁剪）
+   ├─ agent/rag.py           混合检索：词法（同义/方言扩展）+ 向量 + RRF（k=60）
+   ├─ utils/region.py        属地解析（唯一入口，不采 GPS）
+   └─ agent/llm_client.py    LLM 统一入口 + 用量记账（llm_usage）
+   ▼
+数据层 data/  SQLite WAL · schema v46 · 46 个迁移 · 50 张业务表 · 手机号 AES-256-GCM
+</pre>
+
+<p><strong>关键目录</strong></p>
 
 <pre>
 campus-insight-agent/
-├── app.py                    # 入口：双角色路由 + 全局样式
-├── config.py                 # 全局配置（API、模型参数）
-├── agent/                    # Agent 引擎（535行 engine + prompt + 反射器 + enforce）
-│   ├── engine.py             #   OODA 主编排（5阶段）
-│   ├── prompt.py             #   System Prompt + Persona Router（368关键词）
-│   ├── enforce.py            #   工具调用安全网（防幻觉 + 强制补调）
-│   ├── closed_loop.py        #   闭环追踪（自动扫描未解决工单/提案）
-│   ├── offline_agent.py      #   离线降级 Agent（规则引擎，无 LLM 依赖）
-│   └── reflector/            #   反射器（步骤解析 + 10维SQL分析 + 洞察生成）
-├── tools/                    # 16 个 LangChain Tool，pkgutil 自动发现
-│   ├── query_*.py            #   查询类工具（脉搏/天气/工单/提案/议题/百科）
-│   └── action_*.py           #   操作类工具（上报/提案/附议/发表意见）
-├── data/                     # 数据层：SQLite WAL + 15 表 + 种子数据
-├── ui/                       # 界面层：居民端 9 页 + 网格员端 6 页
-├── utils/                    # 重试/文本/日志
-├── tests/                    # 328 测试（单元224 + 集成21 + e2e 7 + 冒烟17 + 关键路径40 + 消融6 + 语义6 + 派单3 + 老年4）
-└── docs/                     # 比赛材料
+├── api_web.py            # FastAPI 主服务装配（中间件 / 生命周期 / WebSocket / SPA 托管）
+├── api_routes/           # 14 个业务路由模块 + deps.py（鉴权与属地依赖）
+├── agent/                # 多智能体：orchestrator / blackboard / verifier / arbiter / rag / roles/
+├── data/                 # 数据层：db_core（schema+迁移）/ db_*.py 业务模块 / seed.py
+├── tools/                # 16 个工具，pkgutil 自动发现
+├── utils/                # region / crypto / jwt / embedding / retry / logger
+├── web/src/              # Vue3 三端（views/{resident,grid,elderly}）+ 设计令牌
+├── scripts/              # 自检 / 评测 / 审计 / 录屏 / 迁移 / 公网隧道
+└── tests/                # 625 项可运行用例（单元 / 集成 / e2e / 安全 / 口径门禁）
 </pre>
 
 <hr>
 
-<h2>三、核心架构：工作流编排</h2>
+<h2>三、多智能体：角色、黑板与真协商</h2>
 
-<p>本项目以 LangChain AgentExecutor 为执行核心，在其前后增加了预处理层（环境感知 + 意图路由）和后处理层（质量控制 + 关联分析）。参照 OODA（Observe-Orient-Decide-Act-Reflect-Associate）循环的阶段划分来组织各层逻辑——不是因为 OODA 本身有特殊的技术含义，而是因为它的阶段划分恰好能将预处理和后处理逻辑组织到清晰的边界里：</p>
+<h3>3.1 九个声明式角色</h3>
+
+<p>角色注册在 <code>agent/roles/__init__.py</code> 的 <code>AGENT_CLASSES</code>（角色 id 有状态，不得随意改）：</p>
+
+<table>
+<th>角色</th><th>key</th><th>职责</th><th>可见工具范围</th>
+<tr><td>接待员</td><td><code>receptionist</code></td><td>入口路由、意图定性、汇总回复</td><td>查询类</td></tr>
+<tr><td>报修调度</td><td><code>repair_dispatch</code></td><td>建单、分类、定级、派单、SLA</td><td>报修全流程</td></tr>
+<tr><td>提案协商</td><td><code>proposal_collab</code></td><td>提案查重、附议、里程碑、回复</td><td>议事类</td></tr>
+<tr><td>政策专员</td><td><code>policy_expert</code></td><td>政策检索增强问答、引用强制</td><td>知识库 + 检索</td></tr>
+<tr><td>健康顾问</td><td><code>health_advisor</code></td><td>健康建议、用药提醒、就医引导（不诊断）</td><td>健康类</td></tr>
+<tr><td>天气守护</td><td><code>weather_guardian</code></td><td>天气取数、恶劣天气提示、主动预警</td><td>天气 + 脉搏</td></tr>
+<tr><td>通知管理员</td><td><code>notification_manager</code></td><td>站内信、多通道触达、已读回执</td><td>通知类</td></tr>
+<tr><td>网格助手</td><td><code>grid_assistant</code></td><td>网格员侧统计、热点、下钻</td><td>统计类</td></tr>
+<tr><td>合规审计</td><td><code>compliance_auditor</code></td><td><strong>所有业务输出必过</strong>的合规检查</td><td>无（只读）</td></tr>
+</table>
+
+<p><strong>声明式</strong>的含义：角色 = 一份配置（<code>key</code> / <code>name</code> / <code>persona</code> / <code>tools</code> / <code>intents</code> / <code>prompt</code> 片段），<br>执行逻辑统一由基类提供。新增角色不改编排代码，只加一份声明 + 注册。</p>
+
+<h3>3.2 黑板（<code>agent/blackboard.py</code>）</h3>
+
+<pre>
+Blackboard
+├── write(key, value, source) / read(key) / read_meta(key)   # 共享上下文
+├── post_message(agent, msg) / get_messages(agent) / clear_messages(agent)
+├── lock(name) / unlock(name)                                 # 互斥（BlackboardLockError）
+├── get_history() / to_dict()                                 # 执行链留痕
+└── 历史上限 500 条（超限裁剪，防内存增长）
+</pre>
+
+<p>消息类型：<code>task_request</code> / <code>task_response</code> / <code>notify</code> / <code>error</code> / <code>handoff</code>。<br>每条消息带 <code>from</code> / <code>to</code> / <code>type</code> / <code>payload</code> / <code>priority</code>，<strong>可序列化、可投屏、可追责</strong>。</p>
+
+<h3>3.3 编排流程（<code>Orchestrator.run</code>）</h3>
 
 <pre>
 用户输入
-   │
-   ▼
-┌──────────────────────────────────────────────────┐
-│  [预处理] Observe — 环境感知                     │
-│  查询天气 API、统计工单热点、获取时间上下文      │
-│  纯数据收集，不涉及 LLM 调用                     │
-├──────────────────────────────────────────────────┤
-│  [预处理] Orient — 意图路由 + 上下文注入         │
-│  关键词匹配检测意图 → 选择角色提示               │
-│  拼接时间/天气/热点/告警 → 形成消息前缀          │
-├──────────────────────────────────────────────────┤
-│  [核心] Decide + Act — Agent 执行                │
-│  LangChain AgentExecutor + 16 个工具             │
-│  DeepSeek 编排工具调用顺序                       │
-│  return_intermediate_steps=True 捕获完整调用链   │
-├──────────────────────────────────────────────────┤
-│  [后处理] Reflect — 质量检查                     │
-│  提取 &lt;think&gt; 块 → 过滤日志泄露行                │
-│  校验工具调用：LLM 未调用的关键工具强制执行      │
-│  失败时如实返回，不编造结果                      │
-├──────────────────────────────────────────────────┤
-│  [后处理] Associate — 关联分析（反射器）         │
-│  解析工具调用链 → 10 维 SQL 分析                 │
-│  独立 LLM 调用生成治理洞察                       │
-│  构建结构化推理链 → 前端可视化                   │
-└──────────────────────────────────────────────────┘
-   │
-   ▼
-结构化响应 + 推理链 + 建议 → 渲染到聊天界面
-</pre>
-
-<p>关于 OODA 命名的说明：这不是引入新的理论框架——本质上是 LangChain Agent 的工程增强。前置了环境感知和意图路由来减少无效的 LLM 调用，后置了质量检查和关联分析来弥补 LLM 输出的不确定性。工程实现比概念命名更重要。</p>
-
-<h3>与普通对话机器人的区别</h3>
-
-<table>
-<th>维度</th><th>普通对话机器人</th><th>本项目</th>
-<tr><td>环境感知</td><td>无——只响应用户输入</td><td>主动——每次对话前查询天气/热点/工单状态</td></tr>
-<tr><td>意图路由</td><td>依赖 LLM 自行判断</td><td>关键词匹配——零延迟，可调试</td></tr>
-<tr><td>工具调用</td><td>单次 LLM 决策，失败无感知</td><td>可追溯 + 校验——捕获每步调用，遗漏时补执行</td></tr>
-<tr><td>质量控制</td><td>无——输出即结果</td><td>多层检查——空回复/告警遗漏/短回复自动补救</td></tr>
-<tr><td>关联分析</td><td>无</td><td>统计驱动——z-score 异常检测 + 跨周对比</td></tr>
-<tr><td>容错降级</td><td>LLM 不可用则服务中断</td><td>三层降级——重试 → 规则引擎 → 数据库直查</td></tr>
-<tr><td>闭环反馈</td><td>无</td><td>上报→分类→追踪→解决→通知</td></tr>
-</table>
-
-<hr>
-
-<h2>四、Agent 自主决策机制</h2>
-
-<h3>4.1 工具选择策略</h3>
-
-<p>Agent 根据用户输入自主决定调用哪些工具，而非走预设分支。核心机制：</p>
-
-<p><strong>Persona 信号 → 工具偏好</strong>：<code>detect_persona()</code> 检测到"上报诉求"意图后，System Prompt 中对应角色的工具描述会前置，提高 LLM 选择接诉相关工具的概率。这是"引导"而非"限制"——Agent 仍然可以调用任意工具。</p>
-
-<p><strong>工具描述即决策依据</strong>：每个工具的 <code>description</code> 字段是 Agent 的唯一决策信息来源。工具描述采用结构化格式：<code>[阶段] 功能描述。参数: ...。适用于: ...。</code> 确保 LLM 能准确判断在什么场景下应该调用哪个工具。</p>
-
-<p><strong>参数推断</strong>：Agent 从自然语言输入中推断工具参数。例如"3号楼2单元楼道灯不亮" → <code>report_issue(title="3号楼2单元楼道灯不亮", category="设施维修", location="3号楼2单元", urgency="普通")</code>。分类推断结合了 LLM 语义理解和关键词匹配降级——LLM 分类失败时，回退到 8 大分类关键词的确定性匹配。</p>
-
-<h3>4.2 多步编排逻辑</h3>
-
-<p>复杂请求需要 Agent 编排多个工具调用。以"上报诉求+查询历史+统计趋势"组合请求为例：</p>
-
-<pre>
-用户: "3号楼电梯又坏了，最近这类问题多吗"
   │
-  ├─ Step 1: report_issue(title="3号楼电梯故障", category="设施维修", ...)
-  │     └─ 返回工单号 #42
-  │
-  ├─ Step 2: query_issues(category="设施维修", status="待处理", limit=10)
-  │     └─ 返回同类别待处理列表（含楼栋分布）
-  │
-  └─ Step 3: get_governance_stats()
-        └─ 返回类别分布统计 → Agent 回复"最近7天设施维修类已有8件，主要集中在3号楼和2号楼区域"
+  ├─ 1) 属地解析（每轮一次）：resolve_region(ctx) → 政策 boost / 天气 adcode
+  │      （失败只 warning 并回落全国，不阻断）
+  ├─ 2) 意图 → 角色派发 _dispatch()
+  │      接待员定性 → 目标角色 _call_agent()（超时重试一次）
+  │      → 目标角色可 post_message 给第三方（handoff / notify）
+  ├─ 3) 协商消费 _drain_negotiations()
+  │      按 priority 排序处理目标队列 → 回复发起方（task_response）
+  │      → 响应可能再触发第三方（天气 → 健康 → 通知），链式往返
+  │      → 循环防护：单目标累计协商 ≥ 2 轮强制转人工；遍历上限 5 轮兜底
+  ├─ 4) 合规审计（所有业务输出必过）
+  │      不通过 → Arbiter 裁决 → 转人工处理包（handoff_id 可追）
+  └─ 5) _finish()：回复 + 动作按钮 + 执行链留痕（黑板上每个 Agent 步骤落 agent_logs）
 </pre>
 
-<p>每一步的工具调用由 LLM 根据前一步的返回结果动态决定。<code>return_intermediate_steps=True</code> 确保完整调用链被捕获，前端可展示推理过程。</p>
+<p><strong>为什么这算"真协商"而不是工作流</strong>：</p>
 
-<h3>4.3 自主纠错循环</h3>
+<table>
+<th>维度</th><th>静态工作流</th><th>本项目</th>
+<tr><td>调用谁</td><td>编排代码写死</td><td>运行时由角色按消息决定，可跨角色多轮往返</td></tr>
+<tr><td>能否改变执行链</td><td>不能</td><td>能——如"高温预警"由天气守护主动触发健康顾问与通知管理员</td></tr>
+<tr><td>可追责性</td><td>日志靠打印</td><td>黑板消息 + <code>agent_logs</code> 双留痕（含仲裁规则名与决策）</td></tr>
+<tr><td>失败处置</td><td>重试/报错</td><td>Arbiter 规则裁决 → 转人工处理包（不静默失败）</td></tr>
+</table>
 
-<p>Agent 的 <code>enforce.py</code> 模块在 LLM 完成后检查工具调用完整性：</p>
+<h3>3.4 双层防线</h3>
+
+<p><strong>Verifier（<code>agent/verifier.py</code>）</strong> — 事实与安全校验，按域分流（<code>_general_checks</code> / <code>_policy_checks</code> / <code>_health_checks</code> / <code>_grid_checks</code>）：</p>
 
 <ul>
-<li><strong>漏调检测</strong>：用户输入匹配到上报关键词但 <code>intermediate_steps</code> 中没有 report_issue → 强制补调用</li>
-<li><strong>空回复检测</strong>：Agent 返回空字符串或过短回复 → 触发降级回复逻辑，走 DB 直查</li>
-<li><strong>幻觉检测</strong>：Agent 回复中包含工单号但对应工具调用不存在 → 标记为不可信，替换为如实描述</li>
+<li>幻觉：回复中出现未在本次工具结果里出现过的编号/数字（工单号、提案号）</li>
+<li>隐私：手机号等 PII 泄露到回复里</li>
+<li>医疗：诊断性句式（"你患了…"）——健康顾问只做建议与引导，不做诊断</li>
+<li>政策：引用下标越界或无检索材料却作答 → 转人工</li>
 </ul>
 
-<p>这个循环让 Agent 具备了"知道自己可能犯错并修正"的能力。</p>
-
-<hr>
-
-<h2>五、反射器——后处理分析</h2>
-
-<p>反射器（<a href="agent/reflector/">agent/reflector/</a>，已模块化拆分）在 Agent 回复完成后运行，执行三层分析：</p>
-
-<h3>5.1 工具步骤解析</h3>
-
-<p>将 LangChain <code>intermediate_steps</code> 转换为结构化步骤卡片，包含阶段分类（observe/act）、工具摘要（16 工具分发表）、输入/输出截取。</p>
-
-<h3>5.2 文本动作回退解析（12 条正则规则）</h3>
-
-<p>当 LLM 在文本中直接描述动作（如"已为你生成工单 #42"）而未走 LangChain 正式工具调用时，反射器通过正则匹配恢复伪步骤。这体现了工程上的防御性设计——不假设 LLM 行为始终符合预期。</p>
-
-<h3>5.3 10 维 SQL 关联分析</h3>
+<p><strong>Arbiter（<code>agent/arbiter.py</code>）</strong> — 冲突仲裁，5 条规则<strong>顺序</strong>裁决，首个命中即生效：</p>
 
 <table>
-<th>维度</th><th>分析方法</th><th>治理价值</th>
-<tr><td><strong>空间关联</strong></td><td>提取输入中的地点关键词，查同区域待处理工单</td><td>发现问题集中楼栋/区域</td></tr>
-<tr><td><strong>时间趋势</strong></td><td>按类别统计近 7 天新增量</td><td>发现上升趋势</td></tr>
-<tr><td><strong>复发检测</strong></td><td>关键词匹配已解决工单</td><td>发现重复问题</td></tr>
-<tr><td><strong>异常检测</strong></td><td>本周 vs 前 4 周均值对比（阈值 1.5x + ≥3 件）</td><td>发现激增预警</td></tr>
-<tr><td><strong>类别关联</strong></td><td>同地点不同类别工单共现分析</td><td>发现连锁问题</td></tr>
-<tr><td><strong>提案关联</strong></td><td>热门待处理类别匹配相关提案</td><td>推动报→议升级</td></tr>
-<tr><td><strong>解决效率</strong></td><td>按类别统计平均解决天数</td><td>发现低效环节</td></tr>
-<tr><td><strong>跨时间对比</strong></td><td>本周 vs 上周新增与解决对比</td><td>判断治理趋势改善/恶化</td></tr>
-<tr><td><strong>Z-score 异常</strong></td><td>按类别 4 周窗口均值与标准差，统计学异常检测</td><td>比简单阈值更可靠的异常发现</td></tr>
-<tr><td><strong>报→议升级</strong></td><td>检测工单密集但无对应提案的类别</td><td>推动问题升级为治理提案</td></tr>
+<th>顺序</th><th>规则</th><th>条件</th><th>裁决</th>
+<tr><td>1</td><td><code>compliance_first</code></td><td>合规审计不通过</td><td><code>block</code>（合规有否决权）</td></tr>
+<tr><td>2</td><td><code>safety_first</code></td><td>涉及人身安全</td><td><code>human</code></td></tr>
+<tr><td>3</td><td><code>professional_first</code></td><td>专业域判断冲突</td><td><code>professional</code>（以专业 Agent 意见为准）</td></tr>
+<tr><td>4</td><td><code>manual_required</code></td><td>涉及费用或不可逆操作</td><td><code>human</code></td></tr>
+<tr><td>5</td><td><code>data_version</code></td><td>数据版本冲突</td><td><code>latest_version</code></td></tr>
+<tr><td>—</td><td>兜底</td><td>无法裁决</td><td><code>human</code>（保守优先）</td></tr>
 </table>
 
-<h3>5.4 治理洞察生成</h3>
+<p>每次裁决都写入 <code>agent_logs</code>（<code>routed=仲裁/<规则名></code>、<code>status=裁决结果</code>），网格端 <code>/agent/logs?intent=仲裁</code> 可直接查。</p>
 
-<p>当关联数据达到阈值（空间 ≥3、时间 ≥5、任意异常），反射器调用独立 LLM（openai.OpenAI 直连 DeepSeek）生成 2-3 句自然语言洞察。该调用独立于主对话链路，即时失败也不影响回复质量。</p>
+<h3>3.5 人在环（Human-in-the-loop）</h3>
 
-<hr>
-
-<h2>六、工具层</h2>
-
-<h3>6.1 自动发现机制</h3>
-
-<p>新增工具文件放入 <code>tools/</code> 目录即可——<code>discover_tools()</code> 通过 <code>pkgutil.iter_modules</code> + <code>isinstance(attr, BaseTool)</code> 自动扫描注册。</p>
-
-<h3>6.2 16 个治理工具清单</h3>
-
-<table>
-<th>文件</th><th>函数名</th><th>阶段</th><th>核心参数</th><th>功能</th>
-<tr><td><code>query_community_pulse.py</code></td><td><code>get_community_pulse</code></td><td>知</td><td>无</td><td>社区脉搏快照（天气 + 事件 + KPI + 热点）</td></tr>
-<tr><td><code>query_weather.py</code></td><td><code>get_weather</code></td><td>知</td><td>无</td><td>当日+未来2天天气（API/模拟自动切换）</td></tr>
-<tr><td><code>query_community_issues.py</code></td><td><code>query_issues</code></td><td>报</td><td>category, status, limit</td><td>多条件工单查询</td></tr>
-<tr><td><code>query_community_issues.py</code></td><td><code>get_governance_stats</code></td><td>督</td><td>无</td><td>治理统计（总数+状态分布+类别分布+健康度）</td></tr>
-<tr><td><code>query_community_issues.py</code></td><td><code>collect_feedback</code></td><td>议</td><td>topic</td><td>意见收集（含演示数据预览）</td></tr>
-<tr><td><code>query_my_issues.py</code></td><td><code>query_my_issues</code></td><td>报</td><td>无（自动身份解析）</td><td>当前用户的全部工单及进度</td></tr>
-<tr><td><code>query_my_issues.py</code></td><td><code>query_my_proposals</code></td><td>议</td><td>无（自动身份解析）</td><td>当前用户的全部提案及状态</td></tr>
-<tr><td><code>action_report_issue.py</code></td><td><code>report_issue</code></td><td>报</td><td>title, category, location, urgency, description</td><td>创建工单（LLM分类+关键词降级+地点校验）</td></tr>
-<tr><td><code>query_proposals.py</code></td><td><code>get_proposals</code></td><td>议</td><td>category, sort_by, limit</td><td>提案列表（按附议数/时间排序）</td></tr>
-<tr><td><code>action_create_proposal.py</code></td><td><code>create_proposal</code></td><td>议</td><td>title, description, category</td><td>创建提案（自动查重）</td></tr>
-<tr><td><code>action_support_proposal.py</code></td><td><code>support_proposal</code></td><td>议</td><td>proposal_id</td><td>附议提案（原子操作+里程碑提示）</td></tr>
-<tr><td><code>query_topics.py</code></td><td><code>get_topics</code></td><td>议</td><td>无</td><td>活跃议题列表 + 热点自动发现</td></tr>
-<tr><td><code>query_topics.py</code></td><td><code>get_topic_detail</code></td><td>议</td><td>topic_id</td><td>议题详情 + 全部意见</td></tr>
-<tr><td><code>action_express_opinion.py</code></td><td><code>express_opinion</code></td><td>议</td><td>topic_id, content</td><td>发表议题意见</td></tr>
-<tr><td><code>query_knowledge.py</code></td><td><code>query_knowledge</code></td><td>知</td><td>query</td><td>字符 n-gram TF-IDF 检索社区百科</td></tr>
-<tr><td><code>query_knowledge.py</code></td><td><code>get_community_policy</code></td><td>知</td><td>topic</td><td>查询社区公约/政策原文</td></tr>
-</table>
-
-<h3>6.3 预取机制</h3>
-
-<p>为避免 Agent 在简单场景下过度调用工具，<code>ui/prefetch.py</code> 根据用户输入关键词匹配意图，按需预取对应的一组数据（社区脉搏、治理统计、天气、热门提案、活跃议题、工单，共 6 类意图），通过系统标注注入用户消息。System Prompt 明确指示：看到 <code>[📊 系统已预取以下数据作为参考...]</code> 标记时可直接使用预取数据，需要更详细或更新信息时仍调用工具。</p>
-
-<hr>
-
-<h2>七、容错与降级设计</h2>
-
-<p>系统在三个层级提供容错能力，确保单点故障不导致服务中断：</p>
-
-<h3>7.1 LLM 调用层</h3>
-
-<p><code>utils/retry.py</code> 提供指数退避重试（初始 1s，倍增，最多 2 次），总超时 30s。重试失败后抛出可捕获异常，由上层决定降级策略。</p>
-
-<h3>7.2 Agent 执行层</h3>
-
-<p>LLM API 不可用时，<code>engine.py</code> 捕获异常后自动切换到 <code>OfflineAgent</code>（<a href="agent/offline_agent.py">agent/offline_agent.py</a>）——一个基于规则引擎的无 LLM 依赖降级方案：</p>
+<p>以下情形一律<strong>不自动作答</strong>，改为生成"人工处理包"（<code>handoff_id</code> 可追）：</p>
 
 <ul>
-<li><strong>意图路由</strong>：回退到纯关键词匹配（同一套 <code>_PERSONA_SIGNALS</code>，368 个关键词全覆盖）</li>
-<li><strong>工具调用</strong>：工单查询/提案查询/社区脉搏/天气 → 直接 SQL 查询，跳过 LLM 编排</li>
-<li><strong>诉求分类</strong>：LLM 分类失败 → 8 大分类关键词确定性匹配（设施维修/环境卫生/安全隐患/停车管理/噪音扰民/物业服务/邻里矛盾/社区事务）</li>
-<li><strong>回复生成</strong>：使用预置回复模板 + 数据填充（如"当前共有 {pending} 件待处理工单，最近一件是 {title}"）</li>
+<li><strong>1.</strong> 合规审计不通过；2. Verifier 判定高风险的幻觉/隐私/诊断问题；3. 协商超过 2 轮（可能死循环）；</li>
+<li><strong>4.</strong> 政策问答检索不到任何达标材料；5. Arbiter 兜底裁决。</li>
+</ul>
+<div class="meta">设计底线：<strong>宁可转人工，也不给居民一个可能错的答案。</strong></div>
+
+<hr>
+
+<h2>四、工具层（16 个工具）</h2>
+
+<h3>4.1 自动发现 + 按角色裁剪</h3>
+
+<ul>
+<li><code>tools/__init__.py::discover_tools()</code> 用 <code>pkgutil.iter_modules</code> 扫描目录，<code>isinstance(obj, BaseTool)</code> 自动注册——</li>
+</ul>
+<p>  新增工具只需放一个文件，不改注册表。</p>
+<ul>
+<li>编排按角色裁剪可见工具集：接待员看查询类、报修调度看报修全流程，避免"什么都能干"的万能 Agent 乱调工具。</li>
+<li>工具有 <code>tests/test_dispatch.py</code> 与口径门禁覆盖：<code>test_tool_discovery_covers_expected</code> 断言工具无缺失。</li>
 </ul>
 
-<p>离线模式下功能有退化（无法做开放式对话和复杂推理），但核心治理操作全部可用。</p>
-
-<h3>7.3 数据层</h3>
-
-<p><code>fallback.py</code> 在数据库异常时提供最后一道防线——内存缓存的关键统计数据（最近一次成功的 <code>get_governance_stats</code> 结果），有效期 5 分钟。过期后返回预设的静态快照数据。天气 API 不可用时自动切换为模拟气象数据。</p>
-
-<h3>7.4 降级可观测性</h3>
-
-<p>每次降级触发均记录到 <code>activity_log</code>（操作日志表），并在 UI 中通过 <code>st.warning</code> 提示用户当前处于降级模式。这确保了降级不是无声的——用户和开发者都能感知到系统状态的切换。</p>
-
-<hr>
-
-<h2>八、Persona Router——轻量级意图路由</h2>
-
-<p><code>detect_persona()</code> 函数（<a href="agent/prompt.py">agent/prompt.py</a>）使用关键词匹配实现意图检测，将用户输入映射到 4 种角色：</p>
+<h3>4.2 清单</h3>
 
 <table>
-<th>角色</th><th>关键词数</th><th>典型场景</th>
-<tr><td>接诉助手</td><td>141</td><td>"3号楼楼道灯坏了" → 自动分类+定级+生成工单</td></tr>
-<tr><td>议事顾问</td><td>108</td><td>"建议延长活动室开放时间" → 查重→引导附议或创建</td></tr>
-<tr><td>数据分析师</td><td>77</td><td>"统计最近诉求趋势" → 调取治理统计数据</td></tr>
-<tr><td>社区观察员</td><td>42</td><td>"社区脉搏" → 获取快照+播报</td></tr>
+<th>分类</th><th>工具</th>
+<tr><td>知（感知）</td><td><code>get_community_pulse</code>（社区脉搏）、<code>get_weather</code>（当日+未来 2 天）、<code>query_knowledge</code>、<code>get_community_policy</code></td></tr>
+<tr><td>报（诉求）</td><td><code>report_issue</code>、<code>query_issues</code>、<code>query_my_issues</code></td></tr>
+<tr><td>议（议事）</td><td><code>create_proposal</code>、<code>support_proposal</code>、<code>get_proposals</code>、<code>query_my_proposals</code>、<code>get_topics</code>、<code>get_topic_detail</code>、<code>express_opinion</code></td></tr>
+<tr><td>督（监督）</td><td><code>get_governance_stats</code>、<code>collect_feedback</code></td></tr>
 </table>
 
-<p>优先级规则：强数据关键词（统计/分析/趋势）→ 数据分析师优先；提案关键词出现时议事顾问覆盖观察员；状态查询词（修好了吗/解决了吗）触发接诉助手转向数据查询。</p>
+<p><strong>纪律</strong>：工具描述（docstring）是 LLM 判断"该不该调用"的唯一依据，因此统一结构化写：<br><code>[阶段] 功能 —— 参数：… —— 适用于：… —— 不适用：…</code>，并显式写明"若系统已预取数据则跳过"。</p>
 
 <hr>
 
-<h2>九、数据库设计</h2>
+<h2>五、知识增强与检索</h2>
 
-<p>15 张表，SQLite WAL 模式，外键约束。迁移使用 <code>ALTER TABLE ADD COLUMN</code> + try/except 兼容历史数据库。</p>
+<h3>5.1 知识库与混合检索</h3>
 
-<h3>治理核心表（5 张）</h3>
+<ul>
+<li><strong>语料</strong>：62 条知识（61 条已发布、55 条公开政策摘要、43 条带"适用地区"），政策摘要均可溯源。</li>
+<li><strong>两路检索并存</strong>：</li>
+<li>线上问答路径 <code>data/db_policy.search_published_knowledge</code>：加权和打分 + 阈值（<code>_match_threshold = 2.0</code>）判定"能否自动作答"。</li>
+<li>智能体路径 <code>agent/rag.search_hybrid</code>：词法（同义词/方言扩展）+ 向量（1024 维）+ <strong>RRF 融合（k=60）</strong>重排。</li>
+<li><strong>为什么两套</strong>：问答要的是"够不够格自动回答"（需要阈值与确定边界）；Agent 要的是"给出最相关的上下文"（需要排序质量）。两套共用同一份属地权重常量，口径不会分叉。</li>
+</ul>
+
+<h3>5.2 评测（可复算）</h3>
+
+<table>
+<th>指标</th><th>值</th>
+<tr><td>金标用例</td><td><strong>48 条</strong>（口语化提问，含 6 条属地用例）</td></tr>
+<tr><td>混合检索 hit@1</td><td><strong>48/48 = 100%</strong></td></tr>
+<tr><td>纯词法基线 hit@1</td><td>85.7%</td></tr>
+<tr><td>属地用例 Top-1 正确</td><td>4/4</td></tr>
+<tr><td>命令</td><td><code>python scripts/rag_eval.py</code></td></tr>
+</table>
+
+<div class="meta"><strong>诚实口径</strong>：金标是自建的，所以 100% 只说明"在这 48 条上混合检索优于纯词法"，<br><strong>不作为泛化能力结论</strong>。可复算的消融对比才是它的价值。</div>
+
+<h3>5.3 轻量知识图谱</h3>
+
+<ul>
+<li>规模：<strong>88 实体 / 199 关系 / 760 提及</strong>（<code>_m45_knowledge_graph</code> 迁移落地）。</li>
+<li>用途<strong>不是可视化</strong>，而是"按实体反查"：从一条工单里的地址/设施/类别，反查历史同类工单与相关政策。</li>
+<li>网格端与 Agent（<code>grid_assistant</code>）都能查。不做图可视化的理由：比赛时间应投在能验证的链路上，</li>
+</ul>
+<p>  一个好看的图回答不了"它解决什么问题"。</p>
+
+<hr>
+
+<h2>六、属地化（地区识别）——本项目的人文落点</h2>
+
+<h3>6.1 设计原则</h3>
+
+<div class="meta"><strong>属地只影响"选谁"，绝不影响"能不能自动回答"。</strong><br>而且<strong>不采 GPS</strong>：居民的网格归属是确定事实（由账号/社区登记决定），不需要、也不应该靠设备定位。</div>
+
+<h3>6.2 实现（<code>utils/region.py</code>，唯一入口）</h3>
 
 <pre>
--- 社区工单
-community_issues (id, title, category, location, description, urgency, status,
-                  author, reported_at, resolved_at)
-
--- 提案
-proposals (id, title, description, category, supporter_count, status,
-           response_text, author, created_at)
-
--- 讨论议题
-discussion_topics (id, title, description, category, created_by_agent,
-                   is_active, participant_count, created_at, ended_at)
-
--- 议题意见
-topic_opinions (id, topic_id FK, content, participant_label, created_at)
-
--- 反馈收集
-feedback_items (id, topic, opinion, source, sentiment, created_at)
+Region(community, province, city, city_id, district, street, source)
+   ├─ chain()        # 社区 → 街道 → 区 → 市 → 省 的行政区划链
+   ├─ label()        # "北京市海淀区·海淀小区"（三端展示口径统一）
+   └─ cache_key()    # 天气缓存键（adcode 优先）
+normalize_area(text)      # 复合地名归一："北京市海淀区" → {北京市, 海淀区}
+resolve_region(...)       # 账号社区 → 区域链；未登记社区 warning 一次后回落全局默认
+policy_region_boost(...)  # 政策属地加成：街道/区 1.5 · 市 1.0 · 省 0.5 · 全国 0 · 跨区 −0.5
+rrf_region_bonus(...)     # Agent 路径的属地加成（与上面同一套权重常量）
 </pre>
 
-<h3>业务支撑表（6 张）</h3>
-
-<p><code>user_profile</code>（role/name/resident_id）、<code>knowledge_base</code>（社区百科）、<code>meal_points</code>（助餐点）、<code>activity_rooms</code>（活动室）、<code>community_events</code>（社区活动安排）、<code>community_notices</code>（社区通知公告）。</p>
-
-<h3>系统支撑表（4 张）</h3>
-
-<p><code>health_surveillance</code>（疾控监测数据）、<code>notifications</code>（通知推送）、<code>activity_log</code>（操作日志）、<code>perception_log</code>（感知巡检记录）。</p>
-
-<h3>治理健康度算法</h3>
-
-<p>三维加权评分（<code>compute_health_score()</code> in <a href="../data/db_health.py">data/db_health.py</a>）：</p>
+<p><strong>政策打分（<code>data/db_policy.search_published_knowledge</code>）</strong></p>
 
 <pre>
-健康度 = 解决率(40%) + 速度分数(35%) + 积压分数(25%)
-
-- 解决率 = 已解决 / 总工单（空库时 100）
-- 速度分数 = max(0, min(100, 120 - 平均解决天数 × 8))
-  （7 天为满分基准线，无数据时为中性 70）
-- 积压分数 = 近 7 天新增 vs 解决对比
-  新增=0 → 100 | 解决≥新增 → 60+(解决-新增)/新增×40 | 解决&lt;新增 → 解决/新增×100+10（上限95）
-- 等级：优(≥80) | 良(≥50) | 需改进(&lt;50)
-- 趋势：↓改善中(≥75) | →持平(≥45) | ↑需关注(&lt;45)
+base_score = 词法/语义相关度                # 决定"能不能答"
+score      = base_score + region_boost      # 决定"优先选谁"
+answer_entry = final 排序中第一条 base_score ≥ 阈值 的条目   # 选答只看 base
 </pre>
 
-<p>审计模块（<a href="../agent/governance_audit.py">agent/governance_audit.py</a>）在此基础上增加四维度交叉分析（工单管理/提案参与/居民参与/热点检测），参考 ISO 37120 市政治理指标体系，输出 A/B/C/D 等级 + Top 3 优先行动建议。</p>
-
-<hr>
-
-<h2>十、双角色系统</h2>
-
-<h3>居民端（9 页）— 知·报·议·督 + 扩展功能</h3>
 <ul>
-<li>对话助手：交互中枢，快速上报诉求，空闲感知，推理链可视化</li>
-<li>社区脉搏：天气 + 事件 + 百科 + 热点分布</li>
-<li>接诉即办：快速上报 + 工单追踪 + 分类统计</li>
-<li>邻里议事：提案排行 + 创建提案 + 议题讨论</li>
-<li>社区治理看板：健康度 + 趋势 + 类别明细</li>
-<li>健康防护：疾病风险预警 + 预防建议（独居老人关怀）</li>
-<li>消息：工单状态变更通知</li>
-<li>我的：个人参与记录 + 我的上报 + 我的提案</li>
-<li>治理大屏：全屏实时数据，30s 自动刷新</li>
+<li>加成只作用于 <code>base_score > 0</code> 的条目（不把无关政策抬上来）。</li>
+<li><strong>跨区惩罚</strong>：<code>_is_district_token</code> 识别到"用户在外区"时，本区政策给 −0.5（不给城市级加成），避免"朝阳用户被推海淀政策"。</li>
+<li>历史坑：<code>海淀小区</code> 以"区"结尾会被误判为行政区 —— 用 <code>_NOT_DISTRICT_SUFFIX = ("小区","社区","园区","学区","景区","地区")</code> 排除。</li>
+<li><strong>最有价值的一条测试</strong>：<code>test_answer_entry_never_downgrades_answerability</code> —— 通过 monkeypatch 强制制造"排序倒挂"</li>
 </ul>
+<p>  （属地加成把低分条目顶到第一），断言系统仍能自动作答，而不是因为 top1 不达标就转人工。</p>
 
-<h3>网格员端（6 页）— 管理后台</h3>
-<ul>
-<li>工作台：KPI + 紧急工单 + 趋势 + 热门提案</li>
-<li>工单管理：表格视图 + 改状态 + 多重筛选</li>
-<li>提案管理：回复 + 采纳 + 实施</li>
-<li>内容发布：通知 + 百科 + 议题管理</li>
-<li>数据洞察：治理数据分析与可视化</li>
-<li>健康管理：社区健康监测（独居老人关怀）</li>
-</ul>
+<p><strong>天气</strong>：按社区 adcode 取数，<code>refresh_weather(city, city_id)</code> 用 <code>city_id or city</code> 做缓存键，<br><code>get_daily_advice</code> 的每日缓存 action 带 key（否则跨社区串味）。<br>居民端、老年端、Agent 文本链路<strong>三端同批接入</strong>——同场演示不能出现两套地名。</p>
 
-<hr>
+<h3>6.3 演示价值</h3>
 
-<h2>十一、关键技术决策</h2>
-
-<h3>11.1 模型选择</h3>
+<p>同一个问题（"我们社区高龄老人有什么补贴？"）在两个演示社区得到不同结果：</p>
 
 <table>
-<th>考量</th><th>DeepSeek</th><th>GPT-4</th><th>结论</th>
-<tr><td>Function Calling</td><td>完整支持 <code>tools</code> + <code>tool_choice</code></td><td>原生支持</td><td>持平</td></tr>
-<tr><td>中文能力</td><td>国产模型，治理术语理解良好</td><td>良好</td><td>持平</td></tr>
-<tr><td>调用成本</td><td>约 1/10</td><td>—</td><td>DeepSeek</td></tr>
-<tr><td>网络可达性</td><td>国内直连</td><td>需代理</td><td>DeepSeek</td></tr>
-<tr><td>模型可替换性</td><td><code>ChatOpenAI(base_url=...)</code> 切换只需改 3 行</td><td>—</td><td>架构层面解耦</td></tr>
+<th>演示账号社区</th><th>命中</th><th>属地级别</th>
+<tr><td>海淀小区（海淀区）</td><td>《海淀小区社区助餐补贴与代办服务指引》</td><td><code>local_street</code></td></tr>
+<tr><td>朝阳试点社区（朝阳区）</td><td>《北京市高龄老人津贴申领实施细则》等北京市级政策</td><td><code>local_city</code></td></tr>
 </table>
 
-<h3>11.2 为什么在 AgentExecutor 外增加预处理/后处理</h3>
-
-<p>直接使用 LangChain AgentExecutor 可以实现"输入→工具→输出"的基本流程，但实际使用中暴露出几个问题：</p>
-<ul>
-<li><strong>LLM 对环境无感知</strong>——不知道当前时间、天气、工单热点 → 增加 Observe 层在对话前收集环境数据</li>
-<li><strong>LLM 容易混淆意图</strong>——"查询我的工单"和"上报新问题"可能被误判 → 增加 Orient 层做关键词意图路由</li>
-<li><strong>LLM 可能编造结果</strong>——描述"工单 #42 已创建"但实际未调用工具 → 增加 Reflect 层校验并补执行</li>
-<li><strong>单条数据背后的统计规律 LLM 不会主动分析</strong> → 增加 Associate 层做 SQL + z-score 关联分析</li>
-</ul>
-
-<p>这种结构将 LLM 的不可靠性限制在可控范围内——让 LLM 专注自然语言理解和生成，环境感知、意图判断、质量检查、统计推理由确定性代码完成。</p>
-
-<h3>11.3 为什么 Streamlit</h3>
-
-<p>比赛场景（单用户演示）下，Streamlit 的开发效率优势明显。内置 <code>st.chat_message</code>/<code>st.chat_input</code>、Altair 图表、session_state 状态管理、多页面导航——单人可在短时间内完成完整的交互界面。</p>
+<p><strong>这就是"一区一策"落地在系统里的样子</strong>：不是给所有人同一份全国政策，也不是凭定位猜，而是按确定的网格归属选对政策，选不到就退回全国兜底。</p>
 
 <hr>
 
-<h2>十二、Prompt Engineering 策略</h2>
+<h2>七、LLM 的使用与降级</h2>
 
-<h3>12.1 System Prompt 结构</h3>
+<h3>7.1 原则：规则为骨、LLM 为脑</h3>
 
-<p>System Prompt 由 <code>agent/prompt.py</code> 中的 <code>get_system_prompt()</code> 动态生成，包含以下固定块：</p>
+<table>
+<th>能力</th><th>实现</th><th>是否依赖 LLM</th>
+<tr><td>角色路由</td><td>确定性关键词 + 同义词/方言归一 + 优先级规则</td><td>否（可选 LLM 兜底）</td></tr>
+<tr><td>权限、脱敏、风控、阈值</td><td>确定性代码</td><td>否</td></tr>
+<tr><td>状态机、迁移、留痕</td><td>SQLite + 版本化迁移</td><td>否</td></tr>
+<tr><td>模糊意图兜底</td><td><code>RECEPTION_LLM_FALLBACK</code></td><td>是（可关）</td></tr>
+<tr><td>政策问答生成</td><td><code>POLICY_LLM_RAG</code>（闭集 + 引用强制）</td><td>是（可关）</td></tr>
+<tr><td>跨角色协商决策</td><td><code>LLM_NEGOTIATION</code></td><td>是（可关）</td></tr>
+<tr><td>编排选人</td><td><code>LLM_ORCHESTRATION</code></td><td>是（可关）</td></tr>
+</table>
 
-<ul>
-<li><strong>1.</strong> <strong>角色定义</strong>（~80 tokens）：根据 <code>detect_persona()</code> 的结果选择对应角色描述</li>
-<li><strong>2.</strong> <strong>工具映射表</strong>（~200 tokens）：16 个工具的结构化清单，每个工具一行：<code>[阶段] 函数名 — 参数 — 一句话说明</code></li>
-<li><strong>3.</strong> <strong>预取数据标注</strong>（~150 tokens）：当前已预取的社区脉搏/天气/工单数据，标记为可直接使用</li>
-<li><strong>4.</strong> <strong>行为约束</strong>（~100 tokens）：禁止编造工单号、禁止跳过必要工具调用、失败时如实告知</li>
-</ul>
+<p><strong>四个开关全部可在 <code>.env</code> 一键关闭</strong>，关掉后系统仍是完整可用的规则版（演示可现场对比"同一问题、两种姿态"）。<br>代码默认全关（确定性优先、成本可控）；<strong>使用姿态</strong>可全开（本机 <code>.env</code> 全开用于演示）。</p>
+<div class="meta">陷阱记录：改 <code>.env</code> 必须重启服务才生效（否则你测的是旧姿态）；<br>依赖开关的测试必须显式 <code>monkeypatch</code> 钉住姿态，否则本机一开开关就会真打网络造成假失败（本轮实测踩到 2 条，已修）。</div>
 
-<p>总长度控制在 600-800 tokens，确保在 DeepSeek 的上下文窗口内为对话历史留出足够空间。</p>
-
-<h3>12.2 工具描述设计</h3>
-
-<p>每个 LangChain Tool 的 <code>description</code> 是 Prompt Engineering 的关键——它是 LLM 判断是否调用该工具的唯一信息来源。设计原则：</p>
-
-<ul>
-<li><strong>阶段前缀</strong>：<code>[知]/[报]/[议]/[督]</code> 让 LLM 快速理解工具的治理定位</li>
-<li><strong>触发条件显式化</strong>：不写"查询工单"，写"当用户询问某类别/状态的工单列表时使用"</li>
-<li><strong>参数范围约束</strong>：<code>category 参数可选值：设施维修/环境卫生/安全隐患/停车管理/噪音扰民/物业服务/邻里矛盾/社区事务</code></li>
-<li><strong>反例引导</strong>：对于查询类工具，添加"如果系统已预取数据则跳过此调用"</li>
-</ul>
-
-<h3>12.3 Few-Shot 示例注入</h3>
-
-<p>在 System Prompt 中嵌入 4 组典型交互示例（每组 2 轮对话 + 工具调用），覆盖上报诉求、查询、提案、闲聊四个场景。示例展示的不是"正确答案"而是"正确的工具调用模式"——让 LLM 学会在什么情况下应该调用哪个工具、应该传递什么参数。</p>
-
-<hr>
-
-<h2>十三、代码质量与测试</h2>
-
-<h3>13.1 工程质量措施</h3>
+<h3>7.2 用量与成本可观测</h3>
 
 <ul>
-<li><strong>类型标注</strong>：所有公开函数含 Python 3.10+ 类型提示</li>
-<li><strong>异常处理</strong>：全项目 agent/data/tools/ui 四层，所有 <code>except</code> 块均有 <code>_log.debug(exc_info=True)</code></li>
-<li><strong>容错机制</strong>：<code>utils/retry.py</code> 指数退避重试（max 2 次），API 请求 30s 超时</li>
-<li><strong>CI</strong>：<code>.github/workflows/test.yml</code>——push/PR 自动运行全部测试</li>
-<li><strong>配置管理</strong>：<code>.env</code> 不入版本控制，<code>.env.example</code> 作为模板</li>
-<li><strong>幂等性</strong>：<code>seed.py</code> 自动检测已有数据，安全重复执行</li>
-<li><strong>数据库迁移</strong>：使用 try/except 兼容已有列，无需手动迁移</li>
+<li>所有 LLM 调用统一走 <code>agent/llm_client.py</code>，逐笔写入 <code>llm_usage</code> 表（模型、tokens、费用）。</li>
+<li><strong>记账不许静默丢账</strong>：<code>_record</code> 失败会懒初始化重试并 warning（有子进程回归测试守着）。</li>
+<li>实测：<strong>30 次调用合计 ¥0.0069</strong>；演示姿态下单轮对话约 <strong>+0.9 秒 / +¥0.0002</strong>。</li>
+<li>网格端工作台可见费用卡，评委可现场核对。</li>
 </ul>
 
-<h3>13.2 测试覆盖（328 tests, CI green）</h3>
+<h3>7.3 降级链路</h3>
 
 <pre>
-        ┌──────┐
-        │ E2E  │  7 场景（接诉/脉搏/提案/闭环/审计/降级/多轮对话）
-       ┌┴──────┴┐
-       │ 集成   │  21 用例（CRUD + 通知 + 活动 + 并发读）
-      ┌┴────────┴┐
-      │  单元    │  224 用例（tools/prompt/helpers/offline/audit）
-     └───────────┘
-      冒烟: 17 项全模块编译 + DB 往返 + 路由验证
-      关键路径: 40 用例（persona/路由/校验/感知）
-      消融: 6 用例（组件开关对比）
-      语义: 6 用例（意图路由泛化） + 派单: 3 用例 + 老年: 4 用例（平安打卡/SOS/用药）
-      兼容: 3 用例（DeepSeek API，默认跳过）
+LLM 可用  → 规则 + LLM（闭集输出、引用校验）
+LLM 不可用 → 纯规则路径（意图关键词、模板回复、SQL 直查）——功能退化但核心治理操作全可用
+外部 API 不可用（天气等） → 缓存 → 模拟数据，且**降级必留痕**（不静默）
 </pre>
 
-<p>覆盖范围：每个工具函数的边界输入、Persona Router 的全量路由规则、工具调用的正确拦截与放行、空数据库下的审计稳定性、多线程并发读、通知已读/未读流转。</p>
-
 <hr>
 
-<h2>十四、性能指标</h2>
+<h2>八、数据层</h2>
 
-<table>
-<th>指标</th><th>值</th><th>测量方式</th>
-<tr><td>反射器关联分析</td><td>< 200ms</td><td>SQLite 10 维查询</td></tr>
-<tr><td>洞察生成</td><td>< 2s</td><td>独立 DeepSeek API 调用，非阻塞</td></tr>
-<tr><td>感知巡检</td><td>< 100ms</td><td>4 项巡检串行执行</td></tr>
-<tr><td>数据库查询</td><td>< 50ms</td><td>SQLite WAL 模式，数据量 < 100 行</td></tr>
-<tr><td>页面首次渲染</td><td>< 2s</td><td>含缓存预热 + 种子数据</td></tr>
-<tr><td>内存占用</td><td>< 200MB</td><td>Python + Streamlit + LangChain</td></tr>
-</table>
-
-<hr>
-
-<h2>十五、已知限制与后续方向</h2>
-
-<table>
-<th>限制</th><th>当前方案</th><th>后续方向</th>
-<tr><td>场景数据依赖预置种子</td><td>39 条工单 + 20 条提案 + 15 条百科模拟数据</td><td>接入真实数据 API</td></tr>
-<tr><td>后台推送依赖轮询</td><td>30s 空闲刷新触发</td><td>迁移 WebSocket 推送</td></tr>
-<tr><td>单用户模式</td><td>SQLite + session_state</td><td>引入用户路由 + PostgreSQL</td></tr>
-<tr><td>知识库检索非语义化</td><td>字符 n-gram TF-IDF</td><td>Embedding + 向量检索</td></tr>
-<tr><td>无身份认证</td><td>session 本地存储</td><td>接入实名认证/微信授权</td></tr>
-<tr><td>天气数据支持降级</td><td>API → 模拟自动切换</td><td>接入更多数据源</td></tr>
-<tr><td>未对接真实接诉即办系统</td><td>模拟数据 + 状态流转</td><td>与社区居委会、物业部门合作，接入真实接诉即办工单系统</td></tr>
-</table>
-
-<hr>
-
-<h2>十六、可迁移性：架构的场景无关设计</h2>
-
-<h3>16.1 架构的场景无关性</h3>
-
-<p>治理工作流（OODA 五阶段）、工具层（16 个 Tool + 自动发现）、数据库结构（15 张表）、校验机制（enforce + closed_loop）、降级链路（重试→规则引擎→DB 直查）——全部保持场景无关。场景特定内容仅存在于 4 个文件中，替换即可迁移：</p>
-
-<table>
-<th>耦合点</th><th>文件</th><th>迁移操作</th>
-<tr><td>意图关键词</td><td><code>agent/prompt.py</code> → <code>_PERSONA_SIGNALS</code></td><td>替换 4 组 368 个关键词</td></tr>
-<tr><td>工具描述</td><td><code>tools/*.py</code> 16 个工具的 docstring</td><td>替换文档字符串与返回值模板</td></tr>
-<tr><td>System Prompt</td><td><code>agent/prompt.py</code> → <code>get_system_prompt()</code></td><td>替换角色上下文段落</td></tr>
-<tr><td>种子数据</td><td><code>data/seed.py</code></td><td>替换人物与场景名，保留数据规模和叙事结构</td></tr>
-</table>
-
-<p><strong>工作流引擎、15 张表结构、UI 组件、校验逻辑、328 个测试——不需要代码改动。</strong> 单场景迁移预计 6-8 小时。</p>
-
-<hr>
-
-<h2>十七、部署与运维</h2>
-
-<h3>17.1 部署方式</h3>
-
-<p>项目通过 Streamlit Cloud 部署，连接到 GitHub 仓库自动构建。<code>.streamlit/config.toml</code> 中配置主题和服务器参数。部署流程：</p>
+<h3>8.1 Schema 与迁移纪律</h3>
 
 <ul>
-<li><strong>1.</strong> 推送代码到 GitHub 主分支</li>
-<li><strong>2.</strong> Streamlit Cloud 自动检测更新并重新构建</li>
-<li><strong>3.</strong> 依赖安装依据 <code>requirements.txt</code>（11 个直接依赖）</li>
-<li><strong>4.</strong> 环境变量（API Key 等）通过 Streamlit Secrets 管理，不入仓库</li>
+<li>纯标准库 <code>sqlite3</code>（<code>data/db_core.get_db</code>），WAL 模式，schema <strong>v46</strong>，<strong>50 张业务表</strong>。</li>
+<li><strong>46 个版本化迁移</strong>：函数命名 <code>_m{N}_{name}</code>，注册进 <code>post</code> 列表；<code>_add_column</code> 用 <code>PRAGMA</code> 判存，幂等。</li>
+<li><strong>禁止运行时裸 ALTER</strong>：v46 已把历史遗留的运行时补列全部收回迁移链（第九轮复审发现并修复）。</li>
+<li>新建库与存量升级走<strong>同一条路径</strong>，保证"评委拿到的库"和"我们的库"结构一致。</li>
 </ul>
 
-<p>从 <code>git push</code> 到线上生效约 2-3 分钟。</p>
+<h3>8.2 数据安全</h3>
 
-<h3>17.2 CI/CD</h3>
+<table>
+<th>措施</th><th>实现</th><th>验证</th>
+<tr><td>手机号加密落库</td><td><strong>AES-256-GCM</strong>（<code>utils/crypto.py</code>，密文带 <code>g1$</code> 算法版本前缀；旧格式仅解密兼容）</td><td><code>python scripts/audit_phone_encryption.py</code> → 8 张表<strong>明文计数 0</strong></td></tr>
+<tr><td>展示脱敏</td><td><code>_mask_phone()</code>，留痕 <code>activity_log.detail</code> 不含完整手机号</td><td>审计脚本 + 端到端验收断言</td></tr>
+<tr><td>注销级联</td><td>账号注销级联清理密文与关联记录</td><td>单元测试覆盖</td></tr>
+<tr><td>密钥姿态</td><td><code>CRYPTO_KEY</code> / <code>WEB_JWT_SECRET</code> 在 <code>DEMO_MODE=false</code> 且缺失或是仓库占位值时<strong>拒绝启动</strong>（fail-closed）</td><td><code>python scripts/demo_preflight.py</code> 姿态行</td></tr>
+<tr><td>自由文本 PII</td><td><strong>未治理</strong>（边界，见第十二节）</td><td>已列入计划</td></tr>
+</table>
 
-<p><code>.github/workflows/test.yml</code> 配置了 push 和 PR 触发器：Python 3.10 + 安装依赖 + <code>pytest tests/ -q</code>。328 个测试在 30 秒内完成。CI 失败时阻止合并。</p>
+<p>覆盖的 8 张表：<code>community_issues</code>、<code>user_profile</code>、<code>emergency_contacts</code>、<code>health_consults</code>、<br><code>emergency_calls</code>、<code>proposals</code>、<code>proposal_drafts</code>、<code>issue_drafts</code>。</p>
 
-<h3>17.3 监控与日志</h3>
-
-<p><code>utils/logger.py</code> 统一日志格式，关键路径均有 <code>_log.info</code> 埋点。<code>activity_log</code> 表记录所有操作（用户行为 + 系统事件 + 降级触发），可按时间范围和事件类型检索。感知巡检（<code>perception_log</code>）每次扫描记录快照，用于追踪系统健康度变化。</p>
-
-<h3>17.4 运行成本</h3>
+<h3>8.3 鉴权与安全响应头</h3>
 
 <ul>
-<li>DeepSeek API：每次对话约 2-5K tokens（含 System Prompt + 工具描述 + 多轮对话历史 + 工具调用结果），反射器额外一次独立 LLM 调用</li>
-<li>Streamlit Cloud：免费层可用于演示（单用户场景）</li>
-<li>和风天气 API：免费层 1000 次/天</li>
-<li>演示场景下运营成本极低，生产环境成本取决于实际调用量</li>
+<li><strong>JWT HS256</strong>：标准库 HMAC 实现（不引第三方库），token 内嵌角色与社区，支撑属地解析。</li>
+<li>角色权限：网格端指标端点按角色锁定；老年端支持免登录演示账号（受 <code>DEMO_MODE</code> 约束）。</li>
+<li>安全响应头：CSP（<code>script-src 'self'</code>，<strong>禁止内联脚本</strong>）、HSTS、<code>X-Frame-Options</code>、<code>X-Content-Type-Options</code> 等。</li>
+<li>限流为进程内实现（单机够用，多进程需 Redis——已列入演进路径）。</li>
 </ul>
 
 <hr>
 
-<h2>十八、开发方法</h2>
+<h2>九、前端工程</h2>
 
-<h3>18.1 分阶段推进</h3>
+<h3>9.1 三端差异化</h3>
 
-<p>项目按数据层 → 工具层 → Agent 引擎 → UI 层 → 网格员端 + 测试五个阶段推进，每阶段先定义接口再实现细节。架构决策（OODA 流程设计、三层降级、enforce 机制、Persona Router 结构）由人工完成，重复性代码生成和测试编写借助 AI 工具加速。</p>
+<table>
+<th>端</th><th>页数</th><th>设计取向</th>
+<tr><td>居民端 <code>/resident</code></td><td>14</td><td>一句话办事：说人话上报、进度透明、议事可参与</td></tr>
+<tr><td>网格员端 <code>/grid</code></td><td>9</td><td>提效率：SLA 工单、提案办理、知识发布、Agent 留痕查询、治理大屏</td></tr>
+<tr><td>老年关怀端 <code>/elderly</code></td><td>8</td><td>大字（≥20px）、大热区（≥72px）、少层级、语音播报、一键拨号、SOS</td></tr>
+</table>
 
-<h3>18.2 测试驱动</h3>
+<h3>9.2 工程化</h3>
 
-<p>328 个测试在整个开发周期中作为"可执行的规格说明"，确保每个模块的行为与预期一致。所有 AI 生成的代码合入前经过 pytest + lint 自动化检查，以及人工审查（异常处理完整性、安全边界、依赖最小化）。</p>
+<ul>
+<li><strong>设计令牌体系</strong>（<code>web/src/style.css</code>）：颜色/字号/间距/圆角全部令牌化；</li>
+</ul>
+<p>  <strong>语义文字色一律用亮暗成对令牌</strong>（写死 hex 在暗色下不随主题切换，<code>ui_audit</code> 会抓——第九轮抓到 6 处）。</p>
+<ul>
+<li><strong>禁用内联脚本</strong>：调试入口是同源外部文件 <code>web/public/debug.js</code>（<code>?debug=1</code>），避免 CSP 报错被评委看见。</li>
+<li><strong><code>web/dist</code> 不进 git</strong>：两个审计脚本内置"dist 落后于源码直接红字退出"的新鲜度闸（复审 F4 的教训：</li>
+</ul>
+<p>  不 build 就审计，测的是旧包，会得出"修了没生效/没修也报绿"的假结论）。</p>
+<ul>
+<li><strong>PWA 口径</strong>：只做到"可添加到主屏幕 + 全屏类 App 体验"，<strong>没有 service worker，不做也不宣称离线能力</strong></li>
+</ul>
+<p>  （政策与工单缓存过期会误导居民）。该口径由 <code>tests/test_claims_consistency.py</code> 门禁守着。</p>
 
 <hr>
 
-<div class="meta">本报告为 2026年"京彩AI·智汇全球"首都大学生智能体OPC创新大赛参赛作品《社区先知 CommunityInsight Agent》的技术实现文档。代码已开源。</div>
+<h2>十、质量工程（本项目最硬的一部分）</h2>
+
+<h3>10.1 九类可复算门禁</h3>
+
+<table>
+<th>#</th><th>门禁</th><th>覆盖</th>
+<tr><td>1</td><td><code>pytest tests/ -q</code></td><td><strong>625 项可运行</strong>（624 通过 / 1 需外部服务跳过 / 0 警告）：单元、集成、e2e、多智能体协商、安全负向、加密、口径一致性</td></tr>
+<tr><td>2</td><td><code>demo_acceptance.py</code></td><td><strong>12 项真实 HTTP 端到端</strong>（三角色登录、多智能体对话、政策命中、老年天气、工作台指标、图谱反查、留痕、属地化两社区对比）</td></tr>
+<tr><td>3</td><td><code>demo_preflight.py</code></td><td><strong>9 项演示前自检</strong>（schema / 密钥姿态 / 加密覆盖 / 演示账号 / 服务身份 / 前端产物 / 登录页口径）</td></tr>
+<tr><td>4</td><td><code>ui_audit.py</code></td><td><strong>34 个路由页 / 54 个页面视口 × 9 类检查 0 违规</strong>（对比度/溢出/热区/字号/暗色/动效/残缺文本，320–1920 五档）</td></tr>
+<tr><td>5</td><td><code>mobile_audit.py</code></td><td><strong>21 页 × 7 类检查 0 违规</strong>（iOS 聚焦放大、底栏遮挡、横屏遮罩、大屏手机降级）</td></tr>
+<tr><td>6</td><td><code>rag_eval.py</code></td><td>48 条金标 hit@1 100%（含属地用例）</td></tr>
+<tr><td>7</td><td><code>audit_phone_encryption.py</code></td><td>8 表<strong>明文计数 0</strong></td></tr>
+<tr><td>8</td><td><code>audit_silent_exceptions.py</code></td><td><strong>"吞异常后返回成功" = 0</strong>；静默吞异常 HIGH 133 / MID 29 基线<strong>只减不增</strong></td></tr>
+<tr><td>9</td><td><code>check_claims.py</code> + <code>test_claims_consistency.py</code></td><td>材料数字/措辞与代码实时核对；过时表述、测试数口径、PWA 口径、消融供数白名单</td></tr>
+</table>
+
+<h3>10.2 故障注入：证明门禁真的会红</h3>
+
+<p>只证明"测试是绿的"不够，还要证明"出问题时会红"。本轮做了<strong>故障注入验证</strong>：<br>故意埋入典型缺陷（越权、明文手机号、跨社区政策串味、静默吞异常返回成功、审计阈值失效等），<br><strong>8 次注入 8 次被门禁拦下</strong>；属地化专项 4 次注入 4 次拦下（详见 <code>docs/spec/dev-log.md</code> 四十七节）。</p>
+
+<h3>10.3 关于"625 项测试"的口径（主动说明）</h3>
+
+<p><code>625 = 624 通过 + 1 需外部服务跳过</code>。其中 <code>tests/test_ablation.py</code> 的 6 项是给消融报告<strong>供数的冒烟项</strong>（只跑通、不断言）；<br>对外引用的两个指标另有<strong>硬断言</strong>守住：<code>test_persona_routing_is_accurate</code>（断言路由准确率 <code>== 100.0</code>）、<br><code>test_tool_discovery_covers_expected</code>。新增任何不做断言的 <code>test_*</code> 都会被门禁拦下——<strong>不给数字留注水空间</strong>。</p>
+
+<h3>10.4 测试隔离踩过的坑（工程真实感）</h3>
+
+<p>一次"两两跑都过、三个文件一起跑 21 条失败"的诡异现象，根因是三处叠加：<br><code>test_dispatch</code> 退出时把全局 <code>_DB_PATH</code> 留在已删除的临时库 + <code>api_web._ensure_db</code> 因 <code>_db_path_seeded</code> 提前返回。<br>修复做了三层（fixture 保存/恢复全局、<code>_db_path_seeded</code> 重置、模块级 autouse 隔离），并立下纪律：<br><strong>绝不并发跑两个 pytest 会话</strong>（会互相清库，产生假失败）。</p>
+
+<hr>
+
+<h2>十一、性能与实测数据（本机演示环境）</h2>
+
+<table>
+<th>指标</th><th>实测</th><th>说明</th>
+<tr><td>首屏加载</td><td>< 2s</td><td>Vue3 构建产物 + 后端同源托管，无额外 CDN 依赖</td></tr>
+<tr><td>规则路径单轮响应</td><td>< 300ms</td><td>无 LLM 调用</td></tr>
+<tr><td>LLM 姿态单轮额外耗时</td><td>≈ <strong>+0.9s</strong></td><td>四个开关全开时</td></tr>
+<tr><td>LLM 单轮额外成本</td><td>≈ <strong>+¥0.0002</strong></td><td><code>llm_usage</code> 逐笔可查</td></tr>
+<tr><td>知识检索（48 条金标）</td><td>< 100ms/条</td><td>词法 + 向量 + RRF</td></tr>
+<tr><td>LLM 调用累计（开发+测试+演示）</td><td>30 次 / <strong>¥0.0069</strong></td><td>含政策生成与协商</td></tr>
+<tr><td>留痕规模</td><td><code>activity_log</code> 11,450 条 / <code>agent_logs</code> 353 条</td><td>全程可审计</td></tr>
+<tr><td>演示数据</td><td>工单 225 / 提案 201 / 通知 6 / 知识 62</td><td>程序生成，<strong>非真实治理成效</strong></td></tr>
+</table>
+
+<div class="meta">性能不做"压测吹牛"：当前是<strong>单进程</strong>形态（黑板、限流、WebSocket 均在进程内），<br>面对真实街道规模（数千户）的扩容清单见 <code>docs/scaling.md</code>（Redis 黑板/限流 + PostgreSQL + 会话粘性 + 多 worker）。</div>
+
+<hr>
+
+<h2>十二、已知限制与后续方向</h2>
+
+<table>
+<th>#</th><th>限制</th><th>当前方案</th><th>后续方向</th>
+<tr><td>1</td><td><strong>无真实试点、无真实用户数据</strong></td><td>程序生成种子数据 + 演示闭环机器人</td><td>选一个社区做四项试点（报修/通知/政策问答/适老 SOS）</td></tr>
+<tr><td>2</td><td><strong>未做非 Chromium 真机验证</strong></td><td>移动端审计按浏览器五档分辨率模拟</td><td>iOS Safari / 微信内置浏览器真机回归；老年端语音在这些环境大概率不可用，已有打字+预置短语降级</td></tr>
+<tr><td>3</td><td>单进程</td><td>黑板/限流/WebSocket 在进程内</td><td>Redis（黑板 + 限流 + Pub/Sub）+ 多 worker</td></tr>
+<tr><td>4</td><td>多租户仅预留</td><td>3 张主表有 <code>tenant_id</code>，查询层未过滤</td><td>查询层租户切分（演示级不切）</td></tr>
+<tr><td>5</td><td>HTTPS 仅临时隧道</td><td><code>serve_public.py</code> + Cloudflare 临时隧道</td><td>正式域名 + 证书 + 访问控制（<code>docs/deploy-https.md</code>）</td></tr>
+<tr><td>6</td><td>自由文本 PII 未治理</td><td>只加密结构化手机号字段</td><td>入库前正则脱敏 + 用户提示 + 复核</td></tr>
+<tr><td>7</td><td>密钥派生偏弱</td><td><code>SHA-256(CRYPTO_KEY)</code> 无盐无迭代，无信封加密</td><td>HKDF + 每记录 DEK + 轮换演练</td></tr>
+<tr><td>8</td><td>外部系统未对接</td><td>12345 / 舆情 / 真实工单系统均为占位</td><td>预留接口层，比赛期不接真实系统</td></tr>
+<tr><td>9</td><td>存储引擎</td><td>SQLite</td><td>PostgreSQL（迁移路径与前置条件见 <code>docs/scaling.md</code>）</td></tr>
+<tr><td>10</td><td>视觉审计是抽样</td><td>34 路由页 / 54 页面视口</td><td>扩充到全站逐页 + 逐像素基线比对</td></tr>
+</table>
+
+<p><strong>明确不做也不宣称的</strong>：离线使用能力（无 service worker，业务强依赖后端实时数据）、全自主无人干预闭环（关键节点必留人工）、<br>真实治理成效数字（没有试点就没有成效）。</p>
+
+<hr>
+
+<h2>十三、可迁移性：架构与场景解耦</h2>
+
+<p>治理闭环（感知 → 理解 → 协作 → 处置 → 留痕）、多智能体编排、双层防线、属地解析、加密与审计链路<br><strong>全部与"社区"这个场景无关</strong>。场景相关内容集中在少数几处，替换即可迁移到其他基层场景（园区、校园、乡镇、政务服务窗口）：</p>
+
+<table>
+<th>耦合点</th><th>位置</th><th>迁移操作</th>
+<tr><td>角色声明</td><td><code>agent/roles/</code>（9 份声明）</td><td>换 persona / 工具范围 / 意图关键词</td></tr>
+<tr><td>工具集</td><td><code>tools/</code>（16 个）</td><td>增删文件即自动注册</td></tr>
+<tr><td>政策语料</td><td><code>data/seed.py</code> + 知识库表</td><td>换本地政策摘要，保留结构与属地字段</td></tr>
+<tr><td>属地映射</td><td><code>config.REGION_BY_COMMUNITY</code></td><td>换社区名单与行政区划</td></tr>
+<tr><td>端形态</td><td><code>web/src/views/{resident,grid,elderly}</code></td><td>换页面与文案</td></tr>
+<tr><td>种子数据</td><td><code>data/seed.py</code></td><td>换场景名与数据规模</td></tr>
+</table>
+
+<p><strong>不动的东西</strong>：编排器、黑板、Verifier/Arbiter、数据层与迁移机制、加密/脱敏/审计、全部质量门禁。</p>
+<div class="meta">这正是一个<strong>平台</strong>与一个<strong>demo</strong> 的区别。</div>
+
+<hr>
+
+<h2>十四、开发方法</h2>
+
+<ul>
+<li><strong>单人全栈 + AI 辅助编码</strong>：架构决策、安全边界、评测口径由人定；重复性代码与测试编写借助 AI 加速。</li>
+<li><strong>分阶段推进</strong>：数据层 → 工具层 → 智能体编排 → 三端前端 → 质量门禁 → 属地化与交付材料。</li>
+<li><strong>每轮外部复审都留回执</strong>：<code>docs/review/</code> 收录多轮外部复审报告与<strong>逐条处理回执</strong>（含未修复项与理由），</li>
+</ul>
+<p>  完整开发日志（48 节）在 <code>docs/spec/dev-log.md</code>——<strong>过程可查，比结论更有说服力</strong>。</p>
+<ul>
+<li><strong>门禁即文档</strong>：把"我们做得好"翻译成可执行的脚本，任何人（包括未来的我）都能复算。</li>
+</ul>
+
+<hr>
+
+<div class="meta">本报告为 2026 年"京彩AI·智汇全球"首都大学生智能体 OPC 创新大赛参赛作品<br>《社区先知 CommunityInsight Agent》（基层治理赛道）的技术实现文档。代码已开源。<br>报告描述的是<strong>当前代码库的真实状态</strong>；如需复核任何数字，请运行 <code>python scripts/check_claims.py</code> 与<br><code>docs/competition/最终版交付说明.md</code> 第二节中的命令。</div>
 
 <div class="footer">
 社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>

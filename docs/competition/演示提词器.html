@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>社区先知 · 演示提词器</title>
+<title>社区先知 · 演示提词器 v7</title>
 <style>
-  :root { --bg:#0d0d14; --card:#161622; --text:#e0e0e8; --muted:#7a7a90; --accent:#5b9cf5; --amber:#e8a040; --border:#252538; --green:#40c880; }
+  :root { --bg:#0d0d14; --card:#161622; --text:#e0e0e8; --muted:#7a7a90; --accent:#5b9cf5; --amber:#e8a040; --border:#252538; --green:#40c880; --red:#e06060; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; }
   #left { flex:0.82; overflow-y:auto; padding:28px 22px; border-right:1px solid var(--border); }
   #left h1 { font-size:1.2em; font-weight:700; letter-spacing:0.02em; }
-  #left .sub { font-size:0.7em; color:var(--muted); margin:2px 0 20px; }
+  #left .sub { font-size:0.7em; color:var(--muted); margin:2px 0 12px; }
   .scene { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:13px 15px; margin-bottom:9px; border-left:3px solid var(--accent); cursor:pointer; transition:all 0.15s; opacity:0.55; }
   .scene:hover { opacity:0.8; }
   .scene.active { opacity:1; border-left-color:var(--green); box-shadow:0 0 0 1px rgba(64,200,128,0.1); }
@@ -19,14 +19,12 @@
   .scene .action { font-size:0.72em; color:var(--amber); margin:3px 0; font-style:italic; }
   .scene .line { font-size:0.82em; line-height:1.55; margin:2px 0; }
   #right { flex:1.18; display:flex; flex-direction:column; background:#000; position:relative; }
-  #topbar { padding:10px 18px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #1a1a1a; flex-shrink:0; }
-  #topbar .dot { width:9px; height:9px; border-radius:50%; }
   #prompter { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:28px 50px; text-align:center; overflow-y:auto; }
-  #prompter .line { font-size:1.95em; font-weight:600; line-height:1.6; letter-spacing:0.04em; color:#3a3a3a; margin-bottom:14px; transition:all 0.3s; }
-  #prompter .line.current { color:#fff; font-size:2.2em; font-weight:700; }
+  #prompter .line { font-size:1.75em; font-weight:600; line-height:1.6; letter-spacing:0.04em; color:#3a3a3a; margin-bottom:14px; transition:all 0.3s; }
+  #prompter .line.current { color:#fff; font-size:2.0em; font-weight:700; }
   #prompter .line.done { color:#1e1e1e; }
-  #prompter .action-line { font-size:1.2em; color:var(--amber); font-style:italic; font-weight:400; margin-bottom:10px; }
-  #prompter .action-line.current { color:#e8a040; font-size:1.4em; }
+  #prompter .action-line { font-size:1.1em; color:var(--amber); font-style:italic; font-weight:400; margin-bottom:10px; }
+  #prompter .action-line.current { color:#e8a040; font-size:1.3em; }
   #prompter .action-line.done { color:#181818; }
   #scene-tag { position:absolute; top:14px; right:20px; font-size:0.66em; color:#444; }
   #bottombar { padding:10px 18px; display:flex; gap:8px; justify-content:center; border-top:1px solid #1a1a1a; flex-shrink:0; }
@@ -35,189 +33,193 @@
   #bottombar button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
   #status { position:fixed; bottom:0; left:0; right:0; height:28px; background:#000; border-top:1px solid #1a1a1a; display:flex; align-items:center; padding:0 14px; gap:14px; font-size:0.64em; color:#555; }
   #status .v { color:var(--green); }
-  @media (max-width:900px) { body { flex-direction:column; } #left { flex:none; max-height:30vh; border-right:none; border-bottom:1px solid var(--border); } #prompter .line { font-size:1.3em; } #prompter .line.current { font-size:1.5em; } }
+  @media (max-width:900px) { body { flex-direction:column; } #left { flex:none; max-height:30vh; border-right:none; border-bottom:1px solid var(--border); } #prompter .line { font-size:1.2em; } #prompter .line.current { font-size:1.4em; } }
 </style>
 </head>
 <body>
 
 <div id="left">
   <h1>🏛️ 社区先知 · CommunityInsight</h1>
-  <div class="sub">键盘: 1-8 场景 · 空格 自动播放(11s/行) · ← → 翻行 · R 重置</div>
-  <div class="sub" style="color:#40c880;">🌐 在线体验：campus-insight-agent.streamlit.app  |  📱 打开「扫码体验.html」评委扫二维码</div>
+  <div class="sub">键盘：1-7 场景 · 空格 自动播放(12s/行) · ← → 翻行 · R 重置</div>
+  <div class="sub" style="color:#40c880;">本机 http://127.0.0.1:8000/login ｜ 手机演示：serve_public.py + .shots/手机访问.html 扫码</div>
+  <div class="sub" style="color:#e06060;">铁律：不说"全自主/100% 准确/已在社区落地/支持离线"；数字不确定就现场跑脚本</div>
 
   <div class="scene" data-scene="1">
-    <h2>一、项目概述 <span class="time">20s</span></h2>
-    <div class="action">Streamlit 首页全景</div>
-    <div class="line">各位评委好。我带来的作品是「社区先知」——一个落地北京海淀区「海淀小区」的智慧社区治理平台。社区是几万居民的共同体——有设施维修、环境卫生、安全隐患、停车管理、邻里矛盾。我们在这个真实的社区场景里验证了一套治理方法论，让「接诉即办」从口号变成可复制的数字化流程。</div>
-    <div class="line">核心理念：把社区视为居民共同体，用 Agent 降低居民参与治理的门槛，用数据透明建立居民对治理的信任。</div>
-    <div class="line">四个字概括：知、报、议、督。</div>
+    <h2>一、开场 <span class="time">20s</span></h2>
+    <div class="action">停在登录页，不点任何按钮（左侧三张角色卡 + 底部口径数字）</div>
+    <div class="line">各位评委好。社区先知是一套面向基层治理的多智能体平台，服务三类人：居民、网格员、老年人。</div>
+    <div class="line">左边是居民端入口，中间网格员端，右边老年关怀端——三个端不是三套界面，是三种服务关系。</div>
+    <div class="line">今天我用五分钟演示一条完整的治理闭环，以及我们和普通对话机器人最不一样的两件事：多智能体是真的在协商，对老人和隐私是真的有底线。</div>
+    <div class="line">顺带一提，页面上这些数字——625 项可运行用例、130 条接口、9 个智能体角色——不是写死在文档里的，是启动时从代码库读的，跑一个脚本就能复算。我们不喜欢用形容词描述质量。</div>
   </div>
 
   <div class="scene" data-scene="2">
-    <h2>二、知 — 社区脉搏 <span class="time">30s</span></h2>
-    <div class="action">点击社区脉搏页面，依次展示天气、热点、事件</div>
-    <div class="line">首先是「知」——知情权。打开应用，系统已完成环境感知。</div>
-    <div class="line">天气数据来自和风 API 实时接口。本周社区问题上报情况和热点类别分布基于数据库实时统计。即将开展的社区活动来自社区活动安排。</div>
-    <div class="line">居民不需要进行任何操作即可获取这些信息。知情是参与的前提——这是治理闭环的起点。</div>
+    <h2>二、居民端 · 一句话报修 <span class="time">60s</span></h2>
+    <div class="action">点「居民」进入 /resident/home；点右下角对话入口，输入并发送</div>
+    <div class="line" style="color:#8fd">输入：3号楼2单元电梯又坏了，停在5楼不动了，家里老人下不来楼</div>
+    <div class="line">居民端首页就是四个字：知、报、议、督。最上面是他所在社区——海淀小区的实时脉搏。</div>
+    <div class="line">一句人话，不选分类、不填表单。系统自动分到设施维修、自动判定紧急，因为这户家里有老人下不来楼。</div>
+    <div class="line">这不是关键词匹配，是接待员智能体把任务派给报修调度智能体，由它建单。</div>
+    <div class="action">点开回复下方的「🤖 多智能体执行链（N 步）」——逐条念出现的角色</div>
+    <div class="line">这是关键。普通产品到这里就给你一句话；我们给你这一轮到底发生了什么：接待员定性、报修调度建单、合规审计过一遍、有冲突就仲裁，每一步都有记录，可以回查。</div>
+    <div class="line">这就是我们说的"可追责"——不是口号，是这一列步骤。</div>
+    <div class="action">进 /resident/work-orders，点刚提交的工单，指「处理留痕」</div>
+    <div class="line">报修单里能看到处理留痕和时间戳。居民不需要打电话问进度，这就是"报"的闭环。</div>
   </div>
 
   <div class="scene" data-scene="3">
-    <h2>三、报 — 接诉即办 <span class="time">60s</span></h2>
-    <div class="action">切换到对话页，输入上报内容，发送</div>
-    <div class="line">其次是「报」——参与权。当居民发现社区问题时，使用自然语言描述即可。</div>
-    <div class="action">Agent 回复，指向工单号、分类、紧急程度</div>
-    <div class="line">系统通过 OODA 引擎的 Orient 阶段完成意图识别——当前输入被路由到接诉助手角色。Agent 调用 report_issue 工具，自动完成分类、定级、工单生成。整个过程居民无需了解任何分类标准或操作流程。</div>
-    <div class="action">点击"处理流程"展开面板，缓慢滚动展示各阶段卡片</div>
-    <div class="line">Agent 的每一次回复背后都有一条完整的处理流程。Observe 阶段感知到的环境数据、Act 阶段调用了哪个工具以及工具返回了什么、Reflect 阶段执行了哪些检查——每一步决策都可追溯、可验证。这不是一个黑盒。</div>
-    <div class="action">快速切换到健康防护页面，滚动疾病卡片</div>
-    <div class="line">此外，系统通过感知引擎主动推送健康风险信息。当前展示的是基于国家疾控局月度公报数据、结合季节模型和天气关联因子的疾病风险评估——甲型流感、乙型流感等疾病的全国趋势和社区风险等级。</div>
+    <h2>三、属地化 · 同一句话两个社区 <span class="time">60s ⭐</span></h2>
+    <div class="action">进 /resident/qa，输入：我们社区高龄老人有什么补贴？</div>
+    <div class="line">注意命中的这条关键词：北京市海淀区高龄老人津贴申领实施细则，适用地区标注北京市海淀区。</div>
+    <div class="line">因为这位居民属于海淀小区，系统按他的社区归属优先给了区级文件。</div>
+    <div class="action">退出登录 → 用 demo_resident_cy / demo123 登录 → 进 /resident/qa → 问同一句话</div>
+    <div class="line">同一个人问同一句话——现在这位居民属于朝阳试点社区，系统不再给海淀区的文件，而是给北京市级的办法。</div>
+    <div class="line">因为海淀那份只适用海淀区，拿它回答朝阳居民是错的。</div>
+    <div class="action">指着页面上的「📍 适用地区」标签</div>
+    <div class="line">这里有三点我想说清楚。第一，我们不采定位：属地来自账号的网格归属——网格是确定的，不需要也不应该为一个政策排序去采 GPS，老人家里定位既不准也不必要。</div>
+    <div class="line">第二，属地只影响"选谁"，绝不影响"能不能答"：相关度决定能不能自动回答，属地只决定在都达标的候选里优先谁。我们有一条专门的测试会故意制造排序倒挂，断言系统仍然照常作答。</div>
+    <div class="line">第三，真的没有本地政策时也不硬凑：会给市级或全国的依据，并在正文里写明适用地区，让居民知道这不是本社区口径。</div>
+    <div class="line" style="color:#8fd">被追问就补：pytest tests/test_region_policy.py -q（14 条属地用例，含两条端到端对比）</div>
   </div>
 
   <div class="scene" data-scene="4">
-    <h2>四、议 — 邻里议事 <span class="time">55s</span></h2>
-    <div class="action">对话页，输入"看看大家有什么好提案"</div>
-    <div class="line">第三个环节——「议」，表达权。</div>
-    <div class="action">展示提案列表</div>
-    <div class="line">系统当前存储 20 条提案，按附议数降序排列。排名第一的加装电梯提案，89 人附议，状态为已采纳。延长活动室开放时间提案，73 人附议，已采纳。增设停车位提案，62 人附议，已采纳。</div>
-    <div class="line">每一条提案包含完整的状态流转记录——从讨论中到已回应、已采纳。</div>
-    <div class="action">输入创建提案</div>
-    <div class="line">当居民提出新提案时，系统首先进行语义查重——计算标题与已有提案的字符重叠度。若相似度超过阈值，引导用户附议已有提案，避免支持力量分散。若为全新提案，自动创建并分类。</div>
-    <div class="action">切到议题讨论区</div>
-    <div class="line">此外，感知引擎会定期扫描工单数据——当某类别问题在短期内集中出现时，自动生成讨论议题，汇集居民意见。这一机制将分散的个人反馈转化为结构化的民意数据。</div>
+    <h2>四、议事与提案 <span class="time">45s</span></h2>
+    <div class="action">回居民端 /resident/proposals（按附议数排序）</div>
+    <div class="line">二十条提案按附议数排序——加装电梯 89 人、增设停车位 73 人，状态都是已采纳。居民用附议表达诉求，社区用行动回应，不是空谈。</div>
+    <div class="action">点开任一提案详情，指「处理留痕」</div>
+    <div class="line">每个提案都有处理留痕：谁在什么时候回复、采纳、实施。公开留痕本身就是信任。</div>
   </div>
 
   <div class="scene" data-scene="5">
-    <h2>五、督 — 社区治理看板 <span class="time">45s</span></h2>
-    <div class="action">打开社区治理看板，指向健康度评分</div>
-    <div class="line">第四个是「督」——监督权。社区治理看板的核心是健康度评分系统。</div>
-    <div class="line">这不是简单的展示统计数据——而是一个三维加权评估模型：解决率占 40% 权重，解决速度占 35%，积压趋势占 25%。评分方法参考了 ISO 37120 市政治理指标体系。</div>
-    <div class="line">七天趋势对比图展示治理动态——新增工单与已解决工单的双线对比，直观反映治理效率的变化方向。</div>
-    <div class="action">点击治理大屏</div>
-    <div class="line">治理大屏是为管理层设计的全屏实时仪表盘。六个核心 KPI、趋势图、工单流转管道、类别分布和最近动态。数据每 30 秒自动刷新，CSS 动画标记异常告警。</div>
-    <div class="line">透明是建立治理信任的基础。当居民看到自己的上报被处理、提案被采纳、数据在改善——参与意愿才能持续。</div>
+    <h2>五、网格端 · 管理与留痕 <span class="time">60s</span></h2>
+    <div class="action">退出 → demo_grid / demo123 登录 → /grid/dashboard</div>
+    <div class="line">换成网格员视角。工作台是治理侧仪表盘：待处理、紧急、SLA 超期、健康度，还有 LLM 用量费用卡——花了多少钱是逐笔记账的，不是估的。</div>
+    <div class="action">进 /grid/work-orders，把刚报修的工单改成「处理中」→「已解决」</div>
+    <div class="line">网格员处理工单，状态变更会推给居民端。刚才居民报的电梯故障，现在已解决。</div>
+    <div class="action">回工作台，点开 Agent 日志/留痕，筛「仲裁」</div>
+    <div class="line">这就是我们的双层防线：Verifier 负责事实与安全——幻觉、隐私、医疗诊断句式；Arbiter 负责冲突裁决，按合规优先、安全、专业、费用或不可逆需人工、数据版本的顺序，第一条命中的规则生效，而且每次裁决都落库。</div>
+    <div class="line">所以智能体之间不一致时，不是谁声音大听谁的，是有规则、有记录。</div>
+    <div class="action">进 /grid/qa，展示知识库「适用地区」列</div>
+    <div class="line">知识库 62 条，55 条是可溯源的公开政策摘要，每条都标了适用地区。政策问答不是让模型背条文，是检索到材料再作答。</div>
   </div>
 
   <div class="scene" data-scene="6">
-    <h2>六、网格员端 — 管理闭环 <span class="time">35s</span></h2>
-    <div class="action">侧边栏 → "切换账号"下拉框 → 选择网格员账号 → 📊 工作台</div>
-    <div class="line">最后一个环节——网格员的视角。切换到网格员端。</div>
-    <div class="action">展示网格员工作台 KPI、智能洞察</div>
-    <div class="line">网格员工作台展示所有待处理的工单和提案。刚才居民上报的水龙头问题已经出现在列表里——和居民端是同一套数据，实时同步。</div>
-    <div class="action">点击工单管理，筛选待处理，切换状态</div>
-    <div class="line">工单管理——网格员按分类和紧急度筛选，一键把状态从待处理改为处理中、已解决。居民端立刻收到通知。上报到分派到处理到解决到通知——每一步都有记录，全部可追溯。</div>
-    <div class="action">点击提案管理，展示审核操作</div>
-    <div class="line">提案管理——网格员逐条审核。89 人附议的加装电梯，标记已采纳。居民端同步更新。管理不是黑盒——从居民表达到网格员响应，完整的治理闭环。</div>
+    <h2>六、老年端 · 底线在哪 <span class="time">60s ⭐</span></h2>
+    <div class="action">退出 → 点登录页「老年」→ /elderly/home（让评委看字号与按钮）</div>
+    <div class="line">请评委看一下字号和按钮大小——老年端不是把居民端放大，是重做：字号不小于 20 像素、热区不小于 72 像素、层级砍到最少、支持语音播报和一键拨号。</div>
+    <div class="action">点一个预置短语（如「我不舒服」）</div>
+    <div class="line">老人不需要打字。语音说得清就说，说不清就点一下。</div>
+    <div class="action">点 SOS / 联系家属（二次确认 + 会留痕）</div>
+    <div class="line">紧急联系是两步：确认、拨打，拨了会留痕，家属和社区都能看到。</div>
+    <div class="line">这里我要主动说两条底线。第一，健康顾问不做诊断：诊断句式会被专门规则拦下来，它只给建议和就医引导——这是合规，也是对老人负责。</div>
+    <div class="line">第二，任何答不了的情况都不是冷冰冰的报错，而是转人工并给居民一个处理编号。</div>
+    <div class="action">进 /elderly/notices（听通知）</div>
+    <div class="line">通知支持朗读。老人不用看屏幕也能知道社区这周有什么安排。</div>
   </div>
 
   <div class="scene" data-scene="7">
-    <h2>七、技术架构 <span class="time">30s</span></h2>
-    <div class="action">切换到 IDE/终端，展示项目结构或 pytest 结果</div>
-    <div class="line">简要说明技术实现。系统基于 OODA 循环设计治理工作流引擎，每个用户请求经过五个阶段。</div>
-    <div class="line">Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 368 个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 16 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。</div>
-    <div class="line">系统设计了三层容错回退链：LLM 不可用时切换至规则引擎，规则引擎不可用时降级至数据库直查，确保服务持续可用。</div>
-    <div class="line">项目包含 328 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。</div>
-  </div>
-
-  <div class="scene" data-scene="8">
-    <h2>八、总结 <span class="time">10s</span></h2>
-    <div class="action">回到首页全景</div>
-    <div class="line">知、报、议、督——四个环节构成完整的治理闭环。</div>
-    <div class="line">社区先知的目标：让每个居民从被管理者转变为治理的参与者。</div>
+    <h2>七、大屏与收尾 <span class="time">45s</span></h2>
+    <div class="action">退出 → demo_grid 登录 → /screen 治理大屏（30 秒自动刷新）</div>
+    <div class="line">最后是全屏治理大屏：工单流转、类别分布、趋势、关怀指标，三十秒自动刷新。</div>
+    <div class="action">回到登录页收尾</div>
+    <div class="line">总结一下我们的取舍：我们没有追求让 AI 全自主办事。涉及安全、费用、政策依据、反复协商的情况，系统一律转人工，并留下可追的处理包。</div>
+    <div class="line">我们也不宣称离线能力、不宣称治理成效，因为没有试点就没有成效——这些边界都写在交付说明里。</div>
+    <div class="line">我们相信基层治理里 AI 的价值不是替代人，而是把人的注意力省下来。这就是我们理解的人文赋能：不是把字放大，而是不越界、不采集、不静默失败。</div>
     <div class="line">谢谢各位评委。</div>
   </div>
 </div>
 
 <div id="right">
-  <div id="topbar">
-    <div class="dot" style="background:#ef4444"></div>
-    <div class="dot" style="background:#e8a040"></div>
-    <div class="dot" style="background:#40c880"></div>
-    <span style="font-size:0.7em;color:#777;margin-left:6px;">提词器 · 约4分30秒</span>
+  <div id="topbar" style="padding:10px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1a1a1a;flex-shrink:0;">
+    <span class="dot" style="width:9px;height:9px;border-radius:50%;background:#40c880;"></span>
+    <span style="font-size:0.72em;color:#666;">提词器 · 当前行高亮，动作行橙色</span>
   </div>
-  <div id="scene-tag">一 · 项目概述</div>
-  <div id="prompter">
-    <div class="line current">点击左侧场景<br>或按数字键 <span style="color:var(--accent);">1-8</span><br>开始演示</div>
-  </div>
+  <div id="prompter"></div>
+  <div id="scene-tag"></div>
   <div id="bottombar">
-    <button onclick="prev()" title="←">◀</button>
-    <button id="btn-auto" onclick="toggle()" title="空格键">▶ 自动播放</button>
-    <button onclick="next()" title="→">▶</button>
-    <button onclick="reset()">↺ 重置</button>
+    <button onclick="reset()">⟲ 重置 (R)</button>
+    <button onclick="prev()">← 上一行</button>
+    <button id="btn-auto" onclick="toggle()">▶ 自动播放 (空格)</button>
+    <button onclick="next()">下一行 →</button>
   </div>
 </div>
 
 <div id="status">
-  <span>场景: <span class="v" id="s-scene">1</span>/8</span>
-  <span>行: <span class="v" id="s-line">0</span></span>
-  <span>自动: <span class="v" id="s-auto">关</span></span>
-  <span>约4分30秒</span>
-  <span style="margin-left:auto;">空格=播放 · ← →=翻行 · 1-8=场景 · R=重置</span>
+  <span>场景 <b class="v" id="s-scene">1</b>/7</span>
+  <span>行 <b class="v" id="s-line">0</b></span>
+  <span>自动 <b class="v" id="s-auto">关</b></span>
+  <span style="margin-left:auto;">铁律：不夸大、不说"全自主"、不确定就现场跑脚本</span>
 </div>
 
 <script>
-const S={
-1:{title:'一 · 项目概述',lines:[
-{t:'各位评委好。我带来的作品是「社区先知」——落地北京海淀区「海淀小区」的智慧社区治理平台。社区是几万居民的共同体，有设施维修、环境卫生、安全隐患、停车管理、邻里矛盾。我们在海淀小区验证了一套治理方法论，让「接诉即办」变成可复制的数字化流程。'},
-{t:'核心理念：把社区视为居民共同体，用 Agent 降低居民参与治理的门槛，用数据透明建立居民对治理的信任。'},
-{t:'四个字概括：知、报、议、督。'},
+const S = {
+1:{title:'一 · 开场',lines:[
+ {a:'停在登录页，不点任何按钮'},
+ {t:'各位评委好。社区先知是一套面向基层治理的多智能体平台，服务三类人：居民、网格员、老年人。'},
+ {t:'左边是居民端入口，中间网格员端，右边老年关怀端——三个端不是三套界面，是三种服务关系。'},
+ {t:'今天我用五分钟演示一条完整的治理闭环，以及我们和普通对话机器人最不一样的两件事：多智能体是真的在协商，对老人和隐私是真的有底线。'},
+ {t:'顺带一提，页面上这些数字——625 项可运行用例、130 条接口、9 个智能体角色——不是写死在文档里的，是启动时从代码库读的，跑一个脚本就能复算。我们不喜欢用形容词描述质量。'},
 ]},
-2:{title:'二 · 知',lines:[
-{a:'点击社区脉搏页面，依次展示天气、热点、事件'},
-{t:'首先是「知」——知情权。打开应用，系统已完成环境感知。'},
-{t:'天气数据来自和风 API 实时接口。本周社区问题上报情况和热点类别分布基于数据库实时统计。即将开展的社区活动来自社区活动安排。'},
-{t:'居民不需要进行任何操作即可获取这些信息。知情是参与的前提——这是治理闭环的起点。'},
+2:{title:'二 · 居民端一句话报修',lines:[
+ {a:'点「居民」进入首页 → 点右下角对话入口 → 输入：3号楼2单元电梯又坏了，停在5楼不动了，家里老人下不来楼'},
+ {t:'居民端首页就是四个字：知、报、议、督。最上面是他所在社区——海淀小区的实时脉搏。'},
+ {t:'一句人话，不选分类、不填表单。系统自动分到设施维修、自动判定紧急，因为这户家里有老人下不来楼。'},
+ {t:'这不是关键词匹配，是接待员智能体把任务派给报修调度智能体，由它建单。'},
+ {a:'点开回复下方的「🤖 多智能体执行链」'},
+ {t:'这是关键。普通产品到这里就给你一句话；我们给你这一轮到底发生了什么：接待员定性、报修调度建单、合规审计过一遍、有冲突就仲裁，每一步都有记录，可以回查。'},
+ {t:'这就是我们说的"可追责"——不是口号，是这一列步骤。'},
+ {a:'进工单列表，点刚提交的工单，指「处理留痕」'},
+ {t:'报修单里能看到处理留痕和时间戳。居民不需要打电话问进度，这就是"报"的闭环。'},
 ]},
-3:{title:'三 · 报',lines:[
-{a:'切换到对话页，输入上报内容，发送'},
-{t:'其次是「报」——参与权。当居民发现社区问题时，使用自然语言描述即可。'},
-{a:'Agent回复，指向工单号、分类、紧急程度'},
-{t:'系统通过 OODA 引擎的 Orient 阶段完成意图识别——当前输入被路由到接诉助手角色。Agent 调用 report_issue 工具，自动完成分类、定级、工单生成。整个过程居民无需了解任何分类标准或操作流程。'},
-{a:'点击"处理流程"展开面板，缓慢滚动展示各阶段卡片'},
-{t:'Agent 的每一次回复背后都有一条完整的处理流程。Observe 阶段感知到的环境数据、Act 阶段调用了哪个工具以及工具返回了什么、Reflect 阶段执行了哪些检查——每一步决策都可追溯、可验证。这不是一个黑盒。'},
-{a:'快速切换到健康防护页面，滚动展示疾病卡片'},
-{t:'此外，系统通过感知引擎主动推送健康风险信息。当前展示的是基于国家疾控局月度公报数据、结合季节模型和天气关联因子的疾病风险评估——甲型流感、乙型流感等疾病的全国趋势和社区风险等级。'},
+3:{title:'三 · 属地化：同一句话，两个社区',lines:[
+ {a:'进 /resident/qa，输入：我们社区高龄老人有什么补贴？'},
+ {t:'注意命中的这条关键词：北京市海淀区高龄老人津贴申领实施细则，适用地区标注北京市海淀区。'},
+ {t:'因为这位居民属于海淀小区，系统按他的社区归属优先给了区级文件。'},
+ {a:'退出登录 → 用 demo_resident_cy / demo123 登录 → 同一句话再问一次'},
+ {t:'同一个人问同一句话——现在这位居民属于朝阳试点社区，系统不再给海淀区的文件，而是给北京市级的办法，因为海淀那份只适用海淀区，拿它回答朝阳居民是错的。'},
+ {a:'指着「📍 适用地区」标签'},
+ {t:'第一，我们不采定位：属地来自账号的网格归属——网格是确定的，不需要也不应该为一个政策排序去采 GPS，老人家里定位既不准也不必要。'},
+ {t:'第二，属地只影响"选谁"，绝不影响"能不能答"：相关度决定能不能自动回答，属地只决定在都达标的候选里优先谁。有一条专门的测试会故意制造排序倒挂，断言系统仍然照常作答。'},
+ {t:'第三，真的没有本地政策时也不硬凑：会给市级或全国的依据，并在正文里写明适用地区。'},
+ {t:'（追问就补：pytest tests/test_region_policy.py -q 有 14 条属地用例，含两条端到端对比）'},
 ]},
-4:{title:'四 · 议',lines:[
-{a:'对话页，输入"看看大家有什么好提案"'},
-{t:'第三个环节——「议」，表达权。'},
-{a:'展示提案列表'},
-{t:'系统当前存储 20 条提案，按附议数降序排列。排名第一的加装电梯提案，89 人附议，状态为已采纳。延长活动室开放时间提案，73 人附议，已采纳。增设停车位提案，62 人附议，已采纳。'},
-{t:'每一条提案包含完整的状态流转记录——从讨论中到已回应、已采纳。'},
-{a:'输入创建提案'},
-{t:'当居民提出新提案时，系统首先进行语义查重——计算标题与已有提案的字符重叠度。若相似度超过阈值，引导用户附议已有提案，避免支持力量分散。若为全新提案，自动创建并分类。'},
-{a:'切到议题讨论区'},
-{t:'此外，感知引擎会定期扫描工单数据——当某类别问题在短期内集中出现时，自动生成讨论议题，汇集居民意见。这一机制将分散的个人反馈转化为结构化的民意数据。'},
+4:{title:'四 · 议事与提案',lines:[
+ {a:'回居民端 → 邻里议事（按附议数排序）'},
+ {t:'二十条提案按附议数排序——加装电梯 89 人、增设停车位 73 人，状态都是已采纳。居民用附议表达诉求，社区用行动回应，不是空谈。'},
+ {a:'点开任一提案详情，指「处理留痕」'},
+ {t:'每个提案都有处理留痕：谁在什么时候回复、采纳、实施。公开留痕本身就是信任。'},
 ]},
-5:{title:'五 · 督',lines:[
-{a:'打开社区治理看板，指向健康度评分'},
-{t:'第四个是「督」——监督权。社区治理看板的核心是健康度评分系统。'},
-{t:'这不是简单的展示统计数据——而是一个三维加权评估模型：解决率占 40% 权重，解决速度占 35%，积压趋势占 25%。评分方法参考了 ISO 37120 市政治理指标体系。'},
-{t:'七天趋势对比图展示治理动态——新增工单与已解决工单的双线对比，直观反映治理效率的变化方向。'},
-{a:'点击治理大屏'},
-{t:'治理大屏是为管理层设计的全屏实时仪表盘。六个核心 KPI、趋势图、工单流转管道、类别分布和最近动态。数据每 30 秒自动刷新，CSS 动画标记异常告警。'},
-{t:'透明是建立治理信任的基础。当居民看到自己的上报被处理、提案被采纳、数据在改善——参与意愿才能持续。'},
+5:{title:'五 · 网格端：管理与留痕',lines:[
+ {a:'退出 → demo_grid / demo123 登录 → 工作台'},
+ {t:'换成网格员视角。工作台是治理侧仪表盘：待处理、紧急、SLA 超期、健康度，还有 LLM 用量费用卡——花了多少钱是逐笔记账的，不是估的。'},
+ {a:'进工单管理，把刚报修的工单改成处理中 → 已解决'},
+ {t:'网格员处理工单，状态变更会推给居民端。刚才居民报的电梯故障，现在已解决。'},
+ {a:'回工作台，点开 Agent 日志/留痕，筛「仲裁」'},
+ {t:'这就是我们的双层防线：Verifier 负责事实与安全——幻觉、隐私、医疗诊断句式；Arbiter 负责冲突裁决，按合规优先、安全、专业、费用或不可逆需人工、数据版本的顺序，第一条命中的规则生效，而且每次裁决都落库。'},
+ {t:'所以智能体之间不一致时，不是谁声音大听谁的，是有规则、有记录。'},
+ {a:'进知识库管理，展示「适用地区」列'},
+ {t:'知识库 62 条，55 条是可溯源的公开政策摘要，每条都标了适用地区。政策问答不是让模型背条文，是检索到材料再作答。'},
 ]},
-6:{title:'六 · 网格员端',lines:[
-{a:'侧边栏 → "切换账号"下拉框 → 选择网格员账号 → 📊 工作台'},
-{t:'最后一个环节——网格员的视角。切换到网格员端。'},
-{t:'网格员工作台展示所有待处理的工单和提案。刚才居民上报的水龙头问题已经出现在列表里——和居民端是同一套数据，实时同步。'},
-{a:'点击工单管理，筛选待处理，切换状态'},
-{t:'工单管理——网格员按分类和紧急度筛选，一键把状态从待处理改为处理中、已解决。居民端立刻收到通知。上报到分派到处理到解决到通知——每一步都有记录，全部可追溯。'},
-{a:'点击提案管理，展示审核操作'},
-{t:'提案管理——网格员逐条审核。89 人附议的加装电梯，标记已采纳。居民端同步更新。管理不是黑盒——从居民表达到网格员响应，完整的治理闭环。'},
+6:{title:'六 · 老年端：底线在哪',lines:[
+ {a:'退出 → 点「老年」进入老年端（让评委看字号与按钮）'},
+ {t:'请评委看一下字号和按钮大小——老年端不是把居民端放大，是重做：字号不小于 20 像素、热区不小于 72 像素、层级砍到最少、支持语音播报和一键拨号。'},
+ {a:'点一个预置短语（如「我不舒服」）'},
+ {t:'老人不需要打字。语音说得清就说，说不清就点一下。'},
+ {a:'点 SOS / 联系家属（二次确认 + 会留痕）'},
+ {t:'紧急联系是两步：确认、拨打，拨了会留痕，家属和社区都能看到。'},
+ {t:'这里我要主动说两条底线。第一，健康顾问不做诊断：诊断句式会被专门规则拦下来，它只给建议和就医引导——这是合规，也是对老人负责。'},
+ {t:'第二，任何答不了的情况都不是冷冰冰的报错，而是转人工并给居民一个处理编号。'},
+ {a:'进「听通知」'},
+ {t:'通知支持朗读。老人不用看屏幕也能知道社区这周有什么安排。'},
 ]},
-7:{title:'七 · 技术架构',lines:[
-{a:'切换到 IDE/终端，展示项目结构或 pytest 结果'},
-{t:'简要说明技术实现。系统基于 OODA 循环设计治理工作流引擎，每个用户请求经过五个阶段。'},
-{t:'Observe 环境感知——预查询天气、工单热点、时间上下文。Orient 意图定位——基于 368 个关键词和正则语义回退的 Persona Router，零延迟完成意图识别。Decide 与 Act——LangChain AgentExecutor 调用 16 个治理工具，DeepSeek 模型自主编排调用顺序。Reflect 反思——七项后处理检查，包括 Anti-Hallucination 安全网，当检测到 LLM 未实际调用工具即编造回复时，强制执行真实工具调用。'},
-{t:'系统设计了三层容错回退链：LLM 不可用时切换至规则引擎，规则引擎不可用时降级至数据库直查，确保服务持续可用。'},
-{t:'项目包含 328 个自动化测试，覆盖单元、集成、端到端三个层级，已配置 GitHub Actions 持续集成。'},
-]},
-8:{title:'八 · 总结',lines:[
-{a:'回到首页全景'},
-{t:'知、报、议、督——四个环节构成完整的治理闭环。'},
-{t:'社区先知的目标：让每个居民从被管理者转变为治理的参与者。'},
-{t:'谢谢各位评委。'},
+7:{title:'七 · 大屏与收尾',lines:[
+ {a:'退出 → demo_grid 登录 → 治理大屏（30 秒自动刷新）'},
+ {t:'最后是全屏治理大屏：工单流转、类别分布、趋势、关怀指标，三十秒自动刷新。'},
+ {a:'回到登录页收尾'},
+ {t:'总结一下我们的取舍：我们没有追求让 AI 全自主办事。涉及安全、费用、政策依据、反复协商的情况，系统一律转人工，并留下可追的处理包。'},
+ {t:'我们也不宣称离线能力、不宣称治理成效，因为没有试点就没有成效——这些边界都写在交付说明里。'},
+ {t:'我们相信基层治理里 AI 的价值不是替代人，而是把人的注意力省下来。这就是我们理解的人文赋能：不是把字放大，而是不越界、不采集、不静默失败。'},
+ {t:'谢谢各位评委。'},
 ]},
 };
 
@@ -241,20 +243,21 @@ function render(){
   const cur=el.querySelector('.current'); if(cur)cur.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
-function next(){ const m=(S[scene]?.lines||[]).length; if(idx<m-1)idx++; else if(scene<8){scene++;idx=0;} else stop(); render(); }
+function next(){ const m=(S[scene]?.lines||[]).length; if(idx<m-1)idx++; else if(scene<7){scene++;idx=0;} else stop(); render(); }
 function prev(){ if(idx>0)idx--; else if(scene>1){scene--;idx=(S[scene]?.lines||[]).length-1;} render(); }
 function go(n){ scene=n; idx=0; render(); }
-function toggle(){ timer?(stop(),btn.textContent='▶ 自动播放',btn.classList.remove('on'),document.getElementById('s-auto').textContent='关'):(btn.textContent='⏸ 暂停',btn.classList.add('on'),document.getElementById('s-auto').textContent='开',advance(),timer=setInterval(advance,11000)); }
+function toggle(){ timer?(stop(),btn.textContent='▶ 自动播放',btn.classList.remove('on'),document.getElementById('s-auto').textContent='关'):(btn.textContent='⏸ 暂停',btn.classList.add('on'),document.getElementById('s-auto').textContent='开',advance(),timer=setInterval(advance,12000)); }
 function stop(){ if(timer){clearInterval(timer);timer=null;} }
-function advance(){ const m=(S[scene]?.lines||[]).length; if(idx>=m-1){ if(scene>=8){stop();return;} scene++; idx=0; } else idx++; render(); }
+function advance(){ const m=(S[scene]?.lines||[]).length; if(idx>=m-1){ if(scene>=7){stop();return;} scene++; idx=0; } else idx++; render(); }
 function reset(){ stop(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; scene=1; idx=0; render(); }
 
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
   const k=e.key;
-  if(k>='1'&&k<='8'){ e.preventDefault(); stop(); go(parseInt(k)); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
-  else if(k==='ArrowRight'||k==='ArrowDown'){ e.preventDefault(); stop(); next(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
-  else if(k==='ArrowLeft'||k==='ArrowUp'){ e.preventDefault(); stop(); prev(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; }
+  const off=()=>{ stop(); btn.textContent='▶ 自动播放'; btn.classList.remove('on'); document.getElementById('s-auto').textContent='关'; };
+  if(k>='1'&&k<='7'){ e.preventDefault(); off(); go(parseInt(k)); }
+  else if(k==='ArrowRight'||k==='ArrowDown'){ e.preventDefault(); off(); next(); }
+  else if(k==='ArrowLeft'||k==='ArrowUp'){ e.preventDefault(); off(); prev(); }
   else if(k===' '){ e.preventDefault(); toggle(); }
   else if(k==='r'||k==='R'){ e.preventDefault(); reset(); }
 });

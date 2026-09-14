@@ -101,6 +101,11 @@ async function delQuestion(q) {
           <template v-if="result.matched">
             <div style="font-weight:700;color:#2E7D32;">✅ 已自动回答</div>
             <div v-if="result.rag" class="muted" style="font-size:0.8rem;margin-top:2px;">🤖 AI 依据知识库生成 · 已校验引用</div>
+            <!-- 属地可解释性：让居民看见"这条政策是按哪个属地选的"（属地只影响选谁，不影响能否自动回答） -->
+            <div v-if="result.applicable_area" style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <n-tag size="small" type="info" round>📍 适用地区：{{ result.applicable_area }}</n-tag>
+              <span v-if="result.region_label" class="muted" style="font-size:0.78rem;">按您的社区「{{ result.region_label }}」优先</span>
+            </div>
             <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
           </template>
           <template v-else>

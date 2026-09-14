@@ -13,7 +13,7 @@
 export const BRAND_METRICS = [
   {
     key: 'tests',
-    value: 622,
+    value: 625,
     suffix: '',
     label: '自动化测试',
     // pytest 收集用例数（= 575 passed / 1 skipped）；全量模式由 preflight 跑 --collect-only 核对

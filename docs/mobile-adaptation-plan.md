@@ -214,7 +214,7 @@ python scripts/demo_preflight.py                # 9/9
 
 | 风险 | 降级 |
 |---|---|
-| 现场设备带不动动效 | 已有 `prefers-reduced-motion` 全站可关 + 页面不可见暂停 + 6 段录屏兜底 |
+| 现场设备带不动动效 | 已有 `prefers-reduced-motion` 全站可关 + 页面不可见暂停 + 7 段录屏兜底（含属地化两社区对比） |
 | 真机拿不到（只有模拟器/仿真） | Playwright 设备仿真（iPhone UA/DPR3/触屏）已覆盖 95% 问题；至少争取一台真机复验第八节清单 |
 | 键盘遮挡输入框 | 已有 `useKeyboard.js`（focusin 滚动 + visualViewport 归位）；真机清单第 ④ 步验证 |
 | iOS 地址栏高度跳变 | G7 用 `100dvh/svh` 兜底；若仍跳，底栏改 `position: sticky` 备选 |
