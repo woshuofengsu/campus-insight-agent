@@ -23,6 +23,46 @@ _TAG_LEN = 16                    # GCM 认证标签
 _MAC_LEN = 32                    # 旧的 HMAC 校验长度
 _SALT = b"campus-insight-crypto-v1"
 
+# 绝不能用于生产加密的密钥值：代码里的演示默认值 + 仓库模板里公开的占位值。
+# 为什么必须显式挡：.env.demo / .env.example 是入库的模板，里面的 CRYPTO_KEY 是公开字符串；
+# 谁把模板复制成生产 .env，"密文"就等于用全网都知道的密钥加密 —— 看着是密文，实际等于明文。
+_INSECURE_KEYS = frozenset({
+    "dev-crypto-key-change-me",              # utils/crypto.py 的历史默认值
+    "demo-please-set-a-crypto-key",          # .env.demo 模板占位
+    "changeme", "change-me", "test", "secret", "your-crypto-key",
+})
+
+
+def _load_env_key() -> str:
+    """按姿态决定"没配 CRYPTO_KEY 时怎么办"（与 api_routes/deps.py 的 JWT 策略对齐）。
+
+    之前的做法是"打一条 warning 然后用公开默认密钥继续跑"（fail-open）——
+    与 JWT 的 secure-by-default（未配即拒绝启动）自相矛盾，且真实部署里"忘配密钥"
+    是高频事故：8 张表的手机号会全部用公开密钥加密。
+
+    现在的规则：
+      - 演示姿态（config.DEMO_MODE=True，默认）：允许缺失/占位密钥，但**每次启动都告警**；
+      - 生产姿态（DEMO_MODE=false）：密钥缺失、或等于仓库里的公开占位值 → **抛异常拒绝启动**。
+    """
+    key = os.environ.get("CRYPTO_KEY", "").strip()
+    demo = True
+    try:  # 用 config 的口径（它同时支持 .env 与 st.secrets），拿不到就保守按演示姿态
+        import config
+        demo = bool(getattr(config, "DEMO_MODE", True))
+    except Exception:  # noqa: BLE001
+        pass
+    if key and key not in _INSECURE_KEYS:
+        return key
+    if demo:
+        _log.warning("CRYPTO_KEY %s，暂用演示密钥（DEMO_MODE=true）；正式使用必须配置强密钥",
+                     "未配置" if not key else "是仓库模板里的公开占位值")
+        return key or "dev-crypto-key-change-me"
+    raise RuntimeError(
+        "CRYPTO_KEY 未配置或是仓库模板里的公开占位值，而 DEMO_MODE=false（生产姿态）："
+        "拒绝启动——否则手机号会用公开密钥加密，等价于明文。"
+        "生成方式：python -c \"import secrets;print(secrets.token_urlsafe(48))\" 写入 .env 的 CRYPTO_KEY。"
+    )
+
 _log = logging.getLogger(__name__)
 
 try:
@@ -82,10 +122,8 @@ class Crypto:
     """
 
     def __init__(self, key: str | None = None):
-        raw = key or os.environ.get("CRYPTO_KEY") or ""
-        if not raw:
-            _log.warning("CRYPTO_KEY 未配置，使用演示默认密钥（生产环境必须配置）")
-            raw = "dev-crypto-key-change-me"
+        # 显式传入 key（单测/轮换脚本）直接采用；否则走环境密钥策略（见 _load_env_key）
+        raw = key if key else _load_env_key()
         if _HAS_GCM:
             self._aes = _AESGCM(_derive_aes_key(raw))
         else:

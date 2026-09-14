@@ -92,3 +92,49 @@ def test_chat_no_key_fast_fail(monkeypatch):
     monkeypatch.setattr("agent.llm_client._record", lambda *a, **k: None)
     r = lc.chat([{"role": "user", "content": "hi"}], module="m")
     assert r["ok"] is False and r["error"] == "no_key"
+
+
+# ---------------------------------------------------------------------------
+# 记账不许静默丢账（本轮修的真 BUG）
+# ---------------------------------------------------------------------------
+
+_RECORD_SCRIPT = r"""
+import json, os, sqlite3, tempfile
+import config
+config.DB_PATH = os.path.join(tempfile.mkdtemp(prefix="llmrec_"), "r.db")
+# 关键：本进程**故意不调用 init_db()** —— 这正是脚本/插件入口/CLI 的真实情况
+import agent.llm_client as LC
+class _Fake:
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def read(self):
+        return json.dumps({"choices": [{"message": {"content": "好"}}],
+                           "usage": {"prompt_tokens": 7, "completion_tokens": 1}}).encode("utf-8")
+import urllib.request as U
+U.urlopen = lambda *a, **k: _Fake()
+r = LC.chat([{"role": "user", "content": "hi"}], module="rec-test", purpose="probe", max_tokens=5)
+assert r["ok"] is True, r
+c = sqlite3.connect(config.DB_PATH)
+n = c.execute("SELECT COUNT(*) FROM llm_usage WHERE module='rec-test'").fetchone()[0]
+c.close()
+assert n == 1, f"LLM 调用成功但 llm_usage 只有 {n} 条（记账被静默丢弃）"
+print("LLM_RECORD_OK")
+"""
+
+
+def test_usage_recorded_even_without_init_db():
+    """回归：未初始化 DB 的进程里，LLM 调用也必须留下用量记录。
+
+    修前 `_record` 用 `_log.debug` 吞掉 `Database not initialized`，
+    于是"钱花了、账没记"—— 直接打穿"成本可现场复算"的对外主张（实测复现）。
+    现在实现为：失败 → 懒初始化一次重试 → 仍失败则 warning 告警。
+    """
+    import subprocess
+
+    env = dict(os.environ)
+    env["DEEPSEEK_API_KEY"] = "fake-key-for-test"
+    p = subprocess.run([sys.executable, "-c", _RECORD_SCRIPT],
+                       cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       env=env, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    assert "LLM_RECORD_OK" in (p.stdout or ""), f"stdout={p.stdout}\nstderr={p.stderr}"

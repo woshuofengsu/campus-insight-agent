@@ -310,12 +310,19 @@ def test_negotiation_loop_guard():
     assert r2["status"] == "transferred_to_human"
 
 
-def test_real_negotiation_chain():
+def test_real_negotiation_chain(monkeypatch):
     """真协商（P2-A2-02）：一次输入内多轮 Agent↔Agent 消息往返。
 
     天气守护员（有极端天气预警）→ 健康顾问评估 → 天气确认并升级 → 通知管理员生成草稿。
     验证：协商响应被链式消费（天气最终能收到健康确认并转给通知管理员），且无循环转人工。
+
+    注意（本轮修）：本测试钉的是**规则链的确定性文案**，因此必须显式关闭 LLM 润色/编排 ——
+    否则本机 .env 或演示姿态一旦把开关打开（LLM_NEGOTIATION 会改写协商文案），
+    这条测试就会因"文案被润色"而失败（实测：LLM 全开姿态下报 line 334 断言失败）。
+    测规则就用规则姿态，测 LLM 用 mock —— 测试必须姿态无关。
     """
+    for k in ("LLM_NEGOTIATION", "LLM_ORCHESTRATION", "POLICY_LLM_RAG", "RECEPTION_LLM_FALLBACK"):
+        monkeypatch.delenv(k, raising=False)
     from agent.orchestrator import Orchestrator
     o = Orchestrator()
     # 构造：weather_guardian 处理天气时发 extreme_weather 给 health_advisor
@@ -882,11 +889,48 @@ def test_self_resolution_stats(client):
     assert r2.status_code == 403 or not r2.json().get("success")
 
 
-def test_llm_negotiator_disabled_by_default():
-    """P1-1：LLM 协商默认关闭时，决策器返回 need=False（不破坏规则主干）。"""
+def test_llm_negotiator_disabled_by_default(monkeypatch):
+    """P1-1：LLM 协商**开关关闭时**决策器返回 need=False（不破坏规则主干）。
+
+    注意（本轮修）：原实现不钉姿态，直接依赖进程环境 —— 一旦本机 .env 或演示姿态把
+    `LLM_ORCHESTRATION` 打开，这条测试就会**真的打网络**并且失败（实测过）。
+    测试必须姿态无关，所以这里显式清掉开关。
+    """
+    monkeypatch.delenv("LLM_ORCHESTRATION", raising=False)
     from agent.llm_negotiator import decide_collaboration
     d = decide_collaboration("楼道闻到燃气味", "repair")
     assert d["need"] is False and d["target"] is None
+
+
+def test_llm_negotiator_parses_llm_decision(monkeypatch):
+    """开关打开时，决策器应解析 LLM 的 JSON 决策（mock 掉 llm_client，不打网络）。"""
+    monkeypatch.setenv("LLM_ORCHESTRATION", "1")
+    import agent.llm_client as LC
+    import agent.llm_negotiator as N
+    monkeypatch.setattr(N, "DEEPSEEK_API_KEY", "fake-key")
+    monkeypatch.setattr(LC, "chat",
+                        lambda *a, **k: {"ok": True, "text":
+                                         '{"need": true, "target": "health_advisor", "reason": "高温需提醒用药"}'},
+                        raising=False)
+    d = N.decide_collaboration("高温天气要注意什么", "health")
+    assert d["need"] is True and d["target"] == "health_advisor" and d["reason"]
+
+
+def test_llm_negotiator_rejects_target_outside_whitelist(monkeypatch):
+    """LLM 若返回白名单外的角色 / 非法 JSON，必须降级为"不联动"（安全兜底）。"""
+    monkeypatch.setenv("LLM_ORCHESTRATION", "1")
+    import agent.llm_client as LC
+    import agent.llm_negotiator as N
+    monkeypatch.setattr(N, "DEEPSEEK_API_KEY", "fake-key")
+    monkeypatch.setattr(LC, "chat",
+                        lambda *a, **k: {"ok": True, "text": '{"need": true, "target": "attacker_role"}'},
+                        raising=False)
+    d = N.decide_collaboration("我中奖了", "chat")
+    assert d["need"] is False and d["target"] is None
+
+    monkeypatch.setattr(LC, "chat", lambda *a, **k: {"ok": True, "text": "不是 JSON"}, raising=False)
+    d2 = N.decide_collaboration("我中奖了", "chat")
+    assert d2["need"] is False and d2["target"] is None
 
 
 def test_llm_negotiator_no_key_falls_back(monkeypatch):

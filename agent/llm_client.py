@@ -4,7 +4,8 @@
 设计原则：
 - 任何异常都不抛：调用方按 `ok=False` 走规则兜底（不 500）。
 - 熔断：连续失败 ≥ 阈值后，锁定窗口内直接快速失败，避免拖垮请求线程。
-- 记账：成功记 tokens，失败记 0，duration 照记；记账失败不阻塞主流程。
+- 记账：成功记 tokens，失败记 0，duration 照记；**记账失败会懒初始化重试并以 warning 告警**
+  （不再静默丢账——实测发现独立进程里 `get_db()` 未初始化会把用量整段丢掉）。
 - 与外部解耦：配置从 config.py 读（DEEPSEEK_*），未配 key 时快速失败。
 
 本模块是**新增/依赖 LLM 的调用点的统一入口**（政策 RAG、意图兜底、协商、润色）。
@@ -26,6 +27,7 @@ _FAIL = {"n": 0, "open_until": 0.0}
 _FAIL_THRESHOLD = 3
 _OPEN_SECONDS = 60
 _DEFAULT_TIMEOUT = 6
+_RECORD_WARNED = False   # 记账失败只告警一次（避免刷屏）
 
 # N5：LLM 输入长度上限（防登录用户发超长文本刷输入 token）
 _MAX_SINGLE_MSG = 2000
@@ -113,8 +115,32 @@ def reset_circuit():
 
 
 def _record(module, ti, to, dt, purpose, uid):
-        try:
-            from data.db_llm_usage import record_usage
-            record_usage(module, ti, to, dt, input_preview=(purpose or "")[:80])
-        except Exception as e:
-            _log.debug("record llm usage fail: %s", e)
+    """写用量记账。**不允许静默丢账**（本轮修）。
+
+    背景（实测发现的真 BUG）：记账走 `data.db_llm_usage.record_usage` → `get_db()`，
+    而 `get_db()` 在**没有调用过 `init_db()` 的进程里**会抛
+    `RuntimeError: Database not initialized`。原实现用 `_log.debug` 吞掉这个异常，
+    结果是：脚本 / 扣子插件入口 / 任何独立进程里 **LLM 调用真的发生了、钱真的花了，
+    但 llm_usage 一条记录都没有** —— 直接打穿"成本可现场复算"这个对外主张。
+
+    现在的策略：① 失败时**懒初始化一次**再重试；② 仍失败则以 **warning** 明确告警（每次进程只喊一次）。
+    """
+    global _RECORD_WARNED
+    try:
+        from data.db_llm_usage import record_usage
+        record_usage(module, ti, to, dt, input_preview=(purpose or "")[:80])
+        return
+    except Exception as e:  # noqa: BLE001
+        first_err = e
+    try:  # ① 懒初始化（独立进程/脚本/插件入口的常见情况）
+        import config
+        from data.db_core import init_db
+        init_db(config.DB_PATH)
+        from data.db_llm_usage import record_usage as _ru
+        _ru(module, ti, to, dt, input_preview=(purpose or "")[:80])
+        return
+    except Exception as e2:  # noqa: BLE001
+        if not _RECORD_WARNED:
+            _RECORD_WARNED = True
+            _log.warning("LLM 用量记账失败（本次调用仍已发生、成本已产生）：%s / 懒初始化后：%s",
+                         first_err, e2)

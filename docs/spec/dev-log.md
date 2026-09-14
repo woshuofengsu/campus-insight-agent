@@ -1359,3 +1359,77 @@ O1「PWA 无 SW，别说离线」、O2「581 里有 6 条供数冒烟项，关�
 
 **提交**：本轮。
 
+---
+
+## 四十六、密钥 fail-closed（独立评审 P1-1 已修）+「LLM 能不能默认打开」的实测答案 ✅
+
+**背景**：独立评审报告里 P1-1 是我自己审出来的硬伤——`CRYPTO_KEY` 缺失时**只打 warning**（fail-open），
+而 JWT 是 secure-by-default（拒绝启动），两者策略自相矛盾；更糟的是 `.env.example` **根本没列这个密钥**，
+`.env.demo` 里给的还是入库的公开占位值。用户问了一句"LLM 能不能默认打开"，本轮把两件事一起做完。
+
+**① `CRYPTO_KEY` 改为 fail-closed（与 JWT 对齐）**
+- `utils/crypto.py` 新增 `_load_env_key()`：
+  - **演示姿态**（`config.DEMO_MODE=True`，默认）：允许缺失/占位密钥，但**每次启动告警**；
+  - **生产姿态**（`DEMO_MODE=false`）：密钥缺失、或等于**仓库里公开的占位值**（`dev-crypto-key-change-me` /
+    `demo-please-set-a-crypto-key` 等）→ **抛异常拒绝启动**，并给出生成命令。
+- 显式传入 key 的调用（单测、轮换脚本）不受影响。
+- `.env.example` 补上 `WEB_JWT_SECRET` / `CRYPTO_KEY` 两项与生成方式，并写明"不要用 `.env.demo` 的占位值"。
+- `demo_preflight` 的**姿态行**增加"加密密钥=自定义/默认(仅演示)"（不新增检查项，保持 9 项口径）。
+- **4 条新测试**（`tests/test_prod_config.py`，子进程 + 全新解释器，真验启动行为）：
+  ① 生产姿态缺密钥 → 必须失败；② 生产姿态用仓库占位值 → 必须失败；
+  ③ 生产姿态 + 强密钥 → 正常加解密（防"fail-closed 写成一律拒绝"）；④ 演示姿态缺密钥 → 仍可用（不误伤演示）。
+- **踩坑记录**：新测试第一版报 `TypeError: NoneType + str` —— 子进程把中文报错以 UTF-8 输出，
+  父进程按 Windows 默认 GBK 解码失败，`subprocess` 的捕获线程死掉 → `stdout/stderr` 变成 `None`。
+  修法：`subprocess.run(..., text=True, encoding="utf-8", errors="replace")` 并统一走 `_out()` 合并。
+  （与上一节"文本只用 UTF-8 工具链"是同一类坑，已固化到测试写法里。）
+
+**② 「LLM 能不能默认打开」——用实测回答，而不是拍脑袋**
+三个 LLM 开关（`LLM_ORCHESTRATION` / `POLICY_LLM_RAG` / `RECEPTION_LLM_FALLBACK`，另有 `LLM_NEGOTIATION`）
+在 `.env.demo` 里**本来就是全开的**，代码默认关。把它们全开跑一次全量测试，结果是：
+- 第一次：**2 条失败** —— `test_llm_negotiator_disabled_by_default`（它不钉姿态，直接断言"默认关"，
+  于是真的**打了网络**并失败）、`test_real_negotiation_chain`（钉规则链文案，被 LLM 润色改文案后失败）。
+- 定性与修法：**这两条测试的缺陷不是"LLM 不能开"，而是"测试受环境姿态影响"**——测试必须姿态无关。
+  已改成显式 pin 姿态（`monkeypatch.delenv/setenv`），并补 2 条**用 mock 打真逻辑**的新测试：
+  LLM 决策 JSON 能被正确解析；**LLM 返回白名单外角色或非 JSON 时必须降级为"不联动"**（安全兜底）。
+- 修后复测：**开姿态与关姿态都全绿**（见验证表），说明"LLM 默认打开"在工程上是成立的。
+- **结论与建议**：代码默认保持关（CI 确定性 + 无网环境不吃 10s 超时），
+  **使用姿态打开**（本机 `.env` 已加 4 个开关）——服务端 LLM 全开、测试仍姿态无关。
+- **代价要说清楚**：`LLM_ORCHESTRATION` 是**同步调用**且挂在每轮对话上（`orchestrator.py:307`，
+  `timeout=10`、`max_tokens=80`），所以每轮对话**多 1 次 LLM 往返（约 1–3 秒）**；失败/无 key 自动降级为规则流程。
+
+**③ 顺带发现的诚实边界（写下来，别当成已有能力吹）**
+`scripts/reencrypt_phones.py` 只支持"用当前环境密钥重新加密"，**不支持指定旧/新密钥**，
+所以真正的密钥轮换需要手工换 env 跑两次；且现有演示库里手机号是用**演示默认密钥**加密的 ——
+**一旦配了正式 `CRYPTO_KEY`，历史密文将无法解密**（演示数据可重灌；生产必须走轮换流程）。
+
+**③b 同一轮里挖出的第二个真 BUG：LLM 用量记账会静默丢账**
+验证"LLM 默认打开"到底花多少钱时，发现跑了两轮全量测试后 `llm_usage` **一条新记录都没有**。
+逐步定位：
+1. 直连一次真实调用 → **成功**（1.25s，返回"好"），但计数仍是 20；
+2. 直接调 `record_usage()` → 抛 `RuntimeError: Database not initialized. Call init_db(db_path)...`；
+3. 而 `agent/llm_client._record()` 用 **`_log.debug` 吞掉**了这个异常 → **调用发生了、钱花了、账没记**。
+   - 影响范围：任何**没有调用过 `init_db()` 的进程**（独立脚本、扣子插件入口 `api.py`、CLI、后台任务）。
+     这正是"成本可现场复算"这个对外主张最怕的漏洞——演示时投屏 `llm_usage` 可能什么都不涨。
+   - 修：`_record` 失败时**懒初始化一次再重试**（`init_db(config.DB_PATH)`），仍失败则 **warning 明确告警**
+     （每进程只喊一次，不刷屏）；实测修复后未初始化进程里 chat 成功 → 行数 21→22。
+   - 加回归测试 `tests/test_llm_client.py::test_usage_recorded_even_without_init_db`：
+     **子进程刻意不调 `init_db`** + mock 网络 → 断言 `llm_usage` 里必须出现该 module 的记录。
+
+**③c LLM 默认打开的实测代价（服务端真跑）**
+重启服务（**只重启服务、不动隧道，避免换域名**）让新 `.env` 生效后，发一轮居民对话：
+- 回复 **1.9 秒**（规则主干 <1s + LLM 编排 892ms），路由 `weather_guardian`；
+- 记账新增 1 行：`[自主协商决策] 123/31 tokens ¥0.0002` —— **每轮 +约 ¥0.0002 / +约 0.9 秒**。
+- 顺带确认一条运维事实：**改 `.env` 必须重启服务**（第一次在旧进程里测，LLM 根本没开，记账自然为 0）。
+
+**④ 验证**
+
+| 门禁 | 结果 |
+|---|---|
+| `pytest tests/ -q`（LLM **全开**姿态） | **全绿**（含 4 条新密钥测试 + 2 条新协商测试） |
+| `pytest tests/ -q`（LLM 关姿态） | **全绿**（同一套测试，姿态无关） |
+| `tests/test_prod_config.py` | 5 条全过（含 fail-closed 三个分支） |
+| `ruff` | 0 |
+| `demo_preflight --fast` | 姿态行显示 `政策LLM生成=开 \| 加密密钥=默认/占位（仅演示，生产会拒绝启动）` |
+
+**提交**：本轮。
+

@@ -253,6 +253,11 @@ def check_env() -> dict:
         pose.append("LLM=真实" if llm else "LLM=规则引擎（无 key 自动降级）")
         pose.append(f"向量={emb_on}" + ("（已配 key）" if emb_key else "（无 key，词法模式）"))
         pose.append(f"政策LLM生成={'开' if rag_llm else '关'}")
+        # 密钥姿态（不打印密钥值）：只是提示，不新增检查项（保持 9 项口径不变）
+        import os as _os
+        _INSECURE = {"", "dev-crypto-key-change-me", "demo-please-set-a-crypto-key", "demo-please-set-a-production-secret"}
+        crypto_ok = _os.environ.get("CRYPTO_KEY", "").strip() not in _INSECURE
+        pose.append("加密密钥=" + ("自定义" if crypto_ok else "默认/占位（仅演示，生产会拒绝启动）"))
         return {"name": ".env 演示姿态", "passed": True, "detail": " | ".join(pose), "fix": ""}
     except Exception as e:  # noqa: BLE001
         return {"name": ".env 演示姿态", "passed": False, "detail": str(e)[:120],
