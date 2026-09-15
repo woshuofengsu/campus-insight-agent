@@ -29,3 +29,6 @@ web/node_modules/
 .shots/
 
 .recordings/
+
+# 提交件 PDF（导出物，可由 `python scripts/export_pdf.py` 一键重建，不入库以免二进制膨胀）
+docs/competition/pdf/

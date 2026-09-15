@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 五维自查报告（模拟评委） — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>五维自查报告（模拟评委视角）—— 社区先知 CommunityInsight Agent</h1>
+
+<div class="meta"><strong>用途</strong>：按大赛官方五维评分标准给自己打一次分，<strong>每一分都要求给出证据与扣分理由</strong>，供答辩前最后打磨。<br><strong>口径声明</strong>：这是<strong>我的模拟自查，不是官方评分</strong>；另一份 <code>docs/review/项目评价报告-独立评审.md</code> 里的<br>"竞赛准备度 9.3" 是 10 分制综合印象分，<strong>与本报告的五维权重分口径不同，不做换算</strong>。<br><strong>版本</strong>：v2（2026-09-14）· 与当前代码库对齐（schema v46 · 可运行用例 625 · 12 项端到端验收全过）<br><strong>官方权重</strong>：结构创新度 35 / 人机协同力 25 / 问题精准度 20 / 应用可行性 15 / 展示表现力 5</div>
+<p>></p>
+<div class="meta">⚠️ 本文件 v1（2026-08）描述的是 Streamlit + OODA + schema v1~v10 的早期形态，已作废；当前架构见下文与代码库。</div>
+
+<hr>
+
+<h2>一、结构创新度（35 分）—— 自查 31</h2>
+
+<p><strong>评委能看到的事实</strong></p>
+
+<ul>
+<li><strong>9 个声明式角色 + 黑板消息队列</strong>：<code>receptionist</code> / <code>repair_dispatch</code> / <code>proposal_collab</code> / <code>policy_expert</code> /</li>
+</ul>
+<p>  <code>health_advisor</code> / <code>weather_guardian</code> / <code>notification_manager</code> / <code>grid_assistant</code> / <code>compliance_auditor</code>；<br>  角色间五类消息（task_request / task_response / notify / error / handoff）真往返。</p>
+<ul>
+<li><strong>一次输入内的跨角色链式协商</strong>：如"极端天气 → 健康顾问 → 通知管理员"，<strong>执行链会被智能体自己改变</strong>；</li>
+</ul>
+<p>  有循环防护（单目标 ≥2 轮强制转人工）。</p>
+<ul>
+<li><strong>双层防线</strong>：Verifier（幻觉 / 隐私 / 医疗诊断句式 / 政策引用下标）→ Arbiter（合规优先 → 安全 → 专业 →</li>
+</ul>
+<p>  费用或不可逆需人工 → 数据版本），<strong>每次裁决落库</strong>（<code>agent_logs</code> 可筛"仲裁"）。</p>
+<ul>
+<li><strong>属地化（一区一策）</strong>：政策按行政区划"本地优先、全国兜底"，<strong>属地只改排序、不改能否自动回答</strong>，<strong>不采定位</strong>。</li>
+<li><strong>质量做成可复算的数字</strong>：625 项可运行用例、12 项真实 HTTP 端到端、54 个页面视口客观审计、</li>
+</ul>
+<p>  检索金标 48 条 hit@1 100%、故障注入 8/8 拦下。</p>
+
+<p><strong>加分点</strong>：把"多智能体"从营销词变成<strong>可投屏的执行链</strong>（前端「🤖 多智能体执行链（N 步）」逐条列出角色与检查），<br>这是大多数作品拿不出来的东西。</p>
+
+<p><strong>扣分风险（诚实）</strong></p>
+
+<ul>
+<li><strong>1.</strong> <strong>编排框架仍是"编排器给出入口 + 角色按消息决定后续"</strong>，不是完全去中心化的自主协商；措辞必须准确，不能说"全自主"。</li>
+<li><strong>2.</strong> 协商的<strong>深度</strong>受演示数据限制（链式往返 2–3 跳），没有更大规模的角色生态。</li>
+<li><strong>3.</strong> 属地化的行政区划链只做到街道/区/市/省四层，没做跨区政策冲突的复杂场景。</li>
+</ul>
+
+<p><strong>证据</strong>：<code>agent/orchestrator.py</code>（<code>_drain_negotiations</code> 链式协商 + 循环防护）、<code>agent/arbiter.py</code>（5 条规则）、<br><code>pytest tests/test_dispatch.py -q</code>、投屏 <code>agent_logs</code>。</p>
+
+<hr>
+
+<h2>二、人机协同力（25 分）—— 自查 22</h2>
+
+<p><strong>评委能看到的事实</strong></p>
+
+<ul>
+<li><strong>规则为骨、LLM 为脑</strong>：状态机 / 权限 / 脱敏 / 风控 / 阈值全是确定性代码；LLM 只做模糊意图、政策生成、</li>
+</ul>
+<p>  跨角色协商——<strong>四个开关可一键关回纯规则</strong>（现场可对比两种姿态）。</p>
+<ul>
+<li><strong>人在环是默认姿态</strong>：合规不通过、Verifier 高风险、协商超轮次、政策无达标材料、仲裁兜底 →</li>
+</ul>
+<p>  <strong>五类情形一律转人工并生成处理包（<code>handoff_id</code>）</strong>，不是弹个"请联系工作人员"。</p>
+<ul>
+<li><strong>网格端闭环</strong>：SLA 工单、提案办理、知识发布、"适用地区"维护、Agent 留痕查询、治理大屏。</li>
+<li><strong>老年端独立设计</strong>：≥20px 字号、≥72px 热区、预置短语、语音播报、一键拨号/SOS，且<strong>不依赖语音也有保底路径</strong>。</li>
+<li><strong>成本可计量</strong>：<code>llm_usage</code> 逐笔记账，<strong>单次均价 ¥0.0002</strong>（2026-09-14 快照：57 次调用合计 ¥0.0139），单轮 +¥0.0002 / +0.9s。</li>
+</ul>
+
+<p><strong>加分点</strong>：<strong>从头到尾不出现"AI 决定一切"</strong>——每一处 AI 的地方都写明"人怎么接手"。</p>
+
+<p><strong>扣分风险</strong></p>
+
+<ul>
+<li><strong>1.</strong> 转人工的<strong>处理侧界面</strong>还是"待办 + 处理包"，没有坐席工作台（真人接手的效率工具）。</li>
+<li><strong>2.</strong> <strong>没有真实网格员/居民用户测试</strong>（已列为已知边界），协同力只有机制论证、没有实测数据。</li>
+<li><strong>3.</strong> 语音能力依赖浏览器，非 Chromium 真机未验证。</li>
+</ul>
+
+<p><strong>证据</strong>：<code>python scripts/demo_preflight.py</code>（姿态行）、<code>agent/llm_client.py</code> + <code>llm_usage</code> 表、<br><code>/grid/work-orders</code> 现场流转、老年端现场演示。</p>
+
+<hr>
+
+<h2>三、问题精准度（20 分）—— 自查 17</h2>
+
+<p><strong>评委能看到的事实</strong></p>
+
+<ul>
+<li><strong>问题定义具体</strong>：老小区里"同一件事在三方之间反复翻译"——居民说人话、系统要结构化、政策是条文、</li>
+</ul>
+<p>  老人不会打字。系统做的是<strong>翻译 + 责任链</strong>。</p>
+<ul>
+<li><strong>场景取舍克制</strong>：只做四项（报修 / 通知 / 政策问答 / 适老 SOS），不承诺"城市大脑"。</li>
+<li><strong>一区一策真实可演</strong>：海淀小区 → 区级细则；朝阳试点社区 → 市级办法（现场切账号即可复现）；</li>
+</ul>
+<p>  <strong>跨区兜底会标注"该依据的适用地区是…"</strong>。</p>
+<ul>
+<li><strong>边界写进材料</strong>：12 条已知边界（无试点、无真机、单进程、多租户未隔离、自由文本 PII 未治理…）。</li>
+</ul>
+
+<p><strong>扣分风险</strong></p>
+
+<ul>
+<li><strong>1.</strong> <strong>没有真实痛点数据</strong>（如某社区工单量的真实分布），问题定义主要靠公开资料与常理推断。</li>
+<li><strong>2.</strong> 舆情、12345 对接、多社区隔离只有框架，没有落地。</li>
+<li><strong>3.</strong> 政策语料 55 条，规模偏小；覆盖养老/医疗/住房等高频类目。</li>
+</ul>
+
+<p><strong>证据</strong>：<code>docs/competition/创意说明书-提交版.md</code>（问题定义 + 边界）、<br><code>python scripts/demo_acceptance.py</code>（第 12 项属地对比）、<code>docs/spec/地区识别落地方案.md</code>。</p>
+
+<hr>
+
+<h2>四、应用可行性（15 分）—— 自查 12</h2>
+
+<p><strong>评委能看到的事实</strong></p>
+
+<ul>
+<li><strong>可复算的工程闭环</strong>：schema v46 + 46 个版本化迁移（禁止运行时裸 ALTER）、8 张表手机号 AES-256-GCM 加密</li>
+</ul>
+<p>  （明文 0）、生产姿态密钥 <strong>fail-closed</strong>、审计留痕。</p>
+<ul>
+<li><strong>一套命令跑起来</strong>：<code>python -m uvicorn api_web:app</code> → 自动迁移建库灌种子；<code>serve_public.py</code> 让评委手机扫码。</li>
+<li><strong>成本极低</strong>：规则优先 + 四个开关，边际成本可忽略（<strong>单次均价 ¥0.0002</strong>（2026-09-14 快照：57 次调用合计 ¥0.0139））。</li>
+<li><strong>可迁移</strong>：场景耦合只在角色声明 / 工具集 / 语料 / 属地映射 / 页面文案五处，核心引擎不动。</li>
+<li><strong>落地路径写清三步</strong>：单社区试点四项 → 生产化（Redis/PG/域名/对接）→ 多社区多租户。</li>
+</ul>
+
+<p><strong>扣分风险</strong></p>
+
+<ul>
+<li><strong>1.</strong> <strong>单进程 + SQLite</strong>：真实街道规模（数千户）需要 Redis + PostgreSQL，扩容清单已写但未实施。</li>
+<li><strong>2.</strong> <strong>未接真实系统</strong>（12345 / 物业 / 街道工单），导入适配器是框架。</li>
+<li><strong>3.</strong> <strong>等保三级、PIPL 同意书、共享台账、KMS</strong> 均为规划项（在 <code>合规路线-一页.md</code> 如实标注）。</li>
+<li><strong>4.</strong> <strong>没有试点单位</strong>：意向阶段，零真实用户。</li>
+</ul>
+
+<p><strong>证据</strong>：<code>docs/scaling.md</code>、<code>docs/competition/合规路线-一页.md</code>、<code>docs/competition/落地路径-一页.md</code>、<br><code>python scripts/audit_phone_encryption.py</code>。</p>
+
+<hr>
+
+<h2>五、展示表现力（5 分）—— 自查 4</h2>
+
+<p><strong>评委能看到的事实</strong></p>
+
+<ul>
+<li><strong>三端差异化 + 设计令牌体系</strong>，老年端大字版独立设计；暗色主题达标；</li>
+</ul>
+<p>  <strong>客观审计</strong>：54 个页面视口 × 9 类检查 0 违规、21 页移动端 × 7 类检查 0 违规。</p>
+<ul>
+<li><strong>演示可现场复算</strong>：<code>demo_preflight</code> 9 项、<code>demo_acceptance</code> 12 项、<code>probe_public</code> 8 项（评委扫码）。</li>
+<li><strong>兜底齐全</strong>：7 段真实录屏（含属地化对比）、演示提词器、完整版 5'30" 与 3 分钟精简版脚本。</li>
+<li><strong>口径纪律</strong>：说/不说对照表（不宣称全自主、不宣称离线、不宣称治理成效）。</li>
+</ul>
+
+<p><strong>扣分风险</strong></p>
+
+<ul>
+<li><strong>1.</strong> 现场依赖本机服务 + 临时隧道，<strong>网络与校园 DNS 仍有不确定性</strong>（有 4G/5G 与录屏兜底）。</li>
+<li><strong>2.</strong> 无真实试点数据，<strong>故事性 > 成效性</strong>；答辩时若渲染过头容易被反问。</li>
+</ul>
+
+<p><strong>证据</strong>：<code>python scripts/ui_audit.py</code>、<code>python scripts/mobile_audit.py</code>、<code>docs/competition/演示脚本.md</code>、<br><code>docs/competition/答辩录屏分镜.md</code>。</p>
+
+<hr>
+
+<h2>六、合计与判断</h2>
+
+<table>
+<th>维度</th><th>权重</th><th>自查</th><th>主要扣分原因</th>
+<tr><td>结构创新度</td><td>35</td><td><strong>31</strong></td><td>协商深度有限；措辞不能夸大</td></tr>
+<tr><td>人机协同力</td><td>25</td><td><strong>22</strong></td><td>无坐席工作台；无真实用户测试</td></tr>
+<tr><td>问题精准度</td><td>20</td><td><strong>17</strong></td><td>缺真实痛点数据；语料规模小</td></tr>
+<tr><td>应用可行性</td><td>15</td><td><strong>12</strong></td><td>单进程/SQLite；未接真实系统；合规项多为规划</td></tr>
+<tr><td>展示表现力</td><td>5</td><td><strong>4</strong></td><td>现场依赖网络；无真实成效</td></tr>
+<tr><td><strong>合计</strong></td><td><strong>100</strong></td><td><strong>86</strong></td><td></td></tr>
+</table>
+
+<p><strong>一句话结论</strong>：<strong>机制与工程是强项（可复算、可追责、有边界），成效与规模是弱项（无试点、无真机、单进程）。</strong><br>答辩策略应当是<strong>主动暴露弱项、把强项演到极致</strong>——评委对"知道自己边界在哪"的团队容忍度，<br>远高于对"什么都行"的团队。</p>
+
+<hr>
+
+<h2>七、答辩前 72 小时：最该做的 5 件事（按性价比排序）</h2>
+
+<table>
+<th>#</th><th>事项</th><th>为什么</th><th>怎么做</th>
+<tr><td>1</td><td><strong>属地化两社区对比练到 60 秒内讲完</strong></td><td>它是本项目"人文 + 技术"最集中的一枪，且<strong>现场可复现</strong>（已进 12 项验收）</td><td>用 <code>docs/competition/演示提词器.html</code> 场景 3；兜底 <code>.recordings/07-region.webm</code></td></tr>
+<tr><td>2</td><td><strong>真机过一次老年端</strong>（iOS Safari 或安卓微信）</td><td>唯一没验证的高风险面；老年端是人文赛道的主战场</td><td>手机连公网 → 走一遍预置短语 + SOS；发现问题就现场用降级话术（打字/预置短语保底）</td></tr>
+<tr><td>3</td><td><strong>背熟"三不宣称"</strong></td><td>一句"支持离线"就能把可信度打回原形</td><td>不宣称全自主 / 不宣称离线能力 / 不宣称治理成效（见 <code>演示脚本.md</code> 第五节）</td></tr>
+<tr><td>4</td><td><strong>把 5 条现场命令敲熟</strong></td><td>评委说"你跑一下"是最容易加分的时刻</td><td><code>demo_acceptance.py</code>、<code>check_claims.py</code>、<code>rag_eval.py</code>、<code>audit_phone_encryption.py</code>、<code>pytest tests/ -q</code></td></tr>
+<tr><td>5</td><td><strong>准备"没有试点"的标准答案</strong></td><td>必被问；答得好是加分，答得虚是致命</td><td>见 <code>答辩问答手册.md</code> Q3/Q23/Q25：机制可验证 + 试点方案已写好 + 不编数字</td></tr>
+</table>
+
+<hr>
+
+<h2>八、与另一份评价报告的关系</h2>
+
+<ul>
+<li>本报告：<strong>五维官方权重自查（86/100）</strong>，逐维度给证据与扣分理由，用于答辩前取舍。</li>
+<li><code>docs/review/项目评价报告-独立评审.md</code>：<strong>生产就绪度与竞赛准备度的综合评估</strong>（竞赛 9.3/10、生产 6.0/10），</li>
+</ul>
+<p>  更偏"如果明天上线还差什么"。</p>
+<ul>
+<li>两份报告结论一致：<strong>强在机制与可验证性，弱在真实落地与规模</strong>；差异只在口径与粒度。</li>
+</ul>
+
+<div class="meta">本报告由参赛者自查，<strong>不构成独立评估</strong>（代码绝大部分由本人与 AI 辅助共同完成，见 <code>开发约定.md</code>）。</div>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>

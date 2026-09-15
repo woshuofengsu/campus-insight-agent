@@ -106,7 +106,7 @@
 <body>
 <h1>智能体创意说明书</h1>
 
-<div class="meta">版本：2026-09-14 定稿（与代码库实时对齐，所有数字可用 <code>python scripts/check_claims.py</code> 复算）<br>赛道：<strong>基层治理</strong> · 申报特别奖：<strong>人文赋能</strong>（适老化 + 数据最小化 + 人机协同留痕）<br><strong>形态说明（先看这句）</strong>：本项目是<strong>可运行的演示级原型（Demo）</strong>，<strong>不是已上线的生产项目</strong>；演示库为程序生成的虚构数据，<br><strong>尚无真实社区试点与真实用户</strong>——能证明的是"机制有效、可审计"，不是"治理成效已提升"。形态边界与移动端适配的让步见 §5.1。</div>
+<div class="meta">版本：2026-09-14 · 赛道：<strong>基层治理</strong> · 申报奖项：<strong>人文赋能</strong>（适老化 + 数据最小化 + 人机协同留痕）<br><strong>项目形态</strong>：可运行的演示级原型（Demo），<strong>不是已上线的生产项目</strong>。三端功能、数据链路与安全机制均为真实实现；<br>演示库为程序生成的虚构数据，<strong>尚无真实社区试点与真实用户</strong>，治理成效未经实测验证。形态边界与移动端适配取舍见 §5.1。</div>
 
 <hr>
 
@@ -123,7 +123,7 @@
 <tr><td>1</td><td>步承泽</td><td>110113200604194512</td><td>大数据管理与应用 / 本科</td><td>北京工商大学</td><td>项目负责人（架构设计 / Agent 内核 / 全栈开发 / 数据与测试）</td><td>（附件待附）</td><td>单人参赛，独立完成</td></tr>
 </table>
 
-<div class="meta">本项目为<strong>单人参赛</strong>（2-5 人组队允许范围内独立完成全部研发工作）。</div>
+<div class="meta">本项目为<strong>单人参赛</strong>，全部研发工作由项目负责人独立完成。</div>
 
 <h3>3. 参赛方向（勾选）</h3>
 
@@ -149,7 +149,7 @@
 
 <p>基层"接诉即办"三大痛点：诉求处理不透明、时效无保障、独居老人安全真空（失联数日无人知晓）。</p>
 
-<p>本项目是多智能体协同的社区治理 Agent：感知层监测工单热点、恶劣天气与老人活跃度；理解层用确定性规则识别诉求，模糊时由大模型兜底；协作层由 <strong>9 个声明式角色在黑板上多轮真协商</strong>，调用 <strong>16 个工具</strong>；反馈层每轮必过 <strong>Verifier（幻觉/诊断/隐私拦截）+ Arbiter（合规·安全·专业·转人工）双层防线</strong>并全程留痕。三端差异化：居民一句话上报并追踪闭环，网格员办 SLA 工单，老人用大字版一键呼叫与 SOS。</p>
+<p>本项目是多智能体协同的社区治理 Agent：感知层监测工单热点、恶劣天气与老人活跃度；理解层用确定性规则识别诉求，模糊时由大模型兜底；协作层由 <strong>9 个声明式角色在黑板上多轮协商</strong>，调用 <strong>16 个工具</strong>；反馈层每轮必过 <strong>Verifier（幻觉/诊断/隐私拦截）+ Arbiter（合规·安全·专业·转人工）双层防线</strong>并全程留痕。三端差异化：居民一句话上报并追踪闭环，网格员办 SLA 工单，老人用大字版一键呼叫与 SOS。</p>
 
 <p>属地化按基层刚需实现：政策<strong>本地优先、全国兜底</strong>，天气按所属社区取数；属地来自账号网格归属，<strong>不采集设备位置</strong>。</p>
 
@@ -159,9 +159,9 @@
 
 <h3>1. 整体架构逻辑</h3>
 
-<p><strong>① 架构范式：多智能体协作（非单 Agent 套壳）</strong></p>
+<p><strong>① 架构范式：多智能体协作</strong></p>
 
-<p>主干为 <strong>OODA 自主循环</strong>（Observe→Orient→Decide→Act→Reflect），叠加<strong>角色化多智能体分工 + 黑板消息队列真协商</strong>：角色之间通过 <code>task_request / task_response / notify / error / handoff</code> 五类消息在共享黑板上往返，<strong>一次用户输入可以触发多轮跨角色协商并改变执行链</strong>（不是"把 9 个 prompt 串起来"）。</p>
+<p>主干为 <strong>OODA 自主循环</strong>（Observe→Orient→Decide→Act→Reflect），叠加<strong>角色化多智能体分工与黑板消息队列协商</strong>：角色之间通过 <code>task_request / task_response / notify / error / handoff</code> 五类消息在共享黑板上往返，<strong>一次用户输入可触发多轮跨角色协商，并改变后续执行链</strong>。</p>
 
 <p><strong>② 核心模块（六层 + 交互层）</strong></p>
 
@@ -170,7 +170,7 @@
 <tr><td>感知层</td><td>天气守护 / 网格助手 / 关怀巡检</td><td>天气与预警、工单热点、老人活跃度与久未互动、SLA 超时升级（定时任务）</td><td><code>agent/roles/auto_agents.py</code>、<code>scripts/scheduler.py</code></td></tr>
 <tr><td>理解层</td><td>接待员（规则为骨 + LLM 兜底）</td><td>同义词/方言归一 + 指代与否定处理；模糊时 LLM 闭集兜底</td><td><code>agent/roles/business_agents.py</code>、<code>agent/intent_llm.py</code></td></tr>
 <tr><td><strong>属地层</strong></td><td><strong>地区识别（属地化）</strong></td><td>由账号所属社区解析属地链（社区→区→市→省）；政策属地优先、天气按社区城市；<strong>不采 GPS</strong></td><td><code>utils/region.py</code>、<code>data/db_policy.py</code></td></tr>
-<tr><td>协作层</td><td>黑板 + 编排器</td><td>9 个声明式角色共享黑板收发消息，多轮真协商；锁 + 版本 + 历史（封顶 500）</td><td><code>agent/blackboard.py</code>、<code>agent/orchestrator.py</code></td></tr>
+<tr><td>协作层</td><td>黑板 + 编排器</td><td>9 个声明式角色共享黑板收发消息、多轮协商；含锁、版本与历史（封顶 500 条）</td><td><code>agent/blackboard.py</code>、<code>agent/orchestrator.py</code></td></tr>
 <tr><td>决策层</td><td>业务角色（5）+ 专家角色（4）</td><td>报修调度、提案协商、政策专员、健康顾问、通知管理、天气守护、网格助手、合规审计、接待员</td><td><code>agent/roles/</code></td></tr>
 <tr><td>执行层</td><td><strong>16 个工具（自动发现 + 按角色裁剪）</strong></td><td>上报/查询工单、我的工单、派单、提案与附议、议题、天气、社区脉搏、治理统计、知识库问答</td><td><code>tools/</code></td></tr>
 <tr><td>反馈层</td><td><strong>Verifier + Arbiter 双层防线</strong></td><td>幻觉/敏感词/完整手机号/医疗诊断句式拦截 → 合规优先·安全·专业·转人工，决策落 <code>agent_logs</code></td><td><code>agent/verifier.py</code>、<code>agent/arbiter.py</code></td></tr>
@@ -212,8 +212,8 @@
 <li><strong>提示词工程</strong>：系统提示注入角色上下文与工具原则；LLM 输出走<strong>闭集校验</strong>（意图白名单、引用下标必须落在检索片段内、协商目标必须在 6 个可联动角色白名单内）。</li>
 <li><strong>知识库构建</strong>：59→<strong>62 条</strong>知识条目；<strong>词法（同义词/方言扩展）+ 语义向量（text-embedding-v3, 1024 维）混合检索 + RRF 融合</strong>。</li>
 <li><strong>检索质量</strong>：<strong>48 条口语金标 hit@1 = 100%</strong>（纯词法基线 85.7%），含 6 条属地用例（属地 Top-1 4/4）。</li>
-<li><strong>属地化检索</strong>：<code>applicable_area</code> 归一（支持"北京市海淀区"这类复合串）→ 本地条目加分、<strong>全国条目永不过滤</strong>（兜底）；<strong>属地只影响"选谁"，绝不改变"能不能自动回答"的阈值</strong>（安全底线有专门测试）。</li>
-<li><strong>工具调用</strong>：自研多智能体编排（9 角色 + 黑板真协商 + 16 工具 + 角色化工具裁剪）。</li>
+<li><strong>属地化检索</strong>：<code>applicable_area</code> 归一（支持"北京市海淀区"这类复合串）→ 本地条目加分、<strong>全国条目始终保留</strong>（兜底）；<strong>属地只影响排序结果，不改变自动回答的阈值判定</strong>（该底线有专门测试）。</li>
+<li><strong>工具调用</strong>：自研多智能体编排（9 个角色 + 黑板协商 + 16 个工具 + 按角色裁剪）。</li>
 <li><strong>自动化节点</strong>：感知周期触发 → 自动派单 → SLA 升级 → 老人平安打卡检测 → 办结回访。</li>
 </ul>
 
@@ -228,7 +228,7 @@ flowchart LR
     U[居民 / 网格员 / 独居老人] --&gt; UI[Vue3 三端&lt;br/&gt;居民 14 页 / 网格 9 页 / 老年 8 页]
     UI --&gt; API[FastAPI 主服务&lt;br/&gt;130 条路由 · JWT · 安全响应头 · WebSocket]
     API --&gt; R[属地解析&lt;br/&gt;账号社区 → 区/市/省链&lt;br/&gt;不采 GPS]
-    API --&gt; O[多智能体编排&lt;br/&gt;黑板消息队列 · 真协商]
+    API --&gt; O[多智能体编排&lt;br/&gt;黑板消息队列 · 多轮协商]
     O --&gt; A1[接待员 / 报修调度 / 提案协商]
     O --&gt; A2[政策专员 / 健康顾问 / 天气守护]
     O --&gt; A3[通知管理 / 网格助手 / 合规审计]
@@ -252,7 +252,7 @@ flowchart LR
 <li>SLA 超时/升级自动识别与预警</li>
 <li>独居老人超过 24 小时未互动 → 自动通知网格员</li>
 <li>用药提醒到点推送、"我已吃"确认记录</li>
-<li>属地自适应：政策按行政区划<strong>本地优先、全国兜底</strong>，天气按所属社区取数（<strong>属地只改排序、不改"能不能自动回答"</strong>）</li>
+<li>属地自适应：政策按行政区划<strong>本地优先、全国兜底</strong>，天气按所属社区取数（<strong>属地只影响排序，不改变能否自动回答</strong>）</li>
 </ul>
 
 <p><strong>② 人类监督 / 审核 / 决策环节</strong></p>
@@ -273,8 +273,8 @@ flowchart LR
 <li><strong>注入防护</strong>：提示注入规则拦截（"忽略之前所有指令"等变体）+ LLM 输出闭集校验</li>
 <li><strong>政策回答不编造</strong>：仅基于检索片段生成，返回引用下标并校验在检索集内；无材料时转人工而非生成</li>
 <li><strong>权限与鉴权</strong>：JWT（HS256，生产强制密钥）+ 角色权限守卫（越权 fail-closed）+ 演示登录生产模式硬关</li>
-<li><strong>数据安全</strong>：手机号 <strong>AES-256-GCM 加密落库（<code>g1$</code> 前缀）</strong>，全库 8 张含手机号表<strong>明文计数为 0</strong>（有自动体检与自检项）；<strong>属地识别不采集设备位置</strong></li>
-<li><strong>可观测与降级</strong>：trace_id 全链路（请求→业务留痕→Agent 留痕→异常）；LLM 不可用时自动回落规则链路，绝不影响业务可用性</li>
+<li><strong>数据安全</strong>：手机号 <strong>AES-256-GCM 加密落库（<code>g1$</code> 前缀）</strong>，全库 8 张含手机号表<strong>明文计数为 0</strong>（含自动体检与启动自检）；<strong>属地识别不采集设备位置</strong></li>
+<li><strong>可观测与降级</strong>：trace_id 全链路（请求→业务留痕→Agent 留痕→异常）；LLM 不可用时自动回落规则链路，不影响业务可用性</li>
 </ul>
 
 <h3>4. 架构创新点</h3>
@@ -284,9 +284,9 @@ flowchart LR
 <table>
 <th>维度</th><th>通用方案</th><th>本项目</th>
 <tr><td>意图理解</td><td>纯关键词 or 纯大模型</td><td><strong>规则为骨、LLM 为脑</strong>：同义词/方言语义归一 + 规则识别，模糊时 LLM 兜底（闭集输出）</td></tr>
-<tr><td>多智能体协作</td><td>单一 Agent 反复调用</td><td><strong>9 个声明式角色 + 黑板消息队列</strong>，跨角色多轮真协商（天气⇄健康→通知），<strong>协商能改变执行链</strong>，非伪多智能体</td></tr>
+<tr><td>多智能体协作</td><td>单一 Agent 反复调用</td><td><strong>9 个声明式角色 + 黑板消息队列</strong>，跨角色多轮协商（天气⇄健康→通知），<strong>协商会改变后续执行链</strong></td></tr>
 <tr><td>输出可信度</td><td>无校验</td><td><strong>Verifier + Arbiter 双层防线</strong>：幻觉/诊断/手机号拦截，仲裁决策留痕可查</td></tr>
-<tr><td>知识回答</td><td>直接问大模型</td><td><strong>仅基于检索片段生成 + 引用下标校验</strong>，无材料绝不编造（转人工）</td></tr>
+<tr><td>知识回答</td><td>直接问大模型</td><td><strong>仅基于检索片段生成 + 引用下标校验</strong>，无材料时转人工，不生成内容</td></tr>
 <tr><td>地区适配</td><td>一份全国口径</td><td><strong>属地化"一区一策"</strong>：本地政策优先、全国兜底，跨区兜底会标注适用地区；<strong>不采定位</strong></td></tr>
 <tr><td>数据安全</td><td>明文存储</td><td><strong>手机号 AES-256-GCM 加密落库，明文计数 0</strong>（自动体检可现场跑）</td></tr>
 <tr><td>可靠性</td><td>单一大模型</td><td>LLM 不可用自动回落规则链路；安全响应头/鉴权/限流成体系，演示有 9 项启动自检</td></tr>
@@ -323,7 +323,7 @@ flowchart LR
 <table>
 <th>现有做法</th><th>痛点</th><th>本项目怎么解</th>
 <tr><td>微信群上报 + 人工台账</td><td>消息沉底、无状态、无法追责</td><td>一句话自动生成工单，状态机 + 留痕 + 时限</td></tr>
-<tr><td>政务 App / 小程序</td><td>表单冗长、老年用户放弃；地区政策混在一起</td><td>三端差异化；<strong>NLU 口语/方言归一</strong>；政策<strong>属地优先</strong></td></tr>
+<tr><td>政务 App / 小程序</td><td>表单冗长、老年用户放弃；地区政策混在一起</td><td>三端差异化；<strong>口语与方言归一</strong>；政策<strong>属地优先</strong></td></tr>
 <tr><td>通用大模型直接答政策</td><td>幻觉、政策过期、地区不符</td><td>强制引用 + Verifier/Arbiter + 弱命中转人工 + 属地优先/全国兜底</td></tr>
 <tr><td>老人关怀靠定期上门</td><td>空档期长、异常发现晚</td><td>活跃度巡检 + 未打卡预警 + 大字 SOS + 家属绑定</td></tr>
 </table>
@@ -332,7 +332,7 @@ flowchart LR
 
 <ul>
 <li><strong>提效</strong>：诉求从"看到消息→手工登记→口头转派"变为"一句话→自动分类/派单/通知"，全流程线上留痕。</li>
-<li><strong>降本</strong>：<strong>规则优先 + LLM 按需</strong>，日常诉求零 LLM 成本；实测 LLM 单轮约 <strong>¥0.0002</strong>（库内记账快照（2026-09-14）：<strong>57 次调用 / ¥0.0139</strong>（评测 40 题 ¥0.0109 + 跨角色协商 15 次 ¥0.0030；稳定口径是单次均价 <strong>¥0.0002</strong>），可现场用 <code>python scripts/llm_cost.py</code> 复核）。</li>
+<li><strong>降本</strong>：<strong>规则优先 + LLM 按需</strong>，日常诉求零 LLM 成本；实测单轮 LLM 成本约 <strong>¥0.0002</strong>（2026-09-14 快照：累计 57 次调用合计 ¥0.0139，其中评测 40 题 ¥0.0109、跨角色协商 15 次 ¥0.0030）。</li>
 <li><strong>提质</strong>：政策问答<strong>强制引用</strong>可溯源（"依据：XX 政策（V1）"），弱命中转人工而非硬答；SLA 分级与超时升级。</li>
 <li><strong>风控</strong>：手机号等敏感字段<strong>加密落库 + 展示脱敏</strong>；医疗/法律类不自动回答；敏感词与完整手机号在输出前拦截；所有 AI 决策留痕可审计。</li>
 </ul>
@@ -341,7 +341,7 @@ flowchart LR
 
 <ul>
 <li><strong>1.</strong> <strong>单社区试点（最小可用闭环）</strong>：报修 + 通知 + 政策问答 + 适老 SOS 四项先跑通，用真实工单验证"平均受理时长 / 一次派单成功率 / 回访满意度"三个指标；</li>
-<li><strong>2.</strong> <strong>多社区接入</strong>：属地映射表（<code>REGION_BY_COMMUNITY</code>）从配置迁到 <code>community_regions</code> 表，租户维度隔离（代码已预留 <code>tenant_id</code>，<strong>当前仅 3 张主表预留、查询层未隔离</strong>——见"已知边界"）；</li>
+<li><strong>2.</strong> <strong>多社区接入</strong>：属地映射表（<code>REGION_BY_COMMUNITY</code>）从配置迁到 <code>community_regions</code> 表，租户维度隔离（代码已预留 <code>tenant_id</code>，<strong>当前仅 3 张主表预留、查询层未隔离</strong>，见 §5.5）；</li>
 <li><strong>3.</strong> <strong>与街道现有系统对接</strong>：12345 / 街道工单系统的字段映射（<strong>当前未对接</strong>，接口层已预留）。</li>
 </ul>
 
@@ -351,50 +351,48 @@ flowchart LR
 
 <h3>1. 原型状态</h3>
 
-<p><strong>形态声明（先说清楚"这是什么"）</strong>：本项目是一个<strong>可运行的演示级原型（Demo / 原型验证版）</strong>，不是已上线的生产项目、也不是已商用的产品。三端功能闭环、数据链路、安全机制都是<strong>真实在跑</strong>的，但：</p>
+<p><strong>项目形态</strong>：可运行的演示级原型（Demo / 原型验证版），不是已上线的生产项目，也不是已商用的产品。</p>
 
 <table>
-<th>是（真实在跑）</th><th>不是（我们不宣称）</th>
-<tr><td>FastAPI 主服务 + Vue3 三端，<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌种子数据（约 15 秒）</td><td><strong>不是生产系统</strong>：单进程 + SQLite，多社区/多副本需 Redis + PostgreSQL（路径见 <code>docs/scaling.md</code>）</td></tr>
-<tr><td>9 智能体角色、16 工具、双层防线、留痕、加密、属地化，全部可现场操作与复算</td><td><strong>不是已落地项目</strong>：<strong>无真实社区试点、无真实用户数据</strong>（演示库为程序生成的虚构种子数据）</td></tr>
-<tr><td>12 项端到端验收、638 项可运行用例、54 页视口 + 21 页移动端审计、7 段真实录屏</td><td><strong>成效未验证</strong>：能证明"机制有效、可审计"，不能证明"治理效率提升了多少"</td></tr>
-<tr><td>已有公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，<strong>演示结束一键关闭</strong>）</td><td><strong>不是安全上线状态</strong>：<code>DEMO_MODE</code> / <code>DEMO_AUTO_WORKER</code> 必须关闭，密钥需换正式值（本机现为演示占位密钥）</td></tr>
+<th>已实现（真实运行）</th><th>尚未具备</th>
+<tr><td>FastAPI 主服务 + Vue3 三端，<code>uvicorn api_web:app --port 8000</code> 一条命令起服务，首次启动自动迁移到 <strong>schema v46</strong> 并灌入演示数据（约 15 秒）</td><td>生产级部署形态：当前为单进程 + SQLite，多社区/多副本需 Redis + PostgreSQL（路径见 <code>docs/scaling.md</code>）</td></tr>
+<tr><td>9 个智能体角色、16 个工具、双层防线、留痕、加密、属地化，均可现场操作与复算</td><td>真实落地：<strong>无真实社区试点、无真实用户数据</strong>（演示库为程序生成的虚构数据）</td></tr>
+<tr><td>12 项端到端验收、638 项可运行用例、54 页视口 + 21 页移动端审计、7 段真实录屏</td><td>治理成效数据：现有验证只覆盖"机制是否有效、是否可审计"，不含效率提升量</td></tr>
+<tr><td>公网 HTTPS 演示入口（本机 + Cloudflare 临时隧道，演示结束关闭）</td><td>安全上线状态：<code>DEMO_MODE</code> / <code>DEMO_AUTO_WORKER</code> 需关闭，密钥需替换为正式值</td></tr>
 </table>
 
-<div class="meta">一句话：<strong>"演示级原型 + 可复算的工程证据"</strong>——这是我们能负责地宣称的范围，也是我们在材料里反复标注"演示数据"的原因。</div>
+<p><strong>移动端适配的取舍（主动放弃或降级的部分）</strong></p>
 
-<p><strong>移动端适配：我们主动做的让步（不藏）</strong></p>
-
-<p>移动端不是"缩小版桌面"，也不是"原生 App"，这是刻意的取舍。以下是明确放弃或降级的部分：</p>
+<p>移动端定位为手机浏览器访问，不做原生 App，也不做桌面布局的等比缩小。以下为明确放弃或降级的部分：</p>
 
 <table>
-<th>#</th><th>让步</th><th>原因与现状</th>
-<tr><td>1</td><td><strong>不做原生 App / 小程序</strong>，只做 Web + PWA（可添加到主屏幕、standalone 全屏）</td><td>单社区推广场景下 App 安装成本过高；<strong>无 service worker，也不宣称离线</strong>——接诉即办强依赖实时数据，缓存到过期政策/工单反而误导居民</td></tr>
-<tr><td>2</td><td><strong>治理大屏在手机上不做适配</strong>，直接出提示层（<code><900px</code> 显示"请在电脑/投屏查看" + 返回/仍要查看）</td><td>大屏是桌面与投屏场景，挤压重排毫无意义；宁可不显示错误布局</td></tr>
-<tr><td>3</td><td><strong>老年端横屏不做重排</strong>，改为"请竖屏使用"提示层</td><td>浏览器无法强制竖屏，与其在横屏下排版错乱，不如明确引导（触发条件：横屏 + 触屏 + ≤1024px；竖屏与桌面不受影响）</td></tr>
-<tr><td>4</td><td><strong>触屏热区放大换来信息密度下降</strong>（通用 ≥44px、老年端 ≥72px）</td><td>老人点得准优先于一屏看得多；代价是手机上一屏信息量明显少于桌面</td></tr>
-<tr><td>5</td><td><strong>不做平板/大屏手机专属布局</strong>：断点体系为 359 / 360–427 / 428–767 / ≥768 四档</td><td>以"手机"与"桌面"两端为主，中间档位只做不破版，不做重新设计</td></tr>
-<tr><td>6</td><td><strong>语音是增强项、不是承诺</strong>（端侧 Web Speech）</td><td>非 HTTPS／浏览器不支持／拒绝授权 → <strong>显式降级为打字 + 预置短语并自动聚焦输入框</strong>（不静默失败）；方言、噪音、语速未做专项；<strong>iOS Safari 与微信内置浏览器大概率不可用</strong>，服务端 ASR 是规划项</td></tr>
-<tr><td>7</td><td><strong>手机上主动削减视觉动效</strong>（<code>backdrop-filter</code> 18px → 10px、页面不可见全站暂停、<code>prefers-reduced-motion</code> 可关）</td><td>保低端机流畅与省电；代价是观感弱于桌面</td></tr>
-<tr><td>8</td><td><strong>复杂表格/多列视图折叠为卡片与抽屉</strong>（网格端手机端为抽屉导航）</td><td>窄屏横向表格不可用，改用卡片保可读性</td></tr>
-<tr><td>9</td><td><strong>未做"低内存设备纯色降级"</strong></td><td>没有可靠的浏览器信号（<code>navigator.deviceMemory</code> 仅部分 Chromium 支持），硬做等于猜——<strong>宁可不做，也不假装做了</strong></td></tr>
-<tr><td>10</td><td><strong>真机验证尚未完成</strong></td><td>21 页移动端审计是<strong>按 iPhone UA / DPR=3 / 触屏事件仿真</strong>跑的，不是真机；iOS Safari / 微信内置浏览器待真机复验（已在"已知边界"中列明）</td></tr>
+<th>#</th><th>取舍</th><th>原因与现状</th>
+<tr><td>1</td><td><strong>不做原生 App / 小程序</strong>，采用 Web + PWA（可添加到主屏幕、standalone 全屏）</td><td>社区推广场景下 App 安装成本过高；<strong>无 service worker，不提供离线能力</strong>——接诉即办依赖实时数据，缓存政策/工单会产生过期信息</td></tr>
+<tr><td>2</td><td><strong>治理大屏在手机上不做适配</strong>，改为提示层（<code><900px</code> 显示"请在电脑/投屏查看" + 返回/仍要查看）</td><td>大屏用于桌面与投屏场景；手机上挤压重排会破坏可读性</td></tr>
+<tr><td>3</td><td><strong>老年端横屏不做重排</strong>，改为"请竖屏使用"提示层</td><td>浏览器无法强制竖屏，横屏下排版空间不足（触发条件：横屏 + 触屏 + ≤1024px；竖屏与桌面不受影响）</td></tr>
+<tr><td>4</td><td><strong>触屏热区放大，信息密度相应下降</strong>（通用 ≥44px、老年端 ≥72px）</td><td>优先保证点按准确率；代价是手机单屏信息量少于桌面</td></tr>
+<tr><td>5</td><td><strong>不做平板/大屏手机专属布局</strong>：断点体系为 359 / 360–427 / 428–767 / ≥768 四档</td><td>以手机与桌面两端为主，中间档位仅保证不破版</td></tr>
+<tr><td>6</td><td><strong>语音为增强功能</strong>（端侧 Web Speech），不作为唯一路径</td><td>非 HTTPS／浏览器不支持／拒绝授权时，显式降级为打字 + 预置短语并聚焦输入框；方言、噪音、语速未做专项测试；<strong>iOS Safari 与微信内置浏览器可能不可用</strong>，服务端 ASR 列为后续工作</td></tr>
+<tr><td>7</td><td><strong>手机端削减视觉动效</strong>（<code>backdrop-filter</code> 18px → 10px、页面不可见时暂停、<code>prefers-reduced-motion</code> 可关）</td><td>保证低端机流畅与省电；代价是观感弱于桌面</td></tr>
+<tr><td>8</td><td><strong>复杂表格/多列视图折叠为卡片与抽屉</strong>（网格端手机端为抽屉导航）</td><td>窄屏横向表格可读性差</td></tr>
+<tr><td>9</td><td><strong>未实现"低内存设备纯色降级"</strong></td><td>缺少可靠的浏览器能力信号（<code>navigator.deviceMemory</code> 仅部分 Chromium 支持）</td></tr>
+<tr><td>10</td><td><strong>真机验证尚未完成</strong></td><td>21 页移动端审计基于 iPhone UA / DPR=3 / 触屏事件的浏览器仿真，非真机；iOS Safari 与微信内置浏览器待真机复验</td></tr>
 </table>
 
-<div class="meta">一句话：移动端我们<strong>优先保证"能点准、看得清、不误导、不白屏"</strong>，把"信息密度、动效观感、原生体验"排在其后；对做不到的部分（离线、真机语音、平板布局）<strong>选择明说而不是含糊</strong>。</div>
+<p>设计优先级：可点准、看得清、不误导 > 信息密度、动效观感、原生体验。</p>
 
 <h3>2. 已完成验证</h3>
 
 <ul>
 <li>[ ] 未测试</li>
 <li>[x] <strong>内部测试</strong>（<strong>638 项可运行用例</strong>：637 通过 + 1 项需外部服务默认跳过；含单元/集成/端到端/多智能体协商/安全负向/数据加密/属地化/适老前端卫生）</li>
-<li>[ ] 小范围试用（<strong>尚无真实用户试用</strong>）</li>
-<li>[ ] 场景试点（<strong>尚无真实社区试点</strong>）</li>
+<li>[ ] 小范围试用（尚未开展）</li>
+<li>[ ] 场景试点（尚未开展）</li>
 </ul>
 
-<div class="meta">说明：后两项<strong>未勾选是事实陈述</strong>——本项目目前只有内部测试与演示验证，治理成效需靠试点验证。我们把它写清楚，而不是含糊过去。</div>
+<div class="meta">内部测试已完成；小范围试用与场景试点尚未开展。</div>
 
-<p><strong>可验证性（全部可现场复算，不是自评）</strong></p>
+<p><strong>可验证性（命令可现场复算）</strong></p>
 
 <table>
 <th>#</th><th>验证项</th><th>命令</th><th>实测结果</th>
@@ -408,8 +406,8 @@ flowchart LR
 <tr><td>8</td><td>代码规范</td><td><code>python -m ruff check .</code></td><td><strong>0 错误</strong></td></tr>
 <tr><td>9</td><td>前端构建</td><td><code>cd web && npm run build</code></td><td>构建成功</td></tr>
 <tr><td>10</td><td>数字一致性</td><td><code>python scripts/check_claims.py</code></td><td>材料数字与代码实时一致</td></tr>
-<tr><td>11</td><td>公网入口可用性</td><td><code>python scripts/probe_public.py</code></td><td><strong>8/8</strong>（评委手机扫码可进入，含智能体对话）</td></tr>
-<tr><td>12</td><td>门禁有效性（故障注入）</td><td>见 <code>docs/spec/dev-log.md</code> 四十七节</td><td><strong>8 次注入 8 次被门禁拦下</strong></td></tr>
+<tr><td>11</td><td>公网入口可用性</td><td><code>python scripts/probe_public.py</code></td><td><strong>8/8</strong>（手机扫码可进入，含智能体对话）</td></tr>
+<tr><td>12</td><td>校验有效性（故障注入）</td><td>内部故障注入验证</td><td><strong>8 次故意注入缺陷，8 次被校验拦下</strong></td></tr>
 </table>
 
 <h3>3. 核心技术栈与依赖工具</h3>
@@ -423,10 +421,10 @@ flowchart LR
 
 <table>
 <th>项</th><th>要求</th><th>当前状态</th>
-<tr><td>算力</td><td>1 台能跑 Python 的机器（演示级 2 核 4G 足够）/ 或云服务器</td><td>✅ 本机已跑通</td></tr>
-<tr><td>数据库</td><td>单社区 SQLite 足够；多社区需 PostgreSQL</td><td>⚠️ 迁 PG 仅有方案与路径</td></tr>
-<tr><td>LLM</td><td>DeepSeek API Key（可选，无 Key 自动降级纯规则）</td><td>✅ 已接</td></tr>
-<tr><td>HTTPS</td><td>老年端语音与"添加到主屏幕"需要 https</td><td>✅ 临时隧道 https；⚠️ 正式域名+证书未部署</td></tr>
+<tr><td>算力</td><td>1 台能跑 Python 的机器（演示级 2 核 4G 足够）/ 或云服务器</td><td>已在本机跑通</td></tr>
+<tr><td>数据库</td><td>单社区 SQLite 足够；多社区需 PostgreSQL</td><td>仅有迁移方案与路径，未实施</td></tr>
+<tr><td>LLM</td><td>DeepSeek API Key（可选，无 Key 自动降级纯规则）</td><td>已接入</td></tr>
+<tr><td>HTTPS</td><td>老年端语音与"添加到主屏幕"需要 https</td><td>演示用临时隧道 https；正式域名与证书未部署</td></tr>
 <tr><td>人工兜底</td><td>至少 1 名网格员/社区工作人员处理转人工事项</td><td>试点必备</td></tr>
 </table>
 
@@ -435,10 +433,10 @@ flowchart LR
 <table>
 <th>风险</th><th>应对（已做 / 计划）</th>
 <tr><td>政策答错误导居民</td><td>强制引用 + Verifier 校验 + 弱命中转人工；<strong>属地优先但不屏蔽其他地区</strong></td></tr>
-<tr><td>老年端语音在部分浏览器不可用</td><td>页面给出<strong>打字 + 预置短语</strong>降级路径；答辩现场真机演示并说明边界</td></tr>
+<tr><td>老年端语音在部分浏览器不可用</td><td>页面给出<strong>打字 + 预置短语</strong>降级路径；演示时以支持语音的浏览器为准，不支持时走降级路径</td></tr>
 <tr><td>AI 越权代替人决策</td><td>明确"人在环"清单（就医建议/SOS/不予执行/批量操作必须人工确认）</td></tr>
 <tr><td>隐私与合规</td><td>不采位置、手机号加密、展示脱敏、留痕不含完整手机号；医疗/法律不自动回答</td></tr>
-<tr><td>单机扩展性</td><td><strong>当前仅支持单进程</strong>（黑板/限流/WebSocket 在进程内）；扩容路径已写进 <code>docs/scaling.md</code></td></tr>
+<tr><td>单机扩展性</td><td><strong>当前仅支持单进程</strong>（黑板、限流、WebSocket 均在进程内）；扩容路径（Redis + PostgreSQL）已在交付说明中给出</td></tr>
 <tr><td>无真实试点数据</td><td><strong>如实声明</strong>：当前验证集中在"机制可验证"，治理成效需试点验证（见下）</td></tr>
 </table>
 
@@ -480,29 +478,29 @@ flowchart LR
 
 <ul>
 <li><strong>1.</strong> 智能体架构图 / 工作流程图（见第三章 Mermaid，可转图片导出）</li>
-<li><strong>2.</strong> 原型界面截图（三角色：居民端 / 网格员工作台 / 老年关怀版 —— <strong>附件待附</strong>，素材已备于 <code>.recordings/</code>，可一键重录）</li>
-<li><strong>3.</strong> 测试数据 / 效果对比（<strong>638 项可运行用例</strong>（637 通过 + 1 跳过）+ 端到端 12/12 + 检索 hit@1 100% + UI 审计 54 页视口 0 违规，复算命令见 §5.2）</li>
+<li><strong>2.</strong> 原型界面截图（三端界面：居民端 / 网格员工作台 / 老年关怀版——<strong>附件待附</strong>）</li>
+<li><strong>3.</strong> 测试数据 / 效果对比（<strong>638 项可运行用例</strong>：637 通过 + 1 跳过；端到端 12/12；检索 hit@1 100%；UI 审计 54 个页面视口 0 违规——明细与命令见 §5.2）</li>
 <li><strong>4.</strong> 知识产权证明（可选，待办）</li>
 <li><strong>5.</strong> 其他支撑材料（README / CHANGELOG / 技术文档 / 开发日志）</li>
 </ul>
 
-<p><strong>补充索引（本仓库内的完整材料，便于评委按需查阅）</strong></p>
+<p><strong>补充索引（仓库内其他材料）</strong></p>
 
 <table>
 <th>附件</th><th>位置</th><th>说明</th>
-<tr><td>最终版交付说明</td><td><code>docs/competition/最终版交付说明.md</code></td><td>5 分钟跑起来 / 怎么验证 / 已知边界 / 答辩速答</td></tr>
+<tr><td>最终版交付说明</td><td><code>docs/competition/最终版交付说明.md</code></td><td>运行方式 / 验证清单 / 已知边界 / 常见问题速答</td></tr>
 <tr><td>技术实现报告</td><td><code>docs/competition/技术实现报告.md</code></td><td>架构与实现细节（与本说明书口径一致）</td></tr>
-<tr><td>答辩问答手册</td><td><code>docs/competition/答辩问答手册.md</code></td><td>25 问 + 加分话术 / 避坑话术 + 证据命令</td></tr>
-<tr><td>演示脚本 / 提词器 / 录屏分镜</td><td><code>docs/competition/演示脚本.md</code>、<code>演示提词器.html</code>、<code>答辩录屏分镜.md</code></td><td>现场演示流程与兜底视频</td></tr>
-<tr><td>五维自查报告</td><td><code>docs/competition/评委评审报告.md</code></td><td>按官方权重自查 + 扣分理由 + 答辩前清单</td></tr>
-<tr><td>开发日志（49 节）</td><td><code>docs/spec/dev-log.md</code></td><td>每轮"问题→修复→证据"，含未修复项与理由</td></tr>
+<tr><td>答辩问答手册</td><td><code>docs/competition/答辩问答手册.md</code></td><td>25 个常见问题与标准答法 + 证据命令</td></tr>
+<tr><td>演示脚本 / 提词器 / 录屏分镜</td><td><code>docs/competition/演示脚本.md</code>、<code>演示提词器.html</code>、<code>答辩录屏分镜.md</code></td><td>现场演示流程与备用录屏</td></tr>
+<tr><td>五维自查报告</td><td><code>docs/competition/评委评审报告.md</code></td><td>按官方五维权重自查与改进清单</td></tr>
+<tr><td>开发日志（50 节）</td><td><code>docs/spec/dev-log.md</code></td><td>每轮"问题→修复→证据"，含未修复项与理由</td></tr>
 <tr><td>外部复审报告与回执</td><td><code>docs/review/</code></td><td>多轮独立复审 + 逐条处理回执（含未修复项与理由）</td></tr>
 <tr><td>移动端 / 常开方案</td><td><code>docs/mobile-deploy.md</code>、<code>docs/演示常开-本机方案.md</code></td><td>手机访问与 0 成本公网演示</td></tr>
 <tr><td>属地化方案</td><td><code>docs/spec/地区识别落地方案.md</code></td><td>属地化设计 v2（含安全底线与"不做清单"）</td></tr>
 <tr><td>合规 / 落地 / 商业一页</td><td><code>docs/competition/合规路线-一页.md</code>、<code>落地路径-一页.md</code>、<code>商业画布-一页.md</code></td><td>合规差距、试点计划、商业画布</td></tr>
 </table>
 
-<div class="meta"><strong>一句话定位</strong>：这是一个<strong>工程完成度高、可现场复算、但尚无真实试点数据</strong>的基层治理多智能体原型——<br>我们选择把"可验证"做成核心能力，而不是把"成效"讲成已完成的事实。</div>
+<div class="meta"><strong>项目定位</strong>：面向基层"接诉即办"的多智能体治理原型。功能链路与质量验证已完整实现并可复算；<br>治理成效需在真实社区试点后评估。</div>
 
 <div class="footer">
 社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
