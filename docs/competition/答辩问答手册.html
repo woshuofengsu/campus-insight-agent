@@ -236,7 +236,7 @@
 
 <ul>
 <li><strong>30 秒答法</strong>：62 条知识，其中 61 条已发布、55 条是<strong>可溯源的公开政策摘要</strong>、43 条带"适用地区"标记。来源是公开渠道的政策原文摘要，不掺虚构条款。</li>
-<li><strong>加分话术</strong>：配套还有一张<strong>轻量知识图谱</strong>：88 个实体、199 条关系、760 次提及，用途不是画图好看，而是<strong>按实体反查</strong>——从一条工单里的地址/设施/类别，反查历史同类工单和相关政策，网格员办单时能"看到来龙去脉"。</li>
+<li><strong>加分话术</strong>：配套还有一张<strong>轻量知识图谱</strong>：89 个实体、202 条关系、772 次提及（（可用 <code>python scripts/rebuild_kg.py --stats</code> 复核）），用途不是画图好看，而是<strong>按实体反查</strong>——从一条工单里的地址/设施/类别，反查历史同类工单和相关政策，网格员办单时能"看到来龙去脉"。</li>
 <li><strong>避坑话术</strong>：❌ 不要把图谱说成"我们做了知识图谱推理"。我们做的是<strong>可查的关联检索</strong>，说清楚反而更可信。</li>
 <li><strong>现场证据</strong>：知识库管理页；网格端图谱反查（端到端验收第 6 项覆盖）。</li>
 </ul>
@@ -423,7 +423,7 @@
 <tr><td>路由 / 智能体角色 / 工具</td><td><strong>130</strong> / <strong>9</strong> / <strong>16</strong></td></tr>
 <tr><td>知识库</td><td><strong>62</strong> 条（61 已发布 / 55 公开政策 / 43 带适用地区）</td></tr>
 <tr><td>检索金标</td><td><strong>48</strong> 条 hit@1 <strong>100%</strong>（词法基线 85.7%，属地 Top-1 4/4）</td></tr>
-<tr><td>知识图谱</td><td>88 实体 / 199 关系 / 760 提及</td></tr>
+<tr><td>知识图谱</td><td>89 实体 / 202 关系 / 772 提及</td></tr>
 <tr><td>端到端验收 / 演示自检</td><td><strong>12/12</strong> / <strong>9/9</strong></td></tr>
 <tr><td>UI 审计 / 移动审计</td><td>34 路由页·54 视口 × 9 类 <strong>0 违规</strong> / 21 页 × 7 类 <strong>0 违规</strong></td></tr>
 <tr><td>加密</td><td>8 张表<strong>明文 0</strong>，AES-256-GCM</td></tr>

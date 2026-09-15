@@ -104,6 +104,7 @@ TASKS = [
     # 正式提交件与当前状态文档（可打印 HTML，评审/评委随手能看）
     (os.path.join(BASE, "创意说明书-提交版.md"), "社区先知 · 创意说明书（提交版）"),
     (os.path.join(BASE, "技术实现报告.md"), "社区先知 · 技术实现报告"),
+    (os.path.join(BASE, "技术选型说明.md"), "社区先知 · 关键技术选型说明"),
     (os.path.join(BASE, "最终版交付说明.md"), "社区先知 · 最终版交付说明"),
     (os.path.join(BASE, "答辩问答手册.md"), "社区先知 · 答辩问答手册"),
     (os.path.join(BASE, "演示脚本.md"), "社区先知 · 演示脚本"),

@@ -200,7 +200,7 @@ FastAPI 主服务 api_web.py（:8000，130 条路由）  ── 另有 api.py �
 数据与检索
   ├─ SQLite（WAL，schema **v46** 版本化迁移，50 张业务表）：手机号 **AES-256-GCM 加密落库**
   ├─ 知识库混合检索：62 条（61 条已发布，55 条公开政策摘要）× 词法(同义/方言扩展) + 语义向量 RRF
-  └─ 轻量知识图谱：88 实体 / 199 关系 / 760 提及
+  └─ 轻量知识图谱：89 实体 / 202 关系 / 772 提及
 </pre>
 
 <p><strong>关键目录</strong>：<code>agent/</code>（多智能体）、<code>api_routes/</code>（14 路由模块）、<code>data/</code>（数据层 + 46 个版本化迁移）、<br><code>web/src/views/{resident,grid,elderly}/</code>（三端）、<code>scripts/</code>（自检/评测/审计/录屏/迁移）、<code>tests/</code>。</p>

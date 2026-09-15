@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 关键技术选型说明 — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>关键技术选型说明</h1>
+
+<div class="meta"><strong>本文回答一个问题</strong>：每个技术决策，我们为什么这样选、放弃了什么、代价是什么。<br>每条都给出<strong>代码位置</strong>或<strong>可复算命令</strong>，不含"业界领先/最佳实践"这类无法验证的说法。<br><strong>配套</strong>：<code>创意说明书-提交版.md</code>（方案全貌）、<code>技术实现报告.md</code>（实现细节）、<code>最终版交付说明.md</code>（怎么跑怎么验）。</div>
+
+<hr>
+
+<h2>决策总览（一页速览）</h2>
+
+<table>
+<th>#</th><th>决策点</th><th>我们的选择</th><th>主要备选</th><th>一句话理由</th><th>代价</th>
+<tr><td>1</td><td>多智能体编排</td><td><strong>自研黑板 + 编排器</strong>（705 + 112 行）</td><td>LangGraph / CrewAI / AutoGen</td><td>主链路要精确控制执行链、留痕与转人工</td><td>无现成图可视化与检查点，工具生态要自己写</td></tr>
+<tr><td>2</td><td>检索</td><td><strong>词法扩展 + 1024 维向量 + RRF 融合</strong>（自研）</td><td>ChromaDB / pgvector + BGE Reranker</td><td>62 条语料规模下 RRF 已足够，且零重依赖</td><td>无二段精排；召回扩展弱于图检索</td></tr>
+<tr><td>3</td><td>知识图谱</td><td><strong>SQLite 三元组</strong>（89 实体 / 202 关系 / 772 提及）</td><td>Neo4j</td><td>只做"按实体反查"这一条真实链路</td><td>多跳查询与图算法能力弱</td></tr>
+<tr><td>4</td><td>数据库与迁移</td><td><strong>SQLite(WAL) + 46 个版本化迁移</strong></td><td>MySQL + Alembic</td><td>单社区零运维；迁移幂等可重跑</td><td>单写者，多进程/多副本不成立</td></tr>
+<tr><td>5</td><td>LLM 使用姿态</td><td><strong>规则为骨、LLM 为脑（四开关可关）</strong></td><td>全 LLM 编排</td><td>确定性、成本、可降级</td><td>模糊表达处理弱于全 LLM；维护两条路径</td></tr>
+<tr><td>6</td><td>实时通知</td><td><strong>WebSocket</strong>（内存连接池）</td><td>SSE / 轮询</td><td>需要低延迟推送 + 客户端心跳</td><td>单进程内存池；重连要自己处理</td></tr>
+<tr><td>7</td><td>鉴权</td><td><strong>标准库 HS256 JWT</strong> + 角色守卫</td><td>第三方 JWT 库 / 服务端会话</td><td>零依赖、可控；生产密钥 fail-closed</td><td>无 refresh token 与吊销列表</td></tr>
+<tr><td>8</td><td>字段加密</td><td><strong>AES-256-GCM</strong>（<code>cryptography</code>，<code>g1$</code> 版本前缀）</td><td>自研 HMAC-CTR / 仅脱敏</td><td>真加密且可平滑换算法</td><td>密钥派生无盐无迭代；无信封加密</td></tr>
+<tr><td>9</td><td>前端栈</td><td><strong>Vue3 + Vite + Naive UI</strong></td><td>React 19 + Ant Design 6</td><td>差距在设计投入，不在框架</td><td>AI 组件生态少，对话组件需手写</td></tr>
+<tr><td>10</td><td>适老</td><td><strong>独立老年端（8 页重做）</strong></td><td>全局放大字号</td><td>老人需要的是"少而大"而非"小放大"</td><td>三端维护成本；单屏信息密度低</td></tr>
+<tr><td>11</td><td>移动端形态</td><td><strong>Web + PWA（可添加到主屏幕）</strong></td><td>原生 App / 带离线 SW</td><td>免安装；不做离线以免展示过期数据</td><td>无离线能力；依赖浏览器</td></tr>
+<tr><td>12</td><td>部署形态</td><td><strong>本机回环 + 可选临时隧道</strong></td><td>云服务器 / Docker</td><td>演示零成本、数据不出本机</td><td>无访问控制；域名每次变化</td></tr>
+</table>
+
+<hr>
+
+<h2>一、多智能体编排：自研黑板 + 编排器 vs 成熟框架</h2>
+
+<p><strong>结论</strong>：主链路用自研编排（<code>agent/orchestrator.py</code> 705 行 + <code>agent/blackboard.py</code> 112 行）。<br>早期原型用 LangChain AgentExecutor 的版本保留在 <code>app.py</code> 作为备线对照，不作为主线。</p>
+
+<table>
+<th>对比项</th><th>自研（当前）</th><th>LangGraph / CrewAI / AutoGen</th>
+<tr><td>执行链可控性</td><td>每一跳由代码显式决定，可插入校验与仲裁</td><td>由框架运行时调度，插入自定义检查点需读源码</td></tr>
+<tr><td>留痕</td><td>每个角色的动作、协商消息、仲裁决策统一落 <code>agent_logs</code></td><td>需自行适配框架的回调/追踪</td></tr>
+<tr><td>失败处置</td><td>超时重试一次 → 仍失败转人工（生成处理包编号）</td><td>多为抛异常或重试，转人工要自己接</td></tr>
+<tr><td>循环防护</td><td>单目标协商 ≥2 轮强制转人工；链式遍历上限 5 轮</td><td>需自行实现终止条件</td></tr>
+<tr><td>依赖</td><td>标准库 + 少量基础库</td><td>引入框架及其传递依赖，版本升级影响面大</td></tr>
+<tr><td>生态</td><td>无（工具需自己写，现有 16 个）</td><td>现成工具/集成多</td></tr>
+</table>
+
+<p><strong>用真实场景走一遍</strong>：一次输入内的跨角色协商</p>
+
+<pre>
+用户："明天高温，社区老人要注意什么？"
+ ① 编排器建 ctx（含属地、天气、会话实体），派发给天气守护
+ ② 天气守护取数 → post_message(type=notify) 给健康顾问
+ ③ 健康顾问 process_negotiation → 生成健康提示 → post_message 给通知管理员
+ ④ 通知管理员生成通知草稿 → task_response 回到发起方
+ ⑤ 编排器 _drain_negotiations 逐轮消费队列，把"协作提示"合并进最终回复
+ ⑥ 合规审计员对所有输出做脱敏/敏感词检查 → 通过后返回；不通过 → Arbiter 裁决 → 转人工
+</pre>
+
+<p><strong>代价与现状</strong>：没有框架自带的图可视化与检查点恢复；新增能力要自己写工具（用 <code>pkgutil</code> 自动发现降低边际成本）。<br><strong>证据</strong>：<code>agent/orchestrator.py::_dispatch / _drain_negotiations / _transfer_to_human</code>、<code>agent/blackboard.py</code>（历史封顶 500 条）、<br><code>pytest tests/test_dispatch.py -q</code>、网格端「Agent 留痕」页可查仲裁记录。</p>
+
+<hr>
+
+<h2>二、检索：自研混合检索 vs 向量数据库 + 重排模型</h2>
+
+<p><strong>结论</strong>：自研三路融合——<strong>词法（同义词/方言扩展）+ 语义向量（百炼 <code>text-embedding-v3</code>，1024 维）+ RRF 融合（k=60）</strong>，<br>不引入 ChromaDB/pgvector，也不上 Reranker 二段精排。</p>
+
+<table>
+<th>对比项</th><th>自研（当前）</th><th>ChromaDB / pgvector + BGE Reranker</th>
+<tr><td>部署</td><td>与业务同库（SQLite + 进程内向量缓存 512 条），零额外服务</td><td>需独立向量库服务或 PG 扩展 + 模型文件</td></tr>
+<tr><td>融合方式</td><td>RRF（按排名融合，不依赖分数量纲）</td><td>向量分数 + 关键词分数直接加权，或二段重排</td></tr>
+<tr><td>召回质量</td><td>48 条口语金标 <strong>hit@1 100%</strong></td><td>语义召回更强，长尾与跨领域更好</td></tr>
+<tr><td>规模适配</td><td>语料 62 条（55 条公开政策摘要）：规模小、优势不明显</td><td>数万条以上差距会拉开</td></tr>
+<tr><td>可解释性</td><td>返回 <code>retrieval</code>（lexical/hybrid）、<code>base_score</code>、<code>region_level</code>，便于排查</td><td>分数来源较黑盒</td></tr>
+</table>
+
+<p><strong>用真实数据走一遍</strong>（同一个金标集，两套算子的对照）：</p>
+
+<pre>
+查询："老楼上下楼不方便，有没有办法？"（句中不含"电梯"二字）
+【纯词法】命中《老旧小区加装电梯政策宣讲会》失败 → 整体 hit@1 = 85.7%
+【加入语义向量 + RRF】语义路召回《…加装电梯操作指引》并前置 → 整体 hit@1 = 48/48 = 100%
+属地用例（6 条，同题不同社区）Top-1 正确 4/4
+</pre>
+
+<p><strong>代价与现状</strong>：语料规模仅 62 条，评测结论<strong>不代表泛化能力</strong>；无 Reranker，召回扩展不如图检索；<br>向量模型依赖外部 API（无 Key / 网络失败自动回落纯词法，<code>provider=none</code> 时行为与升级前逐字节一致）。<br><strong>证据</strong>：<code>agent/rag.py</code>（<code>_RRF_K = 60</code>）、<code>utils/embedding.py</code>、<code>python scripts/rag_eval.py</code>。</p>
+
+<hr>
+
+<h2>三、知识图谱：轻量三元组 vs 图数据库</h2>
+
+<p><strong>结论</strong>：用 SQLite 存实体—关系—提及（<strong>89 实体 / 202 关系 / 772 提及</strong>），<strong>只做"按实体反查"</strong>这一条链路，不引入 Neo4j。</p>
+
+<table>
+<th>对比项</th><th>轻量三元组（当前）</th><th>Neo4j</th>
+<tr><td>用途</td><td>办单时"看到来龙去脉"：按实体反查历史工单与相关政策</td><td>多跳推理、路径分析、图算法</td></tr>
+<tr><td>部署</td><td>与业务同库，无额外服务</td><td>独立数据库（JVM、内存占用、运维）</td></tr>
+<tr><td>数据规模</td><td>62 条政策 + 225 条工单，多跳场景本就不成立</td><td>适合十万级节点以上</td></tr>
+<tr><td>可视化</td><td>不做（评审会追问"图谱解决了什么"）</td><td>自带浏览器可视化</td></tr>
+</table>
+
+<p><strong>用真实场景走一遍</strong>：网格员处理电梯工单时按实体反查</p>
+
+<pre>
+GET /api/web/agent/kg/entity?name=电梯
+→ 命中：**5 条历史工单 + 7 条相关政策 + 10 个关联实体**（端到端验收第 7 项实测）
+用途：判断"这台电梯是不是反复报修"、该引用哪份政策，而不是让网格员自己去翻历史。
+</pre>
+
+<p><strong>代价与现状</strong>：多跳查询与图算法能力弱（当前只支持一跳关联）；图谱是按需重建的派生数据（<code>python scripts/rebuild_kg.py</code>，或网格端一键重建 / <code>POST /api/web/agent/kg/rebuild</code>）。<br><strong>证据</strong>：迁移 <code>_m45_knowledge_graph</code>、<code>data/db_kg.py</code>（<code>build_graph</code> / <code>query_entity</code> / <code>graph_stats</code>）、<code>python scripts/demo_acceptance.py</code>（第 7 项）。</p>
+
+<hr>
+
+<h2>四、数据库与迁移：SQLite + 自研版本化迁移 vs MySQL + Alembic</h2>
+
+<p><strong>结论</strong>：SQLite（WAL）+ <strong>46 个版本化迁移</strong>（<code>data/db_core.py</code> 的 <code>_mN_</code> 注册表，幂等可重跑）；<br><strong>业务代码中不允许出现运行时 <code>ALTER TABLE</code></strong>（已核查：<code>ALTER</code> 仅存在于迁移函数与 <code>_add_column</code> 辅助内）。</p>
+
+<table>
+<th>对比项</th><th>当前（SQLite + 自研迁移）</th><th>MySQL + Alembic</th>
+<tr><td>运维</td><td>单文件、零配置，演示/单社区可直接拷库</td><td>需数据库服务、账号、备份策略</td></tr>
+<tr><td>迁移机制</td><td><code>_mN_name</code> 注册表 + <code>PRAGMA</code> 判存，新建库与存量升级<strong>同一条路径</strong></td><td>Alembic 自动生成迁移脚本（功能更全）</td></tr>
+<tr><td>并发</td><td>WAL + busy_timeout；<strong>单写者</strong></td><td>行级锁、真正并发写</td></tr>
+<tr><td>多进程/多副本</td><td>不成立（换 PG 才成立）</td><td>支持</td></tr>
+</table>
+
+<p><strong>用真实场景走一遍</strong>：新库与老库的升级路径</p>
+
+<pre>
+全新部署：init_db() → 顺序执行 46 个迁移 → schema_version = 46
+存量升级：同一入口 → 逐版本比对并补齐（幂等，可重复执行）
+历史欠账：v46 把早期"运行时补列"全部收回迁移链 —— 现在业务层 0 处 ALTER
+</pre>
+
+<p><strong>代价与现状</strong>：单写者、多进程/多副本不成立（扩容路径 Redis + PostgreSQL 已在交付说明中给出）。<br><strong>证据</strong>：<code>data/db_core.py</code>（<code>_m1_…</code> 至 <code>_m46_phone_enc_and_schema_drift</code>）、<code>PRAGMA integrity_check = ok</code>。</p>
+
+<hr>
+
+<h2>五、LLM 使用姿态：规则为骨、LLM 为脑 vs 全 LLM 编排</h2>
+
+<p><strong>结论</strong>：四个特性开关（<code>LLM_ORCHESTRATION</code> / <code>POLICY_LLM_RAG</code> / <code>RECEPTION_LLM_FALLBACK</code> / <code>LLM_NEGOTIATION</code>）<br>控制 LLM 介入点；<strong>代码默认全关</strong>（纯规则可完整跑通），演示姿态按需打开。</p>
+
+<table>
+<th>能力</th><th>用的什么</th><th>关了 LLM 会怎样</th>
+<tr><td>意图识别</td><td>确定性规则 + 同义/方言归一；模糊时 LLM 闭集兜底</td><td>模糊表达落不到意图 → 走引导话术或转人工（不静默失败）</td></tr>
+<tr><td>政策问答</td><td>检索片段 + 引用强制；弱命中才 LLM 生成</td><td>弱命中直接转人工，不生成内容</td></tr>
+<tr><td>跨角色协商</td><td>规则链为主，LLM 参与目标选择（白名单内）</td><td>退化为固定规则链，仍会联动</td></tr>
+<tr><td>工单状态机 / 权限 / 脱敏 / 风控</td><td><strong>始终是确定性代码</strong></td><td>不受影响</td></tr>
+</table>
+
+<p><strong>用真实数据走一遍</strong>：实测成本与延迟</p>
+
+<pre>
+单轮对话（演示姿态，含 LLM）：约 **+0.9 秒 / +¥0.0002**
+累计（库内记账 `llm_usage`，2026-09-14 快照）：**57 次调用 / ¥0.0139**
+（其中评测 40 题 ¥0.0109、跨角色协商 15 次 ¥0.0030）
+可复核：python scripts/llm_cost.py
+</pre>
+
+<p><strong>代价与现状</strong>：模糊/长尾表达的处理不如全 LLM 方案；需要维护规则与 LLM 两条路径的一致性（测试覆盖两种姿态）。<br><strong>证据</strong>：<code>agent/intent_llm.py</code>、<code>agent/policy_rag.py</code>、<code>agent/llm_client.py</code>、<code>python scripts/llm_cost.py</code>。</p>
+
+<hr>
+
+<h2>六、实时通知：WebSocket vs SSE vs 轮询</h2>
+
+<p><strong>结论</strong>：采用 <strong>WebSocket</strong>（<code>/ws/notify</code>），连接池在进程内。</p>
+
+<table>
+<th>对比项</th><th>WebSocket（当前）</th><th>SSE</th><th>轮询</th>
+<tr><td>方向</td><td>双向（可心跳、可客户端订阅）</td><td>单向（服务端→客户端）</td><td>单向（客户端发起）</td></tr>
+<tr><td>断线重连</td><td>需自行处理</td><td>浏览器自动重连</td><td>天然无状态</td></tr>
+<tr><td>延迟/开销</td><td>低延迟、长连接</td><td>低延迟</td><td>取决于间隔，空转开销大</td></tr>
+<tr><td>多进程</td><td>需 Redis 发布订阅（当前单进程内存池）</td><td>同左</td><td>无需共享状态</td></tr>
+</table>
+
+<p><strong>用真实场景走一遍</strong>：网格员改工单状态 → 居民端收到通知</p>
+
+<pre>
+网格员：工单 #123 处理中 → 已解决
+ ① 服务端写入状态并生成通知
+ ② 通过 /ws/notify 推送给该用户（在线）→ 居民端角标实时更新
+ ③ 用户离线：通知落库，下次进入消息中心可见（不依赖长连接）
+</pre>
+
+<p><strong>代价与现状</strong>：连接池在进程内，多 worker 需 Redis；前端需处理重连与心跳。<br><strong>证据</strong>：<code>api_web.py</code>（WebSocket 路由与安全头）、<code>web/src/views/grid/Notices.vue</code>（前端订阅与重连）。</p>
+
+<hr>
+
+<h2>七、鉴权：标准库 JWT vs 第三方库 / 服务端会话</h2>
+
+<p><strong>结论</strong>：用标准库 <code>hmac</code> 自实现 <strong>HS256 JWT</strong>（无第三方 JWT 依赖），token 内嵌角色与社区，<br>配合角色守卫与登录失败锁定；生产姿态密钥缺失或为仓库占位值时<strong>拒绝启动</strong>。</p>
+
+<table>
+<th>对比项</th><th>标准库 JWT（当前）</th><th>第三方 JWT 库</th><th>服务端会话</th>
+<tr><td>依赖</td><td>零额外依赖</td><td>引入库及其传递依赖</td><td>需会话存储（内存/Redis）</td></tr>
+<tr><td>水平扩展</td><td>无状态，天然可扩展</td><td>同左</td><td>需共享会话存储</td></tr>
+<tr><td>退出/吊销</td><td><strong>无吊销列表</strong>（靠短有效期 + 锁定策略）</td><td>库提供部分能力</td><td>天然可吊销</td></tr>
+<tr><td>实现风险</td><td>自行实现需谨慎（已用标准 HMAC + 固定算法，禁 <code>alg</code> 混淆）</td><td>成熟实现</td><td>成熟</td></tr>
+</table>
+
+<p><strong>用真实场景走一遍</strong>：越权与爆破防护</p>
+
+<pre>
+① 无 token 访问受保护接口 → 401（鉴权中间件）
+② 居民 token 访问网格端指标接口 → 按角色拒绝（fail-closed）
+③ 连续 5 次密码错误 → 同 username|IP 锁定 5 分钟（即便密码正确也拒绝）
+④ 生产姿态（DEMO_MODE=false）：演示登录硬关闭；密钥缺失/占位 → 启动失败
+</pre>
+
+<p><strong>代价与现状</strong>：无 refresh token、无吊销列表；令牌有效期是缓解手段而非根治（已列入后续工作）。<br><strong>证据</strong>：<code>api_routes/deps.py</code>、<code>api_routes/auth.py</code>（<code>login</code> 的失败计数与锁定）、<code>api_web.py</code>（JWT 中间件与安全响应头）。</p>
+
+<hr>
+
+<h2>八、字段加密：AES-256-GCM vs 自研流密码 / 仅脱敏</h2>
+
+<p><strong>结论</strong>：手机号等敏感字段用 <strong>AES-256-GCM</strong>（<code>cryptography</code> 库）加密落库，密文带算法版本前缀 <code>g1$</code>；<br>早期自研 HMAC-CTR 方案<strong>仅保留解密兼容</strong>。明文列置空，展示统一脱敏。</p>
+
+<table>
+<th>对比项</th><th>AES-256-GCM（当前）</th><th>早期自研 HMAC-CTR</th><th>仅脱敏不加密</th>
+<tr><td>机密性</td><td>真加密（AEAD，含完整性校验）</td><td>自研构造，风险高</td><td>无（库内即明文）</td></tr>
+<tr><td>算法轮换</td><td>密文带 <code>g1$</code> 版本前缀，可按前缀分支解密、平滑重加密</td><td>无版本信息</td><td>不适用</td></tr>
+<tr><td>审计</td><td>8 张含手机号表明文计数 0，脚本可复算</td><td>—</td><td>明文计数 > 0</td></tr>
+<tr><td>缺库行为</td><td><code>cryptography</code> 缺失时<strong>拒绝加密</strong>（fail-closed，不静默降级）</td><td>—</td><td>—</td></tr>
+</table>
+
+<p><strong>用真实数据走一遍</strong>：审计命令与结果</p>
+
+<pre>
+python scripts/audit_phone_encryption.py
+→ 含 phone 列的表：8；全部具备 *_enc 兄弟列，明文计数 0
+密文形态：g1$&lt;base64(12 字节 nonce | 密文 | tag)&gt;
+密钥派生：SHA-256(CRYPTO_KEY) → 32 字节（**无盐、无迭代**，已列入改进项）
+</pre>
+
+<p><strong>代价与现状</strong>：密钥派生强度不足、无信封加密与轮换演练；<strong>居民在工单正文里手写的他人手机号未脱敏</strong>（自由文本 PII 未治理，已列入近期工作）。<br><strong>证据</strong>：<code>utils/crypto.py</code>（AESGCM、<code>g1$</code>、12B nonce）、<code>scripts/audit_phone_encryption.py</code>、<code>tests/test_phone_encryption_v39.py</code>。</p>
+
+<hr>
+
+<h2>九、前端技术栈：Vue3 + Naive UI vs React + Ant Design</h2>
+
+<p><strong>结论</strong>：采用 <strong>Vue3 + Vite + Naive UI</strong>，不追换 React/AntD。理由不是"框架更强"，而是：<br><strong>同名对标项目（React 19 + AntD 6）观感更好，差距来自设计投入而不是框架能力</strong>——那 6 处真实差距（主视觉、动效层次、暗色一致性等）我们用设计令牌 + 客观审计补齐了，换栈并不能自动获得。</p>
+
+<table>
+<th>对比项</th><th>Vue3 + Naive UI（当前）</th><th>React 19 + Ant Design 6</th>
+<tr><td>三端差异化</td><td>令牌体系自建，老年端可彻底重做</td><td>组件更"企业范"，改造成本相近</td></tr>
+<tr><td>AI 组件生态</td><td>少，对话/执行链组件手写（换来可完全自控）</td><td>有 Ant Design X 等现成 AI 组件</td></tr>
+<tr><td>审计友好度</td><td>组件结构简单，<code>ui_audit</code>/<code>mobile_audit</code> 可直接量对比度/热区/字号</td><td>需处理更多组件内部样式</td></tr>
+<tr><td>迁移成本</td><td>—</td><td>重写三端 31 个页面，收益不确定</td></tr>
+</table>
+
+<p><strong>用真实数据走一遍</strong>：客观审计而非主观评价</p>
+
+<pre>
+python scripts/ui_audit.py    → 34 个路由页 / 54 个页面视口 × 9 类检查：0 违规
+python scripts/mobile_audit.py → 21 页 × 7 类检查：全部通过
+</pre>
+
+<p><strong>代价与现状</strong>：AI 交互组件需手写（多智能体执行链可视化为自研）；生态组件数量少于 AntD。<br><strong>证据</strong>：<code>web/src/style.css</code>（设计令牌）、<code>web/src/views/{resident,grid,elderly}/</code>、两个审计脚本。</p>
+
+<hr>
+
+<h2>十、适老设计：独立老年端 vs 全局放大字号</h2>
+
+<p><strong>结论</strong>：老年端 <strong>8 个页面独立重做</strong>（不是居民端放大）：字号 ≥20px、热区 ≥72px、层级压到最少、<br>只保留 SOS 一个呼吸动效、支持语音播报与预置短语、一键拨号。</p>
+
+<table>
+<th>对比项</th><th>独立老年端（当前）</th><th>全局放大字号</th>
+<tr><td>信息密度</td><td>低（换可读性与误触率）</td><td>高（老人易误触、迷失）</td></tr>
+<tr><td>语音</td><td>有（端侧 Web Speech，失败显式降级为打字 + 预置短语）</td><td>通常无</td></tr>
+<tr><td>紧急求助</td><td>一键 SOS + 二次确认 + 留痕，不自动拨 110/120</td><td>一般无</td></tr>
+<tr><td>维护成本</td><td>三端各自维护</td><td>一套样式</td></tr>
+</table>
+
+<p><strong>用真实数据走一遍</strong>：审计卡阈值</p>
+
+<pre>
+mobile_audit：21 页 × 7 类检查 0 违规（含 iOS 输入框聚焦放大、底栏遮挡、横屏遮罩、老年端 20px 字号下限）
+缺陷修复实例：老年端天气属地标签曾为 18.4px，被审计判不合格 → 调整为 1.3rem 后通过
+</pre>
+
+<p><strong>代价与现状</strong>：三端维护成本高；老年端单屏信息量小；<strong>语音在 iOS Safari / 微信内置浏览器可能不可用</strong>（已备降级路径，真机待复验）。<br><strong>证据</strong>：<code>web/src/views/elderly/</code>、<code>web/src/mobile.css</code>、<code>python scripts/mobile_audit.py</code>。</p>
+
+<hr>
+
+<h2>十一、移动端形态：PWA 可安装 vs 离线能力</h2>
+
+<p><strong>结论</strong>：提供 manifest 与图标（可添加到主屏幕、standalone 打开），<strong>不实现 service worker，不提供离线能力</strong>。</p>
+
+<table>
+<th>对比项</th><th>当前（可安装、不离线）</th><th>带 service worker 离线</th>
+<tr><td>断网可用</td><td>不可用（明确不宣称）</td><td>可缓存界面与数据</td></tr>
+<tr><td>数据正确性</td><td>始终取后端实时数据</td><td>可能展示过期的政策与工单状态</td></tr>
+<tr><td>实现与调试成本</td><td>低</td><td>高（缓存策略、版本失效、脏数据排查）</td></tr>
+</table>
+
+<p><strong>理由</strong>：接诉即办的时效性意味着"过期数据比没有数据更危险"；界面上线壳离线但没有数据，对居民没有实际价值。<br><strong>代价与现状</strong>：无离线；依赖浏览器能力（语音等）。<br><strong>证据</strong>：<code>web/public/manifest</code> 相关配置与图标、<code>web/index.html</code>（iOS 全屏 meta）、<code>docs/mobile-deploy.md</code>。</p>
+
+<hr>
+
+<h2>十二、部署形态：本机回环 + 临时隧道 vs 云 / 容器</h2>
+
+<p><strong>结论</strong>：演示用<strong>本机服务（默认只绑 127.0.0.1）</strong>，需要评委手机访问时临时开 HTTPS 隧道，<strong>用完即关</strong>。<br>已提供 Dockerfile 与 nginx 部署说明作为生产路径。</p>
+
+<table>
+<th>对比项</th><th>当前（本机 + 临时隧道）</th><th>云服务器 / Docker</th>
+<tr><td>成本</td><td>0 元</td><td>服务器费用</td></tr>
+<tr><td>数据位置</td><td>全在本机（数据不出域）</td><td>需自建或租用合规环境</td></tr>
+<tr><td>访问控制</td><td><strong>无</strong>（拿到链接即可访问）→ 因此限时开放</td><td>可配 WAF/白名单/证书</td></tr>
+<tr><td>稳定性</td><td>依赖本机与临时域名</td><td>正式域名与证书</td></tr>
+</table>
+
+<p><strong>用真实场景走一遍</strong>：演示当天的开关</p>
+
+<pre>
+python scripts/serve_public.py        # 起服务 + 隧道 + 刷新扫码页；默认仅回环，除非加 --lan
+python scripts/probe_public.py        # 公网 8 项端到端探测（8/8）
+python scripts/serve_public.py --stop  # 演示结束立即关闭公网入口
+</pre>
+
+<p><strong>代价与现状</strong>：无访问控制、临时域名每次变化、依赖本机在线；正式域名/证书/白名单未部署。<br><strong>证据</strong>：<code>scripts/serve_public.py</code>、<code>scripts/probe_public.py</code>、<code>docs/deploy-https.md</code>、<code>Dockerfile</code>。</p>
+
+<hr>
+
+<h2>附：主动"不做"的清单（连同理由）</h2>
+
+<p>评委常问"为什么不做 X"。以下为我们<strong>评估后主动放弃</strong>的项，均为取舍而非遗漏：</p>
+
+<table>
+<th>未做项</th><th>理由</th><th>何时会做</th>
+<tr><td>Neo4j 图数据库</td><td>62 条语料 + 一跳反查场景，独立图库的运维成本换不来收益</td><td>语料与实体量级提升后</td></tr>
+<tr><td>BGE Reranker / 向量数据库</td><td>当前金标 hit@1 已 100%，且要避免重依赖；语料规模不足以体现二段精排优势</td><td>语料 > 数千条时</td></tr>
+<tr><td>原生 App / 小程序</td><td>免安装优先；老年端可用性靠大字大热区与语音保障</td><td>需要系统级能力（如通讯录、离线）时</td></tr>
+<tr><td>service worker 离线</td><td>过期政策/工单会误导居民</td><td>若做"只看界面壳 + 明确提示数据过期"</td></tr>
+<tr><td>多租户查询隔离</td><td>演示级仅预留 <code>tenant_id</code>，查询层未按租户过滤</td><td>接入第二个真实社区时</td></tr>
+<tr><td>城市大脑级大屏重设计</td><td>大屏在手机上直接降级为提示层；投入产出比低</td><td>有真实街道看板需求时</td></tr>
+<tr><td>对接 12345 / 街道真实系统</td><td>需数据授权与字段映射，当前仅预留接口层</td><td>试点立项后</td></tr>
+<tr><td>自由文本 PII 脱敏</td><td>尚未实现（已知缺口）</td><td>近期：入库前正则脱敏 + 提示</td></tr>
+</table>
+
+<hr>
+
+<div class="meta">本文与代码库同步维护：若某个决策发生变化，请同时更新本文对应条目的"结论/代价"。<br>数字类结论均可用文中给出的命令复核。</div>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>
