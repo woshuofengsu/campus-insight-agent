@@ -32,3 +32,6 @@ web/node_modules/
 
 # 提交件 PDF（导出物，可由 `python scripts/export_pdf.py` 一键重建，不入库以免二进制膨胀）
 docs/competition/pdf/
+
+# Office 打开文件时生成的锁文件（~$xxx.pptx / ~$xxx.docx）——不是内容，别提交
+~$*

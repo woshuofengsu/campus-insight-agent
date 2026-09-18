@@ -108,7 +108,7 @@
 
 <div class="meta"><strong>场合</strong>：2026-09-22 中关村软件园 OPC 沙龙 · 台下技术专家 / 企业负责人 / 潜在投资人 · 路演后一对一问答<br><strong>人设</strong>：北京工商大学大数据专业大二 · 单人开发 · AI 辅助编码 · 不装专家<br><strong>时长</strong>：5:55（留 15 秒缓冲，落在 5:45–6:15 之间）<br><strong>口径</strong>：本包事实全部来自本人给定内容；<strong>未新增任何功能、数字、客户</strong>。</div>
 <p>></p>
-<div class="meta">⚠️ <strong>上台前唯一必须确认的事（数字口径）</strong>：你给的「581 项测试 / 42 条金标」，与现在系统里的实际值不一致——<br><strong>登录页上显示的是 638 项测试、48 条金标</strong>（<code>web/src/config/meta.js</code>，我核对过代码：638 = 637 通过 + 1 需外部服务跳过；金标文件 48 行）。<br>而且你另外 4 份备战材料（沙龙提问清单 / 现场展示逐字稿 / 作战手册 / 运行说明）<strong>都已经写成 638 / 48</strong>。<br>所以：<strong>推荐把本包数字也统一成 638 / 48</strong>（附件 D 给了替换清单，3 处改完即可）。<br>若坚持讲 581 / 42：<strong>也别让专家点开登录页</strong>，那里是 638。这是今晚唯一会让双方对不上的地方。</div>
+<div class="meta">✅ <strong>数字口径（已统一为代码实测值）</strong>：本包统一使用 <strong>638 项测试（637 通过 + 1 项需外部服务跳过）</strong> 与 <strong>48 条政策金标</strong>。<br>依据：<code>web/src/config/meta.js</code>（登录页显示的就是这两个数）、pytest 实测、金标文件 48 行；<br>另外 4 份备战材料（沙龙提问清单 / 现场逐字稿 / 作战手册 / 运行说明）与本包一致。<br>被问到旧数字时统一说法见附件 D。</div>
 
 <hr>
 
@@ -249,18 +249,18 @@
 
 <ul>
 <li><strong>屏幕上的字</strong>（数字墙，<strong>只放 4 个数字，字号 ≥60pt</strong>）</li>
-<li>581 项测试 · 全绿｜550 并发 · 零失败</li>
-<li>政策 42 条金标 · 第一位命中 100%</li>
+<li>638 项测试 · 全绿｜550 并发 · 零失败</li>
+<li>政策 48 条金标 · 第一位命中 100%</li>
 <li>ruff 0 问题｜v46 · 约 50 张表</li>
 <li><strong>配图建议</strong>：终端里测试通过的最后几行 + 一次审计输出（<strong>只截结果行，不要截代码</strong>）</li>
 <li><strong>时长</strong>：25 秒</li>
 <li><strong>讲稿</strong></li>
 </ul>
-<p>  > 说几个数字，这是我敢上台的底气。<br>  > 581 项测试，全绿。<br>  > 550 个并发一起打，零失败。<br>  > 政策问答，42 条金标准，第一位命中率 100%。<br>  > 代码检查 0 问题。<br>  > 数据库结构到第 46 版，约 50 张表。<br>  ><br>  > 补一句实话：这些都是我在本地自己测的，不是第三方测评。<br>  > 手机号是加密存的，展示和导出都脱敏。</p>
+<p>  > 说几个数字，这是我敢上台的底气。<br>  > 638 项测试，全绿。其中一项要连外部服务，默认跳过。<br>  > 550 个并发一起打，零失败。<br>  > 政策问答，48 条金标准，第一位命中率 100%。<br>  > 代码检查 0 问题。<br>  > 数据库结构到第 46 版，约 50 张表。<br>  ><br>  > 补一句实话：这些都是我在本地自己测的，不是第三方测评。<br>  > 手机号是加密存的，展示和导出都脱敏。</p>
 <ul>
 <li><strong>追问</strong>：这些数字能现场复算吗？</li>
 </ul>
-<p>  <strong>诚实应答</strong>：能。（<strong>注意：现场跑出来会是 638 / 48——见开头口径提醒；要么先统一数字，要么别现场跑测试数</strong>）</p>
+<p>  <strong>诚实应答</strong>：能，我现场就能跑给你看。<br>  （跑出来是 <strong>638 项：637 通过 + 1 跳过</strong>，与 PPT 数字一致；金标 48 条同样可复算）</p>
 
 <hr>
 
@@ -344,7 +344,7 @@
 
 <h3>【04:55–05:20】第 7 页 · 工程可信度</h3>
 
-<div class="meta">说几个数字，这是我敢上台的底气。<br>581 项测试，全绿。550 个并发一起打，零失败。<br>政策问答，42 条金标准，第一位命中率 100%。<br>代码检查 0 问题。数据库结构到第 46 版，约 50 张表。<br>补一句实话：这些都是我在本地自己测的，不是第三方测评。<br>手机号是加密存的，展示和导出都脱敏。</div>
+<div class="meta">说几个数字，这是我敢上台的底气。<br>638 项测试，全绿。550 个并发一起打，零失败。<br>政策问答，48 条金标准，第一位命中率 100%。<br>代码检查 0 问题。数据库结构到第 46 版，约 50 张表。<br>补一句实话：这些都是我在本地自己测的，不是第三方测评。<br>手机号是加密存的，展示和导出都脱敏。</div>
 
 <h3>【05:20–05:50】第 8 页 · 下一步与诉求</h3>
 
@@ -460,23 +460,30 @@
 <li><strong>4.</strong> <strong>核心</strong>：角色之间真的在传消息 ／ 校验 + 仲裁，出事先拦一道 ／ 合规审计有一票否决</li>
 <li><strong>5.</strong> <strong>适老</strong>：大字大按钮 ／ 长按 3 秒才求助 ／ 语音报修，还能听通知</li>
 <li><strong>6.</strong> <strong>演示</strong>：现在看它真的能跑 ／ ① 报修 ② 政策 ③ 联动 ④ 老人端 ⑤ 网格员</li>
-<li><strong>7.</strong> <strong>数字</strong>：581 项测试 · 全绿｜550 并发 · 零失败 ／ 政策 42 条金标 · 第一位命中 100% ／ ruff 0｜v46 · 约 50 张表</li>
+<li><strong>7.</strong> <strong>数字</strong>：638 项测试 · 全绿｜550 并发 · 零失败 ／ 政策 48 条金标 · 第一位命中 100% ／ ruff 0｜v46 · 约 50 张表</li>
 <li><strong>8.</strong> <strong>诉求</strong>：还没真实街道试点 ／ 想请教三件事 ／ ① 边界 ② 试点 ③ 冷启动</li>
 </ul>
 
 <p><strong>排版三条</strong>：标题 ≥40pt；正文 ≥24pt；<strong>页面上不出现代码、不出现超过 3 行的文字</strong>。</p>
 
-<h2>附件 D：数字口径开关（决定后 3 分钟改完）</h2>
+<h2>附件 D：数字口径（已统一，附复核方式）</h2>
 
-<p><strong>方案一（推荐）</strong>：统一为系统实际值——<strong>测试 638 项（637 通过 + 1 跳过）／金标 48 条</strong><br>需要改的 3 处：</p>
-<ul>
-<li><strong>1.</strong> 第 7 页 PPT 数字墙：<code>581 项测试</code> → <code>638 项测试</code>；<code>42 条金标</code> → <code>48 条金标</code></li>
-<li><strong>2.</strong> 第 7 页讲稿与逐字稿同两句</li>
-<li><strong>3.</strong> 附件 B 第 7 问里的自测说明（数字同步即可）</li>
-</ul>
+<p><strong>本包 + 你另外 4 份材料 + 登录页 + 代码，现在都是同一套数字：</strong></p>
 
-<p><strong>方案二</strong>：坚持 581 / 42<br>→ 则<strong>不要现场跑测试</strong>、<strong>不要让人点登录页</strong>（那里写 638）。一对一被问到时统一说法：</p>
-<div class="meta">"我材料里的 581 是早期版本的数字，现在代码里已经涨到 638 项，我回头把材料统一。"</div>
+<table>
+<th>项目</th><th>数字</th><th>怎么复核</th>
+<tr><td>自动化测试</td><td><strong>638 项</strong>（637 通过 + 1 项需外部服务跳过）</td><td><code>python -m pytest tests/ -q</code></td></tr>
+<tr><td>政策金标</td><td><strong>48 条</strong>，第一位命中率 100%</td><td><code>python scripts/rag_eval.py</code></td></tr>
+<tr><td>并发</td><td>550 并发零失败</td><td><code>python scripts/benchmark_concurrency.py</code>（<strong>先起服务</strong>，脚本会探活）</td></tr>
+<tr><td>代码规范</td><td>ruff 0 问题</td><td><code>python -m ruff check .</code></td></tr>
+<tr><td>数据库</td><td>schema v46 / 约 50 张表</td><td><code>python scripts/demo_preflight.py</code></td></tr>
+<tr><td>登录页数字</td><td>与上面一致</td><td><code>python scripts/check_claims.py</code></td></tr>
+</table>
+
+<p><strong>若有人拿旧材料对数字</strong>（例如看到过 581 或 42 的版本），统一说法：</p>
+<div class="meta">"那是我早期版本的数字。现在代码里已经涨到 638 项测试、48 条金标，登录页上显示的就是最新的，材料我已经统一过了。"</div>
+
+<div class="meta">注意：<code>docs/review/</code> 和 <code>docs/spec/dev-log.md</code> 里出现的 581 / 42 是<strong>当时的历史记录</strong>，故意保留，不是笔误——<br>如果专家翻到，就说明"这是那轮评审时的快照，现在的数字在登录页和 <code>check_claims.py</code> 里"。</div>
 
 <h2>附件 E：上台前 10 分钟流程（照着做）</h2>
 
