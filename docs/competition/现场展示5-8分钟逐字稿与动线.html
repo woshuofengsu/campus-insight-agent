@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区先知 · 现场逐字稿与动线 — 社区先知 CommunityInsight Agent</title>
+<style>
+  :root {
+    --text: #1a1a1a; --text2: #555;
+    --accent: #2563eb; --border: #d0d0d0;
+    --bg: #fff; --code-bg: #f5f5f5;
+    --th-bg: #f0f4ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 40px 36px; max-width: 900px; margin: 0 auto;
+    line-height: 1.9; font-size: 15px;
+  }
+  h1 {
+    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
+    letter-spacing: 0.04em; font-weight: 700;
+  }
+  h2 {
+    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
+    font-weight: 700;
+  }
+  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
+
+  /* -- metadata card -- */
+  .meta {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
+    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
+  }
+  .meta strong { color: #222; }
+  .meta a { color: var(--accent); }
+
+  /* -- tables -- */
+  table {
+    border-collapse:collapse; width:100%; margin: 12px 0 18px;
+    font-size: 0.88em; line-height: 1.6;
+  }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
+  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* -- code -- */
+  code {
+    background: var(--code-bg); color: #d63384;
+    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+  }
+  pre {
+    background: #f8f8f8; border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
+    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* -- lists -- */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 2px 0; line-height: 1.8; }
+
+  /* -- blockquote -- */
+  blockquote {
+    background: #fafafa; border-left: 3px solid var(--accent);
+    padding: 10px 16px; margin: 10px 0; color: #555;
+    font-size: 0.9em;
+  }
+  blockquote strong { color: #333; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
+
+  strong { color: #111; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
+    text-align: center; color: #999; font-size: 0.82em;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px; font-size: 14px; }
+    .meta { max-width: 100%; }
+    table { font-size: 0.78em; }
+    th, td { padding: 5px 7px; }
+  }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .meta { background: none; border: 1px solid #ccc; }
+    pre { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<h1>9·22 OPC 沙龙 · 现场展示 5–8 分钟逐字稿与动线</h1>
+<h3>目标时长 6:30（可压到 5:00 / 可放到 8:00）· 以演示为主、讲解为辅</h3>
+
+<div class="meta">用法：左边是【时间/动作】，右边是【口播逐字稿】。不用逐字背，背每段第一句和最后一句，中间用自己的话。<strong>全程放慢语速、边点边讲、手指屏幕。</strong><br>核心原则：<strong>让屏幕替你说话，你只负责点和画龙点睛。</strong> 演示占一半以上时间。</div>
+
+<hr>
+
+<h2>一、时间总表（6:30 标准版）</h2>
+
+<table>
+<th>段落</th><th>时长</th><th>做什么</th><th>屏幕</th>
+<tr><td>① 开场钩子</td><td>0:40</td><td>用"王阿姨楼道灯坏了"讲故事 + 一句话定位</td><td>登录页/三端首页</td></tr>
+<tr><td>② 痛点</td><td>0:50</td><td>基层接诉即办三难 + 大模型直接上的四风险</td><td>架构/痛点页或口述</td></tr>
+<tr><td>③ 方案架构</td><td>1:00</td><td>三端 + 9 角色多智能体 + 规则为主 LLM 为辅</td><td>白板口述/架构图</td></tr>
+<tr><td>④ 现场演示（核心）</td><td>2:30</td><td>三幕：报修+政策引用 / 天气⇄健康联动+黑板 / 老年求助+转人工</td><td>三端实时点</td></tr>
+<tr><td>⑤ 可信与工程证据</td><td>0:50</td><td>双层防线、强制引用、638 项测试、550 并发、加密、RAG 100%</td><td>测试/数据页或口述</td></tr>
+<tr><td>⑥ 落地与团队</td><td>0:40</td><td>一个社区试点→减负数据→复制；单人+AI 副驾</td><td>口述</td></tr>
+<tr><td>⑦ 收尾</td><td>0:10</td><td>金句 + 请专家指点</td><td>微笑看评委</td></tr>
+</table>
+
+<div class="meta"><strong>压到 5 分钟</strong>：②痛点压到 30s、⑤证据压到 30s、⑥落地压到 20s，演示三幕不变（演示是灵魂，别砍）。<br><strong>放到 8 分钟</strong>：②痛点加真实数据、④演示加演"网格员工作台 AI 助手"一幕、⑤证据展开讲 RAG 金标和知识图谱。</div>
+
+<hr>
+
+<h2>二、逐字稿（6:30 标准版）</h2>
+
+<h3>① 开场钩子（0:00–0:40）</h3>
+<p>【动作：站定，微笑，先不碰电脑，用 10 秒抓住人】</p>
+<div class="meta">"各位专家好。我先讲一个我们社区每天都在发生的事——晚上八点，王阿姨发现单元楼的灯坏了，老人怕摔，可网格员已经下班，电话没人接，事情就这么拖到第二天。<br>我做的项目叫<strong>社区先知</strong>，就是要让这种事<strong>不用等人、系统主动办</strong>。它是一套面向社区接诉即办的<strong>多智能体平台</strong>，服务居民、网格员、老年人三类人。"</div>
+
+<h3>② 痛点（0:40–1:30）</h3>
+<p>【动作：可切到架构图，或纯口述，手势比"三"】</p>
+<div class="meta">"基层接诉即办有三个老问题：<strong>第一，人少事多</strong>，一个网格员管几百户，被重复事务淹没；<strong>第二，系统被动</strong>，传统政务系统是人找系统、层层填表，不会主动服务；<strong>第三，老人被落下</strong>，字小、步骤多、不会打字，数字服务反而把最需要的人挡在门外。<br>那能不能直接上大模型？不行。大模型直接进民生场景有四个风险：<strong>会幻觉、不可控、不合规、断网就废</strong>。所以我的答案是——<strong>多智能体协作，规则为主、大模型为辅。</strong>"</div>
+
+<h3>③ 方案架构（1:30–2:30）</h3>
+<p>【动作：在白板/屏幕上用手指画三层，边画边说】</p>
+<div class="meta">"整个系统分三层。<strong>最上面是三端</strong>：居民端、网格员端、老年端，老人端专门做了大字、语音、长按求助。<br><strong>中间是我自研的多智能体内核</strong>：九个分工的 AI 角色——接待员、报修调度、提案协商、健康顾问、政策专员、通知管理员、天气守护、网格员助手，还有一个<strong>合规审计员，有一票否决权</strong>。它们之间不是各说各话，而是通过<strong>共享黑板和五种标准消息协议</strong>协作，意见不一致时有<strong>仲裁器</strong>，输出前有<strong>校验器</strong>，全程留痕。<br><strong>最下面是加密的数据库</strong>，手机号 AES 加密落库，所有操作可追溯。<br>大模型只在四个地方用，而且<strong>默认关、按需开、失败自动回退规则</strong>——所以断网它也能办事。"</div>
+
+<h3>④ 现场演示（2:30–5:00）—— 全场最关键，边点边讲</h3>
+
+<h4>幕一：居民报修 + 政策带引用（2:30–3:10，40 秒）</h4>
+<p>【动作：切居民端，登录 demo_resident】</p>
+<div class="meta">"我现在是居民王阿姨。我直接说一句话报修——（点提交）系统自动识别意图、补全信息、走报修状态机。注意，<strong>生成正式工单前必须我确认</strong>，机器不替人拍板。<br>再问一个政策问题——（点政策问答）看，回答下面<strong>强制带了知识库出处和版本号</strong>，没有出处它宁可不答、转人工。这就是防幻觉。"</div>
+
+<h4>幕二：王牌——天气⇄健康主动联动 + 黑板消息流（3:10–4:10，60 秒）</h4>
+<p>【动作：切到天气/智能体协作页或黑板消息流，这是"真多智能体"铁证，放慢讲】</p>
+<div class="meta">"这是我最想给各位看的——<strong>用户没问，系统主动服务</strong>。天气守护员监测到高温预警，它没有只发一条天气，而是<strong>主动给健康顾问发了一条协作消息</strong>，健康顾问生成针对老人的防护建议，再联动通知管理员向相关人群发提醒。<br>大家看这里——（手指黑板消息流）这是它们之间真实的消息：task_request、task_response、notify，每一条都带时间戳和角色，<strong>全程可追溯、可复盘</strong>。这不是一个聊天机器人套壳，这是九个角色在真正协作办事。"</div>
+
+<h4>幕三：老年端长按求助 + 转人工处理包（4:10–5:00，50 秒）</h4>
+<p>【动作：切老年端 demo_elderly，演示大字/语音/长按，再切转人工】</p>
+<div class="meta">"这是老年端，字大、按钮大、可以语音报修。最关键的是这个——（长按紧急求助按钮）<strong>要长按才触发，防止老人误碰</strong>。<br>一旦机器判断不了，比如老人情绪激动、诉求模糊，它会一键转人工，而且不是把人扔给网格员就完了——（切转人工处理包）这里打包了<strong>老人是谁、经过了哪些 Agent、卡在哪一步、需要人确认什么</strong>，网格员接手不用让老人再重复一遍。"</div>
+
+<h3>⑤ 可信与工程证据（5:00–5:50）</h3>
+<p>【动作：可切测试/数据页，或口述，语速稍快但每个数字咬清楚】</p>
+<div class="meta">"为什么我敢把它放进民生场景？因为有<strong>双层防线</strong>：事实校验 + 合规仲裁，合规审计员一票否决。<br>工程上我也不是堆出来的演示：<strong>638 项自动化测试全绿，550 人并发零失败</strong>，数据库用版本化迁移到第 46 版，手机号加密后明文残留为 0；政策检索 48 条金标，命中率从纯词法的 85.7% 提到 <strong>100%</strong>。我每改一处都要让 638 项测试全绿才提交。"</div>
+
+<h3>⑥ 落地与团队（5:50–6:30）</h3>
+<p>【动作：离开屏幕半步，面对评委，真诚】</p>
+<div class="meta">"落地我不贪大：先找一个社区做小范围试点，跑出<strong>AI 自解决率和平均办结时长</strong>这两个减负数据，再用数据向其他街道复制，走政府购买服务加 SaaS 订阅。<br>这个项目是我<strong>单人完成</strong>的。坦白说，代码是我用 AI 当编程助手一起实现的，但<strong>做什么、不做什么、为什么规则优先、为什么手机号必须加密、为什么紧急通知必须人确认、638 项测试的验收标准，都是我定的</strong>。AI 可以帮我写代码，但架构判断和产品责任是我的。"</div>
+
+<h3>⑦ 收尾（6:30）</h3>
+<p>【动作：站定，微笑，看评委】</p>
+<div class="meta">"社区先知，让基层的事<strong>不用等人、系统主动办、老人不被落下、每一步都可追溯</strong>。请各位专家多指点，谢谢！"</div>
+
+<hr>
+
+<h2>三、现场设备与准备清单（提前一天 + 当天）</h2>
+
+<ul>
+<li>[ ] <strong>三个端提前登录好，开三个浏览器标签页</strong>（居民/网格/老年），现场不输入账号密码。</li>
+<li>[ ] 演示账号写在小纸条上备用：居民 <code>demo_resident</code>、网格 <code>demo_grid/demo123</code>、老人 <code>demo_elderly</code>。</li>
+<li>[ ] <strong>录一条 2–3 分钟完整操作视频</strong>存本地和手机，断网/卡顿时直接放。</li>
+<li>[ ] 关键页截图（三端首页、黑板消息流、政策带引用、转人工包、测试全绿终端）存手机。</li>
+<li>[ ] 带充电器、鼠标；浏览器全屏、关掉无关弹窗和通知。</li>
+<li>[ ] 提前 15 分钟到场，连现场 WiFi 测一次；同时开手机热点备用。</li>
+</ul>
+
+<hr>
+
+<h2>四、控时与翻车预案</h2>
+
+<h3>控时三招</h3>
+<ul>
+<li><strong>1.</strong> 心里给每幕设"硬截止"：演示三幕合计不超过 3 分钟，到点就进下一幕，别恋战。</li>
+<li><strong>2.</strong> <strong>演示是灵魂，讲解可以省</strong>：点得顺就少说话，点不顺就用讲解补。</li>
+<li><strong>3.</strong> 被专家中途打断提问：先答（30 秒内），答完说"我继续把最关键的联动演示完"，把节奏拉回来。</li>
+</ul>
+
+<h3>翻车四预案</h3>
+<table>
+<th>情况</th><th>怎么办</th>
+<tr><td>断网/大模型超时</td><td>立刻说"看，这就是我设计的规则保底——核心流程断网也能跑"，继续演规则流程；实在不行切本地录屏</td></tr>
+<tr><td>页面卡顿/白屏</td><td>不慌，切到下一幕或讲架构，后台刷新；手里有截图兜底</td></tr>
+<tr><td>演示数据不对/报错</td><td>坦诚"这是个真实的边界情况，我记录一下"，立刻切到已准备好的截图/录屏，不纠缠</td></tr>
+<tr><td>忘词</td><td>直接点屏幕，让界面替你说，边点边想，别站着沉默</td></tr>
+</table>
+
+<h3>被追问时的三句万能接话（背下来）</h3>
+<ul>
+<li><strong>1.</strong> "这个问题很关键，我从<strong>产品和业务</strong>角度说一下我的设计思路……"</li>
+<li><strong>2.</strong> "这点目前是规则版本，我留了扩展位，是我下一步排期——您觉得优先级该怎么排？"（变请教）</li>
+<li><strong>3.</strong> "您这点我记一下，按您的经验第一步该怎么改最有效？"</li>
+</ul>
+
+<hr>
+
+<h2>五、上台前最后 10 分钟自检</h2>
+<ul>
+<li>[ ] 三端都登录了、能正常点</li>
+<li>[ ] 手机热点能开</li>
+<li>[ ] 录屏视频能打开</li>
+<li>[ ] 喝口水、深呼吸、放慢语速</li>
+<li>[ ] 记住：<strong>你不是去背技术的，你是去讲一个"让社区事不用等人"的故事，顺便展示它真的能跑。</strong></li>
+</ul>
+
+<div class="footer">
+社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
+作者：步承泽
+</div>
+</body>
+</html>
