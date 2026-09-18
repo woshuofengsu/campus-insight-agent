@@ -119,12 +119,16 @@ def build(tests, golden, gi, out):
     total = 8
 
     # ---------- 1 封面 ----------
+    # ⚠️ 排版教训（2026-09-15 实测）：标题文本框原来宽 11 英寸、一直伸到 12.1 英寸，
+    #    而右侧登录页截图从 8.3 英寸开始并且**后画**（在标题之上）→ 把 "…yInsight" 挡住了，
+    #    看起来像"标题被切断"。所以封面**标题只占左侧 6.6 英寸、分两行写**，右侧留给图，两者不重叠。
     s = prs.slides.add_slide(prs.slide_layouts[6])
     bg(s, NAVY)
-    text(s, 1.1, 2.0, 11, 1.3, ["社区先知 CommunityInsight"], size=54, bold=True, color=WHITE)
-    text(s, 1.1, 3.4, 11, 0.8, ["社区接诉即办 · 多智能体平台"], size=30, color=ORANGE)
-    text(s, 1.1, 4.4, 11, 0.8, ["北京工商大学 · 单人开发"], size=24, color=WHITE)
-    pic(s, "01-登录页.png", 8.3, 1.3, w=4.3)
+    text(s, 1.1, 1.9, 6.6, 0.95, ["社区先知"], size=52, bold=True, color=WHITE)
+    text(s, 1.1, 2.95, 6.6, 0.75, ["CommunityInsight"], size=36, bold=True, color=WHITE)
+    text(s, 1.1, 3.95, 6.6, 0.7, ["社区接诉即办 · 多智能体平台"], size=26, color=ORANGE)
+    text(s, 1.1, 4.8, 6.6, 0.7, ["北京工商大学 · 单人开发"], size=22, color=WHITE)
+    pic(s, "01-登录页.png", 8.0, 1.6, w=4.6)
 
     # ---------- 2 痛点 ----------
     s = prs.slides.add_slide(prs.slide_layouts[6])
@@ -157,10 +161,12 @@ def build(tests, golden, gi, out):
     # ---------- 4 多智能体与双层防线（重点） ----------
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "它们真的在传消息")
-    text(s, 0.95, 1.75, 6.4, 2.4,
+    # 「5 种消息」那行原来太长被折成「转 / 交」，改为拆两行写（COM 量到 textH 167.7 说明发生了折行）
+    text(s, 0.95, 1.75, 6.4, 2.6,
          ["黑板：带锁 · 带版本 · 带历史",
-          "5 种消息：请求 / 响应 / 通知 / 错误 / 转交",
-          "校验 + 仲裁，合规审计一票否决"], size=24, spacing=1.5)
+          "5 种消息：请求 / 响应 / 通知 /",
+          "错误 / 转交",
+          "校验 + 仲裁，合规审计一票否决"], size=22, spacing=1.45)
     box(s, 0.95, 4.35, 6.4, 1.9, LIGHT)
     text(s, 1.2, 4.55, 6.0, 1.6,
          ["规则为主，大模型为辅：", "意图/追问/政策生成 → 大模型",
