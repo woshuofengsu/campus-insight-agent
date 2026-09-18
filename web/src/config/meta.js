@@ -16,7 +16,8 @@ export const BRAND_METRICS = [
     value: 638,
     suffix: '',
     label: '自动化测试',
-    // pytest 收集用例数（= 575 passed / 1 skipped）；全量模式由 preflight 跑 --collect-only 核对
+    // pytest **可运行**用例数（= 637 passed / 1 skipped）；全量模式由 preflight 跑 --collect-only 核对。
+    // ⚠️ 这里只写"可运行口径"，不要写"收集数"（收集数含 3 项按标记排除，两者差 3，曾是口径混淆点）
     source: 'pytest --collect-only（preflight 全量模式核对）',
   },
   {
