@@ -100,6 +100,21 @@ CSS = """<style>
   }
 </style>"""
 
+# 台上用「大字卡」：源文件首行写 <!-- BIGCARD --> 即启用（字大、行松、去页脚）
+BIG_CARD_CSS = """<style>
+  body { font-size: 24px; line-height: 1.72; padding: 0; max-width: 100%; }
+  h1 { font-size: 0.8em; margin: 0 0 4px 0; }
+  h2 { font-size: 0.68em; margin: 14px 0 5px; padding-bottom: 3px; letter-spacing: 0.02em; }
+  p { margin: 4px 0; }
+  hr { margin: 12px 0; border: none; border-top: 2px solid var(--border); page-break-after: always; break-after: page; }
+  ul { margin: 4px 0; padding-left: 22px; font-size: 0.72em; line-height: 1.65; }
+  li { margin: 3px 0; }
+  h3 { font-size: 0.7em; margin: 10px 0 4px; }
+  table { font-size: 0.62em; line-height: 1.5; margin: 6px 0; }
+  th, td { padding: 4px 7px; }
+  .footer { display: none; }
+</style>"""
+
 TASKS = [
     # 正式提交件与当前状态文档（可打印 HTML，评审/评委随手能看）
     (os.path.join(BASE, "创意说明书-提交版.md"), "社区先知 · 创意说明书（提交版）"),
@@ -115,6 +130,7 @@ TASKS = [
     (os.path.join(BASE, "现场展示完整作战手册.md"), "社区先知 · 现场展示作战手册"),
     (os.path.join(BASE, "现场展示5-8分钟逐字稿与动线.md"), "社区先知 · 现场逐字稿与动线"),
     (os.path.join(BASE, "9月22日提词卡-A4.md"), "社区先知 · 9·22 提词卡（A4）"),
+    (os.path.join(BASE, "9月22日提词卡-第5页.md"), "社区先知 · 9·22 第 5 页大字卡（台上用）"),
     # 历史实现（保留当时的形态说明，勿据此判断当前架构）
     (os.path.join(BASE, "创意说明书.md"), "社区先知 · 创意说明书（历史版）"),
 ]
@@ -300,6 +316,9 @@ def build(md_file, title):
     with open(md_file, "r", encoding="utf-8") as f:
         body = md2html(f.read())
 
+    extra_css = BIG_CARD_CSS if "BIGCARD" in body else ""
+    css_block = CSS + "\n" + extra_css if extra_css else CSS
+
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -309,7 +328,7 @@ def build(md_file, title):
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title} — 社区先知 CommunityInsight Agent</title>
-{CSS}
+{css_block}
 </head>
 <body>
 {body}
