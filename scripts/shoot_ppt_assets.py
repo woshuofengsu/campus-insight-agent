@@ -1,13 +1,19 @@
 # scripts/shoot_ppt_assets.py — 抓路演 PPT 需要的真实界面截图
 # -*- coding: utf-8 -*-
 """为什么需要它：PPT 上"字少图多"才好看，但现场临时截图容易漏、容易糊、容易带调试痕迹。
-本脚本用 Playwright 按固定动线把 8 张图一次抓齐，命名规范、尺寸统一，直接放进 PPT。
+本脚本用 Playwright 按固定动线把三端界面一次抓齐，命名规范、尺寸统一，直接放进 PPT。
+
+分组（供"三端各两页"的正文结构使用）：
+    居民端  01(登录) 02 首页+小助手 / 03 政策问答 / 05 工单详情留痕 / 09 报修列表 / 10 提交报修
+            + 11 邻里议事 / 12 通知
+    网格员端 06 工作台 + 13 工单管理 / 14 老年关怀管理
+    老年端  07 大字首页 / 08 长按求助确认框 + 15 社区小助手 / 16 用药提醒
 
 用法：
     python scripts/shoot_ppt_assets.py            # 默认输出 docs/competition/ppt-assets/
     python scripts/shoot_ppt_assets.py --out D:\\素材
 
-前置：服务已在 http://127.0.0.1:8000 运行（python scripts/serve_public.py --no-tunnel --no-open）。
+前置：服务已在 http://127.0.0.1:8000 运行（python -m uvicorn api_web:app --port 8000）。
 注意：本脚本只读页面；老年端长按 SOS 后**点取消**，不真发求助。
 """
 import argparse
@@ -72,10 +78,12 @@ def main() -> int:
             print(f"   （政策问答截图降级：{type(e).__name__}）")
 
         # ---------- 4) 天气联动 → 执行链 ----------
+        # 注意：居民端对话输入框在 components/AgentChat.vue 里，是 <input>（不是 textarea），
+        # placeholder 为「请输入您的问题（如：我家水管漏水了）」。定位器写错会静默失败、用旧图。
         page.goto(f"{BASE}/resident/home", wait_until="networkidle")
         page.wait_for_timeout(1500)
         try:
-            inp = page.locator("textarea").first
+            inp = page.get_by_placeholder("请输入您的问题", exact=False).first
             inp.click()
             inp.fill("明天高温，老人要注意什么")
             page.keyboard.press("Enter")
@@ -92,6 +100,7 @@ def main() -> int:
         try:
             page.goto(f"{BASE}/resident/work-orders", wait_until="networkidle")
             page.wait_for_timeout(1500)
+            shot(page, "09-报修列表与状态.png")          # 列表页（点进详情前先抓）
             first_row = page.locator("tbody tr").first
             if first_row.count():
                 first_row.click()
@@ -99,6 +108,30 @@ def main() -> int:
             shot(page, "05-工单详情与处理留痕.png")
         except Exception as e:  # noqa: BLE001
             print(f"   （工单详情截图降级：{type(e).__name__}）")
+
+        # ---------- 5a) 提交报修表单 ----------
+        try:
+            page.goto(f"{BASE}/resident/work-orders/new", wait_until="networkidle")
+            page.wait_for_timeout(1800)
+            shot(page, "10-提交报修表单.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （提交报修表单截图降级：{type(e).__name__}）")
+
+        # ---------- 5b) 邻里议事（提案）----------
+        try:
+            page.goto(f"{BASE}/resident/proposals", wait_until="networkidle")
+            page.wait_for_timeout(1800)
+            shot(page, "11-居民端-邻里议事.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （邻里议事截图降级：{type(e).__name__}）")
+
+        # ---------- 5c) 通知（四类 + 已读回执）----------
+        try:
+            page.goto(f"{BASE}/resident/notices", wait_until="networkidle")
+            page.wait_for_timeout(1800)
+            shot(page, "12-居民端-通知.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （通知截图降级：{type(e).__name__}）")
         ctx.close()
 
         # ---------- 6) 网格员工作台 ----------
@@ -115,6 +148,22 @@ def main() -> int:
             shot(page, "06-网格员工作台.png")
         except Exception as e:  # noqa: BLE001
             print(f"   （网格员端截图降级：{type(e).__name__}）")
+
+        # ---------- 6b) 网格员端：工单管理（处理与流转）----------
+        try:
+            page.goto(f"{BASE}/grid/work-orders", wait_until="networkidle")
+            page.wait_for_timeout(1800)
+            shot(page, "13-网格员端-工单管理.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （工单管理截图降级：{type(e).__name__}）")
+
+        # ---------- 6c) 网格员端：老年关怀管理 ----------
+        try:
+            page.goto(f"{BASE}/grid/elderly-care", wait_until="networkidle")
+            page.wait_for_timeout(1800)
+            shot(page, "14-网格员端-老年关怀.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （老年关怀截图降级：{type(e).__name__}）")
         ctx.close()
 
         # ---------- 7) 老年端（手机视口）+ SOS 确认框 ----------
@@ -128,7 +177,11 @@ def main() -> int:
             page.wait_for_timeout(2200)
             shot(page, "07-老年端大字首页.png")
             # 长按 SOS 3 秒 → 出确认框 → 截图 → 点取消
-            btn = page.get_by_text("SOS", exact=False).first
+            # 注意：按钮文案是「🆘 紧急求助（长按 3 秒）」，**没有 "SOS" 字样**（旧定位器写 "SOS" 会静默失败）；
+            # 用 data-longpress 属性定位，并先滚进视口（按钮在长页面下方）。
+            btn = page.locator("[data-longpress]").first
+            btn.scroll_into_view_if_needed()
+            page.wait_for_timeout(600)
             box = btn.bounding_box()
             if box:
                 page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
@@ -141,8 +194,26 @@ def main() -> int:
                 if cancel.count():
                     cancel.first.click()          # 绝不真发求助
                     page.wait_for_timeout(500)
+            else:
+                print("   （没找到紧急求助按钮，跳过确认框截图）")
         except Exception as e:  # noqa: BLE001
             print(f"   （老年端截图降级：{type(e).__name__}）")
+
+        # ---------- 7b) 老年端：社区小助手（快捷问题大按钮）----------
+        try:
+            page.goto(f"{BASE}/elderly/agent", wait_until="networkidle")
+            page.wait_for_timeout(2200)
+            shot(page, "15-老年端-社区小助手.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （老人端小助手截图降级：{type(e).__name__}）")
+
+        # ---------- 7c) 老年端：用药提醒（我吃了 / 10 分钟后再说）----------
+        try:
+            page.goto(f"{BASE}/elderly/medication", wait_until="networkidle")
+            page.wait_for_timeout(2200)
+            shot(page, "16-老年端-用药提醒.png")
+        except Exception as e:  # noqa: BLE001
+            print(f"   （用药提醒截图降级：{type(e).__name__}）")
         ctx.close()
         browser.close()
 
