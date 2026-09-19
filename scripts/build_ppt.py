@@ -9,7 +9,20 @@
     python scripts/build_ppt.py --out D:\\答辩素材\\路演.pptx
 
 前置：先跑 `python scripts/shoot_ppt_assets.py` 抓截图（缺失的图会自动跳过，不影响生成）。
-设计约束（按用户要求）：标题 ≥40pt、正文 ≥24pt、不出现代码、每页正文 ≤3 行、字少图多。
+
+结构（15 页）：
+  正文 11 页 封面 / 痛点 / 方案总览 / 架构与数据流 / 多智能体与双层防线 / 适老化 /
+             五步流程 / 再看几处细节 / 功能一览 / 数字墙 / 位置与诉求
+  备用 2 页  规则为主·LLM 为辅 / 防编造与数据安全
+  附录 2 页  如需看实物 / 最常被问的四个问题
+
+设计约束（用户要求）：标题 ≥40pt、正文尽量 ≥20pt、不出现代码、字少图多、
+**页面上不写"给作者自己看"的说明**（如"未做美化""本地可复现"），也不写舞台提示。
+
+排版教训（已内建）：
+  · 封面标题只占左侧、与右侧截图不重叠（曾被截图盖住右半段，看起来像截断）
+  · 竖屏手机截图必须 letterbox（按宽度缩放会变很高，压住下方说明）
+  · 被 PowerPoint 占用的文件：先写 .tmp 再替换，失败则改存"（新版）"并提示
 """
 import argparse
 import os
@@ -35,7 +48,12 @@ INK = RGBColor(0x1B, 0x22, 0x33)
 GREY = RGBColor(0x6B, 0x74, 0x85)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 LIGHT = RGBColor(0xF2, 0xF5, 0xFB)
+PALE = RGBColor(0xE8, 0xEE, 0xF9)
 FONT = "微软雅黑"
+MAIN_PAGES = 11          # 正文档数（页码显示 n/11）
+
+ROLES = ["接待员", "报修调度", "提案协商", "政策专员", "健康顾问",
+         "天气守护", "通知管理", "网格助手", "合规审计"]
 
 
 def _set_font(run, size, bold=False, color=INK, font=FONT):
@@ -45,18 +63,18 @@ def _set_font(run, size, bold=False, color=INK, font=FONT):
     run.font.color.rgb = color
     run.font.name = font
     rPr = run._r.get_or_add_rPr()
-    for tag in ("a:latin", "a:ea", "a:cs"):
-        el = rPr.find(f"{{http://schemas.openxmlformats.org/drawingml/2006/main}}{tag.split(':')[1]}")
+    ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    for tag in ("latin", "ea", "cs"):
+        el = rPr.find(ns + tag)
         if el is None:
             from lxml import etree
-            el = etree.SubElement(rPr, f"{{http://schemas.openxmlformats.org/drawingml/2006/main}}{tag.split(':')[1]}")
+            el = etree.SubElement(rPr, ns + tag)
         el.set("typeface", font)
 
 
 def bg(slide, color):
     from pptx.enum.shapes import MSO_SHAPE
-    shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0,
-                                 Inches(13.333), Inches(7.5))
+    shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(13.333), Inches(7.5))
     shp.fill.solid()
     shp.fill.fore_color.rgb = color
     shp.line.fill.background()
@@ -102,12 +120,26 @@ def pic(slide, name, x, y, w=None, h=None):
     return slide.shapes.add_picture(p, Inches(x), Inches(y), **kw)
 
 
-def page_no(slide, n, total, name=True):
-    """统一页脚：左侧项目名（可选）+ 右侧页码 + 一条细分割线。
+def pic_fit(slide, name, x, y, box_w, box_h):
+    """把图片等比装进给定外框（letterbox）——竖屏手机截图必须用这个，否则会压住下方文字。"""
+    p = os.path.join(ASSETS, name)
+    if not os.path.exists(p):
+        return None
+    from PIL import Image
+    iw, ih = Image.open(p).size
+    ar = iw / ih
+    w = min(box_w, box_h * ar)
+    h = w / ar
+    return pic(slide, name, x + (box_w - w) / 2, y + (box_h - h) / 2, w=w)
 
-    为什么加页脚：这份 PPT 可能被主办方**单独翻看**（没有人讲解），每页都带项目名与页码，
-    翻到任意一页都知道这是什么、在第几页。
-    """
+
+def title(slide, t):
+    box(slide, 0.6, 0.55, 0.14, 0.62, ORANGE)
+    text(slide, 0.95, 0.5, 11.8, 0.9, [t], size=40, bold=True, color=NAVY)
+
+
+def page_no(slide, n, total=MAIN_PAGES, name=True, label=""):
+    """统一页脚：细分隔线 + 左侧项目名 + 右侧页码（附录页给文字标签，避免两套分母）。"""
     from pptx.enum.shapes import MSO_SHAPE
     line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.6), Inches(7.12),
                                   Inches(11.9), Pt(0.75))
@@ -117,25 +149,17 @@ def page_no(slide, n, total, name=True):
     line.shadow.inherit = False
     if name:
         text(slide, 0.6, 7.18, 8.0, 0.3, ["社区先知 CommunityInsight"], size=11, color=GREY)
-    text(slide, 11.6, 7.18, 0.9, 0.3, [f"{n} / {total}"], size=11, color=GREY,
-         align=PP_ALIGN.RIGHT)
+    right = label if label else (f"{n} / {total}" if n else "")
+    if right:
+        text(slide, 11.0, 7.18, 1.5, 0.3, [right], size=11, color=GREY, align=PP_ALIGN.RIGHT)
 
 
-def title(slide, t):
-    box(slide, 0.6, 0.55, 0.14, 0.62, ORANGE)
-    text(slide, 0.95, 0.5, 11.8, 0.9, [t], size=40, bold=True, color=NAVY)
-
-
-def build(tests, golden, gi, out):
+def build(tests, golden):
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
-    total = 8
 
-    # ---------- 1 封面 ----------
-    # ⚠️ 排版教训（2026-09-15 实测）：标题文本框原来宽 11 英寸、一直伸到 12.1 英寸，
-    #    而右侧登录页截图从 8.3 英寸开始并且**后画**（在标题之上）→ 把 "…yInsight" 挡住了，
-    #    看起来像"标题被切断"。所以封面**标题只占左侧 6.6 英寸、分两行写**，右侧留给图，两者不重叠。
+    # ================= 正文 1：封面 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     bg(s, NAVY)
     text(s, 1.1, 1.55, 6.6, 0.95, ["社区先知"], size=52, bold=True, color=WHITE)
@@ -144,13 +168,11 @@ def build(tests, golden, gi, out):
     text(s, 1.1, 4.4, 6.6, 0.7, ["北京工商大学 · 单人开发"], size=22, color=WHITE)
     text(s, 1.1, 5.15, 6.6, 0.6, ["9·22 中关村软件园 OPC 沙龙"], size=16,
          color=RGBColor(0x9F, 0xB4, 0xD8))
-    # 迷你目录条：让人一眼知道这 8 页怎么走
-    text(s, 1.1, 6.0, 11.4, 0.5,
-         ["痛点  →  方案  →  五步流程  →  数字与诉求"], size=18, color=ORANGE)
+    text(s, 1.1, 6.0, 11.4, 0.5, ["痛点 → 方案 → 机制 → 界面 → 数字 → 诉求"],
+         size=18, color=ORANGE)
     pic(s, "01-登录页.png", 8.0, 1.5, w=4.6)
 
-    # ---------- 2 痛点 ----------
-    # 无现场演示后，页面必须自己说完整：四点全部上屏，不再写"第四点口述"
+    # ================= 正文 2：痛点 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "四个老问题")
     for i, t in enumerate(["网格员：一半时间在重复派单",
@@ -160,15 +182,12 @@ def build(tests, golden, gi, out):
         box(s, 0.95, 1.75 + i * 1.15, 7.4, 0.95, LIGHT)
         text(s, 1.2, 1.88 + i * 1.15, 6.9, 0.8, [t], size=22)
     pic(s, "06-网格员工作台.png", 8.7, 2.0, w=3.9)
-    page_no(s, 2, total)
+    page_no(s, 2)
 
-    # ---------- 3 方案总览 ----------
-    # 2026-09-15 增强：主办方可能"只看 PPT、不跑项目"，所以这一页补三端真实截图（每端一张 + 一行小字）
+    # ================= 正文 3：方案总览 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "9 个角色，像一个小组")
-    roles = ["接待员", "报修调度", "提案协商", "政策专员", "健康顾问",
-             "天气守护", "通知管理", "网格助手", "合规审计"]
-    for i, r in enumerate(roles):
+    for i, r in enumerate(ROLES):
         col, row = i % 3, i // 3
         box(s, 0.95 + col * 2.55, 1.8 + row * 1.02, 2.3, 0.86,
             BLUE if r == "合规审计" else LIGHT)
@@ -178,19 +197,41 @@ def build(tests, golden, gi, out):
     text(s, 8.3, 1.9, 4.4, 2.8,
          ["三端各 14 / 9 / 8 页：", "居民端：一句话报修、提问",
           "网格员端：工单、提案、导数据", "老人端：大字、语音、长按求助"], size=18, spacing=1.4)
-    # 三端缩略图（真实截图）—— 尺寸按几何校验调整，确保与上方文字、下方说明都不重叠
     pic(s, "02-居民首页与社区小助手.png", 0.95, 4.8, w=3.2)
     pic(s, "06-网格员工作台.png", 4.5, 4.8, w=3.2)
-    pic(s, "07-老年端大字首页.png", 9.4, 4.8, h=1.95)
+    pic_fit(s, "07-老年端大字首页.png", 9.2, 4.8, 1.6, 1.95)
     text(s, 0.95, 6.8, 3.2, 0.3, ["居民端"], size=13, color=GREY, align=PP_ALIGN.CENTER)
     text(s, 4.5, 6.8, 3.2, 0.3, ["网格员端"], size=13, color=GREY, align=PP_ALIGN.CENTER)
     text(s, 8.3, 6.8, 3.3, 0.3, ["老年端"], size=13, color=GREY, align=PP_ALIGN.CENTER)
-    page_no(s, 3, total)
+    page_no(s, 3)
 
-    # ---------- 4 多智能体与双层防线（重点） ----------
+    # ================= 正文 4：它是怎么搭起来的 =================
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    title(s, "它是怎么搭起来的")
+    for label, x in (("居民端", 0.95), ("网格员端", 3.1), ("老年端", 5.25)):
+        box(s, x, 1.9, 2.0, 0.95, LIGHT)
+        text(s, x, 2.13, 2.0, 0.5, [label], size=20, color=INK, align=PP_ALIGN.CENTER)
+    text(s, 7.6, 1.95, 4.9, 1.0,
+         ["三端共用一个后端", "（Vue3 + Naive UI，已构建为静态文件）"], size=16, color=GREY)
+    box(s, 0.95, 3.15, 11.4, 1.0, BLUE)
+    text(s, 1.2, 3.38, 11.0, 0.6,
+         ["主服务 FastAPI：接口 · 鉴权 · 安全响应头 · 实时通知"],
+         size=20, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+    text(s, 0.95, 4.4, 11.4, 0.5, ["9 个智能体角色（黑板协作）"], size=18, color=NAVY, bold=True)
+    for i, r in enumerate(ROLES):
+        x = 0.95 + i * 1.29
+        box(s, x, 4.9, 1.2, 0.62, LIGHT if r != "合规审计" else ORANGE)
+        text(s, x, 5.03, 1.2, 0.4, [r], size=12,
+             color=WHITE if r == "合规审计" else INK, align=PP_ALIGN.CENTER)
+    box(s, 0.95, 5.85, 11.4, 1.0, PALE)
+    text(s, 1.2, 6.02, 11.0, 0.7,
+         ["本地数据库 SQLite：约 50 张表 · 手机号 AES-256-GCM 加密 · 全流程留痕"],
+         size=18, color=INK, align=PP_ALIGN.CENTER)
+    page_no(s, 4)
+
+    # ================= 正文 5：多智能体与双层防线（重点） =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "它们真的在传消息")
-    # 「5 种消息」那行原来太长被折成「转 / 交」，改为拆两行写（COM 量到 textH 167.7 说明发生了折行）
     text(s, 0.95, 1.75, 6.4, 2.6,
          ["黑板：带锁 · 带版本 · 带历史",
           "5 种消息：请求 / 响应 / 通知 /",
@@ -201,10 +242,10 @@ def build(tests, golden, gi, out):
          ["规则为主，大模型为辅：", "意图/追问/政策生成 → 大模型",
           "状态机/派单/权限/加密 → 规则"], size=20, spacing=1.35)
     pic(s, "04-多智能体执行链.png", 7.7, 1.7, w=4.9)
-    text(s, 7.7, 6.15, 5.0, 0.5, ["↑ 现场展开的「多智能体执行链」"], size=14, color=GREY)
-    page_no(s, 4, total)
+    text(s, 7.7, 6.15, 5.0, 0.5, ["↑ 一次提问后，角色之间的执行链"], size=14, color=GREY)
+    page_no(s, 5)
 
-    # ---------- 5 适老化 ----------
+    # ================= 正文 6：适老化 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "老人端是重做的，不是放大的")
     text(s, 0.95, 1.8, 5.6, 3.2,
@@ -214,11 +255,9 @@ def build(tests, golden, gi, out):
     text(s, 0.95, 5.2, 5.6, 1.2, ["我怕老人放兜里，误触。"], size=22, color=ORANGE, bold=True)
     pic(s, "07-老年端大字首页.png", 7.1, 1.7, h=4.6)
     pic(s, "08-老年端长按求助确认框.png", 9.9, 1.7, h=4.6)
-    page_no(s, 5, total)
+    page_no(s, 6)
 
-    # ---------- 6 五步走查（无现场演示：全靠 PPT 内真实截图讲完） ----------
-    # 2026-09-15 修正：原来这页写"现在看它真的能跑 / 我跑一遍"，隐含后面有现场实操。
-    # 用户明确"不需要现场演示，都放进 PPT 里" → 改成五步截图走查，靠图自己讲完一套流程。
+    # ================= 正文 7：五步走完一套流程 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "五步走完一套流程")
     steps = [
@@ -230,100 +269,29 @@ def build(tests, golden, gi, out):
     ]
     x = 0.72
     for name, cap, sub in steps:
-        # 关键：竖屏手机截图按宽度缩放会变很高（390×844 → 高 4.98 英寸），会压住下方说明。
-        # 所以统一按"固定外框 letterbox"摆放：先量真实宽高比，再等比缩放装进 2.3×2.35 英寸的框。
-        path = os.path.join(ASSETS, name)
-        slot_w, slot_h = 2.3, 2.35
-        if os.path.exists(path):
-            from PIL import Image
-            iw, ih = Image.open(path).size
-            ar = iw / ih
-            w = min(slot_w, slot_h * ar)
-            h = w / ar
-            pic(s, name, x + (slot_w - w) / 2, 1.75 + (slot_h - h) / 2, w=w)
+        pic_fit(s, name, x, 1.75, 2.3, 2.35)
         box(s, x, 4.35, 2.3, 1.45, LIGHT)
         text(s, x, 4.46, 2.3, 0.5, [cap], size=20, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
         text(s, x, 5.02, 2.3, 0.7, [sub], size=14, color=GREY, align=PP_ALIGN.CENTER)
         x += 2.46
-    page_no(s, 6, total)
+    page_no(s, 7)
 
-    # ---------- 7 数字墙 ----------
+    # ================= 正文 8：再看几处细节 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    bg(s, NAVY)
-    title(s, "几个能复算的数字")
-    items = [(f"{tests}", "项测试 · 全绿"), ("550", "并发 · 零失败"),
-             (f"{golden}", "条金标 · 第一位命中 100%"), ("0", "ruff 问题")]
-    for i, (num, lab) in enumerate(items):
-        x = 0.95 + (i % 2) * 6.0
-        y = 2.1 + (i // 2) * 2.1
-        text(s, x, y, 5.4, 1.2, [num], size=72, bold=True, color=WHITE)
-        text(s, x, y + 1.15, 5.4, 0.6, [lab], size=22, color=ORANGE)
-    text(s, 0.95, 6.3, 11, 0.7, ["数据库 schema v46 · 约 50 张表　｜　本机自测，非第三方测评"],
-         size=20, color=WHITE)
-    page_no(s, 7, total)
-
-    # ---------- 8 下一步与诉求 ----------
-    s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "它现在的位置，和我想请教的三件事")
-    box(s, 0.95, 1.85, 11.4, 1.0, LIGHT)
-    text(s, 1.3, 2.0, 10.8, 0.7,
-         ["工程原型：还没在真实街道试点，没有运营数据，商业模式在探索"], size=24)
-    qs = [("① 多智能体的「自动」边界怎么划？", "想请教技术专家"),
-          ("② 第一个试点社区怎么找、怎么谈？", "想请教企业负责人"),
-          ("③ 没有历史数据，冷启动怎么破？", "想请教投资人视角")]
-    for i, (q, who) in enumerate(qs):
-        text(s, 1.2, 3.35 + i * 0.95, 8.4, 0.7, [q], size=26)
-        text(s, 9.8, 3.45 + i * 0.95, 2.6, 0.6, [who], size=15, color=GREY)
-    text(s, 1.2, 6.5, 11, 0.6, ["张奶奶那条路，现在是一句话。"], size=20, color=ORANGE, bold=True)
-    page_no(s, 8, total)
-
-    # ---------- 备用页 ----------
-    s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "备用：为什么规则为主、大模型为辅")
-    text(s, 0.95, 2.0, 11.4, 3.0,
-         ["接了 DeepSeek，但四个 LLM 开关默认关",
-          "意图识别 / 追问补全 / 政策生成 → 大模型",
-          "状态机 / 派单 / 权限 / 加密 → 永远走规则",
-          "每次调用 3–5 秒超时，自动回落规则"], size=26, spacing=1.5)
-    text(s, 0.95, 6.4, 11.4, 0.6, ["省成本，也保稳定——学生项目也养得起。"], size=20, color=GREY)
-
-    s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "备用：防编造与数据安全")
-    text(s, 0.95, 2.0, 11.4, 3.4,
-         ["政策回答强制挂知识库出处，回答完回查数据库",
-          "敏感词 + 权限再审计一道；查不到就转人工",
-          "手机号 AES-256-GCM 加密存储，展示导出脱敏",
-          "SQL 参数化；合规审计员有一票否决"], size=26, spacing=1.5)
-
-    # ---------- 附录 1：界面一览（主办方"只看 PPT 不跑项目"时靠这页看全貌） ----------
-    s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "附录 · 更多界面")
+    title(s, "再看几处细节")
     gallery = [
         ("03-政策问答带依据与属地.png", "政策问答：答案下方给知识库依据，并标注适用地区", 0.95, 3.6),
         ("05-工单详情与处理留痕.png", "工单详情：谁在什么时候处理，全有留痕", 4.85, 3.6),
         ("09-报修列表与状态.png", "居民端报修列表：状态一目了然", 8.75, 3.6),
     ]
-    for name, cap, x, w in gallery:
-        pic(s, name, x, 1.8, w=w)
-        text(s, x, 4.25, w, 0.9, [cap], size=14, color=GREY)
+    for name, cap, gx, gw in gallery:
+        pic(s, name, gx, 1.8, w=gw)
+        text(s, gx, 4.25, gw, 0.9, [cap], size=14, color=GREY)
+    page_no(s, 8)
 
-    # ---------- 附录 2：怎么在电脑上跑起来（若主办方之后想看实物） ----------
+    # ================= 正文 9：现在能用的功能 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "附录 · 如需看实物：三步跑起来")
-    text(s, 0.95, 1.9, 11.4, 2.6,
-         ["1) 双击项目文件夹里的「启动演示」",
-          "2) 等它提示「服务已就绪」（首次约 10–20 秒，会自动建好数据库）",
-          "3) 浏览器会自动打开登录页"], size=26, spacing=1.5)
-    box(s, 0.95, 4.4, 11.4, 1.9, LIGHT)
-    text(s, 1.25, 4.6, 10.8, 1.6,
-         ["演示账号：居民点「居民」免密 · 老年点「老年」免密 · 网格员 demo_grid / demo123",
-          "环境：Windows + Python 3.10 以上；首次启动会自动装依赖",
-          "没有网络也能演示：大模型与天气会自动回到规则与本地数据"],
-         size=18, spacing=1.35)
-
-    # ---------- 附录 3：功能一览（用户给的功能清单，原 deck 只隐含提到，独立阅读时会漏） ----------
-    s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "附录 · 现在能用的功能")
+    title(s, "现在能用的功能")
     feats = [
         ("报修", "全状态机：提交 → 审核 → 派单 → 处理 → 办结 → 回访"),
         ("提案", "全生命周期：提交 → 附议 → 回应 → 采纳 → 实施"),
@@ -341,34 +309,73 @@ def build(tests, golden, gi, out):
         box(s, x, y, 5.6, 1.05, LIGHT)
         text(s, x + 0.25, y + 0.12, 1.6, 0.8, [k], size=20, bold=True, color=NAVY)
         text(s, x + 1.9, y + 0.18, 3.5, 0.8, [v], size=15, color=INK)
-    page_no(s, 13, 15, name=False)
+    page_no(s, 9)
 
-    # ---------- 附录 4：架构与数据流（用形状画，一眼看清"东西是怎么搭起来的"） ----------
+    # ================= 正文 10：数字墙 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "附录 · 它是怎么搭起来的")
-    for i, (label, x) in enumerate([("居民端", 0.95), ("网格员端", 3.1), ("老年端", 5.25)]):
-        box(s, x, 1.9, 2.0, 0.95, LIGHT)
-        text(s, x, 2.13, 2.0, 0.5, [label], size=20, color=INK, align=PP_ALIGN.CENTER)
-    text(s, 7.6, 1.9, 4.9, 1.0,
-         ["三端共用一个后端", "（Vue3 + Naive UI，已构建为静态文件）"], size=16, color=GREY)
-    box(s, 0.95, 3.15, 11.4, 1.0, BLUE)
-    text(s, 1.2, 3.38, 11.0, 0.6,
-         ["主服务 FastAPI：接口 · 鉴权 · 安全响应头 · 实时通知"],
-         size=20, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
-    text(s, 0.95, 4.4, 11.4, 0.5, ["9 个智能体角色（黑板协作）"], size=18, color=NAVY, bold=True)
-    for i, r in enumerate(["接待员", "报修调度", "提案协商", "政策专员", "健康顾问",
-                           "天气守护", "通知管理", "网格助手", "合规审计"]):
-        x = 0.95 + i * 1.29
-        box(s, x, 4.9, 1.2, 0.62, LIGHT if r != "合规审计" else ORANGE)
-        text(s, x, 5.03, 1.2, 0.4, [r], size=12,
-             color=WHITE if r == "合规审计" else INK, align=PP_ALIGN.CENTER)
-    box(s, 0.95, 5.85, 11.4, 1.0, RGBColor(0xE8, 0xEE, 0xF9))
-    text(s, 1.2, 6.02, 11.0, 0.7,
-         ["本地数据库 SQLite：约 50 张表 · 手机号 AES-256-GCM 加密 · 全流程留痕"],
-         size=18, color=INK, align=PP_ALIGN.CENTER)
-    page_no(s, 14, 15, name=False)
+    bg(s, NAVY)
+    title(s, "几个能复算的数字")
+    items = [(f"{tests}", "项测试 · 全绿"), ("550", "并发 · 零失败"),
+             (f"{golden}", "条金标 · 第一位命中 100%"), ("0", "ruff 问题")]
+    for i, (num, lab) in enumerate(items):
+        x = 0.95 + (i % 2) * 6.0
+        y = 2.1 + (i // 2) * 2.1
+        text(s, x, y, 5.4, 1.2, [num], size=72, bold=True, color=WHITE)
+        text(s, x, y + 1.15, 5.4, 0.6, [lab], size=22, color=ORANGE)
+    text(s, 0.95, 6.3, 11, 0.7, ["数据库 schema v46 · 约 50 张表　｜　本机自测，非第三方测评"],
+         size=20, color=WHITE)
+    page_no(s, 10)
 
-    # ---------- 附录 5：常见问答（独立阅读时最容易被问的四个问题，直接写在页上） ----------
+    # ================= 正文 11：位置与诉求 =================
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    title(s, "它现在的位置，和我想请教的三件事")
+    box(s, 0.95, 1.85, 11.4, 1.0, LIGHT)
+    text(s, 1.3, 2.0, 10.8, 0.7,
+         ["工程原型：还没在真实街道试点，没有运营数据，商业模式在探索"], size=24)
+    qs = [("① 多智能体的「自动」边界怎么划？", "想请教技术专家"),
+          ("② 第一个试点社区怎么找、怎么谈？", "想请教企业负责人"),
+          ("③ 没有历史数据，冷启动怎么破？", "想请教投资人视角")]
+    for i, (q, who) in enumerate(qs):
+        text(s, 1.2, 3.35 + i * 0.95, 8.4, 0.7, [q], size=26)
+        text(s, 9.8, 3.45 + i * 0.95, 2.6, 0.6, [who], size=15, color=GREY)
+    text(s, 1.2, 6.5, 11, 0.6, ["张奶奶那条路，现在是一句话。"], size=20, color=ORANGE, bold=True)
+    page_no(s, 11)
+
+    # ================= 备用 1 =================
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    title(s, "备用：为什么规则为主、大模型为辅")
+    text(s, 0.95, 2.0, 11.4, 3.0,
+         ["接了 DeepSeek，但四个 LLM 开关默认关",
+          "意图识别 / 追问补全 / 政策生成 → 大模型",
+          "状态机 / 派单 / 权限 / 加密 → 永远走规则",
+          "每次调用 3–5 秒超时，自动回落规则"], size=26, spacing=1.5)
+    text(s, 0.95, 6.3, 11.4, 0.6, ["省成本，也保稳定。"], size=20, color=GREY)
+
+    # ================= 备用 2 =================
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    title(s, "备用：防编造与数据安全")
+    text(s, 0.95, 2.0, 11.4, 3.4,
+         ["政策回答强制挂知识库出处，回答完回查数据库",
+          "敏感词 + 权限再审计一道；查不到就转人工",
+          "手机号 AES-256-GCM 加密存储，展示导出脱敏",
+          "SQL 参数化；合规审计员有一票否决"], size=26, spacing=1.5)
+
+    # ================= 附录 1：如需看实物 =================
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    title(s, "附录 · 如需看实物")
+    text(s, 0.95, 1.9, 11.4, 2.6,
+         ["1) 双击项目文件夹里的「启动演示」",
+          "2) 等它提示「服务已就绪」（首次约 10–20 秒，会自动建好数据库）",
+          "3) 浏览器会自动打开登录页"], size=26, spacing=1.5)
+    box(s, 0.95, 4.4, 11.4, 1.9, LIGHT)
+    text(s, 1.25, 4.6, 10.8, 1.6,
+         ["演示账号：居民点「居民」免密 · 老年点「老年」免密 · 网格员 demo_grid / demo123",
+          "环境：Windows + Python 3.10 以上；首次启动会自动装依赖",
+          "没有网络也能用：大模型与天气会自动回到规则与本地数据"],
+         size=18, spacing=1.35)
+    page_no(s, None, label="附录")
+
+    # ================= 附录 2：最常被问的四个问题 =================
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "附录 · 最常被问的四个问题")
     qa = [
@@ -386,32 +393,31 @@ def build(tests, golden, gi, out):
         box(s, 0.95, y, 11.4, 1.12, LIGHT if i % 2 == 0 else WHITE)
         text(s, 1.2, y + 0.1, 11.0, 0.45, [q], size=20, bold=True, color=NAVY)
         text(s, 1.2, y + 0.58, 11.0, 0.5, [a], size=15, color=INK)
-    page_no(s, 15, 15, name=False)
+    page_no(s, None, label="附录")
 
-    # ---------- 讲者备注：让"只有 PPT"的人也能看懂每页要说什么 ----------
+    # ================= 讲者备注（顺序与页面一一对应） =================
     notes = [
         "开场（30 秒，不念 PPT）：上周，我家楼下张奶奶摔了一跤。她想找人帮忙，手机却只会打给外地的儿子。等社区知道这件事，天已经黑了。——这一晚没有人做错什么，是这条路太长了。我想把它缩短成一句话，这就是社区先知。",
         "各位专家好，我是北京工商大学大二学生。这个项目我一个人做。它服务三种人：居民、网格员、老人。今天六分钟，我讲三件事：怎么做、能干什么、我卡在哪。",
         "四个痛点：网格员一半时间在重复派单；老人不会用手机、报修太难；网上政策没出处不敢信；天气/健康/通知分属不同部门，出事没人主动联动。主动说明：还没在真实街道试点，这是下一步。",
         "把社区里的事拆开交给 9 个角色。三端各 14 / 9 / 8 页。数据放在本地一个库里，不用搭服务器。",
+        "它是怎么搭起来的：三端共用一个 FastAPI 后端，中间是 9 个角色在黑板协作，最下面是本地数据库（约 50 张表、手机号加密、全流程留痕）。整条链路不依赖外部服务，一台普通电脑就能跑。",
         "重点页（90 秒）：9 个角色不写死流程，靠黑板 + 5 种消息真来往；每轮过校验员与仲裁器，合规审计一票否决。大模型只做意图/追问/政策生成，状态机、派单、权限、加密永远走规则；四个开关默认关。防编造三招：强制出处、回查数据库、敏感词与权限审计。实话：这是按规则分工协作，不是完全自主的大模型智能体。",
         "老人端是单独重做的：大字大按钮、免登录、语音报修、用药提醒点一下。紧急求助要长按 3 秒再确认——我怕老人放兜里误触。",
         "五步走查（本场不需要实操，全靠 PPT 里的截图）：① 居民一句话报修 → ② 政策问答带依据与属地 → ③ 天气联动点开执行链 → ④ 老人端长按求助出确认框 → ⑤ 网格员工作台看待办。讲的时候按图说：这一步居民做了什么、系统回了什么。",
+        "再看几处细节：政策问答的答案下面有知识库依据和适用地区；工单详情里能看到谁在什么时候处理；居民端报修列表状态一目了然。这三张是五步之外的补充。",
+        "功能全景：报修全状态机、提案全生命周期、通知四类、政策问答带出处、健康咨询不诊断并转人工、天气联动、网格员工作台的 AI 助手与导出、以及转人工的处理包（用户信息 + 执行链 + 待确认事项）。",
         "几个能复算的数字：638 项测试全绿、550 并发零失败、48 条金标第一位命中 100%、ruff 0；数据库 v46、约 50 张表。都是本机自测，不是第三方测评。",
         "它现在的位置：工程原型，没在真实街道试点，没有运营数据，商业模式在探索。今天不是来要投资，是来请教三个问题：多智能体的自动边界怎么划、第一个试点社区怎么谈、没有历史数据怎么冷启动。张奶奶那条路，现在是一句话。",
         "备用页：被追问「为什么不全用大模型」时翻到这页。",
         "备用页：被追问「会不会编造、数据安全吗」时翻到这页。",
-        "附录：若对方想看更多界面细节，翻到这页（政策问答依据、工单留痕、报修列表）。",
         "附录：若对方想知道怎么在电脑上看实物，翻到这页。",
-        "附录：功能全景，方便独立阅读的人核对「到底能做什么」。",
-        "附录：架构与数据流，用一张图讲清三端、主服务、9 个角色、本地数据库的关系。",
         "附录：四个最常被问的问题与诚实回答，独立阅读时直接看这页。",
     ]
     for i, note in enumerate(notes):
         if i < len(prs.slides):
             prs.slides[i].notes_slide.notes_text_frame.text = note
 
-    # 保存交给 _save_safely（它负责"被 PowerPoint 占用"的处理），这里只返回对象
     return prs
 
 
@@ -420,7 +426,7 @@ def _save_safely(prs, out: str) -> tuple[str, str]:
 
     踩过的坑（2026-09-15）：目标 pptx 正被 PowerPoint 打开时写入会 PermissionError，
     而脚本已经跑完一半——更糟的是**校验脚本随后校验的是旧文件**，会给出"通过"的假结论。
-    所以这里先写 .tmp，再 os.replace；被占用时保留 .tmp 并明确告知怎么处理。
+    所以这里先写 .tmp，再 os.replace；被占用时保留新版文件并明确告知怎么处理。
     """
     tmp = out + ".tmp"
     prs.save(tmp)
@@ -446,7 +452,8 @@ def main() -> int:
     ap.add_argument("--out", default=os.path.join(ROOT, "docs", "competition",
                                                   "9月22日路演-社区先知.pptx"))
     args = ap.parse_args()
-    p, warn = _save_safely(build(args.tests, args.golden, args.tests, args.out), args.out)
+    prs = build(args.tests, args.golden)
+    p, warn = _save_safely(prs, args.out)
     size = os.path.getsize(p) // 1024
     deck = Presentation(p)
     n_slides = len(deck.slides)
@@ -454,11 +461,10 @@ def main() -> int:
                   if sl.has_notes_slide and sl.notes_slide.notes_text_frame.text.strip())
     n_pics = sum(1 for sl in deck.slides for sh in sl.shapes if sh.shape_type == 13)
     print(f"✅ 已生成：{p}（{size} KB）")
-    print(f"   共 {n_slides} 页 = 正文 8 页 + 备用 2 页 + 附录 5 页；"
+    print(f"   共 {n_slides} 页 = 正文 {MAIN_PAGES} 页 + 备用 2 页 + 附录 2 页；"
           f"{n_notes} 页带讲者备注；内嵌截图 {n_pics} 张")
-    n_pic = sum(1 for _ in os.listdir(ASSETS)) if os.path.isdir(ASSETS) else 0
-    print(f"   截图素材目录：{ASSETS}（{n_pic} 个文件）")
-    print("   数字口径：测试 %d / 金标 %d（改数字重跑本脚本即可）" % (args.tests, args.golden))
+    print(f"   截图素材目录：{ASSETS}")
+    print(f"   数字口径：测试 {args.tests} / 金标 {args.golden}（改数字重跑本脚本即可）")
     if warn:
         print("   " + warn)
     return 0
