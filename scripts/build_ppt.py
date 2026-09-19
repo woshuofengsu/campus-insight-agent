@@ -131,15 +131,17 @@ def build(tests, golden, gi, out):
     pic(s, "01-登录页.png", 8.0, 1.6, w=4.6)
 
     # ---------- 2 痛点 ----------
+    # 无现场演示后，页面必须自己说完整：四点全部上屏，不再写"第四点口述"
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "四个老问题")
     for i, t in enumerate(["网格员：一半时间在重复派单",
                            "老人：不会用手机，报修太难",
-                           "政策：网上答案没出处，不敢信"]):
-        box(s, 0.95, 1.9 + i * 1.35, 7.4, 1.05, LIGHT)
-        text(s, 1.25, 2.05 + i * 1.35, 6.9, 0.8, [t], size=28)
-    text(s, 0.95, 6.0, 11, 0.6,
-         ["（第四点口述：天气、健康、通知分属不同部门，出事没人主动联动）"], size=16, color=GREY)
+                           "政策：网上答案没出处，不敢信",
+                           "天气 / 健康 / 通知：分属不同部门，出事没人主动联动"]):
+        box(s, 0.95, 1.75 + i * 1.15, 7.4, 0.95, LIGHT)
+        text(s, 1.2, 1.88 + i * 1.15, 6.9, 0.8, [t], size=22)
+    text(s, 0.95, 6.5, 11.9, 0.6,
+         ["（这一页之后我会主动说明：还没在真实街道试点，这是下一步）"], size=15, color=GREY)
     pic(s, "06-网格员工作台.png", 8.7, 2.0, w=3.9)
     page_no(s, 2, total)
 
@@ -197,14 +199,38 @@ def build(tests, golden, gi, out):
     pic(s, "08-老年端长按求助确认框.png", 9.9, 1.7, h=4.6)
     page_no(s, 5, total)
 
-    # ---------- 6 现场演示 ----------
+    # ---------- 6 五步走查（无现场演示：全靠 PPT 内真实截图讲完） ----------
+    # 2026-09-15 修正：原来这页写"现在看它真的能跑 / 我跑一遍"，隐含后面有现场实操。
+    # 用户明确"不需要现场演示，都放进 PPT 里" → 改成五步截图走查，靠图自己讲完一套流程。
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    title(s, "现在看它真的能跑")
-    steps = ["① 居民报修", "② 政策问答（看依据）", "③ 天气联动（看执行链）",
-             "④ 老人端长按求助", "⑤ 网格员工作台"]
-    for i, t in enumerate(steps):
-        box(s, 0.95, 1.95 + i * 1.0, 11.4, 0.82, LIGHT if i % 2 == 0 else WHITE)
-        text(s, 1.3, 2.08 + i * 1.0, 10.6, 0.6, [t], size=26)
+    title(s, "五步走完一套流程（真实截图）")
+    steps = [
+        ("10-提交报修表单.png", "① 报修", "一句话提交"),
+        ("03-政策问答带依据与属地.png", "② 政策问答", "带依据与属地"),
+        ("04-多智能体执行链.png", "③ 天气联动", "看执行链"),
+        ("08-老年端长按求助确认框.png", "④ 老人端", "长按 3 秒再确认"),
+        ("06-网格员工作台.png", "⑤ 网格端", "待办与处理"),
+    ]
+    x = 0.72
+    for name, cap, sub in steps:
+        # 关键：竖屏手机截图按宽度缩放会变很高（390×844 → 高 4.98 英寸），会压住下方说明。
+        # 所以统一按"固定外框 letterbox"摆放：先量真实宽高比，再等比缩放装进 2.3×2.35 英寸的框。
+        path = os.path.join(ASSETS, name)
+        slot_w, slot_h = 2.3, 2.35
+        if os.path.exists(path):
+            from PIL import Image
+            iw, ih = Image.open(path).size
+            ar = iw / ih
+            w = min(slot_w, slot_h * ar)
+            h = w / ar
+            pic(s, name, x + (slot_w - w) / 2, 1.75 + (slot_h - h) / 2, w=w)
+        box(s, x, 4.35, 2.3, 1.45, LIGHT)
+        text(s, x, 4.46, 2.3, 0.5, [cap], size=20, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
+        text(s, x, 5.02, 2.3, 0.7, [sub], size=14, color=GREY, align=PP_ALIGN.CENTER)
+        x += 2.46
+    text(s, 0.72, 6.15, 11.9, 0.7,
+         ["均为系统实际界面截图，未做美化；这套流程在本地双击启动脚本即可复现"],
+         size=15, color=GREY)
     page_no(s, 6, total)
 
     # ---------- 7 数字墙 ----------
@@ -259,17 +285,13 @@ def build(tests, golden, gi, out):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     title(s, "附录 · 界面一览（真实截图，未做美化）")
     gallery = [
-        ("03-政策问答带依据与属地.png", "政策问答：带知识库依据 + 适用地区", 0.95, 3.6),
-        ("05-工单详情与处理留痕.png", "工单详情：处理留痕时间线", 4.85, 3.6),
-        ("08-老年端长按求助确认框.png", "老年端：长按 3 秒后的确认框", 9.0, None),
+        ("03-政策问答带依据与属地.png", "政策问答：答案下方给知识库依据，并标注适用地区", 0.95, 3.6),
+        ("05-工单详情与处理留痕.png", "工单详情：谁在什么时候处理，全有留痕", 4.85, 3.6),
+        ("09-报修列表与状态.png", "居民端报修列表：状态一目了然", 8.75, 3.6),
     ]
     for name, cap, x, w in gallery:
-        if w:                                    # 桌面截图：按宽度缩放
-            pic(s, name, x, 1.8, w=w)
-            text(s, x, 4.2, w, 0.9, [cap], size=14, color=GREY)
-        else:                                    # 手机截图：按高度缩放（很高，说明放到底部）
-            pic(s, name, x, 1.8, h=4.3)
-            text(s, 8.8, 6.25, 3.8, 0.7, [cap], size=14, color=GREY)
+        pic(s, name, x, 1.8, w=w)
+        text(s, x, 4.25, w, 0.9, [cap], size=14, color=GREY)
 
     # ---------- 附录 2：怎么在电脑上跑起来（若主办方之后想看实物） ----------
     s = prs.slides.add_slide(prs.slide_layouts[6])
@@ -293,7 +315,7 @@ def build(tests, golden, gi, out):
         "把社区里的事拆开交给 9 个角色。三端各 14 / 9 / 8 页。数据放在本地一个库里，不用搭服务器。",
         "重点页（90 秒）：9 个角色不写死流程，靠黑板 + 5 种消息真来往；每轮过校验员与仲裁器，合规审计一票否决。大模型只做意图/追问/政策生成，状态机、派单、权限、加密永远走规则；四个开关默认关。防编造三招：强制出处、回查数据库、敏感词与权限审计。实话：这是按规则分工协作，不是完全自主的大模型智能体。",
         "老人端是单独重做的：大字大按钮、免登录、语音报修、用药提醒点一下。紧急求助要长按 3 秒再确认——我怕老人放兜里误触。",
-        "现场演示五步：居民报修 → 政策问答（看依据）→ 天气联动（看执行链）→ 老人端长按求助 → 网格员工作台。",
+        "现场演示五步（本场不需要实操，全靠 PPT 内截图）：① 居民一句话报修 → ② 政策问答带依据与属地 → ③ 天气联动点开执行链 → ④ 老人端长按求助出确认框 → ⑤ 网格员工作台看待办。讲的时候按图说：这一步居民做了什么、系统回了什么。",
         "几个能复算的数字：638 项测试全绿、550 并发零失败、48 条金标第一位命中 100%、ruff 0；数据库 v46、约 50 张表。都是本机自测，不是第三方测评。",
         "它现在的位置：工程原型，没在真实街道试点，没有运营数据，商业模式在探索。今天不是来要投资，是来请教三个问题：多智能体的自动边界怎么划、第一个试点社区怎么谈、没有历史数据怎么冷启动。张奶奶那条路，现在是一句话。",
     ]
@@ -301,8 +323,32 @@ def build(tests, golden, gi, out):
         tf = prs.slides[i].notes_slide.notes_text_frame
         tf.text = note
 
-    prs.save(out)
-    return out
+    # 保存交给 _save_safely（它负责"被 PowerPoint 占用"的处理），这里只返回对象
+    return prs
+
+
+def _save_safely(prs, out: str) -> tuple[str, str]:
+    """安全落盘：先写临时文件，再尝试替换目标。
+
+    踩过的坑（2026-09-15）：目标 pptx 正被 PowerPoint 打开时写入会 PermissionError，
+    而脚本已经跑完一半——更糟的是**校验脚本随后校验的是旧文件**，会给出"通过"的假结论。
+    所以这里先写 .tmp，再 os.replace；被占用时保留 .tmp 并明确告知怎么处理。
+    """
+    tmp = out + ".tmp"
+    prs.save(tmp)
+    try:
+        os.replace(tmp, out)
+        return out, ""
+    except PermissionError:
+        alt = out.replace(".pptx", "（新版）.pptx")
+        try:
+            os.replace(tmp, alt)
+        except OSError:
+            alt = tmp
+        return alt, ("⚠️ 目标文件正被 PowerPoint 打开，已改存为："
+                     f"{os.path.basename(alt)}\n"
+                     "   处理：关掉 PowerPoint 里那份 PPT 后重跑本脚本；"
+                     "或直接用这个新版文件（旧文件仍是上一版）。")
 
 
 def main() -> int:
@@ -312,16 +358,21 @@ def main() -> int:
     ap.add_argument("--out", default=os.path.join(ROOT, "docs", "competition",
                                                   "9月22日路演-社区先知.pptx"))
     args = ap.parse_args()
-    p = build(args.tests, args.golden, args.tests, args.out)
+    p, warn = _save_safely(build(args.tests, args.golden, args.tests, args.out), args.out)
     size = os.path.getsize(p) // 1024
-    n_slides = len(Presentation(p).slides)
-    n_notes = sum(1 for sl in Presentation(p).slides
+    deck = Presentation(p)
+    n_slides = len(deck.slides)
+    n_notes = sum(1 for sl in deck.slides
                   if sl.has_notes_slide and sl.notes_slide.notes_text_frame.text.strip())
+    n_pics = sum(1 for sl in deck.slides for sh in sl.shapes if sh.shape_type == 13)
     print(f"✅ 已生成：{p}（{size} KB）")
-    print(f"   共 {n_slides} 页 = 正文 8 页 + 备用 2 页 + 附录 2 页；其中 {n_notes} 页带讲者备注")
+    print(f"   共 {n_slides} 页 = 正文 8 页 + 备用 2 页 + 附录 2 页；"
+          f"{n_notes} 页带讲者备注；内嵌截图 {n_pics} 张")
     n_pic = sum(1 for _ in os.listdir(ASSETS)) if os.path.isdir(ASSETS) else 0
-    print(f"   截图素材：{ASSETS}（{n_pic} 个文件）")
+    print(f"   截图素材目录：{ASSETS}（{n_pic} 个文件）")
     print("   数字口径：测试 %d / 金标 %d（改数字重跑本脚本即可）" % (args.tests, args.golden))
+    if warn:
+        print("   " + warn)
     return 0
 
 
