@@ -148,10 +148,10 @@ def page_no(slide, n, total=MAIN_PAGES, name=True, label=""):
     line.line.fill.background()
     line.shadow.inherit = False
     if name:
-        text(slide, 0.6, 7.18, 8.0, 0.3, ["社区先知 CommunityInsight"], size=11, color=GREY)
+        text(slide, 0.6, 7.16, 8.0, 0.3, ["社区先知 CommunityInsight"], size=12, color=GREY)
     right = label if label else (f"{n} / {total}" if n else "")
     if right:
-        text(slide, 11.0, 7.18, 1.5, 0.3, [right], size=11, color=GREY, align=PP_ALIGN.RIGHT)
+        text(slide, 11.0, 7.16, 1.5, 0.3, [right], size=12, color=GREY, align=PP_ALIGN.RIGHT)
 
 
 def build(tests, golden):
@@ -196,13 +196,13 @@ def build(tests, golden):
              align=PP_ALIGN.CENTER)
     text(s, 8.3, 1.9, 4.4, 2.8,
          ["三端各 14 / 9 / 8 页：", "居民端：一句话报修、提问",
-          "网格员端：工单、提案、导数据", "老人端：大字、语音、长按求助"], size=18, spacing=1.4)
+          "网格员端：工单、提案、导数据", "老人端：大字、语音、长按求助"], size=19, spacing=1.4)
     pic(s, "02-居民首页与社区小助手.png", 0.95, 4.8, w=3.2)
     pic(s, "06-网格员工作台.png", 4.5, 4.8, w=3.2)
     pic_fit(s, "07-老年端大字首页.png", 9.2, 4.8, 1.6, 1.95)
-    text(s, 0.95, 6.8, 3.2, 0.3, ["居民端"], size=13, color=GREY, align=PP_ALIGN.CENTER)
-    text(s, 4.5, 6.8, 3.2, 0.3, ["网格员端"], size=13, color=GREY, align=PP_ALIGN.CENTER)
-    text(s, 8.3, 6.8, 3.3, 0.3, ["老年端"], size=13, color=GREY, align=PP_ALIGN.CENTER)
+    text(s, 0.95, 6.78, 3.2, 0.3, ["居民端"], size=15, color=GREY, align=PP_ALIGN.CENTER)
+    text(s, 4.5, 6.78, 3.2, 0.3, ["网格员端"], size=15, color=GREY, align=PP_ALIGN.CENTER)
+    text(s, 8.3, 6.78, 3.3, 0.3, ["老年端"], size=15, color=GREY, align=PP_ALIGN.CENTER)
     page_no(s, 3)
 
     # ================= 正文 4：它是怎么搭起来的 =================
@@ -212,7 +212,7 @@ def build(tests, golden):
         box(s, x, 1.9, 2.0, 0.95, LIGHT)
         text(s, x, 2.13, 2.0, 0.5, [label], size=20, color=INK, align=PP_ALIGN.CENTER)
     text(s, 7.6, 1.95, 4.9, 1.0,
-         ["三端共用一个后端", "（Vue3 + Naive UI，已构建为静态文件）"], size=16, color=GREY)
+         ["三端共用一个后端", "（Vue3 + Naive UI，已构建为静态文件）"], size=17, color=GREY)
     box(s, 0.95, 3.15, 11.4, 1.0, BLUE)
     text(s, 1.2, 3.38, 11.0, 0.6,
          ["主服务 FastAPI：接口 · 鉴权 · 安全响应头 · 实时通知"],
@@ -221,12 +221,12 @@ def build(tests, golden):
     for i, r in enumerate(ROLES):
         x = 0.95 + i * 1.29
         box(s, x, 4.9, 1.2, 0.62, LIGHT if r != "合规审计" else ORANGE)
-        text(s, x, 5.03, 1.2, 0.4, [r], size=12,
+        text(s, x, 5.02, 1.2, 0.45, [r], size=13,
              color=WHITE if r == "合规审计" else INK, align=PP_ALIGN.CENTER)
     box(s, 0.95, 5.85, 11.4, 1.0, PALE)
     text(s, 1.2, 6.02, 11.0, 0.7,
          ["本地数据库 SQLite：约 50 张表 · 手机号 AES-256-GCM 加密 · 全流程留痕"],
-         size=18, color=INK, align=PP_ALIGN.CENTER)
+         size=19, color=INK, align=PP_ALIGN.CENTER)
     page_no(s, 4)
 
     # ================= 正文 5：多智能体与双层防线（重点） =================
@@ -242,7 +242,7 @@ def build(tests, golden):
          ["规则为主，大模型为辅：", "意图/追问/政策生成 → 大模型",
           "状态机/派单/权限/加密 → 规则"], size=20, spacing=1.35)
     pic(s, "04-多智能体执行链.png", 7.7, 1.7, w=4.9)
-    text(s, 7.7, 6.15, 5.0, 0.5, ["↑ 一次提问后，角色之间的执行链"], size=14, color=GREY)
+    text(s, 7.7, 6.12, 5.2, 0.5, ["↑ 一次提问后，角色之间的执行链"], size=16, color=GREY)
     page_no(s, 5)
 
     # ================= 正文 6：适老化 =================
@@ -272,7 +272,7 @@ def build(tests, golden):
         pic_fit(s, name, x, 1.75, 2.3, 2.35)
         box(s, x, 4.35, 2.3, 1.45, LIGHT)
         text(s, x, 4.46, 2.3, 0.5, [cap], size=20, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
-        text(s, x, 5.02, 2.3, 0.7, [sub], size=14, color=GREY, align=PP_ALIGN.CENTER)
+        text(s, x, 5.0, 2.3, 0.7, [sub], size=16, color=GREY, align=PP_ALIGN.CENTER)
         x += 2.46
     page_no(s, 7)
 
@@ -286,7 +286,7 @@ def build(tests, golden):
     ]
     for name, cap, gx, gw in gallery:
         pic(s, name, gx, 1.8, w=gw)
-        text(s, gx, 4.25, gw, 0.9, [cap], size=14, color=GREY)
+        text(s, gx, 4.25, gw, 0.9, [cap], size=16, color=GREY)
     page_no(s, 8)
 
     # ================= 正文 9：现在能用的功能 =================
@@ -308,7 +308,7 @@ def build(tests, golden):
         y = 1.9 + row * 1.25
         box(s, x, y, 5.6, 1.05, LIGHT)
         text(s, x + 0.25, y + 0.12, 1.6, 0.8, [k], size=20, bold=True, color=NAVY)
-        text(s, x + 1.9, y + 0.18, 3.5, 0.8, [v], size=15, color=INK)
+        text(s, x + 1.9, y + 0.16, 3.5, 0.8, [v], size=16, color=INK)
     page_no(s, 9)
 
     # ================= 正文 10：数字墙 =================
@@ -372,7 +372,7 @@ def build(tests, golden):
          ["演示账号：居民点「居民」免密 · 老年点「老年」免密 · 网格员 demo_grid / demo123",
           "环境：Windows + Python 3.10 以上；首次启动会自动装依赖",
           "没有网络也能用：大模型与天气会自动回到规则与本地数据"],
-         size=18, spacing=1.35)
+         size=19, spacing=1.35)
     page_no(s, None, label="附录")
 
     # ================= 附录 2：最常被问的四个问题 =================
@@ -392,7 +392,7 @@ def build(tests, golden):
         y = 1.85 + i * 1.32
         box(s, 0.95, y, 11.4, 1.12, LIGHT if i % 2 == 0 else WHITE)
         text(s, 1.2, y + 0.1, 11.0, 0.45, [q], size=20, bold=True, color=NAVY)
-        text(s, 1.2, y + 0.58, 11.0, 0.5, [a], size=15, color=INK)
+        text(s, 1.2, y + 0.56, 11.0, 0.55, [a], size=16, color=INK)
     page_no(s, None, label="附录")
 
     # ================= 讲者备注（顺序与页面一一对应） =================

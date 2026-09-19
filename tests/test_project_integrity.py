@@ -27,7 +27,10 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 BINARY_EXT = (".png", ".jpg", ".jpeg", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".pdf",
-              ".zip", ".webm", ".mp4", ".db", ".xlsx", ".docx")
+              ".zip", ".webm", ".mp4", ".db", ".xlsx", ".docx",
+              # Office 格式同样是 ZIP 二进制容器：2026-09-15 把路演 PPT 入库时，本门禁
+              # 曾把 .pptx 误判为"非 UTF-8 文本文件"——二进制必须显式排除。
+              ".pptx", ".ppt", ".doc", ".xls", ".7z", ".rar", ".gz")
 
 # 允许保留历史引用的目录（历史快照，不参与链接检查）
 HISTORY_PREFIXES = ("docs/review/", "docs/superpowers/", "docs/TECHNICAL.md",
