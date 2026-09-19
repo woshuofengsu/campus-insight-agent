@@ -96,16 +96,62 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print(f"   （执行链截图降级：{type(e).__name__}）")
 
-        # ---------- 5) 报修工单详情（处理留痕）----------
+        # ---------- 4b) 居民端：AI 聊天里的「一句话报修」----------
+        # 真实流程（已实测，且有状态）：说一句话 → 识别报修意图 → 只追问关键项
+        # （如"是您家里还是公共区域？"）→ 回一张「请您确认报修信息：问题/分类/紧急程度」
+        # 卡片 + 【确认提交】【取消】。所以抓两帧：①AI 整理好、等人确认（18）
+        # ②点确认后生成工单（19）。注意 18/19 是**居民端**；网格员端的处理画面是 17。
+        try:
+            page.goto(f"{BASE}/resident/home", wait_until="networkidle")
+            page.wait_for_timeout(1500)
+            box = page.get_by_placeholder("请输入您的问题", exact=False).first
+            box.click()
+            box.fill("我家厨房水管漏水了")
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(8000)
+            chat = page.locator(".agent-chat").first
+            confirm = chat.get_by_text("确认提交", exact=True)
+            # 追问补全可能还有 1–2 轮：优先点"家里/公共区域/一般/紧急"这类选项
+            for _ in range(3):
+                if confirm.count():
+                    break
+                labels = [t.strip() for t in chat.locator("button").all_inner_texts() if t.strip()]
+                pick = next((p for p in ("家里", "公共区域", "一般", "紧急", "是") if p in labels), None)
+                if not pick:
+                    break
+                chat.get_by_text(pick, exact=True).first.click()
+                page.wait_for_timeout(6000)
+            if confirm.count():
+                confirm.first.scroll_into_view_if_needed()
+                page.wait_for_timeout(500)
+                page.mouse.wheel(0, -150)        # 往上一点，让提问与信息卡同框
+                page.wait_for_timeout(400)
+                shot(page, "18-居民端-一句话报修.png")
+                print("     一句话 → AI 整理出报修单，等居民确认")
+                confirm.first.click()            # 真的确认一次，抓"已生成工单"那一帧
+                page.wait_for_timeout(5000)
+                shot(page, "19-居民端-报修已生成.png")
+                print("     确认后：" + " ".join(chat.inner_text().split())[-100:])
+            else:
+                print("     ⚠️ 没走到「确认提交」：一句话报修的流程可能变了，18/19 未更新")
+                print("        当前对话：" + " ".join(chat.inner_text().split())[:160])
+        except Exception as e:  # noqa: BLE001
+            print(f"   （一句话报修截图降级：{type(e).__name__}）")
+
+        # ---------- 5) 报修列表 + 工单详情（居民视角）----------
+        # 坑：居民端列表不是表格，是 `div.card` 卡片（v-for），用 tbody tr 永远点不进去，
+        # 会静默产出"两张一样的列表图"。这里改成点卡片标题进详情。
         try:
             page.goto(f"{BASE}/resident/work-orders", wait_until="networkidle")
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(1800)
             shot(page, "09-报修列表与状态.png")          # 列表页（点进详情前先抓）
-            first_row = page.locator("tbody tr").first
-            if first_row.count():
-                first_row.click()
-                page.wait_for_timeout(1800)
-            shot(page, "05-工单详情与处理留痕.png")
+            title_link = page.locator("div.card b").first
+            if title_link.count():
+                title_link.click()
+                page.wait_for_timeout(2000)
+                shot(page, "05-工单详情与处理留痕.png")
+            else:
+                print("     ⚠️ 报修列表没有卡片，05 未更新")
         except Exception as e:  # noqa: BLE001
             print(f"   （工单详情截图降级：{type(e).__name__}）")
 
@@ -154,6 +200,17 @@ def main() -> int:
             page.goto(f"{BASE}/grid/work-orders", wait_until="networkidle")
             page.wait_for_timeout(1800)
             shot(page, "13-网格员端-工单管理.png")
+            # 展开第一行 → 露出审核/派单/处理操作区。
+            # PPT 第 9 页要的是"网格员端正在处理"的画面，不能用居民端视角的工单详情（05 是居民视角）。
+            toggle = page.get_by_text("展开", exact=False).first
+            if toggle.count():
+                toggle.click()
+                page.wait_for_timeout(1200)
+                anchor = page.get_by_text("审核意见", exact=False).first
+                if anchor.count():
+                    anchor.scroll_into_view_if_needed()
+                    page.wait_for_timeout(600)
+                shot(page, "17-网格员端-工单处理.png")
         except Exception as e:  # noqa: BLE001
             print(f"   （工单管理截图降级：{type(e).__name__}）")
 
