@@ -10,6 +10,7 @@ import json
 import logging
 import re
 from data.db_core import get_db
+from utils.pii import scrub_field
 from data.db_notifications import log_activity
 
 _log = logging.getLogger(__name__)
@@ -148,6 +149,9 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
 
     校验必填项、手机号格式；识别特殊情况；信息齐全生成工单（状态待审核）。
     """
+    title = scrub_field(title, "issue.title")
+    location = scrub_field(location, "issue.location")
+    description = scrub_field(description, "issue.description")
     # 校验
     if not title or not description or not location:
         return 0, "报修标题、地址和问题描述都不能为空，请补充完整。"
@@ -378,6 +382,7 @@ def resolve_issue(issue_id: int, resolve_note: str, photo_after: str = "[]",
 def feedback_issue(issue_id: int, satisfied: bool, reason: str = "",
                    actor: str = "居民") -> tuple[bool, str]:
     """居民满意度反馈。满意 → 处理结束；不满意 → 退回处理中（重新计时）。"""
+    reason = scrub_field(reason, "issue.feedback.reason")
     with get_db() as conn:
         row = conn.execute(
             "SELECT status FROM community_issues WHERE id=?", (issue_id,)
@@ -502,6 +507,7 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
 
     补充后自动通知负责人，提示确认是否影响紧急程度/分类（若影响，计时重算或重新分派）。
     """
+    content = scrub_field(content, "issue.supplement")
     if not content:
         return False, "补充内容不能为空"
     new_count = 0

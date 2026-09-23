@@ -27,6 +27,7 @@ import re
 from datetime import datetime, timedelta
 
 from data.db_core import get_db
+from utils.pii import scrub_field
 from data.db_notifications import log_activity
 from data.db_repair import _dec_phone, _enc_phone
 from utils.timeutil import utcnow
@@ -639,6 +640,7 @@ def submit_consult(user_id: int, name: str, phone: str, consult_type: str,
 
     返回 (咨询 ID, 提示语, 咨询编号)。失败返回 (0, 错误信息, "")。
     """
+    content = scrub_field(content, "consult.content")
     if not name or not name.strip():
         return 0, "姓名不能为空（可为昵称，但联系电话必须真实）", ""
     if not _validate_phone(phone):

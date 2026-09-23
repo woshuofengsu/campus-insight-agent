@@ -1,180 +1,188 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>社区先知 · 9·22 提词卡（A4） — 社区先知 CommunityInsight Agent</title>
-<style>
-  :root {
-    --text: #1a1a1a; --text2: #555;
-    --accent: #2563eb; --border: #d0d0d0;
-    --bg: #fff; --code-bg: #f5f5f5;
-    --th-bg: #f0f4ff;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
-    background: var(--bg); color: var(--text);
-    padding: 40px 36px; max-width: 900px; margin: 0 auto;
-    line-height: 1.9; font-size: 15px;
-  }
-  h1 {
-    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
-    letter-spacing: 0.04em; font-weight: 700;
-  }
-  h2 {
-    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
-    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
-    font-weight: 700;
-  }
-  h3 {
-    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
-    font-weight: 700;
-  }
-  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
-
-  /* -- metadata card -- */
-  .meta {
-    background: #fafafa; border: 1px solid var(--border);
-    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
-    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
-  }
-  .meta strong { color: #222; }
-  .meta a { color: var(--accent); }
-
-  /* -- tables -- */
-  table {
-    border-collapse:collapse; width:100%; margin: 12px 0 18px;
-    font-size: 0.88em; line-height: 1.6;
-  }
-  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
-  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
-  tr:nth-child(even) td { background: #fafafa; }
-
-  /* -- code -- */
-  code {
-    background: var(--code-bg); color: #d63384;
-    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
-  }
-  pre {
-    background: #f8f8f8; border: 1px solid var(--border);
-    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
-    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
-    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
-  }
-  pre code { background: none; color: inherit; padding: 0; }
-
-  /* -- lists -- */
-  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
-  li { margin: 2px 0; line-height: 1.8; }
-
-  /* -- blockquote -- */
-  blockquote {
-    background: #fafafa; border-left: 3px solid var(--accent);
-    padding: 10px 16px; margin: 10px 0; color: #555;
-    font-size: 0.9em;
-  }
-  blockquote strong { color: #333; }
-
-  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
-
-  strong { color: #111; }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-
-  .footer {
-    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
-    text-align: center; color: #999; font-size: 0.82em;
-  }
-
-  @media (max-width: 640px) {
-    body { padding: 20px 16px; font-size: 14px; }
-    .meta { max-width: 100%; }
-    table { font-size: 0.78em; }
-    th, td { padding: 5px 7px; }
-  }
-  @media print {
-    body { max-width: 100%; padding: 0; }
-    .meta { background: none; border: 1px solid #ccc; }
-    pre { background: none; border: 1px solid #ccc; }
-  }
-</style>
-</head>
-<body>
-<h1>9·22 路演提词卡（A4 · 台上只看这一张）</h1>
-
-<div class="meta"><strong>总时长 7:21</strong>（限时 5–8 分钟，缓冲 39 秒） · 全程 PPT 翻页 · <strong>不切系统</strong> · 兜底 PDF：<code>docs/competition/pdf/9月22日路演-PPT预览.pdf</code>（放桌面）<br><strong>第 5 页</strong>（85 秒核心）另有独立大字卡：<code>docs/competition/pdf/9月22日提词卡-第5页.pdf</code>（1 张 2 面：正面动线 / 反面卡住与追问）</div>
-
-<h2>一、翻页动线与每页一句话（16 步）</h2>
-
+<!doctype html><html><head><meta charset='utf-8'><style>
+@page { size:A4; margin:4mm 7mm; }
+* { box-sizing:border-box; }
+body { font-family:"Microsoft YaHei","微软雅黑",sans-serif; color:#1f2733; line-height:1.06; font-size:8.6pt; }
+h1 { color:#1B2F52; font-size:13pt; border-bottom:2px solid #ED7D2E; padding-bottom:3px; margin:0 0 4px; }
+h2 { color:#1B2F52; font-size:9.6pt; margin:3px 0 1px; border-left:5px solid #ED7D2E; padding-left:8px; }
+h3 { color:#2750B0; font-size:10pt; margin:10px 0 4px; }
+p { margin:1px 0; }
+table { border-collapse:collapse; width:100%; margin:2px 0; font-size:6.8pt; table-layout:fixed; word-wrap:break-word; }
+th { background:#1B2F52; color:#fff; border:1px solid #b9c4d6; padding:1px 4px; text-align:left; }
+td { border:1px solid #c9d2e0; padding:0 4px; vertical-align:top; }
+tr:nth-child(even) td { background:#f3f6fb; }
+blockquote { background:#f3f6fb; border-left:4px solid #2F63D4; margin:2px 0; padding:3px 8px; color:#33415c; }
+blockquote p { margin:3px 0; }
+code { background:#eef2f8; padding:1px 4px; border-radius:3px; font-family:Consolas,monospace; font-size:7.6pt; }
+pre { background:#1B2F52; color:#eef3fb; padding:8px 10px; border-radius:5px; font-size:8.5pt; white-space:pre-wrap; }
+strong { color:#c05a12; }
+ul,ol { margin:5px 0; padding-left:22px; }
+li { margin:0; }
+hr { border:none; border-top:1px solid #d8dee8; margin:10px 0; }
+</style></head><body><h1>9·22 路演提词卡（A4 · 台上只看这一张）</h1>
+<blockquote>
+<p><strong>总 7:32</strong>（限 5–8 分钟，缓冲 28 秒）· 全程翻页不切系统 · 兜底 PDF：<code>pdf/9月22日路演-PPT预览.pdf</code>（放桌面）· 共 <strong>20 页 = 正文 17（第 17 页大字谢谢）+ 备用 18 数据安全 / 19 怎么跑 / 20 四问</strong></p>
+</blockquote>
+<h2>一、翻页动线（18 步）</h2>
 <table>
-<th>步</th><th>页</th><th>一句话（照着说）</th><th>秒</th><th>累计</th>
-<tr><td>1</td><td>未翻页</td><td><strong>开场故事</strong>：上周，我家楼下张奶奶摔了一跤……我想把它缩短成一句话</td><td>25</td><td>00:25</td></tr>
-<tr><td>2</td><td>1 封面</td><td>各位专家好，我是<strong>步承泽</strong>，北京工商大学大二学生。这个项目从需求、架构到测试都是我一个人做的。讲三件事：怎么做、能干什么、我卡在哪</td><td>7</td><td>00:32</td></tr>
-<tr><td>3</td><td>2 痛点</td><td>四个老问题：重复派单 / 老人不会用 / 政策没出处 / 部门不联动。<strong>再说一句：还没在真实街道试点</strong></td><td>28</td><td>01:00</td></tr>
-<tr><td>4</td><td>3 角色</td><td>拆开交给 9 个角色；<strong>三个端各管一种人</strong>——居民 14 页 / 网格 9 页 / 老人 8 页</td><td>25</td><td>01:25</td></tr>
-<tr><td>5</td><td>4 架构</td><td>三端共用一个后端；中间是 9 个角色在黑板协作；下面是本地 SQLite，手机号加密、全程留痕、<strong>不用运维</strong></td><td>30</td><td>01:55</td></tr>
-<tr><td>6</td><td>5 重点</td><td>黑板 + 5 种消息真来往；校验 + 仲裁，<strong>合规审计一票否决</strong>；规则为主、大模型为辅；<strong>这是按规则分工协作，不是全自主</strong></td><td>85</td><td>03:20</td></tr>
-<tr><td>7</td><td>6 居民端·报修</td><td><strong>三个端我分开讲</strong>；一句「我家厨房水管漏水了」→ AI 理出问题/分类/紧急程度 → <strong>我点确认才提交</strong>；也可手动填表；<strong>安全隐患自动升级紧急通知</strong></td><td>25</td><td>03:45</td></tr>
-<tr><td>8</td><td>7 居民端·问与议</td><td>政策答案挂<strong>依据 + 适用地区</strong>，查不到就转人工；邻里议事能提提案、附议；通知三类 + 已读回执</td><td>25</td><td>04:10</td></tr>
-<tr><td>9</td><td>8 网格员端·工作台</td><td>一页看完：<strong>待办</strong> / 红黑榜 / 按条件导出周报 / <strong>AI 助手用大白话问数据</strong></td><td>25</td><td>04:35</td></tr>
-<tr><td>10</td><td>9 网格员端·留痕与关怀</td><td>批量派单、<strong>退回必须写意见</strong>；<strong>点开一行，审核/派单/处理都在这做，全程留痕</strong>；<strong>用药和联系人要审核</strong>；老人求助要确认响应再结束</td><td>25</td><td>05:00</td></tr>
-<tr><td>11</td><td>10 老人端·看得见</td><td>不是放大、是重做；字大按钮大免登录；首页六件事；<strong>天气和帮助能语音念出来</strong></td><td>25</td><td>05:25</td></tr>
-<tr><td>12</td><td>11 老人端·不会打字</td><td><strong>三条路</strong>：点现成的话 / 语音报修 / 用药提醒（"我吃了"·"10 分钟后再说"）；长按 3 秒 + <strong>10 秒自动取消</strong></td><td>25</td><td>05:50</td></tr>
-<tr><td>13</td><td>12 功能（分端）</td><td><strong>一列一段往下扫</strong>：居民端 14 页（拍照提交/草稿/时间线/提案投票/依据属地）· 网格员端 9 页（待办+红黑榜/派单协商转出/批量导出/审核类）· 老人端 8 页（语音/用药/听通知/联系人）· 底部跨端（处理包/双层防线/治理大屏）</td><td>30</td><td>06:20</td></tr>
-<tr><td>14</td><td>13 数字</td><td><strong>638</strong> 项测试全绿 · <strong>550</strong> 并发零失败 · <strong>48</strong> 条金标 100% · ruff 0 · v46 / 约 50 张表；<strong>补一句：本机自测，非第三方测评</strong></td><td>25</td><td>06:45</td></tr>
-<tr><td>15</td><td>14 诉求</td><td>它是工程原型：<strong>没试点、没运营数据、商业模式在探索</strong>。今天不是要投资，是请教三个问题</td><td>26</td><td>07:11</td></tr>
-<tr><td>16</td><td>15 结尾</td><td><strong>停一下，看着台下</strong>：「张奶奶那条路，现在是一句话。」→「谢谢各位。」<strong>说完就停，不补话</strong></td><td>10</td><td>07:21</td></tr>
+<thead>
+<tr>
+<th>步</th>
+<th>页</th>
+<th>一句话（照着说）</th>
+<th>秒</th>
+<th>累计</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>未翻页</td>
+<td><strong>开场故事</strong>：张奶奶摔了一跤……我想把它缩短成一句话</td>
+<td>25</td>
+<td>0:25</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1 封面</td>
+<td>步承泽，北工商大二，项目一个人做；讲三件事：怎么搭 / 能干啥 / 卡在哪</td>
+<td>8</td>
+<td>0:33</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2 痛点</td>
+<td>重复派单 · 老人不会用 · 政策没出处 · 部门不联动；<strong>还没真实试点</strong></td>
+<td>30</td>
+<td>1:03</td>
+</tr>
+<tr>
+<td>4</td>
+<td>3 三端</td>
+<td>居民"一句话" · 网格"待办有据" · 老人"看得见按得动"；<strong>指橙条：手机/平板/电脑浏览器打开即用、免装 App</strong>；先看功能全景</td>
+<td>20</td>
+<td>1:23</td>
+</tr>
+<tr>
+<td>5</td>
+<td>4 功能全景</td>
+<td><strong>三列快速扫、不逐条念</strong>；底座四条：协作 / 防编造 / 加密留痕 / 断网降级</td>
+<td>16</td>
+<td>1:39</td>
+</tr>
+<tr>
+<td>6</td>
+<td>5 架构</td>
+<td>三端→FastAPI→9 角色黑板→SQLite；加密 · 留痕 · <strong>不用运维</strong></td>
+<td>28</td>
+<td>2:07</td>
+</tr>
+<tr>
+<td>7</td>
+<td>6 角色</td>
+<td>发起 / 处理 / 把关；<strong>合规审计一票否决</strong>（指橙色块）</td>
+<td>20</td>
+<td>2:27</td>
+</tr>
+<tr>
+<td>8</td>
+<td>7 传消息 ★</td>
+<td>一块黑板 + 5 种消息；两个联动；校验 + 仲裁两道关。<strong>放慢，指右侧执行链大图</strong></td>
+<td>55</td>
+<td>3:22</td>
+</tr>
+<tr>
+<td>9</td>
+<td>8 AI 可控</td>
+<td>模型管意图/追问/政策；规则管状态机/派单/权限/加密；三招防编造；开关默认关；<strong>按规则分工，非全自主</strong></td>
+<td>40</td>
+<td>4:02</td>
+</tr>
+<tr>
+<td>10</td>
+<td>9 居民报修</td>
+<td>一句话→追问→整理成单；<strong>我点「确认提交」才提交</strong>；隐患自动升级；也能手填</td>
+<td>26</td>
+<td>4:28</td>
+</tr>
+<tr>
+<td>11</td>
+<td>10 居民问议</td>
+<td>政策挂<strong>依据 + 属地</strong>，查不到转人工；议事可提案附议；通知三类有回执</td>
+<td>26</td>
+<td>4:54</td>
+</tr>
+<tr>
+<td>12</td>
+<td>11 网格工作台</td>
+<td>待办一眼全；一句带过<strong>红黑榜下钻、批量派单关闭</strong>；AI 大白话问数据、导出周报，查不到直说</td>
+<td>24</td>
+<td>5:18</td>
+</tr>
+<tr>
+<td>13</td>
+<td>12 网格留痕</td>
+<td><strong>退回写意见、派单填人+电话，全程留痕</strong>；用药联系人审核；SOS 要确认</td>
+<td>26</td>
+<td>5:44</td>
+</tr>
+<tr>
+<td>14</td>
+<td>13 老人看得见</td>
+<td>重做非放大；大字免登录；首页六件事；<strong>能语音念</strong>（停半秒让图说话）</td>
+<td>24</td>
+<td>6:08</td>
+</tr>
+<tr>
+<td>15</td>
+<td>14 老人不会打字</td>
+<td>点大按钮 / 语音报修 / 用药两个键需审核 / <strong>长按 3 秒+再确认，10 秒取消</strong>；"我怕放兜里误触"</td>
+<td>28</td>
+<td>6:36</td>
+</tr>
+<tr>
+<td>16</td>
+<td>15 数字</td>
+<td><strong>638</strong> 测试 · <strong>550</strong> 并发 · <strong>48</strong> 金标 100% · ruff 0 · v46；<strong>本机自测、可复算</strong></td>
+<td>24</td>
+<td>7:00</td>
+</tr>
+<tr>
+<td>17</td>
+<td>16 诉求</td>
+<td>工程原型<strong>没试点 / 没数据 / 模式探索</strong>；三个请教；指屏幕底部张奶奶那句</td>
+<td>24</td>
+<td>7:24</td>
+</tr>
+<tr>
+<td>18</td>
+<td>17 谢谢</td>
+<td>翻到大字"谢谢各位老师"，<strong>停一下</strong>看台下，说谢谢、敬请指正，<strong>说完就停不补话</strong></td>
+<td>8</td>
+<td>7:32</td>
+</tr>
+</tbody>
 </table>
-
-<h2>二、三个"绝不砍"</h2>
-
+<h2>二、四个"绝不砍"</h2>
+<p>① 开场故事　② <strong>第 7 页</strong>黑板消息 + 双层防线（核心）　③ <strong>第 8 页</strong>"规则为主、非全自主"（差异点）　④ <strong>第 16 页</strong>认没试点 + 三个请教，<strong>第 17 页</strong>大字谢谢收尾（不补话）。</p>
+<h2>三、超时砍谁（按顺序）</h2>
+<p>第 4 页功能全景只扫底座一条 → 第 10 页只讲政策依据 → 第 11 页只留待办+导出 → 第 5 页架构压到 15 秒。<br />
+<strong>自查点</strong>：1:03 痛点完 → 1:39 全景完 → <strong>3:22 第 7 页完</strong> → 4:02 AI 可控完 → 4:54 居民完 → 5:44 网格完 → <strong>6:36 三端全完</strong> → 7:32 谢谢（上限 8:00）。</p>
+<h2>四、被追问翻哪页（不占正文时间）</h2>
 <ul>
-<li><strong>1.</strong> <strong>开场故事</strong>（没有它，结尾那句就白写了）</li>
-<li><strong>2.</strong> <strong>第 5 页</strong>：双层防线 + "规则为主、大模型为辅"</li>
-<li><strong>3.</strong> <strong>第 14 页</strong>：主动说"还没试点" + 三个请教问题</li>
-<li><strong>4.</strong> <strong>第 15 页</strong>：结尾那句"张奶奶那条路，现在是一句话"（说完就停）</li>
+<li><strong>为什么不全用大模型 → 第 8 页</strong>：意图/追问/政策用模型；状态机/派单/权限/加密永远规则，四开关默认关。</li>
+<li><strong>会不会编造 / 数据安全 → 第 8 或 18 页</strong>：强制出处 + 回查库 + 敏感词权限审计；手机号 AES-256-GCM、展示脱敏。</li>
+<li><strong>能体验吗 / 怎么跑 → 第 19 页</strong>：双击「启动演示」→ 等就绪 → 自动开页；居民/老年免密，网格 demo_grid + demo123。</li>
+<li><strong>真实用户 / 商业模式 → 第 20 页</strong>："四问写在附录"：没试点、没运营数据、定价没验证。</li>
 </ul>
-
-<h2>三、超时了砍谁（按顺序）</h2>
-
-<p>第 7 页（居民端·问与议）→ 第 12 页功能只念前四项 → 第 4 页架构压到 15 秒。<br><strong>时间点自查</strong>：01:00 讲完痛点 → <strong>03:20 讲完第 5 页</strong> → 04:10 居民端讲完 → 05:00 网格员端讲完 → <strong>05:50 三端全部讲完</strong> → 07:21 说完谢谢（上限 8:00）。</p>
-
-<h2>四、被追问时翻哪页（不占正文时间）</h2>
-
-<table>
-<th>被问</th><th>翻到</th><th>说什么</th>
-<tr><td>为什么不全用大模型</td><td><strong>翻回第 5 页</strong></td><td>意图/追问/政策生成用大模型；状态机/派单/权限/加密永远走规则，四个开关默认关</td></tr>
-<tr><td>会不会编造 / 数据安全</td><td><strong>翻回第 5 页</strong></td><td>强制出处 + 回查数据库 + 敏感词与权限审计；手机号 AES-256-GCM，展示脱敏</td></tr>
-<tr><td>能不能体验 / 怎么跑</td><td>附录 1</td><td>双击「启动演示」→ 等提示就绪 → 浏览器自动打开；账号：居民免密 / 网格员 demo_grid + demo123</td></tr>
-<tr><td>有真实用户吗 / 商业模式</td><td>附录 2</td><td>直接说"这四个问题我写在附录里"：没有试点、没有运营数据、定价没验证</td></tr>
-</table>
-
-<p><strong>万能三句</strong>：① 这个问题很关键 ② 我目前的理解是……（只讲确定的）③ 我记下来，作为下一步优化项。</p>
-
-<h2>五、三种意外，各一句话</h2>
-
+<p><strong>万能三句</strong>：① 这个问题很关键　② 我目前的理解是……（只讲确定的）　③ 我记下来，作为下一步优化项。</p>
+<h2>五、三种意外</h2>
 <ul>
-<li><strong>PPT / 投影打不开</strong> → "我先用 PDF 版本放一遍，内容一样。"</li>
-<li><strong>翻错页 / 翻页笔失灵</strong> → "我往回一页。"（用键盘方向键；别在错页解释超过 3 秒）</li>
-<li><strong>忘词</strong> → "我停一下，看一眼我的笔记。"（少说比错说好）</li>
+<li><strong>PPT/投影打不开</strong> → "我先用 PDF 放一遍，内容一样。"</li>
+<li><strong>翻错页/笔失灵</strong> → "我往回一页。"（键盘方向键；错页别解释超 3 秒）</li>
+<li><strong>忘词</strong> → "我停一下，看一眼笔记。"（少说比错说好）</li>
 </ul>
-
 <h2>六、上台前 3 分钟</h2>
-
 <ul>
-<li>[ ] PPT 放映模式（F5）翻一遍，字体与图片正常</li>
-<li>[ ] 兜底 PDF 已放桌面</li>
-<li>[ ] 微信 / 系统通知已关；翻页笔或键盘可用</li>
-<li>[ ] 心里过三件事：<strong>讲故事 · 第 5 页是核心 · 主动说没试点</strong></li>
-</ul>
-
-<div class="footer">
-社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
-作者：步承泽
-</div>
-</body>
-</html>
+<li>[ ] F5 翻一遍，字体图片正常（共 20 页：正文 17 + 备查 3）　- [ ] 兜底 PDF 放桌面　- [ ] 关微信/通知，翻页笔或键盘可用</li>
+<li>[ ] 心里过四件事：<strong>讲故事 · 第 7 页核心 · 第 8 页认"非全自主" · 主动说没试点</strong></li>
+</ul></body></html>

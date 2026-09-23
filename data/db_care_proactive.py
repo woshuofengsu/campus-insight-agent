@@ -2,11 +2,15 @@
 """主动关怀（M4）：办结 24h 回访 + 久未活跃老人提醒。
 
 纯查询 + 写通知，不新建表、不喧宾夺主；办结回访用 activity_log 去重（跨 tick 幂等）。
+
+时间口径：**库内时间列一律 UTC**；`now` 形参与静默时段判断用**本地时间**，
+两者之间用 `utils.timeutil.local_to_utc_naive` 显式换算（2026-09-24 修的时区去重 bug）。
 """
 import logging
 from datetime import date, datetime, timedelta
 
 from data.database import get_db
+from utils.timeutil import local_to_utc_naive, utcnow
 
 _log = logging.getLogger(__name__)
 
@@ -27,12 +31,22 @@ def _is_quiet_hour(now: datetime | None = None) -> bool:
 def run_followup(now: datetime | None = None) -> int:
     """昨日办结且未回访 → 给居民发一条回访通知。返回新增回访数。
 
-    静默时段（21:00–8:00）不生成回访（7:00 前跑，等 8 点后 scheduler 下一分钟自然补发，不会漏）。
+    静默时段（21:00–8:00，**本地时间**）不生成回访（7:00 前跑，等 8 点后 scheduler 下一分钟自然补发，不会漏）。
+
+    ⚠️ 时间口径（2026-09-24 修）：`now` 是**本地时间**（与 `_is_quiet_hour` 一致），
+    而库里的时间列统一是 **UTC**。所以：
+    ① 去重日期与「昨日」都必须换算成 UTC 再比；
+    ② 插入 activity_log 时**显式写入 UTC 时间戳**，不再依赖 `CURRENT_TIMESTAMP`
+    （否则测试传入的 `now` 与库里的真实时间对不上，去重永远失败）。
+    修前实测：本地 0:00–8:00 期间 UTC 还在前一天，去重失效 → 重复给居民发回访。
     """
     now = now or datetime.now()
     if _is_quiet_hour(now):  # M4：夜间静默，只生成待办不打扰；次日自动补发
         return 0
-    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    now_utc = local_to_utc_naive(now)
+    yesterday = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
+    today_utc = now_utc.strftime("%Y-%m-%d")
+    stamp = now_utc.strftime("%Y-%m-%d %H:%M:%S")
     created = 0
     try:
         with get_db() as conn:
@@ -48,12 +62,12 @@ def run_followup(now: datetime | None = None) -> int:
                 u = conn.execute("SELECT 1 FROM user_profile WHERE id=?", (r["reporter_id"],)).fetchone()
                 if not u:
                     continue
-                # 去重：该工单今日已回访过则跳过
+                # 去重：该工单今日已回访过则跳过（按 UTC 日期比，与库内口径一致）
                 done = conn.execute(
                     "SELECT 1 FROM activity_log WHERE module='主动关怀' AND action='办结回访' "
                     "AND target_type='community_issue' AND target_id=? "
                     "AND substr(created_at,1,10)=? LIMIT 1",
-                    (r["id"], now.strftime("%Y-%m-%d"))).fetchone()
+                    (r["id"], today_utc)).fetchone()
                 if done:
                     continue
                 try:
@@ -63,9 +77,9 @@ def run_followup(now: datetime | None = None) -> int:
                         f"昨天报的「{r['title'][:20]}」现在还好吗？",
                         "没好利索的话点这里，我再帮您跟进。", related_id=r["id"])
                     conn.execute(
-                        "INSERT INTO activity_log (module, action, target_type, target_id, detail) "
-                        "VALUES ('主动关怀','办结回访','community_issue',?,?)",
-                        (r["id"], f"昨日已办结工单回访（1 次）"))
+                        "INSERT INTO activity_log (module, action, target_type, target_id, detail, created_at) "
+                        "VALUES ('主动关怀','办结回访','community_issue',?,?,?)",
+                        (r["id"], "昨日已办结工单回访（1 次）", stamp))
                     conn.commit()
                     created += 1
                 except Exception as e:  # noqa: BLE001
@@ -76,8 +90,13 @@ def run_followup(now: datetime | None = None) -> int:
 
 
 def list_inactive_elderly(days: int = 5, limit: int = 20) -> list[dict]:
-    """返回最近 days 天无活动的老年用户（供网格员端顶部"关怀提示"）。"""
-    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    """返回最近 days 天无活动的老年用户（供网格员端顶部"关怀提示"）。
+
+    ⚠️ 截止时间用 **UTC**：被比较的 `agent_dialogs.created_at` / `community_issues.reported_at` /
+    `medication_intake_log.taken_at` 都是库内 UTC 时间；之前这里用本地 `datetime.now()`，
+    会带来 8 小时偏差（临界点上把"刚活跃过的老人"误判为久未活跃）。
+    """
+    cutoff = (utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     out = []
     try:
         with get_db() as conn:

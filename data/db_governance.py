@@ -2,6 +2,7 @@
 import hashlib
 import logging
 from data.db_core import get_db
+from utils.pii import scrub_field
 
 _log = logging.getLogger(__name__)
 
@@ -445,6 +446,8 @@ def get_dissatisfaction_reasons(limit: int = 10) -> list[dict]:
 def create_proposal(title: str, description: str, category: str = "其他",
                      author: str = "", reporter_id: int | None = None) -> int:
     """新建一条社区提案，返回新提案 ID。"""
+    title = scrub_field(title, "gov.proposal.title")
+    description = scrub_field(description, "gov.proposal.description")
     if reporter_id is None:
         reporter_id = _resolve_reporter_id()
     with get_db() as conn:

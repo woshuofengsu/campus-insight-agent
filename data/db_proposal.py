@@ -28,6 +28,7 @@ _log = logging.getLogger(__name__)
 from datetime import datetime
 
 from data.db_core import get_db
+from utils.pii import scrub_field
 from data.db_notifications import log_activity, notify_proposal_status_change
 # 手机号加解密：与工单表（db_repair）用**同一实现**，避免两套 crypto 调用与两套降级逻辑
 # （复审 P2-A：提案表此前完全没走加密，明文列直接落库，生产库实测 181 条）
@@ -221,6 +222,8 @@ def submit_proposal(title: str, description: str, category: str,
     校验：标题 ≤50 字、内容 10~1000 字、类别五选一、电话格式、公开/私有必选。
     生成状态「待审核」。draft_id 给定时提交成功自动删除草稿。
     """
+    title = scrub_field(title, "proposal.title")
+    description = scrub_field(description, "proposal.description")
     title = (title or "").strip()
     description = (description or "").strip()
     reporter_name = (reporter_name or "").strip()
@@ -593,6 +596,7 @@ def _proposal_comment_author(user_id: int) -> str:
 
 def add_proposal_comment(pid: int, user_id: int, content: str) -> tuple[bool, str]:
     """公示中公开提案匿名议论（spec 补充：匿名看到别人议论、自己也能匿名议论）。"""
+    content = scrub_field(content, "proposal.comment")
     content = (content or "").strip()
     if not content:
         return False, "议论内容不能为空"

@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-09-24 · 按老师意见补完未完成项（批次 B1）
+
+**背景**：中段展演后，老师意见是"深化老年端 + 把多租户之类的未完成项做完"。
+先做了一轮**只读侦察**（结论见 `docs/spec/多租户与老年端深化-侦察报告.md`），再动手，避免按印象改。
+
+**本批完成**：
+
+- **自由文本 PII 脱敏（已知边界⑥，已收口）**：新增 `utils/pii.py`，在 7 处居民可手写写入点
+  （工单 title/location/description、满意度反馈 reason、补充说明、提案 title/description、公示期匿名议论、
+  健康咨询 content）做**入库前脱敏**：手机号 → `138****8000`（与 `data/db_repair._mask_phone` 同格式）、
+  身份证 → 保留首 6 末 4；命中打 warning 但**日志不记原文**。`tests/test_pii_scrub.py` 12 个用例
+  专门守"误伤"（订单号、短号、长数字串里嵌的 11 位）与"漏检"，并验证结构化手机号列的加密链路不受影响。
+- **修掉一个时区去重 bug**：`data/db_care_proactive.run_followup` 拿本地日期比库里的 UTC 时间列做去重，
+  且写 `activity_log` 时依赖 `CURRENT_TIMESTAMP`（UTC）→ 传入的 `now` 与库内时间对不上。
+  **准确结论**：错配窗口（本地 0–8 点）与"21:00–8:00 静默"重叠，生产上没真发出重复回访，
+  但测试必然失败、且静默时段一改就会重复打扰居民。已加 `utils/timeutil.local_to_utc_naive` /
+  `utc_stamp_of_local` 并统一按 UTC 写入；`list_inactive_elderly` 的截止时间同样改为 `utcnow()`。
+  回归：`tests/test_timeutil_utc.py`。
+- **侦察报告落档**：把"做了但没生效"的四项（平安打卡链路断、无人应答无定时触发、网格员关注列表是孤儿、
+  SOS 卡片读不存在的列）与三个隔离漏洞（缓存键不含租户**且在主线路径上**、agent 工具层绕过 REST、
+  `/weather/alerts` 无角色校验）连同 file:line 证据写入 `docs/spec/多租户与老年端深化-侦察报告.md`，
+  并给出 B2–B6 分批计划。
+
+---
+
 ## v1.0 定稿（2026-09-12）
 
 **基线**：可运行测试 **576 项**（576 passed / 1 skipped，需外部服务默认跳过）· schema **v46** · 130 条路由 · 9 个 Agent 角色 · 50 张表。

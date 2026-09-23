@@ -1,449 +1,670 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>社区先知 · 9·22 路演包（定稿） — 社区先知 CommunityInsight Agent</title>
-<style>
-  :root {
-    --text: #1a1a1a; --text2: #555;
-    --accent: #2563eb; --border: #d0d0d0;
-    --bg: #fff; --code-bg: #f5f5f5;
-    --th-bg: #f0f4ff;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
-    background: var(--bg); color: var(--text);
-    padding: 40px 36px; max-width: 900px; margin: 0 auto;
-    line-height: 1.9; font-size: 15px;
-  }
-  h1 {
-    font-size: 1.7em; text-align:center; margin: 0 0 8px 0;
-    letter-spacing: 0.04em; font-weight: 700;
-  }
-  h2 {
-    font-size: 1.2em; color: var(--accent); margin: 36px 0 14px;
-    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
-    font-weight: 700;
-  }
-  h3 {
-    font-size: 1.05em; color: var(--text); margin: 24px 0 10px;
-    font-weight: 700;
-  }
-  h4 { font-size: 0.95em; color: #444; margin: 18px 0 8px; font-weight: 600; }
-
-  /* -- metadata card -- */
-  .meta {
-    background: #fafafa; border: 1px solid var(--border);
-    border-radius: 6px; padding: 14px 20px; margin: 16px auto 24px;
-    max-width: 580px; font-size: 0.9em; line-height: 1.8; color: #444;
-  }
-  .meta strong { color: #222; }
-  .meta a { color: var(--accent); }
-
-  /* -- tables -- */
-  table {
-    border-collapse:collapse; width:100%; margin: 12px 0 18px;
-    font-size: 0.88em; line-height: 1.6;
-  }
-  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align:left; vertical-align: top; }
-  th { background: var(--th-bg); color: var(--accent); font-weight:700; white-space: nowrap; }
-  tr:nth-child(even) td { background: #fafafa; }
-
-  /* -- code -- */
-  code {
-    background: var(--code-bg); color: #d63384;
-    padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
-  }
-  pre {
-    background: #f8f8f8; border: 1px solid var(--border);
-    border-radius: 6px; padding: 16px 20px; overflow-x: auto;
-    font-size: 0.82em; line-height: 1.55; margin: 12px 0 18px;
-    font-family: "SF Mono","Cascadia Code","Consolas",monospace;
-  }
-  pre code { background: none; color: inherit; padding: 0; }
-
-  /* -- lists -- */
-  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
-  li { margin: 2px 0; line-height: 1.8; }
-
-  /* -- blockquote -- */
-  blockquote {
-    background: #fafafa; border-left: 3px solid var(--accent);
-    padding: 10px 16px; margin: 10px 0; color: #555;
-    font-size: 0.9em;
-  }
-  blockquote strong { color: #333; }
-
-  hr { border: none; border-top: 1px solid #ddd; margin: 28px 0; }
-
-  strong { color: #111; }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-
-  .footer {
-    margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd;
-    text-align: center; color: #999; font-size: 0.82em;
-  }
-
-  @media (max-width: 640px) {
-    body { padding: 20px 16px; font-size: 14px; }
-    .meta { max-width: 100%; }
-    table { font-size: 0.78em; }
-    th, td { padding: 5px 7px; }
-  }
-  @media print {
-    body { max-width: 100%; padding: 0; }
-    .meta { background: none; border: 1px solid #ccc; }
-    pre { background: none; border: 1px solid #ccc; }
-  }
-</style>
-</head>
-<body>
-<h1>9·22 OPC 沙龙 · 路演包（v4 · 14 页正文 · 三端各两页 · 无现场演示）</h1>
-
-<div class="meta"><strong>场合</strong>：2026-09-22 中关村软件园 OPC 沙龙 · 台下技术专家 / 企业负责人 / 投资人 · 路演后一对一问答<br><strong>本场形态</strong>：<strong>全程用 PPT，不做现场操作</strong>（所有界面以 PPT 内真实截图呈现）<br><strong>人设</strong>：步承泽 · 北京工商大学大数据专业大二 · 一个人做完需求/架构/开发/测试（AI 当编程助手）· 不装专家<br><strong>总时长</strong>：<strong>7:21</strong>（限时 5–8 分钟，留 39 秒缓冲；超了按提词卡"砍页顺序"砍）<br><strong>PPT</strong>：<code>docs/competition/9月22日路演-社区先知.pptx</code>（17 页 = 正文 15 + 附录 2）<br><strong>数字口径</strong>：<strong>638 项测试（637 通过 + 1 项需外部服务跳过）· 48 条金标 · 550 并发 · ruff 0 · schema v46 · 约 50 张表</strong><br>与登录页、代码、其他材料一致，可用 <code>python scripts/check_claims.py</code> 复核。</div>
-
-<hr>
-
-<h2>一、开场钩子（25 秒，站定就说，PPT 还停在第 1 页之前）</h2>
-
-<div class="meta">上周，我家楼下张奶奶摔了一跤。<br>她想找人帮忙，手机却只会打给外地的儿子。<br>等社区知道这件事，天已经黑了。</div>
-<p>></p>
-<div class="meta">这一晚，没有人做错什么。<br>是这条路太长了。<br>老人找不到入口，网格员在群里一条条翻消息。</div>
-<p>></p>
-<div class="meta">我想把它缩短成一句话。<br>这就是我做的「社区先知」。</div>
-
-<p><strong>自我提醒（不说出来）</strong>：这是把常见情况合起来的场景。若确实是你身边真事，照实讲；<br>若只是设想，被追问就直说"这是我把常见情况合起来设想的场景"。</p>
-
-<hr>
-
-<h2>二、15 页正文：逐页讲稿（照着念，短句已按呼吸断好）</h2>
-
-<h3>【第 1 页｜封面】7 秒</h3>
-
+<!doctype html><html><head><meta charset='utf-8'><style>
+@page { size:A4; margin:10mm 9mm; }
+* { box-sizing:border-box; }
+body { font-family:"Microsoft YaHei","微软雅黑",sans-serif; color:#1f2733; line-height:1.45; font-size:10.5pt; }
+h1 { color:#1B2F52; font-size:19pt; border-bottom:3px solid #ED7D2E; padding-bottom:6px; margin:0 0 10px; }
+h2 { color:#1B2F52; font-size:14pt; margin:13px 0 6px; border-left:5px solid #ED7D2E; padding-left:8px; }
+h3 { color:#2750B0; font-size:12pt; margin:10px 0 4px; }
+p { margin:5px 0; }
+table { border-collapse:collapse; width:100%; margin:7px 0; font-size:9pt; table-layout:fixed; word-wrap:break-word; }
+th { background:#1B2F52; color:#fff; border:1px solid #b9c4d6; padding:4px 5px; text-align:left; }
+td { border:1px solid #c9d2e0; padding:3px 5px; vertical-align:top; }
+tr:nth-child(even) td { background:#f3f6fb; }
+blockquote { background:#f3f6fb; border-left:4px solid #2F63D4; margin:6px 0; padding:5px 10px; color:#33415c; }
+blockquote p { margin:3px 0; }
+code { background:#eef2f8; padding:1px 4px; border-radius:3px; font-family:Consolas,monospace; font-size:8.6pt; }
+pre { background:#1B2F52; color:#eef3fb; padding:8px 10px; border-radius:5px; font-size:8.5pt; white-space:pre-wrap; }
+strong { color:#c05a12; }
+ul,ol { margin:5px 0; padding-left:22px; }
+li { margin:2px 0; }
+hr { border:none; border-top:1px solid #d8dee8; margin:10px 0; }
+</style></head><body><h1>9·22 OPC 沙龙 · 路演包（v7 · 17 页正文含谢谢结尾 + 3 页备用 = 20 页 · 含功能全景 · 三端各两页 · 无现场演示）</h1>
+<blockquote>
+<p><strong>场合</strong>：2026-09-22 中关村软件园 OPC 沙龙 · 台下技术专家 / 企业负责人 / 投资人 · 路演后一对一问答<br />
+<strong>本场形态</strong>：<strong>全程用 PPT，不做现场操作</strong>（所有界面以 PPT 内真实截图呈现）<br />
+<strong>人设</strong>：步承泽 · 北京工商大学大数据专业大二 · 一个人做完需求/架构/开发/测试（AI 当编程助手）· 不装专家<br />
+<strong>总时长</strong>：<strong>7:32</strong>（限时 5–8 分钟，留 28 秒缓冲；超了按提词卡"砍页顺序"砍）<br />
+<strong>PPT</strong>：<code>docs/competition/9月22日路演-社区先知.pptx</code>（<strong>20 页 = 正文 17（第 17 页为大字谢谢结尾）+ 备用/附录 3（18–20）</strong>）<br />
+<strong>数字口径</strong>：<strong>638 项测试（637 通过 + 1 项需外部服务跳过）· 48 条金标 · 550 并发 · ruff 0 · schema v46 · 约 50 张表</strong><br />
+与登录页、代码、其他材料一致，可用 <code>python scripts/check_claims.py</code> 复核。</p>
+</blockquote>
+<hr />
+<h2>一、开场钩子（25 秒，站定就说，PPT 停在第 1 页）</h2>
+<blockquote>
+<p>上周，我家楼下张奶奶摔了一跤。<br />
+她想找人帮忙，手机却只会打给外地的儿子。<br />
+等社区知道这件事，天已经黑了。</p>
+<p>这一晚，没有人做错什么。<br />
+是这条路太长了。<br />
+老人找不到入口，网格员在群里一条条翻消息。</p>
+<p>我想把它缩短成一句话。<br />
+这就是我做的「社区先知」。</p>
+</blockquote>
+<p><strong>自我提醒（不说出来）</strong>：这是把常见情况合起来的场景。若确实是你身边真事，照实讲；<br />
+若只是设想，被追问就直说"这是我把常见情况合起来设想的场景"。</p>
+<hr />
+<h2>二、17 页正文：逐页讲稿（照着念，短句已按呼吸断好）</h2>
+<h3>【第 1 页｜封面】8 秒</h3>
 <ul>
 <li><strong>屏幕上</strong>：社区先知 CommunityInsight ／ 社区接诉即办 · 多智能体平台 ／ 步承泽 · 北京工商大学</li>
-<li><strong>讲稿</strong></li>
+<li><strong>讲稿</strong><blockquote>
+<p>各位专家好，我是步承泽，北京工商大学大二学生。这个项目，从需求、架构到开发测试，都是我一个人做的。<br />
+它服务三种人：居民、网格员、老人。<br />
+今天七分半钟，我讲三件事：怎么搭、能干什么、我卡在哪。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：代码是你自己写的吗？<br />
+<strong>答</strong>：代码是我用 AI 当编程助手一起写的。做什么、不做什么、验收标准是我定的。</li>
 </ul>
-<p>  > 各位专家好，我是步承泽，北京工商大学大二学生。这个项目，从需求、架构到开发与测试，都是我一个人做的。<br>  > 它服务三种人：居民、网格员、老人。<br>  > 今天六分钟，我讲三件事：怎么做、能干什么、我卡在哪。</p>
+<h3>【第 2 页｜四个老问题】30 秒</h3>
 <ul>
-<li><strong>追问</strong>：代码是你自己写的吗？</li>
+<li><strong>屏幕上</strong>：四张痛点卡片（重复劳动 / 老人用不来 / 政策不敢信 / 部门不联动）</li>
+<li><strong>讲稿</strong><blockquote>
+<p>先说四个老问题。<br />
+一，网格员很多时间在重复派单、重复沟通，一件事要说好几遍。<br />
+二，老人不会用智能手机，有急事的时候，反而最慢。<br />
+三，网上搜到的政策没有出处，居民不敢照着办。<br />
+四，天气、健康、通知分属不同部门，出了事，没人主动把它们连起来。<br />
+说清楚一句：这东西<strong>还没在真实街道试点过</strong>，这是下一步。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：调研过吗？<br />
+<strong>答</strong>：没有做过正式调研，是我从公开信息和自己身边情况推的。</li>
 </ul>
-<p>  <strong>答</strong>：代码是我用 AI 当编程助手一起写的。做什么、不做什么、验收标准是我定的。</p>
-
-<h3>【第 2 页｜四个老问题】28 秒</h3>
-
+<h3>【第 3 页｜一个平台，三端服务三种人】20 秒</h3>
 <ul>
-<li><strong>屏幕上</strong>：四条痛点 + 一张网格员工单管理截图</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：居民端 / 网格员端 / 老年端 各一张界面</li>
+<li><strong>讲稿</strong><blockquote>
+<p>我的做法是一个平台、三个端，服务三种人。<br />
+居民端，要的是"一句话把事说清"。<br />
+网格员端，要的是"待办清楚、有据可查"。<br />
+老年端，要的是"看得见、按得动"。<br />
+（指橙色条）它还是网页做的，手机、平板、电脑浏览器打开就能用，居民和老人连 App 都不用下载。<br />
+三拨人要的不一样，硬做成一个 App，谁都不好用。先看一张功能全景。</p>
+</blockquote>
+</li>
+<li><strong>移动端细节（被追问时答，不必主动全念，这句压在本页 20 秒内）</strong>：触屏热区 ≥44px、输入框防 iOS 聚焦自动放大、适配刘海屏安全区、禁下拉刷新防误触长按 SOS、网格员手机端自动收侧栏变抽屉、老年端横屏提示转回竖屏。</li>
 </ul>
-<p>  > 先说四个老问题。<br>  > 一，网格员很多时间在重复派单、重复沟通。一件事，要说好几遍。<br>  > 二，老人不会用智能手机。有急事的时候，反而最慢。<br>  > 三，网上搜到的政策没有出处，居民不敢照着办。<br>  > 四，天气、健康、通知，分属不同部门。出了事，没人主动把它们连起来。<br>  > 说清楚一句：这东西<strong>还没在真实街道试点过</strong>，这是下一步。</p>
+<h3>【第 4 页｜功能全景：三端各干什么，底座共用什么】16 秒（快速带过）</h3>
 <ul>
-<li><strong>追问</strong>：调研过吗？</li>
+<li><strong>屏幕上</strong>：三列功能（每端 3 个最常用）+ 底部"平台底座"四条</li>
+<li><strong>讲稿</strong><blockquote>
+<p>这一页是功能全景，我快速带过。<br />
+居民端能报修、问政策、议事、收通知、查健康和天气；<br />
+网格员端是工作台、工单和提案通知管理、老年关怀，还有一块治理大屏；<br />
+老人端就是大字、语音、一键求助。<br />
+底下这条是三端共用的底座：多智能体协作、防编造、加密留痕、断网降级。<br />
+接下来先讲它怎么搭、怎么协作，再挑三端各细看两页。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：这些功能都做完了吗？<br />
+<strong>答</strong>：路由都能点开、主流程能跑；批量派单/关闭、红黑榜和满意度下钻这些都已实现并有自动化测试，完成度比我原来说的更完整。我不敢吹的是：还没在真实街道试点、没有运营数据。</li>
 </ul>
-<p>  <strong>答</strong>：没有做过正式调研，是我从公开信息和自己身边情况推的。</p>
-
-<h3>【第 3 页｜9 个角色，像一个小组】25 秒</h3>
-
+<h3>【第 5 页｜它是怎么搭起来的】28 秒</h3>
 <ul>
-<li><strong>屏幕上</strong>：九个角色九宫格 + 三端缩略图（居民 / 网格员 / 老人）</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：三端 → FastAPI 主服务 → 9 个角色黑板协作 → 本地数据库（四层）</li>
+<li><strong>讲稿</strong><blockquote>
+<p>这是它的结构，从上往下四层。<br />
+最上面三个端，共用一个后端。<br />
+中间是主服务，负责接口、鉴权、安全头、实时通知。<br />
+再往下，是 9 个角色在一块黑板上协作。<br />
+最下面是本地数据库，约 50 张表，手机号加密存，每一步都留痕。<br />
+数据库我选了本地的 SQLite，不用单独搭服务器，也就没有运维。<br />
+整条链路不依赖外部服务，一台普通电脑就能跑起来。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：为什么不用 MySQL / 云数据库？<br />
+<strong>答</strong>：单人起步，零运维、够用。数据访问做了抽象，迁移路径我想清楚了，是阶段选择。</li>
 </ul>
-<p>  > 我的做法，是把社区里的事拆开，交给 9 个角色。<br>  > 接待员、报修调度、提案协商、政策专员、健康顾问。<br>  > 还有天气守护、通知管理、网格助手、合规审计。<br>  ><br>  > 社区里其实是三种人，所以三个端我分开做。<br>  > 居民端，14 页。居民要的是"一句话把事说清"，报修、提问都在这儿。<br>  > 网格员端，9 页。网格员要的是"待办清楚、有据可查"，工单、提案、导出都在这儿。<br>  > 老人端，8 页。老人要的是"看得见、按得动"，所以大字、语音、长按求助。<br>  ><br>  > 三拨人要的东西不一样。硬做成一个 App，谁都不好用。</p>
+<h3>【第 6 页｜9 个角色，像一个小组】20 秒</h3>
 <ul>
-<li><strong>追问</strong>：为什么不用现成的智能体框架？</li>
+<li><strong>屏幕上</strong>：九个角色九宫格，合规审计橙色高亮；底部"发起 / 处理 / 把关"</li>
+<li><strong>讲稿</strong><blockquote>
+<p>我把社区里的事拆开，交给 9 个角色：接待、报修调度、提案协商、政策、健康、天气、通知、网格助手，还有合规审计。<br />
+它们分三种活：谁发起、谁处理、谁把关。<br />
+合规审计是最后一道关，它有一票否决权。</p>
+</blockquote>
+</li>
 </ul>
-<p>  <strong>答</strong>：我要精确控制每一步、要能查留痕，自己写更好管。这也可能是学生思路，后面我会认真跟框架对比。</p>
-
-<h3>【第 4 页｜它是怎么搭起来的】30 秒</h3>
-
+<h3>【第 7 页｜它们真的在传消息】55 秒（重点页）</h3>
 <ul>
-<li><strong>屏幕上</strong>：三端 → FastAPI 主服务 → 9 个角色 → 本地数据库</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：左侧黑板 / 5 种消息 / 两道关卡 / 一票否决，右侧两条联动链示意图（天气→健康→通知；报修隐患→紧急通知）</li>
+<li><strong>讲稿</strong><blockquote>
+<p>这一页是核心，我讲细一点。</p>
+<p>这 9 个角色，不是写死的流程。它们共享一块黑板，黑板有锁、有版本、有历史。<br />
+角色之间靠 5 种消息来往：请求、响应、通知、错误、转交。</p>
+<p>举两个真跑起来的例子。<br />
+极端天气来了，天气守护先动，告诉健康顾问出防护建议，然后自动发通知。<br />
+居民报修里是安全隐患，报修调度会自动升级成紧急通知。</p>
+<p>消息不是随便传，每一轮要过两道关。<br />
+先用校验员查：有没有编造、有没有敏感词、有没有越权。<br />
+再由仲裁器定优先级：合规、安全、专业、人工。<br />
+合规审计说不通过，这条消息就发不出去。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：跟 if-else 工作流有什么区别？<br />
+<strong>答</strong>：内核确实是规则。但角色之间靠消息协商，联动是运行时决定的，不是我一条条焊死的。</li>
 </ul>
-<p>  > 这是它的结构，从上往下三层。<br>  > 上面三个端，共用一个后端。<br>  > 中间是主服务，负责接口、鉴权、安全头、实时通知。<br>  > 再往下是 9 个角色在黑板协作。<br>  > 最下面是本地数据库，约 50 张表。手机号是加密存的，每一步都留痕。<br>  > 数据库我选了本地的 SQLite，不用单独搭服务器，也就没有运维。<br>  > 整条链路不依赖外部服务，一台普通电脑就能跑起来。</p>
+<h3>【第 8 页｜AI 被关在笼子里】40 秒（差异点）</h3>
 <ul>
-<li><strong>追问</strong>：为什么不用 MySQL / 云数据库？</li>
+<li><strong>屏幕上</strong>：左"交给大模型"三行，右"永远走规则"三行；三道防编造；底部开关默认关</li>
+<li><strong>讲稿</strong><blockquote>
+<p>再说大模型怎么用，这是我最想讲清的。<br />
+我接了 DeepSeek，但原则是：规则为主，大模型为辅。<br />
+意图识别、追问补全、政策生成，交给大模型。<br />
+状态机、派单、权限、加密，永远走规则。</p>
+<p>防编造我用三招：政策回答必须挂知识库出处；回答完回查一遍数据库；敏感词和权限再审计一道，查不到就转人工。<br />
+四个开关默认关，每次调用 3 到 5 秒超时就自动回落规则——省成本，也保稳定，学生项目也养得起。</p>
+<p>最后一句实话：它是<strong>按规则分工协作</strong>的，不是完全自主的大模型智能体，我不想夸大它。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：为什么不直接全用大模型？<br />
+<strong>答</strong>：政务场景错一次代价很大。派单、权限、加密这些不能让模型"看着办"，必须确定、可复算、能留痕。</li>
 </ul>
-<p>  <strong>答</strong>：单人起步，零运维、够用。数据访问做了抽象，迁移路径我想清楚了，是阶段选择。</p>
-
-<h3>【第 5 页｜它们真的在传消息】85 秒（重点页）</h3>
-
+<h3>【第 9 页｜居民端 · 报修，一句话说清】26 秒</h3>
 <ul>
-<li><strong>屏幕上</strong>：黑板与 5 种消息、双层防线 + 右侧多智能体执行链截图</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：左侧四条要点，右侧提交报修表单大图</li>
+<li><strong>讲稿</strong><blockquote>
+<p>开始看三个端，先说居民端。<br />
+报修不用选分类、挑部门，说一句"我家厨房水管漏水了"就行。<br />
+它会追问关键的一两项，帮你把报修单整理好。<br />
+<strong>但最后要我自己点"确认提交"，它才真的提交——我不让它自己提交。</strong><br />
+识别到燃气味这种安全隐患，会自动升级成紧急通知。<br />
+不愿意说话，也可以老老实实填表，这条路我留着。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：为什么不让 AI 直接提交？<br />
+<strong>答</strong>：报修要动人和钱。让它整理、让人确认，错了也追得回来。</li>
 </ul>
-<p>  > 这一页是核心，我讲细一点。<br>  ><br>  > 这 9 个角色，不是写死的流程。它们共享一块黑板。黑板有锁、有版本、有历史。<br>  > 角色之间，靠 5 种消息来往：任务请求、任务响应、通知、错误、转交。<br>  ><br>  > 举两个真跑起来的例子。<br>  > 极端天气来了，天气守护先动。它告诉健康顾问，健康顾问出防护建议，然后自动发通知。<br>  > 居民报修，里面是安全隐患。报修调度会自动升级成紧急通知。<br>  ><br>  > 消息不是随便传。每一轮要过两道关。<br>  > 先用校验员检查：有没有编造、有没有敏感词、有没有越权。<br>  > 再由仲裁器定优先级：合规、安全、专业、人工、数据一致、保守。<br>  > 合规审计员有一票否决权。它说不通过，这条就发不出去。<br>  ><br>  > 再说大模型怎么用，这是我最想讲清的。<br>  > 我接了 DeepSeek。但原则是：规则为主，大模型为辅。<br>  > 意图识别、追问补全、政策生成，用大模型。<br>  > 状态机、派单、权限、加密，永远走规则。<br>  > 四个开关默认关，省成本，也保稳定。每次调用 3 到 5 秒超时，就自动回落规则。<br>  ><br>  > 防编造我用三招：政策回答必须挂知识库出处；回答完回查一遍数据库；敏感词和权限再审计一道。<br>  ><br>  > 最后一句实话：这套多智能体是<strong>按规则分工协作</strong>的，不是完全自主的大模型智能体。我不想夸大它。</p>
+<h3>【第 10 页｜居民端 · 问政策、议事情】26 秒</h3>
 <ul>
-<li><strong>追问</strong>：跟 if-else 工作流有什么区别？</li>
+<li><strong>屏幕上</strong>：三张截图——政策问答（依据）/ 邻里议事 / 社区通知</li>
+<li><strong>讲稿</strong><blockquote>
+<p>居民端还有两块：问和议。<br />
+政策问答，答案下面挂"依据"：是哪份政策、适用哪个地区，都写清楚；查不到依据就不硬答，转人工。<br />
+邻里议事可以提提案、邻居附议，社区必须给回应。<br />
+通知分普通、紧急、定时三类，发出去有已读回执。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：政策是实时同步官方的吗？<br />
+<strong>答</strong>：不是。库里是我整理的政策，不是实时对接官方系统，这点我不含糊。</li>
 </ul>
-<p>  <strong>答</strong>：内核确实是规则。但角色之间靠消息协商，联动是运行时决定的。</p>
-
-<h3>【第 6 页｜居民端：报修，一句话就能说清】25 秒</h3>
-
+<h3>【第 11 页｜网格员端 · 一个工作台】24 秒</h3>
 <ul>
-<li><strong>屏幕上</strong>：上方两句结论 + 三张截图（① 一句话等确认 ② 确认后生成工单 ③ 手动填表）</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：左侧四条要点，右侧工作台待办概览 + 安全隐患置顶（局部放大）</li>
+<li><strong>讲稿</strong><blockquote>
+<p>第二个端，网格员端，我做成了一个工作台。<br />
+上面是今天的待办：哪些工单要派、哪些要回访，一眼看全。<br />
+下面有红黑榜和满意度下钻，谁解决得快、谁超时，点一下能看到具体工单；工单也能批量派单、批量关闭，都要填原因、全程留痕。<br />
+旁边还有 AI 助手，用大白话问数、按条件导出周报；它查的是库里真实数据，查不到就直说。</p>
+</blockquote>
+</li>
 </ul>
-<p>  > 从这一页起，三个端我分开讲。先说居民端。<br>  > 报修不用选分类、不用挑部门，说一句"我家厨房水管漏水了"就行。<br>  > 它会追问关键的一两项，然后把报修单整理好：问题、分类、紧急程度。<br>  > <strong>但最后要我自己点"确认提交"，它才真的提交——我不让它自己提交。</strong><br>  > 不想说话也可以老老实实填表，这是给愿意填表的人留的路。<br>  > 另外，识别到安全隐患，比如燃气味，会自动升级成紧急通知。</p>
+<h3>【第 12 页｜网格员端 · 留痕，和盯住老人】26 秒</h3>
 <ul>
-<li><strong>追问</strong>：这些数据是真的吗？</li>
+<li><strong>屏幕上</strong>：两张截图——工单全程留痕 / 老年关怀管理</li>
+<li><strong>讲稿</strong><blockquote>
+<p>网格员端另一半是处理和兜底。<br />
+工单点开，审核、派单、处理都在一个地方做。退回必须写意见，派单必须填维修人员和电话。<br />
+每一步谁在什么时候动的，都有留痕，事后能复盘。<br />
+还有一块老年关怀：用药提醒、紧急联系人，要审核通过才生效。<br />
+老人按下求助，网格员这边要确认响应，处理完才能结束。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：老人信息谁维护？<br />
+<strong>答</strong>：社区工作人员维护；信息加密存，展示和导出都脱敏。</li>
 </ul>
-<p>  <strong>答</strong>：全是我自己造的演示数据，里面没有真实居民信息。</p>
+<h3>【第 13 页｜老人端 · 看得见，按得动】24 秒</h3>
 <ul>
-<li><strong>追问</strong>：为什么不让 AI 直接提交？</li>
+<li><strong>屏幕上</strong>：左侧三条要点，右侧天气首页 + 菜单两张手机图</li>
+<li><strong>讲稿</strong><blockquote>
+<p>第三个端，老人端。它不是把居民端放大，是重做的。<br />
+字大、按钮大，不用登录就能进。<br />
+首页就六件事：天气、通知、报修、联系人、用药、求助。<br />
+天气和帮助都能语音念出来，不认字的老人也能用。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：老人真会用吗？<br />
+<strong>答</strong>：没找真实老人测过。我只做了能确定的事：大字、免登录、防误触。</li>
 </ul>
-<p>  <strong>答</strong>：报修是要动人和钱的。让它整理、让人确认，错了也追得回来。</p>
-
-<h3>【第 7 页｜居民端：问政策、议事情】25 秒</h3>
-
+<h3>【第 14 页｜老人端 · 不会打字，也能办事】28 秒</h3>
 <ul>
-<li><strong>屏幕上</strong>：三张截图并排（政策问答依据与属地 / 邻里议事 / 通知）</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：左侧四条要点，右侧用药提醒 + 长按求助两张手机图</li>
+<li><strong>讲稿</strong><blockquote>
+<p>不会打字的老人，我留了几条路。<br />
+可以点现成的话，小助手把常用的话做成大按钮，比如"家里灯不亮了""医保怎么报"。<br />
+也可以按住说话，语音报修；嘈杂环境不准，就点大按钮。<br />
+吃药提醒到点会响，屏幕上就两个键："我吃了"和"十分钟后再说"；用药提醒要社区审核通过才播报，药名剂量错了是安全问题。<br />
+紧急求助要长按 3 秒、再确认一次，10 秒不点它自己取消。<br />
+（指屏幕）我怕老人放兜里，误触。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：方言能听懂吗？<br />
+<strong>答</strong>：做了一部分方言词，但没在真实老人身上验证过，这个我不敢说行。</li>
 </ul>
-<p>  > 居民端还有两块：问和议。<br>  > 政策问答，答案下面挂"依据"——是哪份政策、适用哪个地区，都写清楚。<br>  > 查不到依据，它就不硬答，转人工。<br>  > 邻里议事可以提提案，邻居能附议，社区要给回应。<br>  > 通知分普通、紧急、定时三类，发出去有已读回执。</p>
+<h3>【第 15 页｜几个能复算的数字】24 秒</h3>
 <ul>
-<li><strong>追问</strong>：政策是实时同步官方的吗？</li>
+<li><strong>屏幕上</strong>：638 项测试 ／ 550 并发 ／ 48 条金标 100% ／ ruff 0</li>
+<li><strong>讲稿</strong><blockquote>
+<p>说几个数字，这是我敢上台的底气。<br />
+638 项测试全绿，其中一项要连外部服务，默认跳过。<br />
+550 个并发一起打，零失败。<br />
+政策问答，48 条金标准，第一位命中率 100%。<br />
+代码检查 0 问题，数据库结构到第 46 版，约 50 张表。<br />
+补一句实话：这些都是我在本地自己测的，不是第三方测评，现场可以复算。</p>
+</blockquote>
+</li>
+<li><strong>追问</strong>：能现场复算吗？<br />
+<strong>答</strong>：能，我现场就能跑给你看。</li>
 </ul>
-<p>  <strong>答</strong>：不是。库里是我整理的 62 条政策（61 条已发布），不是实时对接官方系统，这点我不含糊。</p>
+<h3>【第 16 页｜位置、三个请教】24 秒</h3>
 <ul>
-<li><strong>追问</strong>：政策答错了怎么办？</li>
+<li><strong>屏幕上</strong>：工程原型说明 + 三个问题 + 底部"张奶奶那条路，现在是一句话"</li>
+<li><strong>讲稿</strong><blockquote>
+<p>最后说清楚它现在的位置。<br />
+它是一个<strong>工程原型</strong>：功能能跑、测试在；但没在真实街道试点，没有运营数据，商业模式还在探索。<br />
+所以今天我不是来要投资的，是来请教的，想带走三个答案。<br />
+第一，政务场景里，多智能体的"自动"边界该划在哪？哪些必须留给人确认？<br />
+第二，第一个试点社区，我该怎么找、怎么开口谈？<br />
+第三，没有历史工单数据的时候，冷启动怎么破？<br />
+（指屏幕底部）张奶奶那条路，现在是一句话。</p>
+</blockquote>
+</li>
 </ul>
-<p>  <strong>答</strong>：答不出依据就转人工，不硬答。这也是我设计的底线。</p>
-
-<h3>【第 8 页｜网格员端：一个工作台】25 秒</h3>
-
+<h3>【第 17 页｜谢谢结尾】8 秒（大字谢谢页，正文到此结束）</h3>
 <ul>
-<li><strong>屏幕上</strong>：左侧工作台大图 + 右侧四行字</li>
-<li><strong>讲稿</strong></li>
+<li><strong>屏幕上</strong>：深蓝大字"谢谢各位老师" + 情感句 + 署名（页脚 17 / 17，正文最后一页）</li>
+<li><strong>讲稿</strong><blockquote>
+<p>（翻页，停一下，看着台下，别急着说话）<br />
+谢谢各位老师，敬请批评指正。</p>
+</blockquote>
+</li>
+<li><strong>注意</strong>：说完就停，<strong>不要补话</strong>。后面 18–20 是备查页，被问到才翻，不主动讲。</li>
 </ul>
-<p>  > 第二个端，网格员端。我做成了一个工作台。<br>  > 上面是今天的待办：哪些工单要派、哪些要回访。<br>  > 中间是数据概览，红黑榜能看出哪个小区问题多。<br>  > 要给街道交周报，可以按条件把数据导出去。<br>  > 旁边还有 AI 助手，网格员用大白话问"这个月哪类问题最多"就行。</p>
-<ul>
-<li><strong>追问</strong>：AI 助手的数据可信吗？</li>
-</ul>
-<p>  <strong>答</strong>：它查的是库里真实数据，不是自己编；条件查不到就直说。</p>
-
-<h3>【第 9 页｜网格员端：留痕，和盯住老人】25 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：两张截图（工单详情与处理留痕 / 老年关怀管理）</li>
-<li><strong>讲稿</strong></li>
-</ul>
-<p>  > 网格员端另一半是处理。<br>  > 工单管理里能搜索、能导出，还能批量派单、批量关闭。<br>  > 点开一行工单，审核、派单、处理都在这一个地方做。<br>  > 退回必须写意见，派单必须填维修人员和他的电话。<br>  > 每一步谁在什么时候动的，都有留痕，事后能复盘。<br>  > 还有一块是老年关怀：用药提醒、紧急联系人，都要审核通过才生效。<br>  > 老人按下求助，网格员这边要确认响应，处理完再结束。</p>
-<ul>
-<li><strong>追问</strong>：老人信息谁维护？</li>
-</ul>
-<p>  <strong>答</strong>：社区工作人员维护；老人信息是加密存的，展示和导出都脱敏。</p>
-
-<h3>【第 10 页｜老人端：看得见，按得动】25 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：左侧四行字 + 右侧大字首页手机实拍</li>
-<li><strong>讲稿</strong></li>
-</ul>
-<p>  > 第三个端，老人端。它不是把居民端放大，是重做的。<br>  > 字大、按钮大，不用登录就能进。<br>  > 首页就六件事：天气、通知、报修、联系社区、联系人、用药提醒。<br>  > 天气和帮助都能用语音念出来，不认字的老人也能用。</p>
-<ul>
-<li><strong>追问</strong>：老人真会用吗？</li>
-</ul>
-<p>  <strong>答</strong>：没找真实老人测过。只做了能确定的事：大字、免登录、防误触。</p>
-
-<h3>【第 11 页｜老人端：不会打字，也能办事】25 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：三张手机实拍（社区小助手 / 用药提醒 / 长按求助确认框）</li>
-<li><strong>讲稿</strong></li>
-</ul>
-<p>  > 不会打字的老人怎么办？我留了三条路。<br>  > 第一条，点现成的话：小助手把常用的话做成大按钮——"家里灯不亮了""医保怎么报销"。<br>  > 第二条，直接对着手机说话，语音报修。<br>  > 第三条，吃药提醒。到点会响，屏幕上就两个按钮："我吃了"和"10 分钟后再说"。<br>  > 还有个细节：用药提醒不是随便能加的，要社区审核通过才开始播报——药名剂量错了是安全问题。<br>  > 紧急求助要长按 3 秒，出确认框；10 秒不点，它自己取消。我怕老人放兜里误触，所以防了两道。</p>
-<ul>
-<li><strong>追问</strong>：为什么不干脆全用语音？</li>
-</ul>
-<p>  <strong>答</strong>：语音在嘈杂环境不一定准。所以我留了不说话的路径：点大按钮、点快捷问题，一样能把事办完。</p>
-<ul>
-<li><strong>追问</strong>：方言能听懂吗？</li>
-</ul>
-<p>  <strong>答</strong>：做了一部分方言词，但没在真实老人身上验证过，这个我不敢说行。</p>
-<h3>【第 12 页｜现在能用的功能（分端）】30 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：三列功能清单（居民端 14 页 / 网格员端 9 页 / 老人端 8 页）+ 底部一行跨端能力</li>
-<li><strong>讲稿</strong>（一列一段，手指顺着往下扫）</li>
-</ul>
-<p>  > 功能我按端列一遍，这样看得清哪端有什么。<br>  ><br>  > 居民端 14 页：报修能拍照提交、能存草稿；工单详情有时间线，能撤回、能重开；邻里议事能提案、投票、公示期匿名议论；政策问答给依据和适用地区。<br>  ><br>  > 网格员端 9 页：工作台有待办和红黑榜下钻；工单管理能审核、派单、协商、转出，能批量操作和导出；提案管理能决定执行、转执行、延票；还有知识库维护、天气检查任务、健康内容审核、老年关怀的用药审核和 SOS 响应。<br>  ><br>  > 老人端 8 页：语音小助手、语音报修、用药提醒、听通知、紧急联系人、报修进度、语音政策问答。<br>  ><br>  > 最下面一行是跨端的：转人工"处理包"、双层防线、规则为主；另外还有一个治理大屏和一个稳定性演示页。</p>
-<ul>
-<li><strong>追问</strong>：有没有没做完的？</li>
-</ul>
-<p>  <strong>答</strong>：有。真实工单系统没对接，多社区隔离也还没做，我都写在材料里了。</p>
-
-<h3>【第 13 页｜几个能复算的数字】25 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：638 项测试 ／ 550 并发 ／ 48 条金标 100% ／ ruff 0 ／ v46 · 约 50 张表</li>
-<li><strong>讲稿</strong></li>
-</ul>
-<p>  > 说几个数字，这是我敢上台的底气。<br>  > 638 项测试，全绿。其中一项要连外部服务，默认跳过。<br>  > 550 个并发一起打，零失败。<br>  > 政策问答，48 条金标准，第一位命中率 100%。<br>  > 代码检查 0 问题。数据库结构到第 46 版，约 50 张表。<br>  > 补一句实话：这些都是我在本地自己测的，不是第三方测评。<br>  > 手机号是加密存的，展示和导出都脱敏。</p>
-<ul>
-<li><strong>追问</strong>：能现场复算吗？</li>
-</ul>
-<p>  <strong>答</strong>：能，我现场就能跑给你看。</p>
-
-<h3>【第 14 页｜它现在的位置，和我想请教的三件事】26 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：工程原型说明 + 三个问题</li>
-<li><strong>讲稿</strong></li>
-</ul>
-<p>  > 最后说清楚它现在的位置。<br>  > 它是一个<strong>工程原型</strong>：功能能跑，测试在。<br>  > 但它没有在真实街道试点，没有真实运营数据，商业模式我还在探索。<br>  > 所以今天我不是来要投资的，我是来请教的，想带走三个答案。<br>  > 第一，政务场景里，多智能体的"自动"边界该划在哪？哪些必须留给人确认？<br>  > 第二，第一个试点社区，我该怎么找、怎么开口谈？<br>  > 第三，没有历史工单数据的时候，冷启动怎么破？<br>  ><br>  > 这三个问题，我回去改。</p>
-
-<h3>【第 15 页｜结尾】10 秒</h3>
-
-<ul>
-<li><strong>屏幕上</strong>：只有「谢谢各位」+ 项目卡片（三端）——<strong>那句话不打在屏幕上，是说出来的</strong></li>
-<li><strong>讲稿</strong></li>
-</ul>
-<p>  > （停一下，看着台下）<br>  > 张奶奶那条路，现在是一句话。<br>  > 谢谢各位。</p>
-<ul>
-<li><strong>注意</strong>：说完就停，<strong>不要补话</strong>。补话最容易把结尾讲散。</li>
-</ul>
-
-<hr>
-
+<hr />
 <h2>三、翻页动线（本场无现场操作，只需按翻页键）</h2>
-
-<div class="meta"><strong>准备</strong>：PPT 用放映模式打开（F5），用翻页笔或键盘方向键。<strong>全程不切到任何系统页面</strong>。<br>每页停留时间就是上面标注的秒数；<strong>不要在同一页超过标注 1.5 倍的时间</strong>。</div>
-
+<blockquote>
+<p><strong>准备</strong>：PPT 用放映模式打开（F5），用翻页笔或键盘方向键。<strong>全程不切到任何系统页面</strong>。<br />
+每页停留时间就是上面标注的秒数；<strong>不要在同一页超过标注 1.5 倍的时间</strong>。</p>
+</blockquote>
 <table>
-<th>步</th><th>页</th><th>你要做的动作</th><th>停留</th><th>累计到</th>
-<tr><td>1</td><td>开场（未翻页）</td><td>站定，讲开场故事，不看屏幕</td><td>25s</td><td>00:25</td></tr>
-<tr><td>2</td><td>第 1 页 封面</td><td>翻页；说"各位专家好…"</td><td>7s</td><td>00:32</td></tr>
-<tr><td>3</td><td>第 2 页 痛点</td><td>翻页；逐条讲四点，<strong>最后主动说"还没试点"</strong></td><td>28s</td><td>01:00</td></tr>
-<tr><td>4</td><td>第 3 页 方案总览</td><td>翻页；手指九宫格扫过，再指三张端截图（<strong>每端一句话</strong>）</td><td>25s</td><td>01:25</td></tr>
-<tr><td>5</td><td>第 4 页 架构</td><td>翻页；手从上往下划三层</td><td>30s</td><td>01:55</td></tr>
-<tr><td>6</td><td>第 5 页 重点</td><td>翻页；<strong>放慢</strong>；讲到"一票否决"时指屏幕右侧执行链截图</td><td>85s</td><td>03:20</td></tr>
-<tr><td>7</td><td>第 6 页 居民端·报修</td><td>翻页；说"三个端我分开讲"，指两张截图</td><td>25s</td><td>03:45</td></tr>
-<tr><td>8</td><td>第 7 页 居民端·问与议</td><td>翻页；三张图各指一下</td><td>25s</td><td>04:10</td></tr>
-<tr><td>9</td><td>第 8 页 网格员端·工作台</td><td>翻页；大图为主，右侧四行只念三行</td><td>25s</td><td>04:35</td></tr>
-<tr><td>10</td><td>第 9 页 网格员端·处理与关怀</td><td>翻页；两张图，最后一句放慢（审核与求助）</td><td>25s</td><td>05:00</td></tr>
-<tr><td>11</td><td>第 10 页 老人端·看得见按得动</td><td>翻页；讲完停半秒，让手机图自己说话</td><td>25s</td><td>05:25</td></tr>
-<tr><td>12</td><td>第 11 页 老人端·不会打字</td><td>翻页；<strong>三条路一条一句</strong>，指三张手机图</td><td>25s</td><td>05:50</td></tr>
-<tr><td>13</td><td>第 12 页 功能（分端）</td><td>翻页；<strong>一列一段</strong>，手指顺着往下扫，别逐条念</td><td>30s</td><td>06:20</td></tr>
-<tr><td>14</td><td>第 13 页 数字</td><td>翻页；<strong>数字念准</strong>，念完补"本机自测"</td><td>25s</td><td>06:45</td></tr>
-<tr><td>15</td><td>第 14 页 诉求</td><td>翻页；三个问题放慢，逐个看向对应方向的听众</td><td>26s</td><td>07:11</td></tr>
-<tr><td>16</td><td>第 15 页 结尾</td><td>翻页；<strong>停一下再说</strong>，说完就停住</td><td>10s</td><td>07:21</td></tr>
+<thead>
+<tr>
+<th>步</th>
+<th>页</th>
+<th>你要做的动作</th>
+<th>停留</th>
+<th>累计到</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>开场（未翻页）</td>
+<td>站定，讲开场故事，不看屏幕</td>
+<td>25s</td>
+<td>00:25</td>
+</tr>
+<tr>
+<td>2</td>
+<td>第 1 页 封面</td>
+<td>翻页；说"各位专家好…"</td>
+<td>8s</td>
+<td>00:33</td>
+</tr>
+<tr>
+<td>3</td>
+<td>第 2 页 痛点</td>
+<td>翻页；逐条讲四点，<strong>最后主动说"还没试点"</strong></td>
+<td>30s</td>
+<td>01:03</td>
+</tr>
+<tr>
+<td>4</td>
+<td>第 3 页 三端总览</td>
+<td>翻页；三张图各指一下，每端一句话；<strong>指橙色"移动端适配"条说一句免装 App</strong></td>
+<td>20s</td>
+<td>01:23</td>
+</tr>
+<tr>
+<td>5</td>
+<td>第 4 页 功能全景</td>
+<td>翻页；<strong>快速扫三列 + 底座</strong>，不逐条念</td>
+<td>16s</td>
+<td>01:39</td>
+</tr>
+<tr>
+<td>6</td>
+<td>第 5 页 架构</td>
+<td>翻页；手从上往下划四层</td>
+<td>28s</td>
+<td>02:07</td>
+</tr>
+<tr>
+<td>7</td>
+<td>第 6 页 角色</td>
+<td>翻页；指九宫格，点一下橙色"合规审计"</td>
+<td>20s</td>
+<td>02:27</td>
+</tr>
+<tr>
+<td>8</td>
+<td>第 7 页 传消息【重点】</td>
+<td>翻页；<strong>放慢</strong>；讲联动时指右侧执行链大图</td>
+<td>55s</td>
+<td>03:22</td>
+</tr>
+<tr>
+<td>9</td>
+<td>第 8 页 AI 可控</td>
+<td>翻页；左右两栏对照，念到"不是全自主"放慢</td>
+<td>40s</td>
+<td>04:02</td>
+</tr>
+<tr>
+<td>10</td>
+<td>第 9 页 居民·报修</td>
+<td>翻页；强调"我点确认才提交"</td>
+<td>26s</td>
+<td>04:28</td>
+</tr>
+<tr>
+<td>11</td>
+<td>第 10 页 居民·问议</td>
+<td>翻页；三张图各指一下</td>
+<td>26s</td>
+<td>04:54</td>
+</tr>
+<tr>
+<td>12</td>
+<td>第 11 页 网格·工作台</td>
+<td>翻页；一句带过红黑榜下钻与批量处理</td>
+<td>24s</td>
+<td>05:18</td>
+</tr>
+<tr>
+<td>13</td>
+<td>第 12 页 网格·留痕关怀</td>
+<td>翻页；两张图，最后一句放慢（审核与求助）</td>
+<td>26s</td>
+<td>05:44</td>
+</tr>
+<tr>
+<td>14</td>
+<td>第 13 页 老人·看得见</td>
+<td>翻页；停半秒让手机图自己说话</td>
+<td>24s</td>
+<td>06:08</td>
+</tr>
+<tr>
+<td>15</td>
+<td>第 14 页 老人·不会打字</td>
+<td>翻页；指长按求助框，说"怕误触"</td>
+<td>28s</td>
+<td>06:36</td>
+</tr>
+<tr>
+<td>16</td>
+<td>第 15 页 数字</td>
+<td>翻页；<strong>数字念准</strong>，念完补"本机自测"</td>
+<td>24s</td>
+<td>07:00</td>
+</tr>
+<tr>
+<td>17</td>
+<td>第 16 页 诉求</td>
+<td>翻页；三个问题放慢；指屏幕底部念张奶奶那句</td>
+<td>24s</td>
+<td>07:24</td>
+</tr>
+<tr>
+<td>18</td>
+<td>第 17 页 谢谢</td>
+<td>翻到大字谢谢页，<strong>停一下</strong>看台下，说谢谢、不补话</td>
+<td>8s</td>
+<td>07:32</td>
+</tr>
+</tbody>
 </table>
-
-<p><strong>时间点自查（只看这 4 个数）</strong>：01:00 讲完痛点 · 03:20 讲完第 5 页 · 05:50 三端全部讲完 · 07:21 说谢谢。<br><strong>超了怎么办</strong>：按提词卡"砍页顺序"砍（第 7 页居民端·问与议 → 第 12 页功能每端只念前两条 → 第 4 页架构压到 15 秒）。</p>
-
-<p><strong>被追问时才翻的四页（不占正文时间）</strong></p>
-
+<p><strong>时间点自查（只看这几个数）</strong>：01:03 讲完痛点 · 01:39 讲完功能全景 · <strong>03:22 讲完第 7 页核心</strong> · 04:02 讲完 AI 可控 · 06:36 三端全部讲完 · 07:24 讲完三个请教 · <strong>07:32 翻到第 17 页大字谢谢、说完收尾</strong>。<br />
+<strong>超了怎么办</strong>：按提词卡"砍页顺序"砍（第 4 页功能全景只扫底座一条 → 第 10 页居民·问议只讲政策依据 → 第 11 页工作台只念待办和导出 → 第 5 页架构压到 15 秒）。</p>
+<p><strong>被追问时才翻的三页（不占正文时间）</strong></p>
 <table>
-<th>翻页</th><th>什么时候翻</th><th>怎么用</th>
-<tr><td>回翻第 5 页（重点页）</td><td>被问"为什么不全用大模型"</td><td>翻回去指屏幕：状态机/派单/权限/加密永远走规则，四个开关默认关</td></tr>
-<tr><td>回翻第 5 页（重点页）</td><td>被问"会不会编造 / 数据安全"</td><td>翻回去指屏幕：强制出处 + 回查数据库 + 权限审计；手机号加密、展示脱敏</td></tr>
-<tr><td>附录 1（如需看实物）</td><td>被问"能不能体验 / 怎么跑"</td><td>翻过去说明三步与账号</td></tr>
-<tr><td>附录 2（最常被问的四个问题）</td><td>一对一环节，或对方自己翻</td><td>说"这四个问题我写在附录里"</td></tr>
+<thead>
+<tr>
+<th>翻页</th>
+<th>什么时候翻</th>
+<th>怎么用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回翻第 8 页 / 备用第 18 页</td>
+<td>被问"为什么不全用大模型 / 会不会编造 / 数据安全"</td>
+<td>第 8 页讲规则与模型分工；第 18 页是数据安全汇总（加密、脱敏、参数化、一票否决）</td>
+</tr>
+<tr>
+<td>附录第 19 页（如需看实物）</td>
+<td>被问"能不能体验 / 怎么跑"</td>
+<td>翻过去说明三步与账号</td>
+</tr>
+<tr>
+<td>附录第 20 页（最常被问四题）</td>
+<td>一对一环节，或对方自己翻</td>
+<td>说"这四个问题我写在附录里"</td>
+</tr>
+</tbody>
 </table>
-
-<hr>
-
+<hr />
 <h2>四、应急预案（三种情况，各一句话）</h2>
-
 <p><strong>① PPT 打不开 / 投影没信号</strong></p>
-<div class="meta">"我先用 PDF 版本放一遍，内容一样。"<br>（准备：<code>docs/competition/pdf/9月22日路演-PPT预览.pdf</code> 放桌面，随时能双击。）</div>
-
+<blockquote>
+<p>"我先用 PDF 版本放一遍，内容一样。"<br />
+（准备：<code>docs/competition/pdf/9月22日路演-PPT预览.pdf</code> 放桌面，随时能双击。）</p>
+</blockquote>
 <p><strong>② 翻错页 / 翻页笔失灵</strong></p>
-<div class="meta">"我往回一页。"<br>（用键盘方向键即可；<strong>不要在错误页面上解释超过 3 秒</strong>。）</div>
-
+<blockquote>
+<p>"我往回一页。"<br />
+（用键盘方向键即可；<strong>不要在错误页面上解释超过 3 秒</strong>。）</p>
+</blockquote>
 <p><strong>③ 紧张忘词</strong></p>
-<div class="meta">"我停一下，看一眼我的笔记。"<br>（每页只需说清一件事。<strong>少说比错说好。</strong>）</div>
-
-<hr>
-
-<h2>五、结尾诉求（已含在第 14 页）</h2>
-
-<div class="meta">今天我最想带走的不是打分，是三个答案。<br>一，政务场景里，多智能体的"自动"边界该怎么划？哪些必须留给人确认？<strong>（看技术专家）</strong><br>二，第一个试点社区，我该怎么找、怎么开口谈？<strong>（看企业负责人）</strong><br>三，没有历史工单数据的时候，冷启动怎么破？<strong>（看投资人方向）</strong><br>这三个问题我回去就改。愿意的话，会后我拿本子记，一条条问。谢谢各位。</div>
-
-<hr>
-
+<blockquote>
+<p>"我停一下，看一眼我的笔记。"<br />
+（每页只需说清一件事。<strong>少说比错说好。</strong>）</p>
+</blockquote>
+<hr />
 <h1>教练附件（不上台）</h1>
-
 <h2>附件 A：时间控制卡</h2>
-
 <table>
-<th>时间点</th><th>你应该在</th><th>落后了怎么办</th>
-<tr><td>01:00</td><td>讲完第 2 页痛点</td><td>第 3 页只念角色名 + 三端各一句话，不展开</td></tr>
-<tr><td>03:20</td><td>讲完第 5 页重点</td><td><strong>绝不动第 5 页</strong>（全场核心）</td></tr>
-<tr><td>04:10</td><td>讲完第 7 页（居民端讲完）</td><td>第 7 页只讲政策问答那一张</td></tr>
-<tr><td>05:00</td><td>讲完第 9 页（网格员端讲完）</td><td>第 9 页只讲工单留痕那一张</td></tr>
-<tr><td>05:50</td><td>讲完第 11 页（三端全部讲完）</td><td>第 11 页三条路只讲两条</td></tr>
-<tr><td>06:45</td><td>讲完第 13 页数字</td><td>第 12 页功能每端只念前两条</td></tr>
-<tr><td>07:11</td><td>讲完第 14 页三个诉求</td><td>第 14 页只念三个问题，不解释</td></tr>
-<tr><td>07:21</td><td>说完"谢谢各位"</td><td>硬停，别补话（上限 8:00，还有 39 秒缓冲）</td></tr>
+<thead>
+<tr>
+<th>时间点</th>
+<th>你应该在</th>
+<th>落后了怎么办</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>01:03</td>
+<td>讲完第 2 页痛点</td>
+<td>第 3 页三端各只说半句</td>
+</tr>
+<tr>
+<td>01:39</td>
+<td>讲完第 4 页功能全景</td>
+<td>功能全景只念底座一条</td>
+</tr>
+<tr>
+<td>03:22</td>
+<td>讲完第 7 页传消息</td>
+<td><strong>绝不动第 7 页</strong>（全场核心）</td>
+</tr>
+<tr>
+<td>04:02</td>
+<td>讲完第 8 页 AI 可控</td>
+<td>三招防编造只念第一招</td>
+</tr>
+<tr>
+<td>04:54</td>
+<td>讲完居民两端</td>
+<td>第 10 页只讲政策依据那一张</td>
+</tr>
+<tr>
+<td>05:44</td>
+<td>讲完网格员两端</td>
+<td>第 12 页只讲工单留痕</td>
+</tr>
+<tr>
+<td>06:36</td>
+<td>讲完老人两端（三端讲完）</td>
+<td>第 14 页三条路只讲两条</td>
+</tr>
+<tr>
+<td>07:00</td>
+<td>讲完第 15 页数字</td>
+<td>数字只念 638 和 48</td>
+</tr>
+<tr>
+<td>07:32</td>
+<td>翻到第 17 页大字页，说完"谢谢各位"</td>
+<td>硬停，别补话（上限 8:00，还有 28 秒缓冲）</td>
+</tr>
+</tbody>
 </table>
-
-<p><strong>超时优先级</strong>：第 7 页（居民端·问与议）→ 第 12 页功能每端留两条 → 第 4 页架构压到 15 秒。<br><strong>绝不砍</strong>：开场故事 · 第 5 页双层防线与"规则为主" · 第 11 页老人端三条路 · 第 13 页数字 · 第 14 页三个诉求与主动认短板。</p>
-
+<p><strong>超时优先级</strong>：第 4 页功能全景只扫底座 → 第 10 页（居民·问议）只讲政策依据 → 第 11 页工作台只留待办/导出 → 第 5 页架构压到 15 秒。<br />
+<strong>绝不砍</strong>：开场故事 · 第 7 页双层防线与执行链 · 第 8 页"规则为主、不是全自主" · 第 14 页长按求助与"怕误触" · 第 15 页数字 · 第 16 页主动认短板与三个诉求 · 第 17 页大字谢谢收尾。</p>
 <h2>附件 B：备问问答池（12 问）</h2>
-
 <table>
-<th>#</th><th>问题</th><th>一句话答</th>
-<tr><td>1</td><td>这算真多智能体吗？</td><td>角色之间靠黑板消息真来往，联动是运行时决定的；内核规则驱动，我不说它是全自主 Agent。</td></tr>
-<tr><td>2</td><td>和 if-else 工作流差别？</td><td>写死流程的联动是固定的；我这里"高温"触发的那条链，是角色收到消息后自己接的。</td></tr>
-<tr><td>3</td><td>9 个角色是不是过度设计？</td><td>演示协作机制需要够多角色。真上生产我会合并成 5–6 个，这我承认。</td></tr>
-<tr><td>4</td><td>大模型用在哪？</td><td>意图、追问补全、政策生成用它；状态机、派单、权限、加密永远走规则，四个开关默认关。</td></tr>
-<tr><td>5</td><td>会不会编造政策？</td><td>强制挂出处，回答完回查数据库，还有敏感词与权限审计；查不到就转人工。</td></tr>
-<tr><td>6</td><td>为什么用 SQLite？</td><td>单人起步零运维、够用；数据访问做了抽象，迁移路径想清楚了。</td></tr>
-<tr><td>7</td><td>550 并发怎么测的？</td><td>本机同时打 550 个请求，看失败数和延迟。是本机自测，不是第三方压测。</td></tr>
-<tr><td>8</td><td>数据是真的吗？</td><td>全是我自己造的演示数据，没有真实居民信息。</td></tr>
-<tr><td>9</td><td>有人真的用过吗？</td><td>没有。没做过真实街道试点，这是下一步，也是我今天想请教的第一件事。</td></tr>
-<tr><td>10</td><td>商业模式想清楚了吗？</td><td>没想清楚。可能是政府购买服务，但付费方和定价完全没验证过。</td></tr>
-<tr><td>11</td><td>一个人做得过来吗？</td><td>AI 是编程助手，架构、取舍、验收标准是我定的；靠测试和审计兜底。</td></tr>
-<tr><td>12</td><td>最舍不得哪部分？</td><td>双层防线。"规则为主、大模型为辅"这套取舍，我觉得最像真产品。</td></tr>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>一句话答</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>这算真多智能体吗？</td>
+<td>角色之间靠黑板消息真来往，联动是运行时决定的；内核规则驱动，我不说它是全自主 Agent。</td>
+</tr>
+<tr>
+<td>2</td>
+<td>和 if-else 工作流差别？</td>
+<td>写死流程的联动是固定的；我这里"高温"触发的那条链，是角色收到消息后自己接的。</td>
+</tr>
+<tr>
+<td>3</td>
+<td>9 个角色是不是过度设计？</td>
+<td>演示协作机制需要够多角色。真上生产我会合并成 5–6 个，这我承认。</td>
+</tr>
+<tr>
+<td>4</td>
+<td>大模型用在哪？</td>
+<td>意图、追问补全、政策生成用它；状态机、派单、权限、加密永远走规则，四个开关默认关。</td>
+</tr>
+<tr>
+<td>5</td>
+<td>会不会编造政策？</td>
+<td>强制挂出处，回答完回查数据库，还有敏感词与权限审计；查不到就转人工。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>为什么用 SQLite？</td>
+<td>单人起步零运维、够用；数据访问做了抽象，迁移路径想清楚了。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>550 并发怎么测的？</td>
+<td>本机同时打 550 个请求，看失败数和延迟。是本机自测，不是第三方压测。</td>
+</tr>
+<tr>
+<td>8</td>
+<td>数据是真的吗？</td>
+<td>全是我自己造的演示数据，没有真实居民信息。</td>
+</tr>
+<tr>
+<td>9</td>
+<td>有人真的用过吗？</td>
+<td>没有。没做过真实街道试点，这是下一步，也是我今天想请教的第一件事。</td>
+</tr>
+<tr>
+<td>10</td>
+<td>商业模式想清楚了吗？</td>
+<td>没想清楚。可能是政府购买服务，但付费方和定价完全没验证过。</td>
+</tr>
+<tr>
+<td>11</td>
+<td>一个人做得过来吗？</td>
+<td>AI 是编程助手，架构、取舍、验收标准是我定的；靠测试和审计兜底。</td>
+</tr>
+<tr>
+<td>12</td>
+<td>最舍不得哪部分？</td>
+<td>双层防线。"规则为主、大模型为辅"这套取舍，我觉得最像真产品。</td>
+</tr>
+</tbody>
 </table>
-
 <p><strong>万能三句</strong>：① "这个问题很关键。" ② "我目前的理解是……（只讲确定的）" ③ "我记下来，作为下一步优化项。"</p>
-
 <h2>附件 C：PPT 页序速记（背这个就够）</h2>
-
-<pre>
-1 封面   2 四个老问题   3 九个角色   4 它怎么搭起来的   5 它们真的在传消息【重点】
-6 居民端·报修   7 居民端·问与议   8 网格员端·工作台   9 网格员端·处理与关怀
-10 老人端·看得见   11 老人端·不会打字   12 功能（分端）   13 数字墙   14 位置与诉求
-15 结尾（谢谢各位）　—— 附录：如需看实物 / 最常被问的四个问题
-</pre>
-
+<pre><code>1 封面  2 四个老问题  3 三端总览  4 功能全景  5 它怎么搭起来  6 九个角色
+7 它们真的在传消息【核心】  8 AI 被关在笼子里
+9 居民·报修  10 居民·问与议  11 网格·工作台  12 网格·留痕与关怀
+13 老人·看得见  14 老人·不会打字  15 数字墙  16 位置与三个请教  17 谢谢结尾【正文完】
+—— 18 备用·数据安全  19 附录·怎么跑  20 附录·最常被问四题
+</code></pre>
 <h2>附件 D：数字口径（已统一，附复核方式）</h2>
-
 <table>
-<th>项目</th><th>数字</th><th>复核命令</th>
-<tr><td>自动化测试</td><td>638 项（637 通过 + 1 项默认跳过）</td><td><code>python -m pytest tests/ -q</code></td></tr>
-<tr><td>政策金标</td><td>48 条，第一位命中 100%</td><td><code>python scripts/rag_eval.py</code></td></tr>
-<tr><td>并发</td><td>550 并发零失败</td><td><code>python scripts/benchmark_concurrency.py</code></td></tr>
-<tr><td>代码规范</td><td>ruff 0 问题</td><td><code>python -m ruff check .</code></td></tr>
-<tr><td>数据库</td><td>schema v46 / 约 50 张表</td><td><code>python scripts/demo_preflight.py</code></td></tr>
-<tr><td>登录页数字</td><td>与上面一致</td><td><code>python scripts/check_claims.py</code></td></tr>
+<thead>
+<tr>
+<th>项目</th>
+<th>数字</th>
+<th>复核命令</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>自动化测试</td>
+<td>638 项（637 通过 + 1 项默认跳过）</td>
+<td><code>python -m pytest tests/ -q</code></td>
+</tr>
+<tr>
+<td>政策金标</td>
+<td>48 条，第一位命中 100%</td>
+<td><code>python scripts/rag_eval.py</code></td>
+</tr>
+<tr>
+<td>并发</td>
+<td>550 并发零失败</td>
+<td><code>python scripts/benchmark_concurrency.py</code></td>
+</tr>
+<tr>
+<td>代码规范</td>
+<td>ruff 0 问题</td>
+<td><code>python -m ruff check .</code></td>
+</tr>
+<tr>
+<td>数据库</td>
+<td>schema v46 / 约 50 张表</td>
+<td><code>python scripts/demo_preflight.py</code></td>
+</tr>
+<tr>
+<td>登录页数字</td>
+<td>与上面一致</td>
+<td><code>python scripts/check_claims.py</code></td>
+</tr>
+</tbody>
 </table>
-
-<div class="meta"><code>docs/review/</code> 与 <code>docs/spec/dev-log.md</code> 里出现的 581 / 42 是<strong>当时的历史快照</strong>，故意保留。<br>若有人拿旧材料对数字，就说："那是早期版本；现在代码里是 638 项测试、48 条金标，登录页显示的就是最新的。"</div>
-
+<blockquote>
+<p><code>docs/review/</code> 与 <code>docs/spec/dev-log.md</code> 里出现的 581 / 42 是<strong>当时的历史快照</strong>，故意保留。<br />
+若有人拿旧材料对数字，就说："那是早期版本；现在代码里是 638 项测试、48 条金标，登录页显示的就是最新的。"</p>
+</blockquote>
 <h2>附件 E：上台前 10 分钟流程</h2>
-
-<ul>
-<li><strong>1.</strong> <strong>T-10</strong>：PPT 放映模式（F5）翻一遍，确认字体与图片正常</li>
-<li><strong>2.</strong> <strong>T-8</strong>：把 <code>pdf/9月22日路演-PPT预览.pdf</code> 放桌面（PPT 出问题就放它）</li>
-<li><strong>3.</strong> <strong>T-6</strong>：关微信 / 系统通知；确认翻页笔或键盘可用</li>
-<li><strong>4.</strong> <strong>T-4</strong>：本文件第二、三部分打印一页放手边（只看不动）</li>
-<li><strong>5.</strong> <strong>T-2</strong>：心里过三件事：<strong>① 开场讲故事 ② 第 5 页是核心 ③ 主动说"还没试点"</strong></li>
-<li><strong>6.</strong> <strong>T-0</strong>：深呼吸。你不是去被考代码的，是去让专家帮你把"边界、试点、冷启动"想清楚的。</li>
-</ul>
-
-<div class="footer">
-社区先知 CommunityInsight Agent · 2026 京彩AI·智汇全球 · 基层治理赛道<br>
-作者：步承泽
-</div>
-</body>
-</html>
+<ol>
+<li><strong>T-10</strong>：PPT 放映模式（F5）翻一遍，确认字体与图片正常（共 20 页：正文 17 + 备查 3）</li>
+<li><strong>T-8</strong>：把 <code>pdf/9月22日路演-PPT预览.pdf</code> 放桌面（PPT 出问题就放它）</li>
+<li><strong>T-6</strong>：关微信 / 系统通知；确认翻页笔或键盘可用</li>
+<li><strong>T-4</strong>：把提词卡 A4 打印一张放手边（只看不动）</li>
+<li><strong>T-2</strong>：心里过三件事：<strong>① 开场讲故事 ② 第 7 页是核心、第 8 页是差异点 ③ 主动说"还没试点"</strong></li>
+<li><strong>T-0</strong>：深呼吸。你不是去被考代码的，是去让专家帮你把"边界、试点、冷启动"想清楚的。</li>
+</ol></body></html>
