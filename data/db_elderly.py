@@ -88,13 +88,20 @@ def touch_active(user_id: int) -> None:
 
 
 def get_inactive_elders(hours: int = INACTIVE_HOURS) -> list[dict]:
-    """查超过 `hours` 小时没互动的老人（安全巡检用）。"""
+    """查超过 `hours` 小时没互动的老人（安全巡检用）。
+
+    ⚠️ 2026-09-24 修：原来把 `last_active_at IS NULL` 也算作"未互动"——**未知 ≠ 失联**。
+    批量建档会让所有新老人立刻涌进"重点关注"，网格员会当成真事去打电话。
+    现在用 `COALESCE(last_active_at, updated_at)`：新档案从建档那一刻起算，24 小时后才可能进名单。
+    同时补 `u.role='elderly'`：`_ensure_profile()` 会给任何 uid 建档（家属代操作也会），
+    不过滤角色的话，**居民也会被当成老人**拉进巡检名单。
+    """
     with get_db() as conn:
         rows = conn.execute(
             "SELECT e.user_id, u.name, e.last_active_at, e.is_living_alone, e.emergency_contact "
             "FROM elderly_profile e JOIN user_profile u ON u.id = e.user_id "
-            "WHERE u.is_active = 1 AND (e.last_active_at IS NULL "
-            "  OR julianday('now') - julianday(e.last_active_at) > ?/24.0)",
+            "WHERE u.is_active = 1 AND u.role = 'elderly' AND "
+            "  julianday('now') - julianday(COALESCE(e.last_active_at, e.updated_at)) > ?/24.0",
             (hours,),
         ).fetchall()
     result = []
@@ -122,7 +129,7 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
         return 0
     try:
         from data.db_notifications import create_notification
-        from data.db_user import list_users
+        from data.db_user import list_users, list_guardians_of
         from utils.pii import mask_phone
         grids = list_users(role="grid")
         if not grids:
@@ -154,6 +161,16 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
                     g["id"], "elderly_safety",
                     f"👴 老人安全留意：{elder.get('name', '')}",
                     body,
+                    related_id=uid,
+                )
+            # P3：家属（子女）也收一条——口吻不同：给网格员的是待办，给家属的是关心。
+            # 诚实边界：站内通知（WebSocket/消息中心），**不是短信/电话外呼**。
+            for guardian in list_guardians_of(uid):
+                create_notification(
+                    guardian["id"], "elderly_safety",
+                    f"👴 关心一下：{elder.get('name', '')}",
+                    f"已经 {hours} 小时没有互动了，方便的话打个电话问问。"
+                    "（社区网格员也收到了这条提醒）",
                     related_id=uid,
                 )
             notified += 1

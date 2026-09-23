@@ -108,6 +108,74 @@ def test_notify_inactive_elders_dedup_within_24h():
     assert notify_inactive_elders(hours=24) == 0, "24h 内不应重复通知同一老人"
 
 
+def test_null_last_active_is_not_treated_as_missing():
+    """未知 ≠ 失联：刚建档（last_active_at 为空、updated_at 是刚刚）不进"未互动"名单。
+
+    修前：`last_active_at IS NULL` 直接被判未互动 → 批量建档会让所有新老人涌进"重点关注"，
+    网格员照着名单去打电话，是**假警报**（比漏报更消耗信任）。
+    """
+    from data.db_core import get_db
+    from data.db_elderly import get_inactive_elders
+
+    fresh = 94001
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO user_profile (id, username, role, name, is_active) "
+                     "VALUES (?, 'fresh94001', 'elderly', '新建档老人', 1)", (fresh,))
+        conn.execute("INSERT OR REPLACE INTO elderly_profile (user_id, is_living_alone, last_active_at, "
+                     "health_info, medication_reminders, emergency_contact, updated_at) "
+                     "VALUES (?, 0, NULL, '{}', '[]', '[]', CURRENT_TIMESTAMP)", (fresh,))
+        conn.commit()
+    assert fresh not in [e["user_id"] for e in get_inactive_elders(hours=24)]
+
+    # 但建档满 24 小时后仍会被捞出来（不是永远不报）
+    with get_db() as conn:
+        conn.execute("UPDATE elderly_profile SET updated_at = datetime('now','-30 hours') WHERE user_id=?",
+                     (fresh,))
+        conn.commit()
+    assert fresh in [e["user_id"] for e in get_inactive_elders(hours=24)]
+
+
+def test_inactive_notifies_bound_guardian_too():
+    """P3：家属（子女）也要收到——反向绑定查询原本是缺的，全库 0 条绑定。"""
+    from data.db_core import get_db
+    from data.db_elderly import notify_inactive_elders
+    from data.db_user import list_guardians_of
+
+    guardian = 94002
+    _seed(elder_active_hours_ago=30)
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO user_profile (id, username, role, name, is_active) "
+                     "VALUES (?, 'son94002', 'resident', '小张', 1)", (guardian,))
+        conn.execute("UPDATE user_profile SET bound_elderly_id=? WHERE id=?", (ELDER_UID, guardian))
+        conn.execute("DELETE FROM notifications WHERE type='elderly_safety'")
+        conn.commit()
+
+    assert [g["id"] for g in list_guardians_of(ELDER_UID)] == [guardian]
+    assert notify_inactive_elders(hours=24) >= 1
+    with get_db() as conn:
+        mine = conn.execute("SELECT title, content FROM notifications "
+                            "WHERE type='elderly_safety' AND user_id=?", (guardian,)).fetchall()
+    assert mine, "绑定的家属必须收到关心提醒"
+    assert "张奶奶" in mine[0]["title"]
+    assert "打个电话" in mine[0]["content"]
+
+
+def test_sos_calls_carry_elder_name():
+    """SP：网格员端 SOS 列表必须能显示**求助的老人**，而不是被叫的联系人姓名。"""
+    from data.db_core import get_db
+    from data.db_elderly_care import get_sos_calls
+
+    _seed(elder_active_hours_ago=30)
+    with get_db() as conn:
+        conn.execute("INSERT INTO emergency_calls (user_id, call_type, target_name, target_phone, "
+                     "result, status) VALUES (?, 'sos', '张小明', '13900001111', '', '求助中')",
+                     (ELDER_UID,))
+        conn.commit()
+    calls = get_sos_calls(status="求助中", limit=5)
+    assert calls, "应能查到求助记录"
+    assert calls[0].get("elder_name") == "张奶奶", "必须 join 出求助者（老人）姓名"
+
+
 # ---------------- 接线守卫（这两条正是本轮回溯出的问题）----------------
 
 def test_elderly_endpoints_record_activity():

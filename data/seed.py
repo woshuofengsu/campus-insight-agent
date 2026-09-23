@@ -96,6 +96,16 @@ def _seed_elderly_profile():
             {"name": "张小明", "relation": "儿子", "phone": "13900001111"},
         ])
         set_living_alone(uid, True)
+        # P3 安全闭环：给「家属绑定」补一条种子。
+        # 为什么必须补：全库原本 0 条绑定，`list_guardians_of()` 永远查不到人 →
+        # "老人久未互动时通知子女"在演示里必然是空的（看着像功能没做）。
+        # 演示账号 demo_resident 扮演张大爷的儿子，绑定后即可演示"子女也收到关心提醒"。
+        with get_db() as conn:
+            g = conn.execute("SELECT id FROM user_profile WHERE username = 'demo_resident'").fetchone()
+            if g:
+                conn.execute("UPDATE user_profile SET bound_elderly_id=? WHERE id=? "
+                             "AND (bound_elderly_id IS NULL OR bound_elderly_id=0)", (uid, g["id"]))
+                conn.commit()
     except Exception as e:
         _log.debug("seed 老人档案失败：%s", e, exc_info=True)
 

@@ -299,3 +299,19 @@ def get_bound_elderly(guardian_id: int) -> dict | None:
             "WHERE g.id=? AND g.bound_elderly_id>0", (guardian_id,),
         ).fetchone()
         return dict(row) if row else None
+
+
+def list_guardians_of(elderly_id: int) -> list[dict]:
+    """反向查：谁把这位老人绑定为「我的老人」（家属/子女）。
+
+    P3 安全闭环要用它把"老人久未互动"的通知**同时发给家属**——`get_bound_elderly` 是
+    「家属 → 老人」方向，这里是反方向（老人 → 家属），原来是缺的。
+    """
+    if not elderly_id:
+        return []
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name FROM user_profile WHERE bound_elderly_id=? AND is_active=1 "
+            "ORDER BY id", (elderly_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]

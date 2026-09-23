@@ -111,7 +111,7 @@ async function sosAction(s, action) {
         <div v-for="s in sosList" :key="s.id" class="card"
              :style="s.status === '求助中' ? 'border:2px solid #dc2626;' : ''">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <b>{{ s.target_name || ('老人#' + s.user_id) }}</b>
+            <b>{{ s.elder_name || s.target_name || ('老人#' + s.user_id) }}</b>
             <n-tag size="small" :type="s.status === '求助中' ? 'error' : 'default'">{{ s.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">

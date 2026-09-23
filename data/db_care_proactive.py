@@ -102,7 +102,8 @@ def list_inactive_elderly(days: int = 5, limit: int = 20) -> list[dict]:
         with get_db() as conn:
             elders = conn.execute(
                 "SELECT p.user_id, u.name FROM elderly_profile p "
-                "LEFT JOIN user_profile u ON u.id = p.user_id WHERE u.name != ''").fetchall()
+                "LEFT JOIN user_profile u ON u.id = p.user_id "
+                "WHERE u.name != '' AND u.role = 'elderly'").fetchall()
             for e in elders:
                 uid = e["user_id"]
                 last = conn.execute(

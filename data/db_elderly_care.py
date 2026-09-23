@@ -1195,15 +1195,22 @@ def get_latest_sos(user_id: int) -> dict | None:
 
 def get_sos_calls(user_id: int | None = None, status: str | None = None,
                   limit: int = 20) -> list[dict]:
-    q = "SELECT * FROM emergency_calls WHERE call_type='sos'"
+    """求助记录（网格员端列表用）。
+
+    ⚠️ 2026-09-24 修：原来 `SELECT *` 不 join `user_profile`，前端只能把 `target_name`
+    （**被叫的联系人**姓名）当成"求助的老人"显示——网格员可能看到错的人。现在 join 出
+    `elder_name`（求助者姓名），前端优先用它。
+    """
+    q = ("SELECT ec.*, u.name AS elder_name FROM emergency_calls ec "
+         "LEFT JOIN user_profile u ON u.id = ec.user_id WHERE ec.call_type='sos'")
     args: list = []
     if user_id:
-        q += " AND user_id=?"
+        q += " AND ec.user_id=?"
         args.append(user_id)
     if status:
-        q += " AND status=?"
+        q += " AND ec.status=?"
         args.append(status)
-    q += " ORDER BY id DESC LIMIT ?"
+    q += " ORDER BY ec.id DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
