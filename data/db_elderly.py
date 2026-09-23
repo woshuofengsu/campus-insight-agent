@@ -112,6 +112,10 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
     """通知网格员：有老人超过 `hours` 小时没互动了。
 
     24h 去重（同一天内不重复通知同一老人）。返回本次通知的老人数。
+
+    P3 收口（2026-09-24）：通知正文补上**独居标记与子女联系方式（脱敏）**，让网格员能直接找到家属。
+    ⚠️ 诚实边界：本项目**没有短信/电话外呼通道**，所以做的是"把家属联系方式交给网格员"，
+    **不是"已自动短信通知子女"**——对外口径不许写成后者。
     """
     inactive = get_inactive_elders(hours)
     if not inactive:
@@ -119,6 +123,7 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
     try:
         from data.db_notifications import create_notification
         from data.db_user import list_users
+        from utils.pii import mask_phone
         grids = list_users(role="grid")
         if not grids:
             return 0
@@ -134,11 +139,21 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
                 ).fetchone()
             if dup and dup["cnt"] > 0:
                 continue
+            # 正文：谁、多久没互动、是否独居、家属电话（脱敏，供网格员联系）
+            body = f"已 {hours} 小时未互动，请电话或上门确认。"
+            if elder.get("is_living_alone"):
+                body += "（独居）"
+            contacts = elder.get("emergency_contact") or []
+            if isinstance(contacts, list) and contacts:
+                first = contacts[0] if isinstance(contacts[0], dict) else {}
+                cname, cphone = first.get("name", ""), first.get("phone", "")
+                if cname or cphone:
+                    body += f" 家属：{cname} {mask_phone(cphone)}".rstrip()
             for g in grids:
                 create_notification(
                     g["id"], "elderly_safety",
                     f"👴 老人安全留意：{elder.get('name', '')}",
-                    f"已 {hours} 小时未互动，请电话或上门确认。",
+                    body,
                     related_id=uid,
                 )
             notified += 1

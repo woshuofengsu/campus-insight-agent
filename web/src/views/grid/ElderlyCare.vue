@@ -9,6 +9,7 @@ const tab = ref('meds')
 const meds = ref([])
 const contacts = ref([])
 const sosList = ref([])
+const inactive = ref([])            // P3：久未互动的老人（24h 阈值，后端算好的）
 const auditOp = ref({}) // 审核意见
 const replyOp = ref({}) // SOS 处理备注
 
@@ -18,6 +19,7 @@ async function load() {
   try { meds.value = (await elderly.manageMeds()) || [] } catch { /* 忽略 */ }
   try { contacts.value = (await elderly.manageContacts()) || [] } catch { /* 忽略 */ }
   try { sosList.value = (await elderly.manageSos()) || [] } catch { /* 忽略 */ }
+  try { inactive.value = (await elderly.manageInactive({ days: 1 })) || [] } catch { /* 忽略 */ }
 }
 
 async function auditMed(m, approve) {
@@ -51,6 +53,24 @@ async function sosAction(s, action) {
     <p class="page-sub">用药提醒审核 · 紧急联系人审核 · 紧急求助处理</p>
 
     <n-tabs v-model:value="tab" type="line">
+      <!-- P3 安全闭环：久未互动 / 重点关注老人 -->
+      <n-tab-pane name="focus" tab="👀 重点关注老人">
+        <div v-for="e in inactive" :key="e.user_id" class="card"
+             style="border:2px solid #f59e0b;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b>{{ e.name || ('老人#' + e.user_id) }}</b>
+            <n-tag size="small" type="warning">已 {{ e.days_inactive }} 天未互动</n-tag>
+          </div>
+          <div class="muted" style="font-size:0.9rem;margin-top:6px;">
+            请电话或上门确认；系统已给网格员发了安全留意通知。
+          </div>
+        </div>
+        <n-empty v-if="inactive.length === 0" description="暂无久未互动的老人" />
+        <div class="muted" style="font-size:0.82rem;margin-top:10px;">
+          口径：超过 24 小时没有互动（打开老年端 / 语音报修 / 用药打卡）即进入本列表，24 小时内不重复提醒。
+        </div>
+      </n-tab-pane>
+
       <!-- 用药审核 -->
       <n-tab-pane name="meds" tab="💊 用药审核">
         <div v-for="m in meds" :key="m.id" class="card">
@@ -95,7 +115,9 @@ async function sosAction(s, action) {
             <n-tag size="small" :type="s.status === '求助中' ? 'error' : 'default'">{{ s.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
-            🕐 {{ (s.created_at || '').slice(0, 16) }} · {{ s.content || s.description || '' }}
+            🕐 {{ (s.created_at || '').slice(0, 16) }}<template v-if="s.call_type"> · {{ s.call_type }}</template>
+            <template v-if="s.handle_note"> · 处理：{{ s.handle_note }}</template>
+            <template v-else-if="s.result"> · {{ s.result }}</template>
           </div>
           <div v-if="s.status === '求助中'" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
             <n-input v-model:value="replyOp[s.id]" placeholder="处理备注" size="small" style="max-width:200px;" />

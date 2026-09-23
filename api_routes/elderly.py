@@ -16,6 +16,24 @@ router = APIRouter(prefix="/api/web/elderly", tags=["elderly"])
 manage_router = APIRouter(prefix="/api/web/elderly/manage", tags=["elderly"])
 
 
+def _touch(uid) -> None:
+    """记一次**真实互动**（P3 安全闭环的输入：久未互动检测靠它）。
+
+    ⚠️ 2026-09-24 修：`touch_active` 过去只被 Streamlit 备线调用（`ui/pages_elderly/home.py`），
+    Vue 主路径从不写 `elderly_profile.last_active_at`（库里值停在 2026-08-21）
+    → 主线上"久未互动"检测等于失效。现在在老年端真实交互处统一上报。
+
+    失败只 warning，**绝不影响主流程**：记活跃不是业务前置条件，不能因为它坏了就让老人用不了。
+    """
+    if not uid:
+        return
+    try:
+        from data.db_elderly import touch_active
+        touch_active(uid)
+    except Exception:  # noqa: BLE001
+        _log.warning("记录老人活跃失败 uid=%s", uid, exc_info=True)
+
+
 class MedicationAudit(BaseModel):
     approve: bool = Field(default=True)
     opinion: str = Field(default="")
@@ -93,6 +111,7 @@ def web_elderly_home(request: Request):
     # 属地化（WS4）：老年端也必须带属地，否则与居民端口径不一致（演示一切屏就露馅）
     r = _region(request)
     uid = _resolve_elder_uid(request) or u.get("uid")
+    _touch(uid)                       # 打开首页 = 一次真实互动（久未互动检测的输入）
     elderly = get_profile(uid) or {}
     health = elderly.get("health_info", {})
     due = 0
@@ -169,6 +188,7 @@ def web_elderly_voice_report(req: VoiceReport, request: Request):
     from tools.action_report_issue import _llm_classify
     u = _user(request)
     uid = _resolve_elder_uid(request) or u.get("uid")
+    _touch(uid)
     profile = {}
     try:
         from data.db_user import get_user_by_id
@@ -237,6 +257,7 @@ def web_emergency_trigger(request: Request):
     from data.db_elderly_care import trigger_sos
     from data.db_user import get_user_by_id, get_bound_elderly
     u = _user(request)
+    _touch(_resolve_elder_uid(request) or u.get("uid"))
     profile = get_user_by_id(u.get("uid")) or {}
     # 家属绑定模式：禁止家属代替老人触发
     try:
@@ -316,6 +337,7 @@ def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
     from agent.tone import human_status  # noqa: F401
     actor = _user(request).get("name") or "老人"
     uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    _touch(uid)
     if req.action == "taken" or req.action == "snooze":
         ok_, msg, streak = mark_intake(uid, rid, action=req.action)
         encourage = f"连续 {streak} 天按时吃药，真棒！" if streak >= 3 else msg

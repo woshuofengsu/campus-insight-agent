@@ -407,3 +407,14 @@
 - `python -m pytest -q` → **318 passed, 7 warnings, 7 subtests passed**（约 38–43s）。
 - 每批改动后均跑全量回归，基线一致，无破坏。
 - 敏感项复核：`.env`（含真实 `DEEPSEEK_API_KEY` / `HEFENG_API_KEY` / `SMTP_*`）仍在 `.gitignore` 内，不打包、不提交。
+
+### 2026-09-24 · B2：老年端 P3 安全闭环收口
+
+- **打卡链路接回主路径**：`touch_active` 过去只被 Streamlit 备线调用，Vue 主路径从不写 `last_active_at`
+  （库里值停在 8-21）→ 现已在老年端 4 处真实交互（首页/语音报修/紧急求助/用药打卡）上报。
+- **无人应答巡检进调度**：`notify_inactive_elders` 早写好但没进 `scheduler` → 已注册为独立任务（自带 24h 去重）。
+- **通知正文补独居标记 + 家属联系方式（脱敏）**，让网格员能直接找到家属；**无短信通道，不宣称"已通知子女"**。
+- **修前端两处**：SOS 卡片原来读了表里不存在的列（只显示时间）→ 改显示 `call_type`/`handle_note`/`result`；
+  `/manage/inactive` 是孤儿接口 → 补前端方法并新增网格员端「重点关注老人」页签。
+- 新增 `tests/test_elderly_safety_loop.py`（6 用例，含 2 条接线守卫）；前端 build 后 `mobile_audit` 全过、`ui_audit` 0 HIGH。
+- 记录一条环境坑：跑全量 pytest 前必须停掉本机服务（否则 e2e 有 2 例假失败），已写入 `AGENTS.md`。

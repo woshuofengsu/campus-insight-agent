@@ -141,6 +141,7 @@ def run_all() -> dict:
     results["care_event_cleaned"] = _safe("关怀事件日志清理", lambda: _care_event_clean())
     results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
     results["proactive_followup"] = _safe("主动关怀-办结回访", lambda: _proactive_care())
+    results["elderly_safety"] = _safe("老人安全巡检", lambda: _elderly_safety())
     return results
 
 
@@ -180,6 +181,21 @@ def _proactive_care() -> int:
         from data.db_care_proactive import run_proactive_care
         return run_proactive_care().get("followup", 0)
     except Exception:
+        return 0
+
+
+def _elderly_safety() -> int:
+    """P3 安全闭环：老人安全巡检——超过阈值未互动 → 通知网格员（24h 去重）。
+
+    ⚠️ 2026-09-24 修：`data/db_elderly.notify_inactive_elders()` 早就写好了，但**没人按计划调它**，
+    过去只在 Agent 聊天观察阶段顺带跑（`agent/engine.py`）→ "无人应答检测"实际是文案 + 偶发。
+    现在按调度跑（默认 60 秒一轮；函数自带 24h 去重，重复跑不会重复打扰）。
+    """
+    try:
+        from data.db_elderly import notify_inactive_elders
+        return notify_inactive_elders()
+    except Exception:
+        _log.warning("老人安全巡检失败", exc_info=True)
         return 0
 
 

@@ -155,6 +155,8 @@ export const elderly = {
   manageContacts: (params) => api.get('/elderly/manage/contacts', { params }),
   auditContact: (id, data) => api.post(`/elderly/manage/contacts/${id}/audit`, data),
   manageSos: (params) => api.get('/elderly/manage/sos', { params }),
+  // P3 安全闭环：久未互动老人（后端 /elderly/manage/inactive 早就有，前端此前没有方法 → 孤儿接口）
+  manageInactive: (params) => api.get('/elderly/manage/inactive', { params }),
   sosAction: (id, data) => api.post(`/elderly/emergency/${id}/action`, data),
 }
 

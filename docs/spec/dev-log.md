@@ -1823,3 +1823,47 @@ check_claims **三方一致**。
 不涉安全与隔离，故未在本批抢修（避免一次动太多统计口径）。
 
 **测试数**：638 → **655**（可运行）。**门禁**：全量回归绿 · ruff 0 · 口径一致（`check_claims`）。
+
+## 五十二、老年端 P3 安全闭环收口（B2）：把"做了但没生效"的四处接回主路径 ✅
+
+侦察（见 `docs/spec/多租户与老年端深化-侦察报告.md` §2.1）发现 P3 的四项"代码都在、但没人调"，
+本轮逐条接回，并给关键接线加了**删掉就红**的守卫测试。
+
+### 一、打卡链路接回 Vue 主路径（原来只被 Streamlit 备线调用）
+
+`touch_active()` 过去只在 `ui/pages_elderly/home.py` 被调用，Vue 走的 `api_routes/elderly.py`
+从不写 `elderly_profile.last_active_at`（库里值停在 2026-08-21）→ 主线的"久未互动"检测等于失效。
+现在在老年端 4 个**真实交互处**统一上报：打开首页、语音报修、紧急求助、用药打卡（`_touch()` 辅助函数，
+失败只 warning，绝不影响主流程——记活跃不是业务前置条件）。
+
+### 二、无人应答巡检进调度（原来只在 Agent 聊天时顺带跑）
+
+`data/db_elderly.notify_inactive_elders()`（给网格员建 `elderly_safety` 通知、24h 去重）早就写好，
+但没进 `scripts/scheduler.py` 的任务表。已加 `_elderly_safety()` 并注册为 `results["elderly_safety"]`
+（默认 60 秒一轮，函数自带 24h 去重，重复跑不会重复打扰）。
+
+### 三、通知正文补"能不能找到家属"（不假装发了短信）
+
+原正文只有"已 X 小时未互动，请电话或上门确认"。现在追加**独居标记**与**家属联系方式（脱敏）**，
+让网格员拿到通知就能直接联系家属。**诚实边界**：本项目没有短信/电话外呼通道，
+所以做的是"把家属联系方式交给网格员"，对外口径**不许**写成"已自动短信通知子女"。
+
+### 四、修孤儿接口与空白卡片（前端）
+
+- `ElderlyCare.vue` 的 SOS 卡片读的是 `s.content || s.description`，而 `emergency_calls` 表里
+  **没有这两列**（只有 `call_type`/`handle_note`/`result`）→ 卡片长期只显示时间。已改为显示真实字段。
+- `/api/web/elderly/manage/inactive` 早就存在，但前端 `api/index.js` 没有对应方法 → 孤儿接口。
+  已补 `elderly.manageInactive()`，并在网格员端新增**「👀 重点关注老人」页签**（久未互动列表 +
+  口径说明），把"无人应答"从后端数据变成网格员看得见的抓手。
+
+### 五、测试与门禁
+
+- 新增 `tests/test_elderly_safety_loop.py`（6 用例）：打卡 → 阈值判定 → 通知网格员（断言含独居标记、
+  家属姓名、**脱敏手机号且无完整号码**）→ 24h 去重；另加两条**接线守卫**（端点数 ≥4 处 `_touch(`、
+  scheduler 必须注册 `elderly_safety`），删掉接线就会红。
+- 前端按约定 `npm run build` 后审计：`mobile_audit` 全过、`ui_audit` **0 处 HIGH**。
+- **踩坑并写进约定**：跑全量 `pytest tests/` 时若本机服务（`uvicorn`）还开着，
+  `tests/e2e/test_demo_scenarios.py` 有 2 个用例会报 `no such table: community_issues`（"单跑过、全量挂"）；
+  停服务后同一套代码 660 全绿。而 `ui_audit`/`mobile_audit` 反过来**需要**服务在跑——已写入 `AGENTS.md`。
+
+**测试数**：655 → **661**（可运行）。**门禁**：全量 660 passed / 1 skipped · ruff 0 · 口径一致。
