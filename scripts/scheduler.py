@@ -67,6 +67,13 @@ def _health_linkage_tasks(db_weather, db_health) -> list[dict]:
     """健康天气联动自动触发：对生效窗口内（≤12h）的 active 预警逐条联动（每日去重）。
 
     天气数据降级（>30 分钟未更新）时暂停新联动触发（spec #39：API 异常暂停新联动）。
+
+    **多租户（B7）**：联动阈值可以按社区分别配置，所以这里必须**按社区逐个判定**——
+    只调一次（不带社区）会让"按社区配阈值"永远不生效，属本项目最忌讳的"做了但不生效"。
+    预警源（`weather_alerts`）本身没有社区维度（是全国/城市级），因此同一预警对
+    每个社区各判一次：阈值不同 → 触发结果天然不同（朝阳把高温阈值调到 30℃ 时，
+    32℃ 的天气只触发朝阳的联动）。`all_tenants()` 为空（例如库里还没用户）时，
+    保留一次不带社区（全局口径）的调用作为兜底，避免演示环境静默什么都不做。
     """
     out: list[dict] = []
     try:
@@ -80,7 +87,9 @@ def _health_linkage_tasks(db_weather, db_health) -> list[dict]:
         except Exception:
             pass
         from datetime import datetime as _dt, timedelta as _td
+        from utils.tenant import all_tenants
         cutoff = (_dt.now() + _td(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+        tenants: list[str | None] = list(all_tenants()) or [None]
         for a in db_weather.get_active_alerts():
             eff = (a.get("effective_time") or "")
             if eff and eff > cutoff:
@@ -91,7 +100,8 @@ def _health_linkage_tasks(db_weather, db_health) -> list[dict]:
                 "effective_time": eff,
                 "expire_time": a.get("expire_time", ""),
             }
-            out.append(db_health.trigger_weather_linkage(ev, actor="系统"))
+            for tenant in tenants:
+                out.append(db_health.trigger_weather_linkage(ev, actor="系统", tenant=tenant))
     except Exception as e:  # noqa: BLE001
         _log.warning("健康天气联动任务失败: %s", e)
         try:

@@ -109,26 +109,35 @@ def web_health_linkage_records(request: Request, limit: int = 50):
 
 @router.get("/linkage/active")
 def web_health_linkage_active(request: Request, limit: int = 3):
-    """居民端当前生效的天气联动提醒（当天触发，最多 3 条，其余折叠）。"""
+    """居民端当前生效的天气联动提醒（当天触发，最多 3 条，其余折叠）。
+
+    多租户（B7）：只返回**本社区**触发的联动（留痕带 `[社区]` 归属标签；
+    不带标签的历史行视为全局触发，仍可见，避免升级后这一段突然空白）。
+    """
     from data.db_core import get_db
+    from data.db_health_content import linkage_scope_of
+    scope = _tenant(request) or "全局"
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM activity_log WHERE module='疾病预防' AND target_type='weather_linkage' "
             "AND action='联动提醒触发' AND date(created_at, 'localtime')=date('now','localtime') "
-            "ORDER BY id DESC LIMIT ?", (limit,),
+            "ORDER BY id DESC LIMIT ?", (limit * 5,),
         ).fetchall()
-        return _ok([{
-            "content_id": r["target_id"], "title": r["target_title"] or "",
-            "detail": r["detail"] or "", "created_at": r["created_at"],
-        } for r in rows])
+    out = [{
+        "content_id": r["target_id"], "title": r["target_title"] or "",
+        "detail": (r["detail"] or "").replace(f"[{scope}]", ""), "created_at": r["created_at"],
+    } for r in rows if linkage_scope_of(r["detail"]) in (scope, "")]
+    return _ok(out[:limit])
 
 
 @router.get("/linkage/thresholds")
 def web_health_linkage_thresholds_get(request: Request):
+    """本社区生效的联动阈值（多租户 B7：社区专属 → 全局 → 代码默认）。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_health_content import get_linkage_thresholds
-    return _ok(get_linkage_thresholds())
+    tenant = _tenant(request)
+    return _ok({**get_linkage_thresholds(tenant=tenant), "scope": tenant or "全局"})
 
 
 class LinkageThresholdsSet(BaseModel):
@@ -139,37 +148,55 @@ class LinkageThresholdsSet(BaseModel):
 
 @router.post("/linkage/thresholds")
 def web_health_linkage_thresholds_set(req: LinkageThresholdsSet, request: Request):
-    """天气联动阈值配置（仅疾病预防负责人，立即生效留痕）。"""
+    """天气联动阈值配置（仅疾病预防负责人，立即生效留痕）。
+
+    多租户（B7）：只改**本社区**的阈值（`linkage_thresholds@社区`），其他社区不受影响。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_health_content import set_linkage_thresholds
     actor = _user(request).get("name") or "负责人"
+    tenant = _tenant(request)
     r = set_linkage_thresholds(high_temp=req.high_temp, low_temp=req.low_temp,
-                               temp_drop=req.temp_drop, actor=actor)
-    return _ok(r, "阈值已更新")
+                               temp_drop=req.temp_drop, actor=actor, tenant=tenant)
+    return _ok({**r, "scope": tenant or "全局"}, "阈值已更新")
 
 
 class LinkageAction(BaseModel):
     action: str = Field(..., pattern="^(close|reopen)$")
     reason: str = Field(default="")
+    # 「永久关闭」此前**没有任何入口**（路由从不传 permanent）→ `reopen_linkage` 永远没有可开启的
+    # 对象、`_linkage_perm_closed` 恒为 False，属"做了但没接上主路径"。这里补上开关。
+    permanent: bool = Field(default=False)
 
 
 @router.post("/linkage/{link_key}/action")
 def web_health_linkage_action(link_key: str, req: LinkageAction, request: Request):
-    """联动关闭/重新开启（二次确认留痕）。"""
+    """联动关闭/重新开启（二次确认留痕）。
+
+    `permanent=true` = 永久关闭（需 reopen 才能再触发）；否则只做当天去重。
+
+    多租户（B7）：关闭/重开只对本社区生效（留痕带 `[社区]` 归属标签）——
+    耦合 `link_key` 的联动态（关闭状态、今日已触发）**不含社区信息**，
+    所以归属必须由这里的服务端身份补上，否则 A 社区关闭会连带关掉 B 社区。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_health_content import close_linkage, reopen_linkage
     actor = _user(request).get("name") or "负责人"
+    tenant = _tenant(request)
     if req.action == "close":
-        ok_, msg = close_linkage(link_key, req.reason or "演示关闭", actor=actor, confirm=True)
+        ok_, msg = close_linkage(link_key, req.reason or "演示关闭", actor=actor,
+                                 permanent=req.permanent, confirm=True, tenant=tenant)
     elif req.action == "reopen":
-        ok_, msg = reopen_linkage(link_key, actor=actor, confirm=True)
+        ok_, msg = reopen_linkage(link_key, actor=actor, confirm=True, tenant=tenant)
     else:
         return _fail(1001, "不支持的操作")
     if not ok_:
         return _fail(2001, msg)
-    return _ok({"link_key": link_key}, "操作成功")
+    return _ok({"link_key": link_key, "scope": tenant or "全局",
+                "permanent": req.permanent if req.action == "close" else False},
+               "已永久关闭" if (req.action == "close" and req.permanent) else "操作成功")
 
 
 # ---- 咨询详情 / 居民反馈 ----

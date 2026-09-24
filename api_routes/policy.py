@@ -319,15 +319,21 @@ class ThresholdSet(BaseModel):
 
 @router.get("/threshold")
 def web_qa_threshold_get(request: Request):
+    """当前生效的自动回答阈值（多租户 B7：按请求者所在社区取，社区专属 → 全局 → 默认）。"""
     from data.db_policy import get_match_threshold
-    return _ok({"threshold": get_match_threshold()})
+    return _ok({"threshold": get_match_threshold(tenant=_tenant(request)),
+                "scope": _tenant(request) or "全局"})
 
 
 @router.post("/threshold")
 def web_qa_threshold_set(req: ThresholdSet, request: Request):
-    """匹配阈值配置（仅负责人，留痕）。"""
+    """匹配阈值配置（仅负责人，留痕）。多租户 B7：只改**本社区**的阈值，不影响其他社区。"""
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_policy import set_match_threshold
-    set_match_threshold(req.threshold, actor=_user(request).get("name") or "负责人")
-    return _ok({"threshold": req.threshold}, "阈值已更新")
+    tenant = _tenant(request)
+    ok_, msg = set_match_threshold(req.threshold, actor=_user(request).get("name") or "负责人",
+                                   tenant=tenant)
+    if not ok_:
+        return _fail(2001, msg or "阈值保存失败")
+    return _ok({"threshold": req.threshold, "scope": tenant or "全局"}, "阈值已更新")

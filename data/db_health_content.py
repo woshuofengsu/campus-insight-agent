@@ -27,6 +27,7 @@ import re
 from datetime import datetime, timedelta
 
 from data.db_core import get_db
+from data.db_settings import get_setting_json, set_setting_json
 from utils.tenant import stamp_tenant, tenant_clause
 from utils.pii import scrub_field
 from data.db_notifications import log_activity
@@ -1000,87 +1001,111 @@ def get_unread_reply_count(user_id: int) -> int:
 # 三、天气联动触发
 # ============================================================
 
-def get_linkage_thresholds() -> dict:
-    """联动阈值（settings 表持久化，重启不丢）。"""
-    try:
-        with get_db() as conn:
-            row = conn.execute(
-                "SELECT value FROM settings WHERE key='linkage_thresholds'"
-            ).fetchone()
-            if row and row["value"]:
-                import json
-                stored = json.loads(row["value"])
-                merged = dict(_LINKAGE_THRESHOLDS)
-                merged.update(stored)
-                return merged
-    except Exception:
-        pass
-    return dict(_LINKAGE_THRESHOLDS)
+def _linkage_scope(tenant: str | None = None) -> str:
+    """联动态的**归属标签**（多租户 B7）：社区名，取不到社区时用「全局」。
+
+    联动状态（阈值、永久关闭、今日已触发）都记在 `activity_log` 里——那张表**没有** tenant 列
+    （它是全局审计流水，不改表结构），所以用 detail 前缀 `[标签]` 承载归属。
+    历史行没有标签 = 升级前的全局决策 → 读取时按"对所有社区都生效"处理（保守，见下面两个查询），
+    避免升级后把一个社区已经永久关闭的联动又打开。
+    """
+    return tenant or "全局"
+
+
+def linkage_scope_of(detail: str) -> str:
+    """从联动留痕的 detail 解析**归属标签**：`[社区名]其余内容` → `社区名`；无标签 → `""`。
+
+    无标签 = 升级前的全局留痕（那时还没有按社区记）。读取侧把 `""` 视为"对谁都可见/生效"，
+    避免升级后把历史行当成"别社区的"而丢掉（表现为页面突然空白或联动被重新打开）。
+    """
+    d = detail or ""
+    if not d.startswith("["):
+        return ""
+    end = d.find("]")
+    return d[1:end] if end > 0 else ""
+
+
+def get_linkage_thresholds(tenant: str | None = None) -> dict:
+    """联动阈值（settings 表持久化，重启不丢）。
+
+    多租户（B7）：`tenant` 给了就取该社区的阈值（社区专属 → 全局 → 代码默认），
+    不给 = 全局口径；`_LINKAGE_THRESHOLDS` 只作内置默认值，**任何路径都不改写它**。
+    """
+    merged = dict(_LINKAGE_THRESHOLDS)
+    stored = get_setting_json("linkage_thresholds", tenant=tenant)
+    if isinstance(stored, dict):
+        for k in ("high_temp", "low_temp", "temp_drop"):
+            v = stored.get(k)
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                merged[k] = int(v)
+    return merged
 
 
 def set_linkage_thresholds(high_temp: int | None = None, low_temp: int | None = None,
-                           temp_drop: int | None = None, actor: str = "") -> dict:
+                           temp_drop: int | None = None, actor: str = "",
+                           tenant: str | None = None) -> dict:
     """调整联动阈值：仅疾病预防负责人可操作，调整后立即生效并留痕（不需二次确认）。
 
-    持久化到 settings 表，重启不丢。
+    多租户（B7）：把**合并后的完整阈值**写进该社区专属键（`linkage_thresholds@社区`），
+    只影响这个社区；`tenant` 不给则写全局键。
+    ⚠️ 不再改写模块级 `_LINKAGE_THRESHOLDS`：那个全局字典被改写就是跨租户串味
+    （朝阳调高温阈值会连带改掉海淀）。
     """
+    cur = get_linkage_thresholds(tenant)
+    merged = dict(cur)
     changes: list[str] = []
-    if high_temp is not None and high_temp != _LINKAGE_THRESHOLDS["high_temp"]:
-        changes.append(f"高温阈值 {_LINKAGE_THRESHOLDS['high_temp']}℃→{high_temp}℃")
-        _LINKAGE_THRESHOLDS["high_temp"] = high_temp
-    if low_temp is not None and low_temp != _LINKAGE_THRESHOLDS["low_temp"]:
-        changes.append(f"低温阈值 {_LINKAGE_THRESHOLDS['low_temp']}℃→{low_temp}℃")
-        _LINKAGE_THRESHOLDS["low_temp"] = low_temp
-    if temp_drop is not None and temp_drop != _LINKAGE_THRESHOLDS["temp_drop"]:
-        changes.append(f"降温阈值 {_LINKAGE_THRESHOLDS['temp_drop']}℃→{temp_drop}℃")
-        _LINKAGE_THRESHOLDS["temp_drop"] = temp_drop
-    if changes:
-        log_activity(actor or "疾病预防负责人", "调整天气联动阈值", "weather_linkage",
-                     module=MODULE, detail="；".join(changes))
-        try:
-            import json
-            with get_db() as conn:
-                conn.execute(
-                    "INSERT INTO settings (key, value) VALUES ('linkage_thresholds', ?) "
-                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    (json.dumps(_LINKAGE_THRESHOLDS, ensure_ascii=False),),
-                )
-                conn.commit()
-        except Exception:
-            pass  # 持久化失败不影响进程内生效
-    return get_linkage_thresholds()
+    for key, val, label in (("high_temp", high_temp, "高温阈值"),
+                            ("low_temp", low_temp, "低温阈值"),
+                            ("temp_drop", temp_drop, "降温阈值")):
+        if val is not None and val != cur[key]:
+            changes.append(f"{label} {cur[key]}℃→{val}℃")
+            merged[key] = val
+    if not changes:
+        return cur
+    scope = _linkage_scope(tenant)
+    try:
+        set_setting_json("linkage_thresholds", merged, tenant=tenant)
+    except Exception as e:  # noqa: BLE001 — 持久化失败绝不能假装成功（否则"改了但没生效"）
+        _log.warning("联动阈值持久化失败（未生效）：%s", e)
+        return cur
+    log_activity(actor or "疾病预防负责人", "调整天气联动阈值", "weather_linkage",
+                 module=MODULE, detail=f"[{scope}]" + "；".join(changes))
+    return get_linkage_thresholds(tenant)
 
 
-def weather_event_to_link_keys(weather_event: dict) -> list[str]:
+def weather_event_to_link_keys(weather_event: dict, tenant: str | None = None) -> list[str]:
     """天气事件 → 联动键列表。
 
     weather_event 支持两种来源：
       1) 天气预警：{"alert_type": "高温", "level": "黄色", ...}
       2) 气温阈值：{"temp_high": 37, "temp_low": 3, "temp_drop_24h": 9, ...}
+
+    多租户（B7）：阈值比较用**该社区**的阈值——这是"按社区配阈值"真正生效的地方。
     """
     keys: list[str] = []
     alert_type = weather_event.get("alert_type", "")
     if alert_type in WEATHER_LINK_KEYS:
         keys.append(alert_type)
-    # 气温阈值联动
+    # 气温阈值联动（按社区取阈值）
+    thr = get_linkage_thresholds(tenant)
     high = weather_event.get("temp_high")
     low = weather_event.get("temp_low")
     drop = weather_event.get("temp_drop_24h")
     if high is not None:
         try:
-            if int(high) >= _LINKAGE_THRESHOLDS["high_temp"]:
+            if int(high) >= thr["high_temp"]:
                 keys.append("高温")
         except (TypeError, ValueError):
             pass
     if low is not None:
         try:
-            if int(low) <= _LINKAGE_THRESHOLDS["low_temp"]:
+            if int(low) <= thr["low_temp"]:
                 keys.append("天气转冷")
         except (TypeError, ValueError):
             pass
     if drop is not None:
         try:
-            if int(drop) >= _LINKAGE_THRESHOLDS["temp_drop"]:
+            if int(drop) >= thr["temp_drop"]:
                 keys.append("天气转冷")
         except (TypeError, ValueError):
             pass
@@ -1088,35 +1113,51 @@ def weather_event_to_link_keys(weather_event: dict) -> list[str]:
     return [k for k in WEATHER_LINK_KEYS if k in keys]
 
 
-def _linkage_perm_closed(link_key: str) -> bool:
-    """是否已永久关闭（且之后未重新开启）。"""
+def _linkage_perm_closed(link_key: str, tenant: str | None = None) -> bool:
+    """该社区是否已永久关闭这条联动（且之后未重新开启）。
+
+    匹配两种留痕：带归属标签的 `[社区]键`（升级后按社区各记各的），以及**没有标签的历史行**
+    `键`——那是升级前的全局决策，按"对所有社区都生效"处理（保守：宁可少触发，也不擅自
+    把一个社区原本关闭的联动打开）。
+    """
+    scope = _linkage_scope(tenant)
     with get_db() as conn:
         closed = conn.execute(
-            "SELECT id FROM activity_log WHERE module=? AND action='永久关闭联动' "
-            "AND target_type='weather_linkage' AND detail=? ORDER BY id DESC LIMIT 1",
-            (MODULE, link_key),
+            "SELECT id, detail FROM activity_log WHERE module=? AND action='永久关闭联动' "
+            "AND target_type='weather_linkage' AND (detail=? OR detail=?) ORDER BY id DESC LIMIT 1",
+            (MODULE, f"[{scope}]{link_key}", link_key),
         ).fetchone()
         if not closed:
             return False
+        closed_detail = closed["detail"]
         reopened = conn.execute(
             "SELECT id FROM activity_log WHERE module=? AND action='重新开启联动' "
-            "AND target_type='weather_linkage' AND detail=? AND id>? ORDER BY id DESC LIMIT 1",
-            (MODULE, link_key, closed["id"]),
+            "AND target_type='weather_linkage' AND (detail=? OR detail=?) AND id>? "
+            "ORDER BY id DESC LIMIT 1",
+            (MODULE, f"[{scope}]{link_key}", closed_detail, closed["id"]),
         ).fetchone()
         return reopened is None
 
 
-def _linkage_triggered_today(link_key: str) -> bool:
-    """同一天气事件内不再触发（本轮按"同键同日"近似去重）。"""
+def _linkage_triggered_today(link_key: str, tenant: str | None = None) -> bool:
+    """该社区今天是否已触发过这条联动（同键同日近似去重）。
+
+    多租户（B7）：去重**按社区各算各的**——否则 A 社区触发过就把 B 社区压掉，
+    表现为"B 配了阈值却收不到提醒"。没有标签的历史行视为全局触发（对所有社区生效，保守）。
+    """
     today = _fmt(_now())[:10]
+    scope = _linkage_scope(tenant)
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM activity_log WHERE module=? AND action='联动提醒触发' "
-            "AND target_type='weather_linkage' AND detail LIKE ? AND substr(created_at,1,10)=? "
-            "ORDER BY id DESC LIMIT 1",
+        rows = conn.execute(
+            "SELECT detail FROM activity_log WHERE module=? AND action='联动提醒触发' "
+            "AND target_type='weather_linkage' AND detail LIKE ? AND substr(created_at,1,10)=?",
             (MODULE, f"%{link_key}%", today),
-        ).fetchone()
-    return row is not None
+        ).fetchall()
+    for r in rows:
+        d = r["detail"] or ""
+        if d.startswith(f"[{scope}]") or not d.startswith("["):
+            return True
+    return False
 
 
 def _find_linkable_contents(link_key: str) -> list[dict]:
@@ -1128,22 +1169,27 @@ def _find_linkable_contents(link_key: str) -> list[dict]:
     return matched
 
 
-def trigger_weather_linkage(weather_event: dict, actor: str = "系统") -> dict:
+def trigger_weather_linkage(weather_event: dict, actor: str = "系统",
+                            tenant: str | None = None) -> dict:
     """天气联动触发：校验内容有效性 → 触发居民卡片/老年语音/后台记录。
+
+    多租户（B7）：按 `tenant` 这个社区的阈值判定、按社区去重与关闭状态判定。
+    没有用户上下文的定时任务应**逐个社区各调一次**（见 `scripts/scheduler.py`）。
 
     返回：
       {
-        "keys": [...], "triggered": [内容...], "missing": [联动键...],
-        "notified_missing": bool, "elderly_texts": [...],
+        "tenant": 社区名（无则 "全局"）, "keys": [...], "triggered": [内容...],
+        "missing": [联动键...], "notified_missing": bool, "elderly_texts": [...],
       }
     """
-    keys = weather_event_to_link_keys(weather_event)
-    result: dict = {"keys": keys, "triggered": [], "missing": [], "notified_missing": False,
-                    "elderly_texts": []}
+    scope = _linkage_scope(tenant)
+    keys = weather_event_to_link_keys(weather_event, tenant=tenant)
+    result: dict = {"tenant": scope, "keys": keys, "triggered": [], "missing": [],
+                    "notified_missing": False, "elderly_texts": []}
     for key in keys:
-        if _linkage_perm_closed(key):
+        if _linkage_perm_closed(key, tenant=tenant):
             continue
-        if _linkage_triggered_today(key):
+        if _linkage_triggered_today(key, tenant=tenant):
             continue
         matched = _find_linkable_contents(key)
         if not matched:
@@ -1159,7 +1205,7 @@ def trigger_weather_linkage(weather_event: dict, actor: str = "系统") -> dict:
         log_activity(actor, "联动提醒触发", "weather_linkage", content["id"],
                      target_title=content["title"], module=MODULE,
                      after_value="已触发",
-                     detail=f"{key}|{weather_event.get('level', '')}|{content['content_type']}")
+                     detail=f"[{scope}]{key}|{weather_event.get('level', '')}|{content['content_type']}")
         result["triggered"].append(content)
         if content.get("elderly_reminder_text"):
             result["elderly_texts"].append({
@@ -1180,11 +1226,14 @@ def get_linkage_records(limit: int = 50) -> list[dict]:
 
 
 def close_linkage(link_key: str, reason: str, actor: str = "",
-                  permanent: bool = False, confirm: bool = False) -> tuple[bool, str]:
+                  permanent: bool = False, confirm: bool = False,
+                  tenant: str | None = None) -> tuple[bool, str]:
     """关闭/永久关闭联动：仅疾病预防负责人可操作，需二次确认并留痕。
 
     permanent=False：同一天气事件内不再触发（同日去重）；
     permanent=True ：永久关闭，需重新开启后才能再次触发。
+
+    多租户（B7）：留痕带归属标签 `[社区]`，只对该社区生效（别的社区不受影响）。
     """
     if link_key not in WEATHER_LINK_KEYS:
         return False, "联动类型不正确"
@@ -1192,23 +1241,30 @@ def close_linkage(link_key: str, reason: str, actor: str = "",
         return False, "关闭原因必填"
     if not confirm:
         return False, "请二次确认后再关闭"
+    scope = _linkage_scope(tenant)
     action = "永久关闭联动" if permanent else "关闭联动"
     log_activity(actor or "疾病预防负责人", action, "weather_linkage", module=MODULE,
-                 before_value="已触发", after_value="已关闭", detail=link_key,
+                 before_value="已触发", after_value="已关闭", detail=f"[{scope}]{link_key}",
                  target_title=f"{link_key}联动")
     log_activity(actor or "疾病预防负责人", "联动关闭原因", "weather_linkage", module=MODULE,
-                 detail=f"{link_key}：{reason.strip()}")
+                 detail=f"[{scope}]{link_key}：{reason.strip()}")
     return True, "ok"
 
 
-def reopen_linkage(link_key: str, actor: str = "", confirm: bool = False) -> tuple[bool, str]:
-    """重新开启永久关闭的联动：仅疾病预防负责人，需二次确认并留痕。"""
+def reopen_linkage(link_key: str, actor: str = "", confirm: bool = False,
+                   tenant: str | None = None) -> tuple[bool, str]:
+    """重新开启永久关闭的联动：仅疾病预防负责人，需二次确认并留痕。
+
+    多租户（B7）：只重新开启**本社区**的关闭状态（带归属标签留痕）。
+    """
     if link_key not in WEATHER_LINK_KEYS:
         return False, "联动类型不正确"
     if not confirm:
         return False, "请二次确认后再重新开启"
+    scope = _linkage_scope(tenant)
     log_activity(actor or "疾病预防负责人", "重新开启联动", "weather_linkage", module=MODULE,
-                 before_value="已永久关闭", after_value="已重新开启", detail=link_key,
+                 before_value="已永久关闭", after_value="已重新开启",
+                 detail=f"[{scope}]{link_key}",
                  target_title=f"{link_key}联动")
     return True, "ok"
 
@@ -1239,8 +1295,13 @@ def log_elderly_linkage_reminder(content_id: int, text: str) -> None:
                  module=MODULE, detail=text or "")
 
 
-def get_elderly_linkage_reminders() -> list[dict]:
-    """今天应播报的老年端联动提醒（内容已发布且未过期、未永久关闭、7 天窗口内）。"""
+def get_elderly_linkage_reminders(tenant: str | None = None) -> list[dict]:
+    """今天应播报的老年端联动提醒（内容已发布且未过期、未永久关闭、7 天窗口内）。
+
+    ⚠️ 当前**没有调用方**（老年端播报走 `should_send_elderly_linkage_reminder` 那条链），
+    保留仅作历史接口；`tenant` 参数是按社区判定关闭状态用的（多租户 B7），
+    将来接回去时**必须**把请求者的社区传进来，否则社区级关闭对它不生效。
+    """
     out: list[dict] = []
     for c in get_published_contents(limit=200):
         links = c.get("weather_link") or []
@@ -1248,7 +1309,7 @@ def get_elderly_linkage_reminders() -> list[dict]:
             continue
         if not c.get("elderly_reminder_text"):
             continue
-        if any(_linkage_perm_closed(k) for k in links):
+        if any(_linkage_perm_closed(k, tenant=tenant) for k in links):
             continue
         if should_send_elderly_linkage_reminder(c["id"]):
             out.append({

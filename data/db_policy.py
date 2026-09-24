@@ -25,7 +25,8 @@ import re
 from datetime import datetime, timedelta
 
 from data.db_core import get_db
-from utils.tenant import stamp_tenant, tenant_clause
+from data.db_settings import get_setting, set_setting
+from utils.tenant import stamp_tenant, tenant_clause, tenant_of_user
 from data.db_notifications import log_activity
 
 MODULE = "政策问答"
@@ -67,7 +68,11 @@ REPLY_HOURS = 24        # 人工回复时限（小时）
 AUTO_CLOSE_DAYS = 7     # 人工回复后 7 天未反馈自动结束
 
 # 自动回答匹配阈值：最高匹配度低于该值判定失败提示转人工。
-# 负责人可在后台调整（进程内生效，立即生效，留痕；重启恢复默认）。
+# 负责人可在后台调整（持久化到 settings，重启不丢；留痕）。
+# 多租户（B7）：阈值**按社区生效**——`settings` 里存 `match_threshold@<社区>`，
+# 没配的社区回落全局裸键，再回落这个代码默认值。
+# ⚠️ `_match_threshold` 只作"读设置失败时的进程内兜底"，**不再被 setter 改写**：
+#    当年它被 set_match_threshold 直接改写，等于把 A 社区的配置写进了 B 社区的口径。
 AUTO_ANSWER_THRESHOLD = 2.0
 _match_threshold = AUTO_ANSWER_THRESHOLD
 
@@ -929,6 +934,10 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
     if len(q) > 200:
         return {"matched": False, "reason": "too_long"}
     summary = q[:30]
+    # 多租户（B7）：自动回答阈值按**提问人所属社区**取（社区专属 → 全局 → 代码默认）。
+    # 为什么要在这里算：阈值是"能不能自动回答"的判定点，只让配置页按社区显示、
+    # 判定仍读全局，就等于"配了但不生效"。
+    threshold = _threshold_for(tenant_of_user(user_id))
     q_type = classify_question(q)
     actor = actor or masked_nickname(user_id)
 
@@ -995,7 +1004,7 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
     #   ③ 若一个属地适用条目都没达标，**仍回落到达标的跨区条目**（宁可给一份适用地区不同的政策，
     #      也不把"能答"变成"不答"），并在正文里显式标注它的适用地区（见 format_knowledge_answer）。
     qualified = [e for e in results
-                 if float(e.get("base_score", e.get("score", 0.0))) >= _match_threshold]
+                 if float(e.get("base_score", e.get("score", 0.0))) >= threshold]
     applicable = [e for e in qualified if (e.get("region_level") or "national") != "other"]
     answer_entry = (applicable or qualified or [None])[0]
     if answer_entry is None:
@@ -1036,7 +1045,7 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
                 rag_out = None
         log_activity(actor, "自动回答失败", "policy_question", None, summary,
                      module=MODULE, after_value="匹配失败",
-                     detail=f"{q_type} · 匹配度 {best['score']} 低于阈值 {_match_threshold} · {q[:50]}")
+                     detail=f"{q_type} · 匹配度 {best['score']} 低于阈值 {threshold} · {q[:50]}")
         return {"matched": False, "reason": "low_score", "question": q,
                 "summary": summary, "q_type": q_type, "best_score": best["score"]}
 
@@ -1537,43 +1546,59 @@ def get_common_questions(limit: int = 10, q_type: str | None = None,
 
 # ---------------------------------------------------------------- 匹配阈值
 
-def get_match_threshold() -> float:
-    """自动回答匹配阈值（存 settings 表持久化，重启不丢）。"""
+def _threshold_for(tenant: str | None = None) -> float:
+    """取某社区**实际生效**的自动回答阈值（社区专属 → 全局 → 代码默认）。
+
+    读设置失败时不静默：记一条 warning 再回落代码默认值——阈值是"能不能自动回答"的判定点，
+    悄悄回落会让"改了阈值没生效"变成无法排查的现象。
+    """
     try:
-        with get_db() as conn:
-            row = conn.execute(
-                "SELECT value FROM settings WHERE key='match_threshold'"
-            ).fetchone()
-            if row and row["value"]:
-                return float(row["value"])
-    except Exception:
-        pass
+        raw = get_setting("match_threshold", tenant=tenant)
+        if raw not in (None, ""):
+            return float(raw)
+    except (TypeError, ValueError) as e:
+        _log.warning("匹配阈值取值非法（tenant=%s），回落默认 %s：%s",
+                     tenant, _match_threshold, e)
+    except Exception as e:  # noqa: BLE001 — 读设置异常不许影响提问主流程，但必须留痕
+        _log.warning("读取匹配阈值失败（tenant=%s），回落默认 %s：%s",
+                     tenant, _match_threshold, e)
     return _match_threshold
 
 
-def set_match_threshold(value: float, actor: str = "负责人") -> tuple[bool, str]:
-    """负责人调整自动回答匹配阈值（立即生效，留痕；持久化到 settings）。"""
-    global _match_threshold
+def get_match_threshold(tenant: str | None = None) -> float:
+    """自动回答匹配阈值（存 settings 表持久化，重启不丢）。
+
+    多租户（B7）：`tenant` 给了就取该社区的值（社区专属 → 全局 → 代码默认）；
+    不给 = 全局口径（向后兼容 `scripts/rag_sensitivity.py` 等无用户上下文的调用）。
+    """
+    return _threshold_for(tenant)
+
+
+def set_match_threshold(value: float, actor: str = "负责人",
+                        tenant: str | None = None) -> tuple[bool, str]:
+    """负责人调整自动回答匹配阈值（立即生效，留痕；持久化到 settings）。
+
+    多租户（B7）：`tenant` 给了就写**该社区专属键**（`match_threshold@社区`），
+    只影响这个社区；不给则写全局键（影响所有未单独配置的社区）。
+    ⚠️ 不再改写进程内的 `_match_threshold`：那个全局变量被改写就是跨租户串味。
+    """
     try:
         v = float(value)
     except (TypeError, ValueError):
         return False, "阈值必须是数字"
     if not (0.1 <= v <= 10):
         return False, "阈值范围 0.1 ~ 10"
-    old = _match_threshold
-    _match_threshold = v
+    old = _threshold_for(tenant)
+    scope = tenant or "全局"
     try:
-        with get_db() as conn:
-            conn.execute(
-                "INSERT INTO settings (key, value) VALUES ('match_threshold', ?) "
-                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(v),),
-            )
-            conn.commit()
+        set_setting("match_threshold", str(v), tenant=tenant)
     except Exception as _e:  # noqa: BLE001
-        # 进程内已生效，但**重启后会回退**——必须告警，否则用户以为永久改了
-        _log.warning("自动回答阈值持久化失败（重启后会回退到旧值）：%s", _e)
+        # 没有进程内兜底了（不再改全局变量）→ 写库失败必须明确告诉调用方，不能假装成功
+        _log.warning("自动回答阈值持久化失败（未生效）：%s", _e)
+        return False, "阈值保存失败，请稍后再试"
     log_activity(actor, "调整自动回答阈值", "knowledge", None, "",
-                 module=MODULE, before_value=str(old), after_value=str(v))
+                 module=MODULE, before_value=str(old), after_value=str(v),
+                 detail=f"社区：{scope}；阈值 {old}→{v}")
     return True, ""
 
 
