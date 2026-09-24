@@ -23,13 +23,17 @@ def log_care_event(user_id: int | None, role: str = "resident", emotion_tag: str
     """记录一次关怀动作（U4）。失败只记日志，绝不影响业务主流程。"""
     try:
         with get_db() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT INTO care_event_log (user_id, role, emotion_tag, comfort_used, "
                 "scene, scene_line_used, intent, status) VALUES (?,?,?,?,?,?,?,?)",
                 (user_id, role, emotion_tag or "", 1 if comfort_used else 0,
                  scene or "", 1 if scene_line_used else 0,
                  (intent or "")[:50], (status or "")[:50]),
             )
+            # 多租户（B6 补漏）：关怀事件要盖租户章——否则网格端关怀量化/事件列表
+            # （已按 tenant 过滤）看不到这些记录，指标会恒为 0（"做了但页面上没有"）。
+            from utils.tenant import stamp_tenant
+            stamp_tenant(conn, "care_event_log", cur.lastrowid, user_id)
             conn.commit()
     except Exception:
         _log.debug("记录关怀事件失败（已忽略）", exc_info=True)

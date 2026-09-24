@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant, _same_tenant
 
 import logging
 _log = logging.getLogger(__name__)
@@ -105,6 +105,10 @@ def web_notice_action(nid: int, req: NoticeAction, request: Request):
     # 管理动作仅负责人；mark_read 允许居民/老年
     if req.action != "mark_read" and u.get("role") != "grid":
         return _fail(1003, "无权限执行该操作（仅负责人可管理通知）")
+    # 多租户（B6）：通知按 id 直取只能动本社区的（否则可跨社区发布/撤回/删除/置顶，
+    # 或把别的社区的通知标成已读）
+    if not _same_tenant(request, "notices", nid):
+        return _fail(1003, "无权限操作该通知（非本社区）")
     actor = u.get("name") or "负责人"
     a = req.action
     try:
@@ -146,6 +150,9 @@ def web_notice_detail(nid: int, request: Request):
     n = get_notice(nid)
     if not n:
         return _fail(1004, "通知不存在")
+    # 多租户（B6）：网格员按 id 直取也必须落在本社区（居民/老年下面按可见集合过滤）
+    if u.get("role") == "grid" and not _same_tenant(request, "notices", nid):
+        return _fail(1003, "无权限查看该通知（非本社区）")
     # 范围过滤：居民/老年只能看本端可见通知（N8：授权判断 fail-closed，校验异常即拒绝，不静默放行）
     if u.get("role") != "grid":
         try:

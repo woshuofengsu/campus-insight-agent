@@ -114,8 +114,12 @@ def report_issue(title: str, category: str, location: str = "",
             (title, category, location, description, urgency, author,
              suggested_category, reporter_id),
         )
-        conn.commit()
         iid = cur.lastrowid
+        # 多租户（B6 补漏）：这条工单创建路径（政务上报）也要盖章——否则租户为空，
+        # 工单在网格端列表（已按 tenant 过滤）里看不见（v41 的老毛病换个入口复现）。
+        from utils.tenant import stamp_tenant
+        stamp_tenant(conn, "community_issues", iid, reporter_id)
+        conn.commit()
     _log.info("report_issue 已创建工单 #%d (reporter_id=%s, category=%s, suggested=%s)",
               iid, reporter_id, category, suggested_category or category)
     # 记一条活动日志

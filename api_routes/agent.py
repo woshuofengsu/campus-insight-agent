@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant
+from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant, _same_tenant
 
 _log = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ def agent_handoffs(request: Request, status: str = "", limit: int = 50):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_agent import list_handoffs
-    return _ok(list_handoffs(status=status, limit=limit))
+    return _ok(list_handoffs(status=status, limit=limit, tenant=_tenant(request)))
 
 
 @router.post("/handoffs/{hid}/resolve")
@@ -141,6 +141,9 @@ def agent_handoff_resolve(hid: int, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_agent import resolve_handoff
+    # 多租户（B6）：处理包按 id 直取只能处理本社区的
+    if not _same_tenant(request, "agent_handoffs", hid):
+        return _fail(1003, "无权限处理该处理包（非本社区）")
     if not resolve_handoff(hid, _user(request).get("name") or "负责人"):
         return _fail(2001, "处理包不存在或已处理")
     return _ok({"handoff_id": hid}, "已处理完成")
@@ -221,7 +224,7 @@ def agent_trace_chain(trace_id: str, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_agent import get_trace_chain
-    return _ok(get_trace_chain(trace_id))
+    return _ok(get_trace_chain(trace_id, tenant=_tenant(request)))
 
 
 @router.get("/kg/entity")

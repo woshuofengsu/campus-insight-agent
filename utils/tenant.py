@@ -126,6 +126,78 @@ def tenant_clause(tenant, args: list, *, self_scoped: bool = False, column: str 
     return f" AND {column}=?"
 
 
+# v48 迁移里做了租户隔离的表（**白名单**）。按 id 直取时表名要拼进 SQL，
+# 只允许取自这里，杜绝把请求参数当表名用的注入面。
+TENANT_TABLES = frozenset({
+    "community_issues", "proposals", "notices", "health_consults", "policy_questions",
+    "medication_reminders", "emergency_contacts", "emergency_calls", "agent_logs",
+    "agent_handoffs", "agent_dialogs", "care_event_log", "weather_check_tasks",
+})
+
+# 每张租户表的归属人列（None = 无归属人，如通知/巡查任务）。用于"按归属人补判"。
+TENANT_OWNER_COLUMN = {
+    "community_issues": "reporter_id", "proposals": "reporter_id", "notices": None,
+    "health_consults": "user_id", "policy_questions": "user_id",
+    "medication_reminders": "user_id", "emergency_contacts": "user_id",
+    "emergency_calls": "user_id", "agent_logs": "user_id", "agent_handoffs": "user_id",
+    "agent_dialogs": "user_id", "care_event_log": "user_id", "weather_check_tasks": None,
+}
+
+
+def row_in_tenant(table: str, row_id, tenant) -> bool:
+    """「按 id 直取」的授权判定：该行是否属于 tenant 这个社区（**fail-closed**）。
+
+    为什么单独有这个函数：列表/聚合走 `tenant_clause`（SQL 过滤），但**详情与操作接口是
+    按 id 直取单行的**——那条路径上没有 WHERE 可加，于是只校验角色（"是网格员就放行"）就会
+    出现"列表里看不见、换个 id 就能读到别的社区"的越权（B6 实测复现过：
+    朝阳网格员读到了海淀工单 #352 的全文）。
+
+    返回 False 的全部情形（一律拒绝，绝不放行）：
+      - 表名不在白名单（调用方写错，抛 ValueError 而不是静默放行）；
+      - tenant 归一化后为空（身份没解析出社区）；
+      - 行不存在；
+      - 行自己没租户（历史脏数据，无法证明归属）。
+
+    注意：本函数只回答"在不在同一社区"，**不替代**自身范围校验
+    （居民看自己的单还要 `reporter_id == uid`），两者是"与"关系。
+    """
+    if table not in TENANT_TABLES:
+        raise ValueError(f"row_in_tenant 收到非租户表：{table!r}（表名必须取自 TENANT_TABLES）")
+    t = normalize_tenant(tenant)
+    if not t:
+        return False
+    try:
+        row_id = int(row_id)
+    except (TypeError, ValueError):
+        return False
+    if row_id <= 0:
+        return False
+    from data.db_core import get_db
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                f"SELECT tenant_id FROM {table} WHERE id=?", (row_id,)).fetchone()
+    except Exception:  # noqa: BLE001 — 查不动不等于放行
+        _log.warning("按 id 校验租户失败 table=%s id=%s（拒绝访问）", table, row_id, exc_info=True)
+        return False
+    if not row:
+        return False
+    return normalize_tenant(row["tenant_id"]) == t
+
+
+def stamp_tenant_value(conn, table: str, row_id, tenant) -> str:
+    """给**没有归属人**的行盖章（写入侧统一入口）。
+
+    用在"行不属于某个具体用户"的场景：极端天气巡查任务（预警源本身没有社区维度）、
+    系统级通知等。与 `stamp_tenant` 的区别是直接给租户值，而不是按 owner 反查。
+    同样**不写默认值**：传空就是空（读取侧 fail-closed 会让它谁都看不见，而不是谁都看得见）。
+    """
+    t = normalize_tenant(tenant)
+    if row_id:
+        conn.execute(f"UPDATE {table} SET tenant_id=? WHERE id=?", (t, row_id))
+    return t
+
+
 def stamp_tenant(conn, table: str, row_id, owner_id) -> str:
     """给刚插入的行**盖上租户章**（写入侧统一入口）。
 
@@ -142,6 +214,7 @@ def stamp_tenant(conn, table: str, row_id, owner_id) -> str:
     return tenant
 
 
-__all__ = ["LEGACY_TENANT_VALUES", "normalize_tenant", "is_valid_tenant", "tenant_of_user",
-           "tenant_of_user_uncached", "clear_cache", "default_community", "stamp_tenant",
-           "tenant_clause"]
+__all__ = ["LEGACY_TENANT_VALUES", "TENANT_TABLES", "TENANT_OWNER_COLUMN", "normalize_tenant",
+           "is_valid_tenant", "tenant_of_user", "tenant_of_user_uncached", "clear_cache",
+           "default_community", "stamp_tenant", "stamp_tenant_value", "tenant_clause",
+           "row_in_tenant"]

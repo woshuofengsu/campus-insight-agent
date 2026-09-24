@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、697 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、754 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 697 项：696 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 754 项：753 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,20 +70,29 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 697 项测试**（696 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 754 项测试**（753 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
   两条命令的"服务开/关"要求正好相反，别搞混。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
-- **多租户（v48 起真隔离）**：租户键 = **社区名**（`user_profile.community`）。三条硬规则：
+- **多租户（v48 起真隔离）**：租户键 = **社区名**（`user_profile.community`）。**四条硬规则**：
   ① **写入侧必须落租户**——社区范围数据的 INSERT 后要调 `utils.tenant.stamp_tenant(conn, 表, 新行id, 归属人id)`
-     （v41 的教训：只加列+回填、业务从不写入 → 租户为空、隔离静默失效）；
+     （无归属人的行用 `stamp_tenant_value(conn, 表, 行id, 租户)`）。
+     v41 的教训：只加列+回填、业务从不写入 → 租户为空、隔离静默失效；
+     **B6 又扫出 6 处漏盖章**，后果不是"看见别人的"而是**自己人也看不见**（转人工处理包/关怀事件/
+     天气巡查任务/政务上报工单全被读取侧的 fail-closed 过滤掉）→ 由 `tests/test_tenant_write_side.py` 静态守着；
   ② **读取侧 fail-closed**——跨用户列表/聚合函数必须显式传 `tenant=`（走 `utils.tenant.tenant_clause`）：
      合法社区名 → `AND tenant_id=?`；**空串 → 返回空集**；两者都没给（也没给 `reporter_id/user_id` 自身范围）
      → **抛 ValueError**，绝不悄悄查全库；
-  ③ **租户只从服务端身份来**（`api_routes/deps._tenant(request)`，源自 JWT 的 `community`），
+  ③ **按 id 直取必须过闸门**——详情/操作接口是"按 id 直取单行"，没有 WHERE 可加，
+     只校验角色就会出现"列表看不见、换个 id 就看见"（B6 实测：朝阳网格员读到海淀工单全文）。
+     这类路由一律调 `api_routes.deps._same_tenant(request, 表, 行id)`（内部走
+     `utils.tenant.row_in_tenant`，表名白名单 + 全分支 fail-closed）；
+     它**不替代**自身范围校验（居民看自己的单仍要 `reporter_id == uid`，两者是"与"）。
+     新增按-id 路由忘了带闸门 → `tests/test_tenant_idor_sweep.py` 直接红（豁免要写理由）；
+  ④ **租户只从服务端身份来**（`api_routes/deps._tenant(request)`，源自 JWT 的 `community`），
      绝不接受前端传的 tenant/community 作为过滤依据。
   `config.DEFAULT_COMMUNITY` 是历史/无归属数据的归档社区（`DEFAULT_TENANT` 是 v41 旧口径的行政区值，仅兼容保留）；
   Streamlit 备线在入口 `app.py` 调 `install_tenant_defaults()` 统一注入（见 `ui/_tenant.py`）。

@@ -166,6 +166,32 @@ def _require_role(request: Request, role: str):
     return None
 
 
+def _same_tenant(request: Request, table: str, row_id) -> bool:
+    """按 id 直取的授权闸（多租户 B6）：该行必须属于请求者所在社区。
+
+    **为什么必须有它**：列表/聚合接口走 SQL 里的 `tenant_id=?`，而**详情与操作接口是按 id
+    直取单行的**——那条路径没有 WHERE 可加，历史写法只校验角色（"是网格员就放行"），
+    于是出现了"列表里看不见、换个 id 就能读到别的社区"的越权。实测复现：
+    朝阳试点社区网格员 GET 海淀小区的工单详情返回 200 并带出诉求全文（B6 探针）。
+
+    fail-closed（`utils.tenant.row_in_tenant` 统一判定）：租户解析为空、行不存在、
+    行自己没租户、表名不在白名单 → 一律 False（拒绝）。查不动也不放行。
+
+    用法（放在拿到 row 之后、返回/写入之前）：
+        if not _same_tenant(request, "community_issues", issue_id):
+            return _fail(1003, "无权查看该工单")
+    注意它**不替代**自身范围校验：居民看自己的单仍需 `reporter_id == uid`，两者是"与"。
+    """
+    try:
+        from utils.tenant import row_in_tenant
+        return row_in_tenant(table, row_id, _tenant(request))
+    except ValueError:
+        raise  # 表名写错属于编码错误，必须炸出来（不要退化成"拒绝"而掩盖 bug）
+    except Exception as e:  # noqa: BLE001 — 判定失败绝不放行
+        _log.warning("按 id 校验租户失败 table=%s id=%s（拒绝访问）：%s", table, row_id, e)
+        return False
+
+
 def _resolve_elder_uid(request: Request) -> int | None:
     """老年端免登录：?elder_id=X 且当前 token 用户是该老人的绑定家属 → 返回老人 uid。"""
     u = _user(request)

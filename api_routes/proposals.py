@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant, _same_tenant
 
 import logging
 from utils.timeutil import utcnow
@@ -170,6 +170,10 @@ def proposal_detail(pid: int, request: Request):
     p = get_proposal(pid)
     if not p:
         return _fail(1004, "提案不存在")
+    # 多租户（B6）：提案属于某个社区，按 id 直取必须先落在自己社区内
+    # （否则"列表看不见、换 id 就看见"，且网格员分支原本无条件放行）
+    if not _same_tenant(request, "proposals", pid):
+        return _fail(1003, "无权限查看该提案")
     # 居民：只能看自己提交的（含私有/待审核）+ 公开公示链上的提案，隐藏敏感字段
     if u.get("role") != "grid":
         mine = p.get("reporter_id") == u.get("uid")
@@ -211,6 +215,9 @@ def proposal_detail(pid: int, request: Request):
 def proposal_vote(pid: int, req: ProposalVote, request: Request):
     from data.db_proposal import vote_proposal
     u = _user(request)
+    # 多租户（B6）：只能给本社区提案投票（按 id 直取，无 SQL 过滤可依赖）
+    if not _same_tenant(request, "proposals", pid):
+        return _fail(1003, "无权限对该提案投票")
     ok_, msg = vote_proposal(pid, u.get("uid"), req.score, actor="匿名居民")
     if not ok_:
         return _fail(2001, msg or "投票失败")
@@ -227,6 +234,8 @@ def proposal_comments(pid: int, request: Request, limit: int = 100):
     if not p:
         return _fail(1004, "提案不存在")
     u = _user(request)
+    if not _same_tenant(request, "proposals", pid):
+        return _fail(1003, "无权限查看该提案的议论")
     if u.get("role") != "grid" and (not p.get("is_public") or p.get("status") not in
                                     ("公示中", "待执行", "执行中", "待提案人反馈", "重新执行")):
         return _fail(1003, "该提案暂不支持议论")
@@ -238,6 +247,8 @@ def proposal_comment_add(pid: int, req: ProposalCommentCreate, request: Request)
     """匿名发表议论（自己能看到、别人能看到，均不显示真实身份）。"""
     from data.db_proposal import add_proposal_comment
     u = _user(request)
+    if not _same_tenant(request, "proposals", pid):
+        return _fail(1003, "无权限对该提案发表议论")
     ok_, msg = add_proposal_comment(pid, u.get("uid"), req.content)
     if not ok_:
         return _fail(2001, msg)
@@ -259,6 +270,9 @@ def proposal_action(pid: int, req: ProposalAction, request: Request):
     resident_actions = {"confirm", "feedback", "resubmit", "withdraw", "reopen_mine", "change_visibility"}
     if role != "grid" and req.action not in resident_actions:
         return _fail(1003, "无权限执行该操作（仅负责人可管理提案）")
+    # 多租户（B6）：网格员按 id 直取只能操作本社区提案（否则可跨社区审核/结单）
+    if role == "grid" and not _same_tenant(request, "proposals", pid):
+        return _fail(1003, "无权限操作该提案（非本社区）")
     actor = u.get("name") or "负责人"
     a = req.action
     try:

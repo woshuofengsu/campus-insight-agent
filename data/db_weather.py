@@ -803,6 +803,12 @@ def create_check_task(alert_id: int, alert_type: str, level: str,
             (str(alert_id), alert_type, level, checklist_json),
         )
         task_id = cur.lastrowid
+        # 多租户（B6 补漏）：巡查任务也要盖章，否则租户为空、网格端任务列表
+        #（已按 tenant 过滤）为空——"生成了任务但没人看得见"。
+        # ⚠️ 已知边界：`weather_alerts` 没有社区/城市列（预警源是全国/城市级），
+        # 任务本身无从判断归属，故按默认社区归档，与 v48 迁移对无归属行的口径一致。
+        from utils.tenant import default_community, stamp_tenant_value
+        stamp_tenant_value(conn, "weather_check_tasks", task_id, default_community())
         conn.commit()
     log_activity("系统", "生成极端天气检查任务", "weather_check_task", task_id,
                  target_title=f"{alert_type}{level}检查",

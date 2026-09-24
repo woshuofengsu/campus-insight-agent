@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant, _same_tenant
 
 import logging
 from utils.timeutil import utcnow
@@ -225,6 +225,9 @@ def issue_detail(issue_id: int, request: Request):
     # 权限：居民只能看自己的工单
     if u.get("role") != "grid" and row.get("reporter_id") != u.get("uid"):
         return _fail(1003, "无权限查看该工单")
+    # 多租户（B6）：网格员按 id 直取也必须落在自己社区内，否则"列表看不见、换 id 就看见"
+    if u.get("role") == "grid" and not _same_tenant(request, "community_issues", issue_id):
+        return _fail(1003, "无权查看该工单")
     detail = _issue_view(row)
     if u.get("role") != "grid":
         detail = _mask_phone(detail)
@@ -259,6 +262,9 @@ def issue_action(issue_id: int, req: IssueAction, request: Request):
             return _fail(1004, "工单不存在")
         if issue.get("reporter_id") != u.get("uid"):
             return _fail(1003, "无权限操作该工单（非本人报修）")
+    # 多租户（B6）：网格员按 id 直取只能操作本社区工单（否则可跨社区派单/结单）
+    elif not _same_tenant(request, "community_issues", issue_id):
+        return _fail(1003, "无权限操作该工单（非本社区）")
     actor = u.get("name") or "负责人"
     a = req.action
     try:

@@ -1119,6 +1119,9 @@ def transfer_to_human(question_id: int | None = None, user_id: int | None = None
             (user_id, q, summary, q_type, source),
         )
         qid = cur.lastrowid
+        # 多租户（B6 补漏）：转人工提问也要盖章——否则租户为空，网格端"待回复提问"
+        # 列表（已按 tenant 过滤）看不到，居民转了人工却没人收到待办（功能故障）。
+        stamp_tenant(conn, "policy_questions", qid, user_id)
         conn.commit()
     log_activity(actor, "提问并转人工", "policy_question", qid, summary,
                  module=MODULE, after_value="已转人工")

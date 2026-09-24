@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _fail, _ok, _require_role, _user, _tenant
+from api_routes.deps import _fail, _ok, _require_role, _user, _tenant, _same_tenant
 
 import logging
 _log = logging.getLogger(__name__)
@@ -73,6 +73,9 @@ def web_qa_transfer(qid: int, req: TransferHuman, request: Request):
             return _fail(1004, "提问不存在")
         if u.get("role") != "grid" and q.get("user_id") != u.get("uid"):
             return _fail(1003, "无权限操作该提问")
+        # 多租户（B6）：负责人按 id 直取只能动本社区提问
+        if u.get("role") == "grid" and not _same_tenant(request, "policy_questions", qid):
+            return _fail(1003, "无权限操作该提问（非本社区）")
     try:
         transfer_to_human(qid) if qid > 0 else transfer_to_human(
             user_id=u.get("uid"), question=req.question, source="居民端")
@@ -92,6 +95,9 @@ def web_qa_question_delete(qid: int, request: Request):
         return _fail(1004, "提问不存在")
     if u.get("role") != "grid" and q.get("user_id") != u.get("uid"):
         return _fail(1003, "无权限删除该提问")
+    # 多租户（B6）：负责人按 id 直取只能删本社区提问
+    if u.get("role") == "grid" and not _same_tenant(request, "policy_questions", qid):
+        return _fail(1003, "无权限删除该提问（非本社区）")
     ok_, msg = delete_question(qid, u.get("uid"))
     if not ok_:
         return _fail(2001, msg or "删除失败")
@@ -265,6 +271,9 @@ class QaReply(BaseModel):
 def web_qa_reply(qid: int, req: QaReply, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
+    # 多租户（B6）：只能回复本社区的提问（居民提问正文可能含个人信息）
+    if not _same_tenant(request, "policy_questions", qid):
+        return _fail(1003, "无权限回复该提问（非本社区）")
     from data.db_policy import reply_question
     actor = _user(request).get("name") or "负责人"
     ok_, msg, _ = reply_question(qid, req.reply, actor=actor)

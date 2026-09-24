@@ -1268,6 +1268,9 @@ def log_emergency_call(user_id: int, call_type: str, target_name: str,
             (user_id, call_type, target_name, "", _enc_phone(target_phone), result, status),
         )
         call_id = cur.lastrowid
+        # 多租户（B6 补漏）：拨号留痕也要盖章——否则租户为空，网格端 SOS 列表
+        # （已按 tenant 过滤）**看不到这些记录**，表现为"打了电话但留痕没了"。
+        stamp_tenant(conn, "emergency_calls", call_id, user_id)
         conn.commit()
     log_activity(actor or target_name or "老人", "联系拨打", "emergency_call", call_id,
                  target_name or "", module=MODULE, after_value=result,
@@ -1360,13 +1363,15 @@ def migrate_legacy_profile(user_id: int, actor: str = "系统") -> dict:
                 dosage = (m.get("dosage") or "1片").strip()
                 if not drug or not times_list:
                     continue
-                conn.execute(
+                cur = conn.execute(
                     "INSERT INTO medication_reminders (user_id, patient_name, drug_name, "
                     "dosage, times_json, repeat_rule, start_date, status, setter_id) "
                     "VALUES (?,?,?,?,?,'每天',?,'审核通过',?)",
                     (user_id, patient_name, drug, dosage,
                      json.dumps(times_list, ensure_ascii=False), today, user_id),
                 )
+                # 多租户（B6 补漏）：历史数据迁移也盖章，别指望下次迁移重跑兜底
+                stamp_tenant(conn, "medication_reminders", cur.lastrowid, user_id)
                 result["meds"] += 1
                 migrated_meds.append({"title": f"{patient_name} - {drug}",
                                       "detail": f"时间：{'、'.join(times_list)}"})
@@ -1381,11 +1386,13 @@ def migrate_legacy_profile(user_id: int, actor: str = "系统") -> dict:
                 relation = (c.get("relation") or "家属").strip()
                 if not name or not _validate_phone(phone):
                     continue
-                conn.execute(
+                cur = conn.execute(
                     "INSERT INTO emergency_contacts (user_id, name, phone, relation, "
                     "setter_id, status) VALUES (?,?,?,?,?,'审核通过')",
                     (user_id, name, phone, relation, user_id),
                 )
+                # 多租户（B6 补漏）：历史数据迁移也盖章
+                stamp_tenant(conn, "emergency_contacts", cur.lastrowid, user_id)
                 result["contacts"] += 1
                 migrated_contacts.append({"title": f"{relation} - {name}",
                                           "detail": f"电话：{phone[:3]}****{phone[-4:]}"})

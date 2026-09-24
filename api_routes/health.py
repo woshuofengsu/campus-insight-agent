@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant, _same_tenant
 
 router = APIRouter(prefix="/api/web/health", tags=["health"])
 
@@ -184,6 +184,9 @@ def web_consult_detail(cid: int, request: Request):
     # 权限：居民只能看自己的咨询；负责人可看全部
     if u.get("role") != "grid" and c.get("user_id") != u.get("uid"):
         return _fail(1003, "无权限查看该咨询")
+    # 多租户（B6）：负责人按 id 直取也必须落在本社区（否则跨社区读走居民健康咨询正文）
+    if u.get("role") == "grid" and not _same_tenant(request, "health_consults", cid):
+        return _fail(1003, "无权限查看该咨询（非本社区）")
     out = dict(c)
     if u.get("role") != "grid" and out.get("phone"):
         out["phone"] = out["phone"][:3] + "****" + out["phone"][-4:]
@@ -335,6 +338,9 @@ def web_consult_reply(cid: int, req: ConsultReply, request: Request):
     # 权限：咨询处理人（疾病预防负责人自动成为处理人）
     if not is_disease_prevention_manager(_user(request)):
         return _fail(1003, "无权限：仅咨询处理人可回复")
+    # 多租户（B6）：只能回复本社区的健康咨询（咨询正文含居民健康信息）
+    if not _same_tenant(request, "health_consults", cid):
+        return _fail(1003, "无权限回复该咨询（非本社区）")
     actor = _user(request).get("name") or "负责人"
     ok_, msg = reply_consult(cid, req.reply, actor=actor, doctor_guide=req.doctor_guide,
                              need_offline=req.need_offline, offline_confirmed=req.offline_confirmed)

@@ -7,7 +7,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant
+from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant, _same_tenant
 
 import logging
 _log = logging.getLogger(__name__)
@@ -232,6 +232,9 @@ def web_medication_modify(rid: int, req: MedicationCreate, request: Request):
     """修改用药提醒 → 重新审核（审核期间原规则继续播报）。"""
     from data.db_elderly_care import modify_medication
     u = _user(request)
+    # 多租户（B6）：按 id 直取只能改本社区的用药提醒（否则可跨社区改别人家老人的药）
+    if not _same_tenant(request, "medication_reminders", rid):
+        return _fail(1003, "无权限修改该用药提醒（非本社区）")
     times = [t.strip() for t in req.times.replace("，", ",").split(",") if t.strip()]
     ok_, msg = modify_medication(
         rid, u.get("name") or "老人", req.drug_name, req.dosage, times,
@@ -312,6 +315,9 @@ def web_contacts_create(req: ContactCreate, request: Request):
 def web_contacts_delete(cid: int, request: Request):
     from data.db_elderly_care import delete_emergency_contact
     u = _user(request)
+    # 多租户（B6）：紧急联系人按 id 直取只能删本社区的
+    if not _same_tenant(request, "emergency_contacts", cid):
+        return _fail(1003, "无权限删除该联系人（非本社区）")
     ok_, msg = delete_emergency_contact(cid, actor=u.get("name") or "老人")
     if not ok_:
         return _fail(2001, msg)
@@ -322,6 +328,9 @@ def web_contacts_delete(cid: int, request: Request):
 def web_sos_action(call_id: int, req: SosAction, request: Request):
     from data.db_elderly_care import respond_sos, end_sos
     actor = _user(request).get("name") or "负责人"
+    # 多租户（B6）：SOS 处置按 id 直取只能动本社区的求助（含位置与老人信息）
+    if not _same_tenant(request, "emergency_calls", call_id):
+        return _fail(1003, "无权限处置该求助（非本社区）")
     if req.action == "respond":
         ok_, msg = respond_sos(call_id, actor=actor)
     else:
@@ -345,8 +354,13 @@ def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
             return _ok({"reminder_id": rid, "streak": streak, "already": True}, msg)  # 重复打卡幂等
         return _ok({"reminder_id": rid, "streak": streak}, encourage)
     if req.action == "pause":
+        # 多租户（B6）：暂停/恢复按 id 直取，只能动本社区的用药提醒
+        if not _same_tenant(request, "medication_reminders", rid):
+            return _fail(1003, "无权限操作该用药提醒（非本社区）")
         ok_, msg = pause_medication(rid, actor=actor)
     else:
+        if not _same_tenant(request, "medication_reminders", rid):
+            return _fail(1003, "无权限操作该用药提醒（非本社区）")
         ok_, msg = resume_medication(rid, actor=actor)
     if not ok_:
         return _fail(2001, msg)
@@ -386,6 +400,9 @@ def web_manage_medication_audit(rid: int, req: MedicationAudit, request: Request
         return _require_role(request, "grid")
     from data.db_elderly_care import audit_medication
     actor = _user(request).get("name") or "负责人"
+    # 多租户（B6）：审核是按 id 直取，只能审本社区老人的用药提醒
+    if not _same_tenant(request, "medication_reminders", rid):
+        return _fail(1003, "无权限审核该用药提醒（非本社区）")
     ok_, msg = audit_medication(rid, req.approve, opinion=req.opinion, actor=actor)
     if not ok_:
         return _fail(2001, msg)
@@ -412,6 +429,9 @@ def web_manage_contact_audit(cid: int, req: ContactAudit, request: Request):
         return _require_role(request, "grid")
     from data.db_elderly_care import audit_emergency_contact
     actor = _user(request).get("name") or "负责人"
+    # 多租户（B6）：审核是按 id 直取，只能审本社区老人的紧急联系人
+    if not _same_tenant(request, "emergency_contacts", cid):
+        return _fail(1003, "无权限审核该联系人（非本社区）")
     ok_, msg = audit_emergency_contact(cid, req.approve, opinion=req.opinion, actor=actor)
     if not ok_:
         return _fail(2001, msg)

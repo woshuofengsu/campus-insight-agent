@@ -221,13 +221,18 @@ def generate_today_events() -> dict:
                     (title, report_date),
                 ).fetchone()
                 if existing and existing["cnt"] == 0:
-                    conn.execute(
+                    cur = conn.execute(
                         """INSERT INTO community_issues
                            (title, category, location, description, urgency, status, reported_at, author)
                            VALUES (?, ?, ?, ?, ?, '待处理', ?, '系统感知')""",
                         (title, cat, loc, f"【自动感知】{desc}（系统于{report_date}自动检测）",
                          urgency, report_date),
                     )
+                    # 多租户（B6 补漏）：系统感知生成的工单也要盖章——它没有自然人归属，
+                    # 按默认社区归档（与 v48 迁移对无归属行/种子数据的口径一致）。
+                    from utils.tenant import default_community, stamp_tenant_value
+                    stamp_tenant_value(conn, "community_issues", cur.lastrowid,
+                                       default_community())
                     result["new_issues"] += 1
 
         conn.commit()

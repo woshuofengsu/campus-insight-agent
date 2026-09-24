@@ -147,20 +147,30 @@ def clean_agent_logs(days: int = RETENTION_DAYS) -> int:
         return cur.rowcount
 
 
-def get_trace_chain(trace_id: str, limit: int = 50) -> dict:
+def get_trace_chain(trace_id: str, limit: int = 50, tenant: str | None = None) -> dict:
     """按 trace_id 串联同一次用户操作的链路（P2-F4-01）。
 
     返回 {trace_id, activity: [...], agent: [...], exceptions: [...]}，
     用于负责人排查「一次请求经过了哪些业务操作 / Agent 调用 / 异常」。
+
+    多租户（B6）：`agent_logs` 按 tenant 过滤（agent_logs 已租户化）；`activity_log` 是
+    **全局审计流水、没有 tenant 列**，只有拿到 trace_id 才能查——trace_id 由服务端生成、
+    不对外，故此处按创建者社区不回过滤，属已知边界（见交付说明）。
     """
     with get_db() as conn:
         activity = [dict(r) for r in conn.execute(
             "SELECT id, actor, action, target_type, target_id, module, detail, "
             "before_value, after_value, created_at FROM activity_log "
             "WHERE trace_id=? ORDER BY id LIMIT ?", (trace_id, limit)).fetchall()]
-        agent = [dict(r) for r in conn.execute(
-            "SELECT id, role, user_input, intent, routed, status, error, created_at "
-            "FROM agent_logs WHERE trace_id=? ORDER BY id LIMIT ?", (trace_id, limit)).fetchall()]
+        aargs: list = [trace_id]
+        atc = tenant_clause(tenant, aargs)
+        if atc is None:
+            agent = []
+        else:
+            agent = [dict(r) for r in conn.execute(
+                "SELECT id, role, user_input, intent, routed, status, error, created_at "
+                "FROM agent_logs WHERE trace_id=?" + atc + " ORDER BY id LIMIT ?",
+                aargs + [limit]).fetchall()]
         exceptions = [dict(r) for r in conn.execute(
             "SELECT id, module, error, detail, created_at FROM exception_log "
             "WHERE trace_id=? ORDER BY id LIMIT ?", (trace_id, limit)).fetchall()]
@@ -232,12 +242,17 @@ def create_handoff(session_id: str, user_id: int, role: str, intent: str,
             (session_id, user_id, role, intent, reason or "",
              _json.dumps(package or {}, ensure_ascii=False)),
         )
+        handoff_id = cur.lastrowid
+        # 多租户（B6 补漏）：转人工处理包必须盖章，否则租户为空 → 网格端列表
+        # （已按 tenant 过滤）返回空集，**所有网格员都看不到待处理包**（功能故障）。
+        from utils.tenant import stamp_tenant
+        stamp_tenant(conn, "agent_handoffs", handoff_id, user_id)
         conn.commit()
-        return cur.lastrowid
+        return handoff_id
 
 
-def list_handoffs(status: str = "", limit: int = 50) -> list[dict]:
-    """负责人端人工处理包列表（含上下文摘要）。"""
+def list_handoffs(status: str = "", limit: int = 50, tenant: str | None = None) -> list[dict]:
+    """负责人端人工处理包列表（含上下文摘要）。多租户（B6）：必须带 tenant。"""
     import json as _json
     with get_db() as conn:
         q = "SELECT * FROM agent_handoffs WHERE 1=1"
@@ -245,6 +260,10 @@ def list_handoffs(status: str = "", limit: int = 50) -> list[dict]:
         if status:
             q += " AND status=?"
             args.append(status)
+        tc = tenant_clause(tenant, args)
+        if tc is None:
+            return []
+        q += tc
         q += " ORDER BY id DESC LIMIT ?"
         args.append(limit)
         rows = conn.execute(q, args).fetchall()
