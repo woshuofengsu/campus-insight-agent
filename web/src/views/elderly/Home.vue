@@ -253,7 +253,9 @@ function cancelCall() {
          style="text-align:center;font-size:1.25rem;border-radius:18px;"
          @click="router.push('/elderly/notices')">
       🔔 {{ home.unread_notices }} 条新通知
-      <n-button size="large" type="success" style="margin-left:8px;">去听 ›</n-button>
+      <!-- 老年端可达性：老年端文字一律 ≥20px（这里是 1.25rem 的 15px 默认字号），
+           按钮高度也提到 52px 以上——长辈版不该出现"小字小按钮"。 -->
+      <n-button size="large" type="success" style="margin-left:8px;font-size:1.2rem;min-height:52px;">去听 ›</n-button>
     </div>
 
     <!-- 最近求助状态 -->
@@ -265,7 +267,7 @@ function cancelCall() {
     <div class="card hero-card" style="padding:0;">
       <div class="grad-flow" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#166534,#2E7D32);color:#fff;">
         <b style="font-size:1.25rem;">🤖 社区小助手</b>
-        <n-button size="small" text style="color:#fff;font-size:1.25rem;" @click="router.push('/elderly/agent')">全页对话 ›</n-button>
+        <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:52px;" @click="router.push('/elderly/agent')">全页对话 ›</n-button>
       </div>
       <div style="padding:14px;">
         <n-button type="error" block size="large" style="min-height:76px;font-size:1.3rem;font-weight:700;border-radius:18px;"

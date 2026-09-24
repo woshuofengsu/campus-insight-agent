@@ -30,7 +30,7 @@ const navs = [
   <div style="min-height:100vh;background:var(--bg);">
     <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:1.3rem;font-weight:800;">🏘️ 社区服务</div>
-      <n-button size="small" text style="color:#fff;font-size:1.25rem;" @click="store.logout(); router.replace('/login')">退出</n-button>
+      <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:48px;" @click="store.logout(); router.replace('/login')">退出</n-button>
     </div>
     <div class="elderly-nav" style="display:flex;gap:10px;padding:12px 14px;background:var(--primary-light,#E8EDFF);flex-wrap:wrap;">
       <n-button v-for="n in navs" :key="n.key" size="large" round
