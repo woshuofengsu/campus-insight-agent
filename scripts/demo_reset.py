@@ -97,8 +97,25 @@ def main() -> int:
                 print(f"      → 已关闭 #{cid}（HTTP {st2}，留痕已记）"
                       if r2.get("success") else f"      → 关闭 #{cid} 失败：{r2.get('error')}")
 
-    # ---------- 2. 演示要用的两社区数据是否都在 ----------
-    print("\n② 两社区演示数据")
+    # ---------- 2. 遗留草稿（会把上一次报修的描述带进新的确认卡片）----------
+    print("\n② 遗留草稿（现场高危：新报修的确认卡片可能写着上次的问题）")
+    for role, accounts in (("resident", [("demo_resident", ""), ("demo_resident_cy", "demo123")]),):
+        for user, pwd in accounts:
+            st, r = call("POST", "/api/web/auth/login", body={"username": user, "password": pwd},
+                         base=base)
+            if not r.get("success"):
+                print(f"   ⚠️ {user} 登录失败，跳过")
+                continue
+            t = r["data"]["token"]
+            # 「取消」是应用自带的**清草稿**路径（orchestrator 对取消会清空草稿与会话状态），
+            # 比裸删库表干净：走的是业务逻辑，且不会留下不一致状态。
+            st2, r2 = call("POST", "/api/web/agent/chat", t, {"text": "取消"}, base=base)
+            ok = bool(r2.get("success"))
+            print(f"   {'✅' if ok else '⚠️'} {user}：已清空遗留草稿与会话"
+                  f"（{str((r2.get('data') or {}).get('reply'))[:26]}）")
+
+    # ---------- 3. 演示要用的两社区数据是否都在 ----------
+    print("\n③ 两社区演示数据")
     for com in ("海淀小区", "朝阳试点社区"):
         t = grid_token(base, com)
         if not t:
@@ -112,7 +129,7 @@ def main() -> int:
             problems.append(f"{com} 网格端看不到工单")
 
     # ---------- 3. 老年端可演示项 ----------
-    print("\n③ 老年端可演示项")
+    print("\n④ 老年端可演示项")
     st, r = call("POST", "/api/web/auth/demo", body={"role": "elderly"}, base=base)
     etok = r["data"]["token"] if r.get("success") else None
     if not etok:
@@ -130,7 +147,7 @@ def main() -> int:
                 problems.append(f"老年端「{label}」为空，演示时是空页面")
 
     # ---------- 4. 网格端演示面 ----------
-    print("\n④ 网格端演示面")
+    print("\n⑤ 网格端演示面")
     for label, path in (("人工处理包", "/api/web/agent/handoffs?limit=50"),
                         ("通知管理", "/api/web/notices/manage?limit=200"),
                         ("知识库", "/api/web/knowledge?limit=300"),
@@ -141,7 +158,7 @@ def main() -> int:
         print(f"   {'✅' if isinstance(n, int) and n > 0 else '⚠️'} {label}：{n} 条")
 
     # ---------- 5. 前端产物新鲜度 ----------
-    print("\n⑤ 前端产物（改了 web/src 没 build 会演旧包）")
+    print("\n⑥ 前端产物（改了 web/src 没 build 会演旧包）")
     st, r = call("GET", "/api/web/auth/me", base=base)     # 未登录 → 401，说明服务活着
     print(f"   {'✅' if st == 401 else '⚠️'} 服务鉴权在位（未登录 /me → HTTP {st}，期望 401）")
 
