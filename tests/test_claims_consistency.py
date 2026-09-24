@@ -24,15 +24,24 @@ PROJ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def test_current_docs_have_no_stale_wording():
-    """当前状态文档不得含过时表述（旧 schema 版本 / 旧测试数 / 旧架构词）。"""
+    """当前状态文档不得含过时表述（旧 schema 版本 / 旧测试数 / 旧架构词）。
+
+    豁免规则与 `scripts/check_claims.py` **共用同一份常量**（`STRUCTURE_EXEMPT` /
+    `STRUCTURE_ONLY`）：CHANGELOG 的版本历史与 HANDOFF 的交接快照允许保留"当时的
+    结构数字"（schema 版本/路由数/表数）——把历史改成今天的数字才是篡改。
+    规则只此一处，避免两处清单各写一份、慢慢漂移。
+    """
     hits = []
     for doc in C.CURRENT_DOCS:
         p = os.path.join(PROJ, doc)
         if not os.path.exists(p):
             continue
+        struct_exempt = doc in getattr(C, "STRUCTURE_EXEMPT", set())
         for i, ln in enumerate(io.open(p, encoding="utf-8").read().splitlines(), 1):
             for s in C.STALE:
                 if s in ln:
+                    if struct_exempt and s in getattr(C, "STRUCTURE_ONLY", []):
+                        continue
                     hits.append(f"{doc}:{i} 「{s}」")
                     break
     assert not hits, "当前状态文档出现过时表述：\n  " + "\n  ".join(hits)

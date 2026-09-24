@@ -98,6 +98,32 @@ def default_community() -> str:
         return ""
 
 
+def all_tenants() -> list[str]:
+    """列出系统里**真实存在**的社区名（去重、已归一化）。
+
+    用途：系统级定时任务（没有"当前用户"可依）要"按社区各跑一遍"时用它枚举——
+    例如天气联动按每个社区自己的阈值判定（见 `data/db_health_content.trigger_weather_linkage`）。
+    空值/历史行政区值一律不返回：拿空社区去查是 fail-closed（查不到数据），
+    所以这里宁可少枚举，也不给调用方一个无法解释的空租户。
+    """
+    try:
+        from data.db_core import get_db
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT community FROM user_profile "
+                "WHERE community IS NOT NULL AND community != ''").fetchall()
+    except Exception as e:  # noqa: BLE001 — 枚举失败返回空表，调用方按"没有社区"处理
+        _log.warning("枚举社区失败（按空表处理）：%s", e)
+        return []
+    out, seen = [], set()
+    for r in rows:
+        t = normalize_tenant(r["community"])
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return sorted(out)
+
+
 def tenant_clause(tenant, args: list, *, self_scoped: bool = False, column: str = "tenant_id"):
     """读取侧租户过滤的统一入口（fail-closed，三条硬约定）。
 
@@ -216,5 +242,5 @@ def stamp_tenant(conn, table: str, row_id, owner_id) -> str:
 
 __all__ = ["LEGACY_TENANT_VALUES", "TENANT_TABLES", "TENANT_OWNER_COLUMN", "normalize_tenant",
            "is_valid_tenant", "tenant_of_user", "tenant_of_user_uncached", "clear_cache",
-           "default_community", "stamp_tenant", "stamp_tenant_value", "tenant_clause",
-           "row_in_tenant"]
+           "default_community", "all_tenants", "stamp_tenant", "stamp_tenant_value",
+           "tenant_clause", "row_in_tenant"]

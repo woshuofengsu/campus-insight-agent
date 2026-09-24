@@ -93,7 +93,15 @@ elderly:  demo_elderly（免登录）
      它**不替代**自身范围校验（居民看自己的单仍要 `reporter_id == uid`，两者是"与"）。
      新增按-id 路由忘了带闸门 → `tests/test_tenant_idor_sweep.py` 直接红（豁免要写理由）；
   ④ **租户只从服务端身份来**（`api_routes/deps._tenant(request)`，源自 JWT 的 `community`），
-     绝不接受前端传的 tenant/community 作为过滤依据。
+     绝不接受前端传的 tenant/community 作为过滤依据；
+  ⑤ **配置（`settings` 表）也要按租户分键**——裸键 = 全局默认，`键@社区` = 社区专属；
+     一律走 `data/db_settings.py`（`get_setting`/`set_setting`/`get_setting_json`/`set_setting_json`），
+     读取顺序 **社区专属 → 全局 → 代码默认**，**写入只写社区键**（别去改全局）。
+     ⚠️ **别把配置缓存在模块级变量里再被 setter 改写**：那是跨租户串味的根源
+     （B7 前的 `_match_threshold` / `_LINKAGE_THRESHOLDS` 就是这样，朝阳改阈值会连带改掉海淀）；
+     另外**配置项必须接到真正做判定的地方**——只改"配置页读数"而不改判定点，就是本项目最忌讳的
+     "做了但不生效"（天气联动原来连社区维度都没有，B7 已让定时任务按社区逐个判定）。
+     系统级定时任务（没有"当前用户"）要"按社区各跑一遍"时，用 `utils.tenant.all_tenants()` 枚举社区。
   `config.DEFAULT_COMMUNITY` 是历史/无归属数据的归档社区（`DEFAULT_TENANT` 是 v41 旧口径的行政区值，仅兼容保留）；
   Streamlit 备线在入口 `app.py` 调 `install_tenant_defaults()` 统一注入（见 `ui/_tenant.py`）。
 - LLM 默认**规则优先降本**：代码默认 `LLM_NEGOTIATION`/`LLM_ORCHESTRATION`/`POLICY_LLM_RAG`/`RECEPTION_LLM_FALLBACK` 全关；

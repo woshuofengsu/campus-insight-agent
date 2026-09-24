@@ -44,7 +44,7 @@ web（FastAPI 主服务 `:8000` 托管 Vue3 三端；另有 `api.py` 扣子插�
 
 **约束：**
 - **单进程形态**：黑板 / 限流 / WebSocket 均在进程内，多 worker 需 Redis（见 `docs/scaling.md`）
-- SQLite（WAL，schema v46）；PostgreSQL 迁移路径已写、比赛期不做大重构
+- SQLite（WAL，schema v48）；PostgreSQL 迁移路径已写、比赛期不做大重构
 - **无 service worker**：不宣称离线能力，业务强依赖后端实时数据
 - 多租户仅预留 `tenant_id`，查询层未隔离
 - DeepSeek（对话）+ 百炼 text-embedding-v3（向量）双模型依赖
@@ -65,9 +65,9 @@ web（FastAPI 主服务 `:8000` 托管 Vue3 三端；另有 `api.py` 扣子插�
 
 ## Evidence on Hand
 
-- 可运行主服务（FastAPI，130 条路由）+ Vue3 三端构建产物（`web/dist`，不入 git）
+- 可运行主服务（FastAPI，135 条路由）+ Vue3 三端构建产物（`web/dist`，不入 git）
 - 754 项可运行用例（753 通过 / 1 需外部服务跳过）、54 个页面视口 UI 审计、21 页移动端审计、12 项端到端验收
-- 9 个角色 / 16 个工具 / 50 张业务表 / 46 个版本化迁移（schema v46）
+- 9 个角色 / 16 个工具 / 51 张业务表 / 47 个版本化迁移（schema v48）
 - 62 条知识库条目（含 3 条属地政策：区级/社区级/市级）+ 48 条检索金标
 - 7 段答辩兜底录屏（`.recordings/`，含属地化两社区对比）与录屏脚本
 - `docs/competition/`：提交版创意说明书、技术实现报告、最终版交付说明、答辩问答手册、演示脚本、提词器

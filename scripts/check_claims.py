@@ -128,6 +128,10 @@ CURRENT_DOCS = [
 # 改成今天的数字反而是篡改历史（CHANGELOG 按版本记录；HANDOFF 是那次交接时的快照）。
 COUNT_EXEMPT = {"CHANGELOG.md", "HANDOFF.md"}
 
+# 「结构数字」黑名单的豁免：同样是历史记录/交接快照 → 允许保留当时的 schema 版本、
+# 路由数、表数（改它等于篡改"当时是什么样"）。其余当前状态文档一律不许出现旧值。
+STRUCTURE_EXEMPT = {"CHANGELOG.md", "HANDOFF.md"}
+
 # 历史文档：正文允许保留原型阶段的数字（328 测试 / Streamlit / LangChain / 16 工具），
 # **但必须在开头明确标注**是历史实现，否则会误导评委 → 门禁检查「标注存在」。
 LEGACY_BANNER_DOCS = {
@@ -151,6 +155,19 @@ STALE = [
     # （曾把不存在的 manifest.webmanifest / pwa-192.png 写成已落地方案 → 误导）。
     "离线可用", "支持离线", "离线 PWA", "断网可用",
     "manifest.webmanifest", "pwa-192", "pwa-512",
+    # 第十一轮：B3/B5/B6 把 schema 推到 v48（v47 老年健康记录、v48 多租户真隔离），
+    # 路由 130→135（老年端健康记录/管理端点），业务表 50→51。旧数字不得回流——
+    # 评委按「对应当前代码库」核对时会对不上。当前值以本脚本头部实时计算的数字为准。
+    "schema v46", "schema **v46**", "schema v47", "schema **v47**",
+    "130 条路由", "HTTP 路由 **130**", "50 张业务表", "**50 张业务表**",
+    "50 张表", "46 个版本化迁移", "46 个迁移", "**46 个版本化迁移**",
+]
+
+# 上述「结构数字」黑名单的适用文件（历史快照豁免见 STRUCTURE_EXEMPT）
+STRUCTURE_ONLY = [
+    "schema v46", "schema **v46**", "schema v47", "schema **v47**",
+    "130 条路由", "HTTP 路由 **130**", "50 张业务表", "**50 张业务表**",
+    "50 张表", "46 个版本化迁移", "46 个迁移", "**46 个版本化迁移**",
 ]
 
 
@@ -177,9 +194,13 @@ def _cross_check(collected: int) -> int:
         if not os.path.exists(p):
             continue
         txt = io.open(p, encoding="utf-8").read()
+        struct_exempt = doc in STRUCTURE_EXEMPT
         for i, ln in enumerate(txt.splitlines(), 1):
             for s in STALE:
                 if s in ln:
+                    # 历史记录/交接快照允许保留"当时的结构数字"（改它等于篡改历史）
+                    if struct_exempt and s in STRUCTURE_ONLY:
+                        continue
                     bad.append(f"{doc}:{i} 含过时表述「{s}」→ {ln.strip()[:70]}")
                     break
         # 测试数口径自检（本轮新增）：光核对 meta.js 不够——文档里可能一处写新的、另一处写旧的
