@@ -293,7 +293,9 @@ PAGES = [
     ("elderly-contacts", "elderly", "/elderly/contacts", (390, 844), True, True, False),
     ("elderly-orders", "elderly", "/elderly/orders", (390, 844), True, True, False),
     ("elderly-qa", "elderly", "/elderly/qa", (390, 844), True, True, False),
+    ("elderly-health", "elderly", "/elderly/health", (390, 844), True, True, False),
     # 暗色覆盖扩面：内联写死色在暗色下翻车是这批问题的共同根因，多抽几页暗色做回归
+    ("elderly-health-dark", "elderly", "/elderly/health", (390, 844), True, True, True),
     ("elderly-notices-dark", "elderly", "/elderly/notices", (390, 844), True, True, True),
     ("elderly-medication-dark", "elderly", "/elderly/medication", (390, 844), True, True, True),
     ("elderly-contacts-dark", "elderly", "/elderly/contacts", (390, 844), True, True, True),

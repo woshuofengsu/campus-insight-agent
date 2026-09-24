@@ -705,6 +705,43 @@ def _m42_medication_intake(conn):
     """)
 
 
+def _m47_elderly_vitals(conn):
+    """v47：老年健康记录表（血压 / 血糖）——P4「深化老年端」。
+
+    为什么新建表而不是往 `elderly_profile.health_info` JSON 里塞：那个 JSON 是整块覆盖写
+    （`set_health_info`），并发录入会互相覆盖丢记录，也无法按时间分页/排序。
+
+    幂等：建表用 IF NOT EXISTS；回填走 `db_vitals.backfill_from_profile`（自身带去重守卫）。
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS elderly_vitals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,                   -- bp / glucose
+            sys INTEGER,                          -- 收缩压 mmHg
+            dia INTEGER,                          -- 舒张压 mmHg
+            glucose REAL,                         -- 血糖 mmol/L
+            measure_when TEXT DEFAULT 'random',   -- fasting / postprandial / random
+            measured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            recorder_id INTEGER,                  -- 谁录的（老人自己 / 家属代录）
+            source TEXT DEFAULT 'self',           -- self / family / grid / backfill
+            note TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_vitals_user_kind
+            ON elderly_vitals(user_id, kind, measured_at);
+    """)
+    # 历史血压（health_info.blood_pressure）搬进新表，避免"以前有记录、现在一开新页是空的"
+    try:
+        import os
+        import sys as _sys
+        _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from data.db_vitals import backfill_from_profile
+        backfill_from_profile(conn)
+    except Exception as e:  # noqa: BLE001
+        log.warning("v47 健康记录回填失败（不影响建表）：%s", e)
+
+
 def _m43_kb_query_log(conn):
     """U3/v43：知识库查询日志（RAG 可观测：命中率 / 零命中问题 / 检索路线）。
 
@@ -1097,6 +1134,7 @@ def init_db(db_path: str):
         (44, "care_event_log", _m44_care_event_log),
         (45, "knowledge_graph", _m45_knowledge_graph),
         (46, "phone_enc_all_and_schema_drift", _m46_phone_enc_and_schema_drift),
+        (47, "elderly_vitals", _m47_elderly_vitals),
     ]
     for version, name, fn in post:
         if version <= current:

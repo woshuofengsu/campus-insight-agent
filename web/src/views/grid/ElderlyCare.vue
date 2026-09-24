@@ -10,6 +10,9 @@ const meds = ref([])
 const contacts = ref([])
 const sosList = ref([])
 const inactive = ref([])            // P3：久未互动的老人（24h 阈值，后端算好的）
+const elders = ref([])              // P4：老人下拉（网格员选对象，不用手输 ID）
+const vitalUid = ref(null)
+const vitals = ref([])
 const auditOp = ref({}) // 审核意见
 const replyOp = ref({}) // SOS 处理备注
 
@@ -20,6 +23,20 @@ async function load() {
   try { contacts.value = (await elderly.manageContacts()) || [] } catch { /* 忽略 */ }
   try { sosList.value = (await elderly.manageSos()) || [] } catch { /* 忽略 */ }
   try { inactive.value = (await elderly.manageInactive({ days: 1 })) || [] } catch { /* 忽略 */ }
+  try { elders.value = (await elderly.manageElders()) || [] } catch { /* 忽略 */ }
+}
+
+// P4：健康记录（只做记录与提醒，页面不出现任何医学结论——文案全部来自后端）
+const VITAL_LEVEL = { normal: '正常范围', attention: '需留意', alert: '明显偏离' }
+
+async function loadVitals(uid) {
+  vitalUid.value = uid
+  vitals.value = []
+  if (!uid) return
+  try {
+    const d = await elderly.manageVitals({ uid, limit: 14 })
+    vitals.value = (d && d.records) || []
+  } catch (e) { message.error(e.message) }
 }
 
 async function auditMed(m, approve) {
@@ -53,6 +70,36 @@ async function sosAction(s, action) {
     <p class="page-sub">用药提醒审核 · 紧急联系人审核 · 紧急求助处理</p>
 
     <n-tabs v-model:value="tab" type="line">
+      <!-- P4 健康记录：选老人 → 看血压/血糖与分级（只提醒，不下结论） -->
+      <n-tab-pane name="vitals" tab="🩺 健康记录">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <n-select :value="vitalUid" style="max-width:280px;" placeholder="选择老人"
+                    :options="elders.map(e => ({ label: (e.name || ('老人#' + e.id)) + '（' + (e.community || '') + '）', value: e.id }))"
+                    @update:value="loadVitals" />
+          <span class="muted" style="font-size:0.85rem;">只做记录与提醒；具体用药听社区医生的。</span>
+        </div>
+        <div v-for="r in vitals" :key="r.id" class="card"
+             :style="r.level === 'alert' ? 'border:2px solid #dc2626;' : (r.level === 'attention' ? 'border:2px solid #f59e0b;' : '')">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b v-if="r.kind === 'bp'">血压 {{ r.sys }}/{{ r.dia }} mmHg</b>
+            <b v-else>血糖 {{ r.glucose }} mmol/L</b>
+            <n-tag size="small" :type="r.level === 'normal' ? 'success' : (r.level === 'attention' ? 'warning' : 'error')">
+              {{ VITAL_LEVEL[r.level] }}
+            </n-tag>
+          </div>
+          <div class="muted" style="font-size:0.85rem;margin-top:4px;">
+            🕐 {{ (r.measured_at || '').slice(0, 16) }}
+            <template v-if="r.kind === 'glucose' && r.measure_when">
+              · {{ r.measure_when === 'fasting' ? '空腹' : (r.measure_when === 'postprandial' ? '餐后' : '随机') }}
+            </template>
+            <template v-if="r.source === 'backfill'"> · 迁移自旧档案</template>
+          </div>
+          <div v-if="r.level !== 'normal'" class="muted" style="font-size:0.85rem;margin-top:4px;">{{ r.level_hint }}</div>
+        </div>
+        <n-empty v-if="!vitalUid" description="先选一位老人" />
+        <n-empty v-else-if="vitals.length === 0" description="这位老人还没有健康记录" />
+      </n-tab-pane>
+
       <!-- P3 安全闭环：久未互动 / 重点关注老人 -->
       <n-tab-pane name="focus" tab="👀 重点关注老人">
         <div v-for="e in inactive" :key="e.user_id" class="card"

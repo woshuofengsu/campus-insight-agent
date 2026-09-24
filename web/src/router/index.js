@@ -69,6 +69,7 @@ const routes = [
       { path: 'contacts', name: 'e-contacts', component: () => import('../views/elderly/Contacts.vue'), meta: { title: '紧急联系人' } },
       { path: 'orders', name: 'e-orders', component: () => import('../views/elderly/Orders.vue'), meta: { title: '我的报修' } },
       { path: 'qa', name: 'e-qa', component: () => import('../views/elderly/QA.vue'), meta: { title: '政策问答' } },
+      { path: 'health', name: 'e-health', component: () => import('../views/elderly/Health.vue'), meta: { title: '我的健康' } },
     ],
   },
 

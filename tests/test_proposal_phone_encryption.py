@@ -124,7 +124,9 @@ def test_m46_migration_backfills_and_is_idempotent():
     try:
         with get_db() as conn:
             # 直接退回 v45，并插入两条明文（绕过写路径，模拟历史脏数据）
-            conn.execute("UPDATE schema_version SET version=45 WHERE version=46")
+            # 注意：schema_version 是**单行**表（存当前版本），所以不能写 WHERE version=46——
+            # 版本已经 >46 时那个条件匹配不到任何行，v46 不会重跑（v47 上线时就是这么把它打红的）。
+            conn.execute("UPDATE schema_version SET version=45")
             conn.execute(
                 "INSERT INTO proposals (title, description, category, author, reporter_name, "
                 "reporter_phone) VALUES ('旧提案','这是一条历史明文提案','其他','王阿姨','王阿姨',?)",
@@ -142,7 +144,9 @@ def test_m46_migration_backfills_and_is_idempotent():
             u = conn.execute("SELECT phone, phone_enc FROM user_profile "
                              "WHERE username='legacy_user'").fetchone()
             ver = conn.execute("SELECT MAX(version) v FROM schema_version").fetchone()["v"]
-        assert ver == 46, f"schema 版本应升到 46，实际 {ver}"
+        # 该用例只关心"v46 是否跑过"：断言 >= 46 而不是 == 46，
+        # 否则以后每加一条迁移都要来改这里（v47 健康记录就是这么把它打红的）。
+        assert ver >= 46, f"schema 版本应至少升到 46（v46 手机号加密），实际 {ver}"
         assert p["reporter_phone"] == "", "存量明文应被清空"
         assert p["reporter_phone_enc"].startswith("g1$"), "存量明文应回填为密文"
 

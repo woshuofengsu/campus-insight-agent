@@ -438,3 +438,75 @@ def web_manage_sos(request: Request, status: str = ""):
     from data.db_elderly_care import get_sos_calls
     rows = get_sos_calls(status=status or None, limit=50)
     return _ok([dict(r) for r in rows])
+
+
+# ---------------- P4：老年健康记录（血压 / 血糖）----------------
+
+class VitalCreate(BaseModel):
+    """录入一条健康记录：血压给 sys/dia，血糖给 glucose。"""
+    kind: str = Field(..., pattern="^(bp|glucose)$")
+    sys: int | None = Field(default=None)
+    dia: int | None = Field(default=None)
+    glucose: float | None = Field(default=None)
+    measure_when: str = Field(default="random")   # fasting / postprandial / random
+    measured_at: str = Field(default="")          # 留空=现在
+    note: str = Field(default="", max_length=200)
+
+
+@router.post("/vitals")
+def web_vital_create(req: VitalCreate, request: Request):
+    """老年端（或家属代录）录一条血压/血糖，返回分级与固定提示语（不诊断）。"""
+    from data.db_vitals import add_vital, notify_abnormal_vital
+    u = _user(request)
+    uid = _resolve_elder_uid(request) or u.get("uid")
+    _touch(uid)
+    vid, level, meta = add_vital(uid, req.kind, req.sys, req.dia, req.glucose,
+                                 req.measure_when, req.measured_at,
+                                 recorder_id=u.get("uid"), source="self", note=req.note)
+    if vid <= 0:
+        return _fail(1003, meta.get("error") or "录入失败")
+    value_text = (f"{req.sys}/{req.dia} mmHg" if req.kind == "bp" and req.sys
+                  else f"{req.glucose} mmol/L")
+    notified = notify_abnormal_vital(uid, req.kind, level, meta.get("hint", ""), value_text)
+    return _ok({"id": vid, "level": level, "hint": meta.get("hint", ""), "notified": notified})
+
+
+@router.get("/vitals")
+def web_vitals_list(request: Request, kind: str = "", limit: int = 14):
+    """老年端：自己的健康记录（按测量时间倒序，带分级与提示语）。"""
+    from data.db_vitals import list_vitals
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    return _ok(list_vitals(uid, kind, limit=limit))
+
+
+@router.get("/vitals/summary")
+def web_vitals_summary(request: Request, limit: int = 7):
+    """老年端首页摘要：最新血压/血糖 + 各自趋势一句话。"""
+    from data.db_vitals import vitals_summary
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    return _ok(vitals_summary(uid, limit=limit))
+
+
+@manage_router.get("/vitals")
+def web_manage_vitals(request: Request, uid: int = 0, kind: str = "", limit: int = 14):
+    """负责人端：看某位老人的健康记录（网格员关怀页用）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    if not uid:
+        return _fail(1003, "请指定老人")
+    from data.db_vitals import list_vitals, vitals_summary
+    return _ok({"records": list_vitals(uid, kind, limit=limit),
+                "summary": vitals_summary(uid)})
+
+
+@manage_router.get("/elders")
+def web_manage_elders(request: Request):
+    """负责人端：老人下拉列表（网格员选对象用，避免手输用户 ID）。"""
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_core import get_db
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, community FROM user_profile "
+            "WHERE role='elderly' AND is_active=1 ORDER BY id").fetchall()
+    return _ok([dict(r) for r in rows])

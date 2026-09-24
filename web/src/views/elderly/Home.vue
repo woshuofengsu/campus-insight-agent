@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
 
 const rows = [
   [{ icon: '🌤️', label: '天气', action: 'weather' }, { to: '/elderly/notices', icon: '🔊', label: '通知' }, { to: '/elderly/report', icon: '🗣️', label: '报修' }],
-  [{ icon: '🏛️', label: '联系社区', action: 'community' }, { to: '/elderly/medication', icon: '💊', label: '用药提醒' }, { icon: '❓', label: '语音帮助', action: 'help' }],
+  [{ icon: '🏛️', label: '联系社区', action: 'community' }, { to: '/elderly/medication', icon: '💊', label: '用药提醒' }, { to: '/elderly/health', icon: '🩺', label: '我的健康' }],
 ]
 
 function playWeather() {

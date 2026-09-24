@@ -1890,3 +1890,56 @@ check_claims **三方一致**。
 `last_active_at` 刷成刚刚（审计确实算互动，这次的 `_touch` 就是这样把张大爷刷活的）。
 故新增 `scripts/demo_elderly_inactive.py`：`--run` 回拨并立刻跑巡检看通知、`--restore` 恢复，
 脚本自己打印改了什么、怎么改回来，并明确标注"这是演示数据操作，不是业务功能"。
+
+
+## 五十三、老年端 P4 健康记录（B3）：血压/血糖流水 + 分级提醒 ✅
+
+### 一、为什么新建表而不是塞 JSON
+
+`elderly_profile.health_info` 里的 `blood_pressure` 是**整块覆盖写**（`set_health_info`），
+两条记录并发录入会互相覆盖丢数据，也没法按时间分页/排序。健康记录是"只增不改"的流水，
+所以 v47 新建 `elderly_vitals`（`id/user_id/kind/sys/dia/glucose/measure_when/measured_at/
+recorder_id/source/note` + `(user_id, kind, measured_at)` 索引），并把旧档案里的历史血压
+**回填**进新表（幂等，有测试守着），避免"以前有记录、开了新页却是空的"。
+
+### 二、分级与文案单独抽文件——这是本项目最容易越界的地方
+
+`data/_vitals_logic.py` 只有纯函数（无 IO，好测）：
+- 阈值是**提醒阈值**不是诊断标准（血压 180/110 → alert、140/90 → attention、<90/60 → attention；
+  血糖 <3.9 → alert、空腹 ≥7.0 / 餐后 ≥11.1 → attention）；
+- 文案**唯一出口** `hint_of()`，固定为"建议联系社区医生或家属复核，必要时就医"这一档；
+- 测试用**黑名单正则**拦住 确诊 / 您是 / 患了 / 得了 / 诊断为 等句式（口径对齐 `agent/verifier.py`），
+  并且**所有分级结果都要过一遍黑名单**，防止以后加分支漏审。
+
+### 三、异常提醒的三条口径
+
+`db_vitals.notify_abnormal_vital()`：
+1. **只提醒、不下结论**——正文直接用 `hint_of()` 的固定文案；
+2. **只对 alert 级提醒**（attention 级在页面上标黄即可，避免天天弹）；
+3. **每人每天每种指标最多一条**，按 **UTC 日期**去重（与 2026-09-24 修的时区 bug 同口径，两边都用 UTC，不会再错配）。
+   通知同时发给网格员与已绑定的家属（复用 P3 的 `list_guardians_of`）。
+
+### 四、接口与界面
+
+- 接口：老年端 `POST /elderly/vitals`、`GET /elderly/vitals`、`GET /elderly/vitals/summary`；
+  负责人端 `GET /elderly/manage/vitals?uid=`（`_require_role(grid)`，居民调用返回 1003）、
+  `GET /elderly/manage/elders`（老人下拉，网格员不用手输用户 ID）。
+- 老年端新页 `web/src/views/elderly/Health.vue`：大字录入（血压两个框 / 血糖 + 空腹餐后随机）、
+  最近记录、分级颜色、"🔊 听一遍"（录完把提示语念出来）；首页九宫格把"语音帮助"换成"🩺 我的健康"
+  （语音入口仍在下方"🎤 按住说话"大按钮）。
+- 网格员端 `ElderlyCare.vue` 新增「🩺 健康记录」页签：选老人 → 看记录与分级。
+
+### 五、门禁与两个被门禁抓住的问题
+
+- 新增 `tests/test_elderly_vitals.py`（11 例）+ `test_api_web.py` 的接口用例（含越权断言）；
+- **审计清单补齐**：`mobile_audit` 补 `elderly-health`、`grid-elderly-care`（后者此前一直没被覆盖），
+  `ui_audit` 补 `elderly-health` 与 `elderly-health-dark`。补完后**门禁立刻抓出两处我真写错的地方**：
+  1. 新页字号 17.6px / 15px / 19.2px 不达老年端 **20px** 阈值 → 输入框用大字 `n-input`（弃 `n-input-number`，
+     它内部的 +/- 小按钮还会踩 24px 热区下限），文案统一 ≥1.25rem；
+  2. **我在内联样式里写死了十六进制色**（`#B45309` 等）→ 暗色下对比度只有 **2.91:1**（要求 ≥3）。
+     改用项目既有的亮/暗成对令牌 `--ink-success/--ink-warning/--ink-danger`。
+  这两条正是 `AGENTS.md` 里写过的坑，说明门禁有效、也说明"新页面必须进审计清单"这条不能省。
+
+**待办（记下不遗忘）**：路演 PPT 第 10 页写"首页六件事：天气 通知 报修 联系社区 联系人 用药提醒"，
+而界面六格现在是"天气 / 通知 / 报修 / 联系社区 / 用药提醒 / **我的健康**"。
+用户明确说 **PPT 暂时不改**，故此处只登记差异，下次更新 PPT 时一并对齐。

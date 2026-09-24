@@ -547,3 +547,53 @@ def test_batch_operations(client):
         "issue_ids": ids, "assignee_name": "x", "assignee_phone": "",
     }, headers=h)
     assert r.status_code == 400 and r.json()["code"] == 1003
+
+
+def test_elderly_vitals_api(client):
+    """P4：老年端录健康记录 → 出分级与固定提示语；网格员可查；居民不许查别人。"""
+    e = _login(client, "demo_elderly", "")
+    eh = {"Authorization": f"Bearer {e['token']}"}
+
+    # 录入一条偏高一点的血压 → attention（只提醒，不下结论）
+    r = client.post("/api/web/elderly/vitals", json={
+        "kind": "bp", "sys": 152, "dia": 92, "measure_when": "random",
+    }, headers=eh)
+    assert r.status_code == 200 and r.json()["success"], r.text
+    data = r.json()["data"]
+    assert data["id"] > 0 and data["level"] == "attention"
+    for bad in ("确诊", "您是", "患了", "诊断为"):
+        assert bad not in data["hint"]
+    assert "建议" in data["hint"]
+
+    # 明显偏离 → alert（会提醒网格员/家属，但正文仍是提醒口径）
+    r2 = client.post("/api/web/elderly/vitals", json={
+        "kind": "bp", "sys": 188, "dia": 118,
+    }, headers=eh)
+    assert r2.json()["data"]["level"] == "alert"
+    assert r2.json()["data"]["notified"] >= 0      # 有没有网格员账号取决于种子
+
+    # 列表与摘要
+    rl = client.get("/api/web/elderly/vitals?kind=bp&limit=5", headers=eh)
+    rows = rl.json()["data"]
+    assert rows and rows[0]["sys"] == 188, "按测量时间倒序，最新的在最前"
+    rs = client.get("/api/web/elderly/vitals/summary", headers=eh)
+    assert rs.json()["data"]["latest_bp"]["sys"] == 188
+
+    # 明显不合理的值要被拒（防手滑，不是医学判断）
+    bad = client.post("/api/web/elderly/vitals", json={"kind": "bp", "sys": 900, "dia": 10},
+                      headers=eh)
+    assert bad.status_code == 400
+
+    # 网格员可查；居民查不了（越权）
+    g = _login(client, "demo_grid", "demo123")
+    gh = {"Authorization": f"Bearer {g['token']}"}
+    me = client.get("/api/web/auth/me", headers=eh).json()["data"]
+    eid = me.get("user_id") or me.get("uid") or me.get("id")
+    assert eid, f"老年端 /auth/me 应返回 user_id，实际：{me}"
+    rm = client.get(f"/api/web/elderly/manage/vitals?uid={eid}", headers=gh)
+    assert rm.status_code == 200 and rm.json()["success"]
+    assert rm.json()["data"]["records"], "网格员应能查到该老人的记录"
+    resident = _login(client, "demo_resident", "")
+    rh = {"Authorization": f"Bearer {resident['token']}"}
+    rbad = client.get(f"/api/web/elderly/manage/vitals?uid={eid}", headers=rh)
+    assert rbad.status_code == 400 and rbad.json()["code"] == 1003

@@ -158,6 +158,12 @@ export const elderly = {
   // P3 安全闭环：久未互动老人（后端 /elderly/manage/inactive 早就有，前端此前没有方法 → 孤儿接口）
   manageInactive: (params) => api.get('/elderly/manage/inactive', { params }),
   sosAction: (id, data) => api.post(`/elderly/emergency/${id}/action`, data),
+  // P4 健康记录（血压 / 血糖）
+  vitals: (params) => api.get('/elderly/vitals', { params }),
+  addVital: (data) => api.post('/elderly/vitals', data),
+  vitalsSummary: (params) => api.get('/elderly/vitals/summary', { params }),
+  manageVitals: (params) => api.get('/elderly/manage/vitals', { params }),
+  manageElders: () => api.get('/elderly/manage/elders'),
 }
 
 // 导出
