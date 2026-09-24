@@ -9,10 +9,17 @@ from data.db_proposal import (
 
 
 def _check_duplicate(title: str) -> list[dict]:
-    """看看是不是已经有过类似提案（简单算关键词重叠）。"""
-    # 多租户：查重限定在本社区（工具无用户上下文，用默认社区兜底）。
-    from utils.tenant import default_community
-    existing = _db_get_proposals(limit=50, tenant=default_community())
+    """看看是不是已经有过类似提案（简单算关键词重叠）。
+
+    多租户（B7）：查重**限定在会话所在社区**（入口处 `tenant_context` 声明的租户）——
+    拿不到租户时按"查不到重复"处理并告警：宁可漏报一次重复提示，也不能把别的社区的
+    提案标题读出来（那是跨租户泄漏）。
+    """
+    from tools._ctx import tool_tenant
+    tenant = tool_tenant()
+    if not tenant:
+        return []
+    existing = _db_get_proposals(limit=50, tenant=tenant)
     title_keywords = set(title)
     duplicates = []
     for p in existing:

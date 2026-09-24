@@ -25,8 +25,9 @@ from datetime import datetime, timedelta
 
 from data.db_core import get_db
 from data.db_notifications import log_activity
+from data.db_settings import get_setting_json, set_setting_json
 from utils.timeutil import utcnow
-from utils.tenant import tenant_clause
+from utils.tenant import normalize_tenant, tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -1036,33 +1037,37 @@ def get_escalation_status(task_id: int) -> dict:
     }
 
 
-def get_senior_manager_ids() -> list[int]:
-    """更高级负责人名单（settings 表 senior_manager_ids，JSON 数组，可配置）。"""
+def get_senior_manager_ids(tenant: str | None = None) -> list[int]:
+    """更高级负责人名单（settings 表 senior_manager_ids，JSON 数组，可配置）。
+
+    多租户（B7）：`tenant` 给了就取该社区的名单（社区专属 → 全局 → 空），
+    不给 = 全局口径。空名单在升级逻辑里走"无法升级"分支（保持最高优先级告警），
+    **绝不**静默换成别的社区的名单。
+    """
+    val = get_setting_json("senior_manager_ids", tenant=tenant, default=None)
+    if not isinstance(val, list):
+        return []
     try:
-        with get_db() as conn:
-            row = conn.execute(
-                "SELECT value FROM settings WHERE key='senior_manager_ids'"
-            ).fetchone()
-        if not row:
-            return []
-        val = json.loads(row["value"] or "[]")
         return [int(x) for x in val if str(x).isdigit()]
-    except Exception:
+    except (TypeError, ValueError) as e:
+        _log.warning("更高级负责人名单含非法项（tenant=%s），按空处理：%s", tenant, e)
         return []
 
 
-def set_senior_manager_ids(ids: list[int], actor: str = "负责人") -> None:
-    """配置更高级负责人名单（升级第 2 层；配置即留痕）。"""
-    val = json.dumps([int(x) for x in ids if str(x).isdigit()], ensure_ascii=False)
-    with get_db() as conn:
-        exists = conn.execute("SELECT 1 FROM settings WHERE key='senior_manager_ids'").fetchone()
-        if exists:
-            conn.execute("UPDATE settings SET value=? WHERE key='senior_manager_ids'", (val,))
-        else:
-            conn.execute("INSERT INTO settings (key, value) VALUES ('senior_manager_ids', ?)", (val,))
-        conn.commit()
+def set_senior_manager_ids(ids: list[int], actor: str = "负责人",
+                           tenant: str | None = None) -> str:
+    """配置更高级负责人名单（升级第 2 层；配置即留痕）。
+
+    多租户（B7）：给了 `tenant` 就只对该社区生效（写 `senior_manager_ids@社区`）。
+    返回实际写入的设置键。
+    """
+    clean = [int(x) for x in (ids or []) if str(x).isdigit()]
+    key = set_setting_json("senior_manager_ids", clean, tenant=tenant)
+    scope = tenant or "全局"
     log_activity(actor, "配置更高级负责人", "settings", module=MODULE,
-                 after_value=val, detail="天气检查任务超时升级第 2 层通知对象")
+                 after_value=json.dumps(clean, ensure_ascii=False),
+                 detail=f"[{scope}]天气检查任务超时升级第 2 层通知对象，共 {len(clean)} 人")
+    return key
 
 
 def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
@@ -1073,7 +1078,12 @@ def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
     - 更高级负责人未配置 → 记录"无法升级"日志，保持最高优先级告警；
     - 升级通知失败 → 重试一次，仍失败标记"升级通知失败"；更高级通知也失败 →
       保留最高优先级告警，显示"紧急天气检查任务等待人工介入"并通知系统管理员。
+
+    多租户（B7）：`senior_user_ids` **不给**时，按**每个任务自己所属的社区**取名单
+    （任务行的 `tenant_id`）——"升级给谁"是社区自己的配置，不该由一个全局名单决定。
+    显式传 `senior_user_ids` 时按传入值处理（老调用方/测试兼容）。
     """
+    per_task_senior = senior_user_ids is None
     results: dict = {
         "escalated": [], "notified": 0, "senior_notified": 0,
         "cannot_upgrade": [], "notify_failed": [],
@@ -1120,10 +1130,12 @@ def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
         else:
             results["notified"] += sent
 
-        # 第 2 层：更高级负责人兜底
-        if senior_user_ids:
+        # 第 2 层：更高级负责人兜底（按任务所属社区取名单）
+        task_senior = (get_senior_manager_ids(tenant=normalize_tenant(t.get("tenant_id")))
+                       if per_task_senior else senior_user_ids)
+        if task_senior:
             senior_sent = _notify_managers(title, content, related_id=task_id,
-                                           online_user_ids=senior_user_ids)
+                                           online_user_ids=task_senior)
             results["senior_notified"] += senior_sent
             if senior_sent == 0:
                 log_activity("系统", "升级通知失败", "weather_check_task", task_id,

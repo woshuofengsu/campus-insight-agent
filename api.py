@@ -700,7 +700,15 @@ def agent_chat(req: ChatRequest):
                 "community": "社区先知",
             }
 
-        response = agent.run(req.message)
+        response_text = None
+        # 多租户（B7）：本插件入口**没有登录身份**（扣子只传昵称，没有 uid/社区），
+        # 所以在这里**显式声明**按默认社区运行——而不是让 `tools/*.py` 各自偷偷猜一个社区。
+        # 显式声明的意义：这是"插件入口被设计成单社区演示"的一个可搜索、可解释的决定；
+        # 主服务（api_web）走 JWT 身份，不受这里影响。
+        from utils.tenant import default_community, tenant_context
+        with tenant_context(default_community()):
+            response_text = agent.run(req.message)
+        response = response_text
         return {
             "success": True,
             "data": {

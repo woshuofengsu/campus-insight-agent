@@ -309,15 +309,32 @@ class TestProposals(unittest.TestCase):
     def tearDownClass(cls):
         _cleanup_test_db(cls._db_path)
 
-    def test_empty_db_returns_no_results(self):
+    def test_without_tenant_context_fails_closed(self):
+        """多租户 B7：**没有会话租户上下文**时不许拿默认社区的数据充数。
+
+        工具是给引擎/插件/备线调的普通函数，拿不到 FastAPI 的 Request；历史写法用
+        `default_community()` 兜底 = "永远看成默认社区"（朝阳用户会看到海淀提案）。
+        现在契约是：明确提示"无法确定所在社区"，不展示任何社区的数据。
+        """
         from tools.query_proposals import get_proposals
         result = get_proposals.invoke({"category": "", "sort_by": "supporters", "limit": 5})
+        self.assertIsInstance(result, str)
+        self.assertIn("无法确定您所在的社区", result)
+
+    def test_empty_db_returns_no_results(self):
+        """给了租户上下文时，空库仍应给"暂无"提示（原行为守住）。"""
+        from utils.tenant import tenant_context
+        from tools.query_proposals import get_proposals
+        with tenant_context("海淀小区"):
+            result = get_proposals.invoke({"category": "", "sort_by": "supporters", "limit": 5})
         self.assertIsInstance(result, str)
         self.assertIn("暂无", result)
 
     def test_sort_by_latest(self):
+        from utils.tenant import tenant_context
         from tools.query_proposals import get_proposals
-        result = get_proposals.invoke({"category": "", "sort_by": "latest", "limit": 5})
+        with tenant_context("海淀小区"):
+            result = get_proposals.invoke({"category": "", "sort_by": "latest", "limit": 5})
         self.assertIsInstance(result, str)
 
 

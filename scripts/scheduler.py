@@ -123,9 +123,10 @@ def run_all() -> dict:
     results["auto_dispatch"] = _safe("自动分派", lambda: len(_dispatch.discover_and_dispatch(limit=20)))
     results["weather"] = _safe("天气自动任务", lambda: _weather_tasks(db_weather))
     results["weather_overdue"] = _safe("天气超时", db_weather.mark_overdue_tasks)
-    # 天气升级：传入可配置的「更高级负责人」名单（settings senior_manager_ids，未配置则走无法升级分支）
-    _safe("天气升级", lambda: db_weather.escalate_overdue_tasks(
-        senior_user_ids=db_weather.get_senior_manager_ids()))
+    # 天气升级：**不传**名单 → 由 escalate_overdue_tasks 按每个任务所属社区取
+    # （settings `senior_manager_ids@社区`，未配置则走"无法升级"分支）。
+    # 传一个全局名单会让"社区级配置"永远不生效——B7 的教训。
+    _safe("天气升级", db_weather.escalate_overdue_tasks)
     _safe("天气预警解除", db_weather.expire_alerts)
     results["proposal_confirm"] = _safe("提案确认", db_proposal.auto_confirm_overdue)
     results["proposal_end"] = _safe("提案反馈", db_proposal.auto_end_unfeedback)

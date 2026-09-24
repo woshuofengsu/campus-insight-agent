@@ -14,6 +14,8 @@
 本模块只做解析与归一化，不碰具体表的 SQL——表的过滤在各 `data/db_*.py` 里，
 由调用方显式传 `tenant=`（**不给默认值**，忘了传会直接 TypeError 而不是悄悄返回全量）。
 """
+import contextlib
+import contextvars
 import logging
 import threading
 
@@ -81,6 +83,33 @@ def tenant_of_user_uncached(uid) -> str:
     with get_db() as conn:
         row = conn.execute("SELECT community FROM user_profile WHERE id=?", (key,)).fetchone()
     return normalize_tenant(row["community"]) if row else ""
+
+
+# ---------------- 请求级租户上下文（给"没有 request 对象"的代码用） ----------------
+#
+# 场景：Agent 工具（`tools/*.py`）、LangChain 引擎这些地方**拿不到 FastAPI 的 Request**，
+# 而它们又要按租户过滤。历史上它们用 `default_community()` 兜底 —— 等于"永远看成海淀"，
+# 朝阳用户问"有哪些提案"会看到海淀的提案（跨租户泄漏，只是发生在对话文本里，页面审计抓不到）。
+#
+# 所以加一个**显式的请求级上下文**：入口处（主服务的会话处理、插件入口、备线）用
+# `with tenant_context(tenant):` 声明"这段代码属于哪个社区"，工具再用 `ctx_tenant()` 读。
+# 用 `contextvars` 而不是模块级全局：全局变量会在并发请求之间串味（这是本项目已经踩过的坑）。
+_ctx_tenant: contextvars.ContextVar[str] = contextvars.ContextVar("community_tenant", default="")
+
+
+@contextlib.contextmanager
+def tenant_context(tenant):
+    """在 `with` 块内声明"当前请求的社区"（可嵌套，退出时自动还原）。"""
+    token = _ctx_tenant.set(normalize_tenant(tenant))
+    try:
+        yield
+    finally:
+        _ctx_tenant.reset(token)
+
+
+def ctx_tenant() -> str:
+    """读当前请求级租户；没有显式上下文时返回空串（**不猜社区**，由调用方决定怎么降级）。"""
+    return normalize_tenant(_ctx_tenant.get())
 
 
 def clear_cache() -> None:
@@ -243,4 +272,4 @@ def stamp_tenant(conn, table: str, row_id, owner_id) -> str:
 __all__ = ["LEGACY_TENANT_VALUES", "TENANT_TABLES", "TENANT_OWNER_COLUMN", "normalize_tenant",
            "is_valid_tenant", "tenant_of_user", "tenant_of_user_uncached", "clear_cache",
            "default_community", "all_tenants", "stamp_tenant", "stamp_tenant_value",
-           "tenant_clause", "row_in_tenant"]
+           "tenant_clause", "row_in_tenant", "tenant_context", "ctx_tenant"]

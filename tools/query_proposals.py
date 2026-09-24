@@ -33,12 +33,18 @@ def get_proposals(category: str = "", status: str = "", sort_by: str = "latest",
     """
     cat = category if category else None
     st = status if status in _VISIBLE_STATUSES else None
-    # 多租户：查询限定在本社区（工具无用户上下文，用默认社区兜底）。
-    from utils.tenant import default_community
+    # 多租户（B7）：按**会话身份**取租户（入口处 `tenant_context` 声明 → 备线登录用户社区）；
+    # 取不到就明确说"无法确定社区"，而不是拿默认社区的数据充数——那会把海淀提案展示给
+    # 朝阳用户，而且泄漏发生在**对话文本**里，页面审计抓不到。
+    from tools._ctx import tool_tenant
+    tenant = tool_tenant()
+    if not tenant:
+        return ("⚠️ 暂时无法确定您所在的社区，为免看到别的社区的内容，提案列表暂不展示。"
+                "请登录后重试。")
     proposals = _db_get_proposals(
         category=cat, status=st, is_public=1,
         exclude_statuses=[s for s in ["待审核", "退回修改", "待确认公示/私有", "已撤回", "已关闭"] if s != st],
-        limit=limit, tenant=default_community(),
+        limit=limit, tenant=tenant,
     )
 
     if not proposals:

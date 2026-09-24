@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、770 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、781 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 770 项：769 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 781 项：780 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 770 项测试**（769 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 781 项测试**（780 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -101,7 +101,16 @@ elderly:  demo_elderly（免登录）
      （B7 前的 `_match_threshold` / `_LINKAGE_THRESHOLDS` 就是这样，朝阳改阈值会连带改掉海淀）；
      另外**配置项必须接到真正做判定的地方**——只改"配置页读数"而不改判定点，就是本项目最忌讳的
      "做了但不生效"（天气联动原来连社区维度都没有，B7 已让定时任务按社区逐个判定）。
-     系统级定时任务（没有"当前用户"）要"按社区各跑一遍"时，用 `utils.tenant.all_tenants()` 枚举社区。
+     系统级定时任务（没有"当前用户"）要"按社区各跑一遍"时，用 `utils.tenant.all_tenants()` 枚举社区；
+  ⑥ **拿不到 `Request` 的代码要用请求级租户上下文**——Agent 工具（`tools/*.py`）、引擎这类
+     普通函数没有 FastAPI 的 `Request`，**不许**用 `default_community()` 兜底（那等于"永远看成默认社区"，
+     朝阳用户会看到海淀的数据，而且泄漏发生在**对话文本**里、页面审计抓不到）。
+     入口处用 `with utils.tenant.tenant_context(租户):` 显式声明（`/agent/chat` 按 JWT、
+     插件入口显式声明单社区口径），工具用 `tools/_ctx.py::tool_tenant()` 读；
+     **取不到就返回空串**，由工具给出"无法确定所在社区"的明确提示。
+     ⚠️ 备线的 `ui/_tenant.current_tenant()` 拿不到会话会回落默认社区，工具**不要**用它，
+     要用严格版 `session_tenant_or_empty()`（实测踩到过：用它等于工具没隔离）。
+     上下文用 `contextvars` 不用模块级全局（全局变量并发会串味）。
   `config.DEFAULT_COMMUNITY` 是历史/无归属数据的归档社区（`DEFAULT_TENANT` 是 v41 旧口径的行政区值，仅兼容保留）；
   Streamlit 备线在入口 `app.py` 调 `install_tenant_defaults()` 统一注入（见 `ui/_tenant.py`）。
 - LLM 默认**规则优先降本**：代码默认 `LLM_NEGOTIATION`/`LLM_ORCHESTRATION`/`POLICY_LLM_RAG`/`RECEPTION_LLM_FALLBACK` 全关；

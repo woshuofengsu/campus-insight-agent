@@ -61,7 +61,11 @@ def agent_chat(req: AgentChat, request: Request):
     try:
         key = f"{role}:{u.get('uid')}"
         orch = _get_orchestrator(request, key)
-        return _ok(orch.run(role, u.get("uid"), u.get("name") or "居民", req.text))
+        # 多租户（B7）：声明**请求级租户上下文**，让编排/工具里"拿不到 Request"的代码
+        # （`tools/*.py` 等）也能按社区过滤——否则它们只能猜一个默认社区（跨租户泄漏）。
+        from utils.tenant import tenant_context, tenant_of_user
+        with tenant_context(_tenant(request) or tenant_of_user(u.get("uid"))):
+            return _ok(orch.run(role, u.get("uid"), u.get("name") or "居民", req.text))
     except Exception as e:  # noqa: BLE001
         _log.warning("对话异常：%s", e)
         return _fail(2001, "服务暂时不可用，请稍后再试")
@@ -80,7 +84,10 @@ def agent_elderly_chat(req: AgentChat, request: Request):
         uid = _resolve_elder_uid(request) or u.get("uid")
         key = f"elderly:{uid}"
         orch = _get_orchestrator(request, key)
-        return _ok(orch.run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid))
+        # 多租户（B7）：同 `/chat`，声明请求级租户上下文（老年端按老人所属社区）
+        from utils.tenant import tenant_context, tenant_of_user
+        with tenant_context(tenant_of_user(uid) or _tenant(request)):
+            return _ok(orch.run("elderly", uid, u.get("name") or "老人", req.text, elder_uid=uid))
     except Exception as e:  # noqa: BLE001
         _log.warning("老年端对话异常：%s", e)
         return _fail(2001, "服务暂时不可用，请稍后再试")

@@ -506,3 +506,25 @@ B5 做完"列表隔离"后**自测发现还有口子**：列表走了 SQL 过滤
   **重复的**清单改为复用同一份常量（两处各写一份必然漂移）。
 - 验证：`tests/test_tenant_settings.py` 16 例（含"32℃ 只触发 A 社区"的行为级断言、
   定时任务按社区调用、`ask_question` 确实传了提问人社区）；全量用例全绿，`ruff` 0。
+
+### 2026-09-24 · B7 尾巴：升级名单按社区 + Agent 工具按会话身份取租户
+
+- **更高级负责人名单按社区**：`get/set_senior_manager_ids(tenant=...)` 走按社区分键；
+  `escalate_overdue_tasks()` **不给名单时按每个任务自己的社区取**（任务行的 `tenant_id`），
+  `scripts/scheduler.py` 相应改为不传全局名单。
+  ⚠️ 诚实说明：该名单**暂无前端/API 入口**，只能程序化配置（机制已就位、入口待做）。
+- **Agent 工具按会话身份取租户**：`tools/*.py` 拿不到 FastAPI 的 `Request`，历史写法
+  `default_community()` 等于"永远看成默认社区"——朝阳用户问"有哪些提案"会看到海淀的提案
+  （**对话文本里的跨租户泄漏**，页面审计抓不到）。现在加请求级租户上下文
+  （`utils.tenant.tenant_context`/`ctx_tenant`，用 `contextvars` 防并发串味），
+  入口处显式声明（`/agent/chat`、`/agent/elderly/chat` 按 JWT/老人所属社区；扣子插件入口
+  **显式声明**按单社区演示口径）；工具取不到上下文时明确提示"无法确定所在社区"、
+  不给任何社区的数据。
+- **顺带修两个真问题**：① 备线 `ui/_tenant.current_tenant()` 拿不到会话会回落默认社区，
+  工具若直接用它等于没隔离 → 新增严格版 `session_tenant_or_empty()`；
+  ② `data.db_user.get_current_user()` 在"没有活动用户"时**静默返回 id=1**
+  （调用方会把操作记到 id=1 名下且无提示）→ 两条回退路径都加 warning。
+- 验证：`tests/test_tenant_context.py` 10 例（名单按社区隔离与回落、升级按任务社区取名单、
+  上下文默认空/可嵌套还原/行政区值归一化为空、工具无上下文时明确提示不给数据、
+  提案工具与查重都只在本社区内）；`tests/unit/test_tools.py` 同步新契约（无上下文 fail-closed，
+  给了上下文才给"暂无"）；全量用例全绿，`ruff` 0。

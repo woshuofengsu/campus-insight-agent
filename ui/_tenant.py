@@ -37,15 +37,27 @@ _BINDINGS = {
 
 
 def current_tenant() -> str:
-    """当前登录用户的社区；取不到返回默认社区（备线降级，但绝不放行全量）。"""
+    """当前登录用户的社区；取不到返回默认社区（备线降级，但绝不放行全量）。
+
+    ⚠️ 注意它是**永不返回空串**的（末位回落默认社区）——这是给备线页面用的"能跑就行"口径。
+    需要区分"没登录/拿不到社区"的调用方（例如 Agent 工具要 fail-closed 而不是展示别的社区
+    的数据）请用 `session_tenant_or_empty()`。
+    """
+    return session_tenant_or_empty() or default_community()
+
+
+def session_tenant_or_empty() -> str:
+    """严格版：只认**登录会话里的真实社区**，拿不到返回空串（不回落默认社区）。
+
+    为什么必须分开：`current_tenant()` 的末位回落在工具场景是**错的**——
+    "拿不到就当成默认社区"等于让朝阳用户看到海淀的数据。
+    """
     try:
         user = st.session_state.get("user") or st.session_state.get("auth_user") or {}
-        t = normalize_tenant(user.get("community") if isinstance(user, dict) else "")
-        if t:
-            return t
-    except Exception:  # noqa: BLE001 — 备线可能在没有 session 的脚本里被调用，回落默认社区
-        _log.debug("备线取当前租户失败，回落默认社区", exc_info=True)
-    return default_community()
+        return normalize_tenant(user.get("community") if isinstance(user, dict) else "")
+    except Exception:  # noqa: BLE001 — 不在 Streamlit 脚本上下文里（主服务）属正常情况
+        _log.debug("备线取当前租户失败（非 Streamlit 上下文）", exc_info=True)
+    return ""
 
 
 def _bind(fn):

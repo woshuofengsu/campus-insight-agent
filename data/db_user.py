@@ -95,19 +95,24 @@ def authenticate(username: str, password: str = "") -> dict | None:
 
 
 def get_current_user() -> dict:
-    """拿当前登录用户的资料（从 session_state）。
+    """拿当前登录用户的资料（session_state / 显式指定的 user_id）。
 
-    迁移期间兼容老逻辑：拿不到就回退到 id=1。
+    拿不到活动用户时**回退到 id=1**（登录改造前的老库兜底）——这条回退是历史兼容，
+    但它会"静默给出一个错误身份"：主服务（FastAPI）路径没人调 `set_active_user_id`，
+    于是 `_get_active_user_id()` 抛 RuntimeError → 这里返回 id=1，
+    调用方（`_resolve_reporter_id` 等）就会把操作**记到 id=1 名下**。
+    所以回退时必须**打日志**：宁可日志里显眼，也不要出现"数据归错人还不知道为什么"。
     """
     try:
         uid = _get_active_user_id()
         profile = get_user_by_id(uid)
         if profile:
             return profile
-        # 用户 ID 解析出来了但库里没这个人（比如 session 里的 ID 过期了），
-        # 回退到 id=1。
+        _log.warning("活动用户 id=%s 在库里不存在（session 可能过期），回退 id=1 兜底", uid)
     except RuntimeError:
-        pass
+        _log.warning("没有活动用户上下文（非 UI 场景需先 set_active_user_id()），"
+                     "按历史兼容回退 id=1 —— 若这条出现在 API 日志里，说明该调用点应改为"
+                     "显式传 user_id/tenant，别依赖这个回退")
     # 老逻辑兜底：返回 id=1 的用户（登录改造前的库）
     return get_user_by_id(1)
 
