@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
 import { elderly, notices } from '../../api'
-import { useSpeech } from '../../composables/useSpeech'
+import { useSpeech, speechCapability } from '../../composables/useSpeech'
 
 const router = useRouter()
 const store = useUserStore()
@@ -28,6 +28,11 @@ const callConfirm = ref(false)
 let callTimer = null
 const callContact = ref(null)
 const contacts = ref([])
+// 降级硬化（B4）：语音是增强项，不是唯一路径
+const cap = speechCapability()
+const ttsOk = ref(cap.hasTTS)
+const welcomeText = ref('')        // 首屏要念的话（改由"点一下听"触发）
+const urgentText = ref('')         // 紧急通知要念的话
 
 onMounted(async () => {
   try {
@@ -36,28 +41,41 @@ onMounted(async () => {
     rate.value = home.value?.speech_rate || 0.9
     greetText.value = home.value?.greeting ? `${home.value.greeting}，${home.value.name || '您好'}` : ''
     careLine.value = home.value?.care_line || ''
-    if (careLine.value) speak(greetText.value ? `${greetText.value}。${careLine.value}` : careLine.value, vol.value, rate.value)
+    // 降级硬化（B4）：**不再挂载即播报**——iOS Safari 的 TTS 必须由用户手势触发，
+    // 自动播会静默不响（老人以为坏了）。改成页面上一句大字 + 一个"点一下听"按钮。
+    welcomeText.value = careLine.value
+      ? (greetText.value ? `${greetText.value}。${careLine.value}` : careLine.value)
+      : ''
   } catch { /* 忽略 */ }
   try { contacts.value = (await elderly.contacts()) || [] } catch { /* 忽略 */ }
-  // 紧急通知主动弹窗 + 语音（重复两次）
+  // 紧急通知：仍然弹窗（必须让老人看见），但播报改为**用户点一下**（同上，自动播在 iOS 不响）
   try {
     const nl = (await notices.list()) || []
     const urgent = nl.find((n) => n.is_urgent && !n.is_read)
     if (urgent) {
       urgentNotice.value = urgent
-      const txt = `紧急通知：${urgent.elderly_summary || urgent.title}`
-      speak(txt, vol.value, rate.value)
-      setTimeout(() => speak(txt, vol.value, rate.value), 3500)
+      urgentText.value = `紧急通知：${urgent.elderly_summary || urgent.title}`
     }
   } catch { /* 忽略 */ }
   if (home.value?.due_medications > 0 && !careLine.value) {
-    speak(`今天有 ${home.value.due_medications} 次药要吃，我会到点提醒您。`, vol.value, rate.value)
+    welcomeText.value = `今天有 ${home.value.due_medications} 次药要吃，我会到点提醒您。`
   }
   if (home.value?.weather?.alert_tags?.length && !careLine.value) {
     const tags = home.value.weather.alert_tags.map((a) => `${a.type}${a.level}`).join('、')
-    speak(`注意！当前有极端天气预警：${tags}，请尽量减少外出。`, vol.value, rate.value)
+    welcomeText.value = `注意！当前有极端天气预警：${tags}，请尽量减少外出。`
   }
 })
+
+/** 点一下听（用户手势触发，iOS 才会真的响）；播不出来就说明原因并保留大字。 */
+async function playWelcome() {
+  const ok = await speak(welcomeText.value || greetText.value, vol.value, rate.value)
+  if (!ok) ttsOk.value = false
+}
+
+async function playUrgent() {
+  const ok = await speak(urgentText.value, vol.value, rate.value)
+  if (!ok) ttsOk.value = false
+}
 
 async function closeUrgent() {
   const n = urgentNotice.value
@@ -181,6 +199,18 @@ function cancelCall() {
       💗 {{ careLine }}
     </div>
 
+    <!-- 语音不可用时的降级说明（审计靠 data-speech-fallback 验证"关掉语音仍可用"） -->
+    <div v-if="!ttsOk" data-speech-fallback
+         class="card panel-warm" style="border-radius:14px;font-size:1.3rem;margin-bottom:12px;">
+      🔇 这台手机不能自动念出来，页面上的字都放大了，点按钮一样能办事
+    </div>
+
+    <!-- 首屏问候/提醒：**改成点一下听**（iOS Safari 的 TTS 必须由用户手势触发，自动播会静默不响） -->
+    <div v-if="welcomeText && ttsOk" style="margin-bottom:12px;">
+      <n-button type="primary" block size="large" style="min-height:72px;font-size:1.35rem;border-radius:18px;"
+                @click="playWelcome">🔊 点一下听今天的提醒</n-button>
+    </div>
+
     <!-- 音量设置（语音按老人设置音量） -->
     <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;">
       <span style="font-size:1.25rem;">🔊 音量：</span>
@@ -299,10 +329,16 @@ function cancelCall() {
              positive-text="确认拨打" negative-text="取消"
              @positive-click="confirmCall" @negative-click="cancelCall" />
 
-    <!-- 紧急通知主动弹窗（我知道了） -->
+    <!-- 紧急通知主动弹窗（我知道了 + 点一下听；不再自动播报，iOS 需要用户手势） -->
     <n-modal :show="!!urgentNotice" @update:show="(v) => { if (!v) urgentNotice = null }" preset="dialog" type="error"
              :title="urgentNotice ? ('🚨 ' + urgentNotice.title) : ''"
              :content="urgentNotice ? (urgentNotice.elderly_summary || urgentNotice.body) : ''"
-             positive-text="我知道了" @positive-click="closeUrgent" />
+             positive-text="我知道了" @positive-click="closeUrgent">
+      <template #action>
+        <n-button v-if="ttsOk" type="error" size="large" style="min-height:64px;font-size:1.3rem;"
+                  @click="playUrgent">🔊 点一下听</n-button>
+        <n-button size="large" style="min-height:64px;font-size:1.3rem;" @click="closeUrgent">我知道了</n-button>
+      </template>
+    </n-modal>
   </div>
 </template>

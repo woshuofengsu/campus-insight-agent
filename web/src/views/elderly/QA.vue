@@ -1,9 +1,10 @@
 <script setup>
 // 老年端政策问答：语音提问确认（对，提交/重新说）+ 答案大字播报 + 转人工二次确认 + 最近5条历史
-import { ref, onMounted } from 'vue'
+// 降级硬化（B4）：语音不可用/没权限/连不上时**明说原因并引导打字**，不再一律"没听清"。
+import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { qa } from '../../api'
-import { useSpeech } from '../../composables/useSpeech'
+import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
 
 const message = useMessage()
 const { recognize, speak } = useSpeech()
@@ -17,6 +18,11 @@ const confirmTimer = null
 const transferConfirm = ref(false)
 const history = ref([])
 
+const cap = speechCapability()
+const asrBlocked = ref(!cap.hasASR || !cap.secure)
+const blockReason = ref(cap.asrReason || '')
+const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+
 onMounted(async () => {
   try {
     const rows = (await qa.questions()) || []
@@ -25,6 +31,7 @@ onMounted(async () => {
 })
 
 async function startListen() {
+  if (asrBlocked.value) return
   listening.value = true
   const r = await recognize()
   listening.value = false
@@ -32,7 +39,12 @@ async function startListen() {
     pendingText.value = r.text
     speak(`您说的是：${r.text}。说“对”或点确认提交，说“重新说”重新来。`)
   } else {
-    message.warning('没听清，请再说一次或直接打字')
+    const reason = r.reason || 'empty'
+    if (reason !== 'empty' && reason !== 'done') {
+      asrBlocked.value = true
+      blockReason.value = reason
+    }
+    message.warning(reasonText(reason))
   }
 }
 
@@ -92,7 +104,11 @@ async function doTransfer() {
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">问医保、养老、住房政策</p>
 
     <div class="card">
-      <n-button type="error" block size="large" style="min-height:64px;font-size:1.3rem;" :loading="listening" @click="startListen">
+      <div v-if="asrBlocked" data-speech-fallback class="panel-warm"
+           style="border-radius:12px;padding:10px;margin-bottom:10px;font-size:1.3rem;">
+        🔇 {{ banner }}
+      </div>
+      <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:64px;font-size:1.3rem;" :loading="listening" @click="startListen">
         🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '按住说话提问' }}
       </n-button>
 

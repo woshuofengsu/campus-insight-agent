@@ -1,9 +1,11 @@
 <script setup>
 // 老年端 Agent 语音对话区：按住说话（60秒）→ 转写确认（对，提交/重新说）→ 大字回复 + 语音播报（可再听一次）
-import { ref, onMounted } from 'vue'
+// 降级硬化（B4）：降级文案统一走 `reasonText`（原来这页自己写了一份，其余页各写各的），
+// 并在挂载时就用 `speechCapability()` 把"这台机器不能语音"提前说清楚。
+import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { agent } from '../../api'
-import { useSpeech } from '../../composables/useSpeech'
+import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
 
 const message = useMessage()
 const { recognize, speak } = useSpeech()
@@ -17,6 +19,11 @@ const inputEl = ref(null) // 文字输入框，语音降级时聚焦
 const busy = ref(false)
 let timer = null
 
+const cap = speechCapability()
+const asrBlocked = ref(!cap.hasASR || !cap.secure)
+const blockReason = ref(cap.asrReason || '')
+const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+
 const QUICK = ['家里灯不亮了', '医保怎么报销', '今天天气', '我要联系社区']
 
 onMounted(() => {
@@ -26,17 +33,11 @@ onMounted(() => {
   })
 })
 
-function reasonMsg(reason) {
-  const t = {
-    'mic-denied': '麦克风权限未开启：请点浏览器地址栏的🔒，选择"麦克风"→允许',
-    'https-required': '语音需要 HTTPS 访问，请用 Safari 或 Chrome 直接打开',
-    network: '网络不稳，请再按一次说话',
-    unsupported: '当前浏览器不支持语音，已为您切换为大字文字输入，请直接打字',
-  }
-  return t[reason] || '没听清，请再说一次'
-}
-
 async function startListen() {
+  if (asrBlocked.value) {          // 已知不可用：直接聚焦打字框，不空转
+    inputEl.value?.focus()
+    return
+  }
   listening.value = true
   remain.value = 60
   timer = setInterval(() => { remain.value -= 1; if (remain.value <= 0) stopListen() }, 1000)
@@ -47,11 +48,16 @@ async function startListen() {
     pendingText.value = r.text
     speak(`您说的是：${r.text}，对吗？说“对”确认，或点“重新说”。`)
   } else {
-    const msg = reasonMsg(r.reason)
+    const reason = r.reason || 'empty'
+    const msg = reasonText(reason)
     message.warning(msg)
     speak(msg)
-    // 语音不可用 → 聚焦文字输入框（明确降级，不静默）
-    if (r.reason === 'unsupported') inputEl.value?.focus()
+    // 语音不可用/没权限 → 明确降级：显示提示条 + 聚焦文字输入框（不静默）
+    if (reason !== 'empty' && reason !== 'done') {
+      asrBlocked.value = true
+      blockReason.value = reason
+    }
+    inputEl.value?.focus()
   }
 }
 
@@ -106,11 +112,20 @@ function sendOption(o) {
     <div class="elderly-title">🤖 社区小助手</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">按住说话，或直接打字问我</p>
 
+    <!-- 降级提示条：这台机器不能语音时提前说清（审计靠 data-speech-fallback 验证） -->
+    <div v-if="asrBlocked" data-speech-fallback
+         class="card panel-warm" style="border-radius:14px;font-size:1.3rem;margin:8px 0;">
+      🔇 {{ banner }}
+    </div>
+
     <!-- 语音按钮（至少 80px 高） -->
     <div style="margin:8px 0;">
-      <n-button type="error" block size="large" style="min-height:80px;font-size:1.4rem;" :loading="listening" @mousedown="startListen" @mouseup="stopListen" @touchstart="startListen" @touchend="stopListen">
+      <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:80px;font-size:1.4rem;" :loading="listening" @mousedown="startListen" @mouseup="stopListen" @touchstart="startListen" @touchend="stopListen">
         🎤 {{ listening ? `正在聆听…（${remain} 秒）` : '按住说话（最多 60 秒）' }}
       </n-button>
+      <div v-else style="font-size:1.3rem;font-weight:700;text-align:center;">
+        ✍️ 在下面的框里打字问我，一样能办事
+      </div>
     </div>
 
     <!-- 转写确认（对，提交 / 重新说） -->

@@ -6,10 +6,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
-import { useSpeech } from '../../composables/useSpeech'
+import { useSpeech, speechCapability } from '../../composables/useSpeech'
 
 const message = useMessage()
 const { speak } = useSpeech()
+const cap = speechCapability()
+const ttsOk = ref(cap.hasTTS)     // 播不出来就隐藏「听一遍」，并说明原因（不假装能念）
 const kind = ref('bp')
 const form = ref({ sys: '', dia: '', glucose: '', measure_when: 'random' })
 const records = ref([])
@@ -86,8 +88,11 @@ function readAloud() {
       <div v-if="latestBp?.level_hint" style="font-size:1.3rem;margin-top:8px;">
         {{ latestBp.level_hint }}
       </div>
-      <n-button size="large" block style="margin-top:12px;min-height:64px;font-size:1.3rem;"
+      <n-button v-if="ttsOk" size="large" block style="margin-top:12px;min-height:64px;font-size:1.3rem;"
                 @click="readAloud">🔊 听一遍</n-button>
+      <div v-else data-speech-fallback style="font-size:1.25rem;margin-top:10px;">
+        🔇 这台手机不能念出来，上面的字已经放大了，看字就行
+      </div>
     </div>
 
     <!-- 录入 -->

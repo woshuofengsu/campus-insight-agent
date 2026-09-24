@@ -9,6 +9,13 @@ import os
 os.environ.setdefault("WEB_JWT_SECRET", "test-only-jwt-secret-not-for-prod")
 os.environ.setdefault("CRYPTO_KEY", "test-only-crypto-key-not-for-prod")
 
+# 测试姿态钉死（AGENTS.md 硬规则：「测试必须姿态无关」）：
+# 本机 `.env` 四个 LLM 开关是**全开**的；不钉住的话，没显式设置姿态的用例会**真打 DeepSeek**——
+# 既慢（实测全量由 ~3:30 变成 ~8:00）、又花钱，还会因网络抖动造成假失败。
+# 需要 LLM 的用例必须自己 `monkeypatch.setenv("LLM_XXX", "1")`（写法见 tests/test_agent.py）。
+for _k in ("LLM_ORCHESTRATION", "LLM_NEGOTIATION", "POLICY_LLM_RAG", "RECEPTION_LLM_FALLBACK"):
+    os.environ.setdefault(_k, "0")
+
 import warnings  # noqa: E402
 
 import pytest  # noqa: E402
@@ -35,11 +42,21 @@ with warnings.catch_warnings():
 
 @pytest.fixture(autouse=True)
 def _reset_runtime_guards():
-    """每个测试前清空运行时"每用户限流"桶，避免跨测试累计导致偶发 429（N5 限流对测试隔离）。"""
+    """每个测试前复位运行时全局状态，避免跨测试累计导致偶发失败。
+
+    ① 每用户限流桶（N5）：不清会跨测试累计 → 偶发 429；
+    ② **LLM 熔断器**（2026-09-24 补）：`agent.llm_client._FAIL` 是模块级状态，
+       前面的用例把真实网络打失败后熔断打开（连续 3 次失败即锁定窗口），
+       后面的用例即使 mock 好了也会被"快速失败"短路 → 表现为"单跑过、全量挂"。
+       实测：`tests/test_agent.py::test_llm_polish_pass_uses_llm` 就是这么红的。
+    """
     import api_routes.agent as _agent_mod
+    from agent.llm_client import reset_circuit
     _agent_mod._chat_rate.clear()
+    reset_circuit()
     yield
     _agent_mod._chat_rate.clear()
+    reset_circuit()
 
 
 @pytest.fixture(autouse=True, scope="module")

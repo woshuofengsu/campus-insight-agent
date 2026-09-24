@@ -1,10 +1,12 @@
 <script setup>
 // 老年端语音报修：语音识别（60秒）→ 转写确认（10秒超时）→ 提交
-import { ref, onMounted } from 'vue'
+// 降级硬化（B4）：语音只是增强项——不支持/没权限/连不上时，明确告诉老人"打字就行"，
+// 不再把"不支持"误报成"没听清"（那会让老人一直重按，越按越急）。
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
-import { useSpeech } from '../../composables/useSpeech'
+import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
 
 const router = useRouter()
 const message = useMessage()
@@ -16,9 +18,15 @@ const confirming = ref(false)
 const submitting = ref(false)
 const lastResult = ref(null) // {issue_id, category, corrected, original}
 
+const cap = speechCapability()
+const asrBlocked = ref(!cap.hasASR || !cap.secure)
+const blockReason = ref(cap.asrReason || '')
+const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+
 onMounted(() => speak('请说出或写下您遇到的问题'))
 
 async function startListen() {
+  if (asrBlocked.value) return                      // 已知不可用：直接给打字路径，不空转
   listening.value = true
   const r = await recognize()
   listening.value = false
@@ -34,7 +42,13 @@ async function startListen() {
       }
     }, 10000)
   } else {
-    message.warning('没听清，请再说一次或直接打字')
+    // 按真实原因分派文案：不支持/没权限/网络 → 引导打字；空识别 → 请再说一次
+    const reason = r.reason || 'empty'
+    if (reason !== 'empty' && reason !== 'done') {
+      asrBlocked.value = true
+      blockReason.value = reason
+    }
+    message.warning(reasonText(reason))
   }
 }
 
@@ -60,10 +74,20 @@ async function submit() {
     <div class="elderly-title">🗣️ 一句话报修</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">点「🎤 按住说话」语音上报，或直接打字</p>
 
+    <!-- 降级提示条：语音不可用时明说"打字就行"（审计靠 data-speech-fallback 做机器验证） -->
+    <div v-if="asrBlocked" data-speech-fallback
+         class="card panel-warm" style="border-radius:14px;font-size:1.3rem;">
+      🔇 {{ banner }}
+    </div>
+
     <div class="card" style="font-size:1.3rem;">
-      <n-button type="error" block size="large" style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
+      <n-button v-if="!asrBlocked" type="error" block size="large"
+                style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
         🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '按住说话' }}
       </n-button>
+      <div v-else style="font-size:1.3rem;font-weight:700;">
+        ✍️ 请在下面的框里打字告诉我们（最少 5 个字）
+      </div>
 
       <n-input v-model:value="text" type="textarea" :rows="4" placeholder="或直接输入问题：3号楼电梯坏了"
                style="font-size:1.3rem;margin-top:12px;" />

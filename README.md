@@ -94,7 +94,7 @@ elderly:  demo_elderly（免登录）
 | 模型 | DeepSeek（deepseek-chat），默认规则优先（降本），**单次均价 ¥0.0002**（2026-09-14 快照：57 次调用合计 ¥0.0139） |
 | 数据库 | SQLite（**schema v46**，WAL），版本化迁移（`_mN_` 注册表），可演进 PostgreSQL |
 | 知识检索 | 词法（同义/方言扩展）+ 语义向量（text-embedding-v3, 1024 维）混合检索 + RRF 融合 |
-| 质量门禁 | 676 项测试 / ruff 0 / 54 页视口 UI 客观审计（全站 34 个路由页）/ 9 项演示前自检 / 检索评测（CI 门禁）|
+| 质量门禁 | 681 项测试 / ruff 0 / 54 页视口 UI 客观审计（全站 34 个路由页）/ 9 项演示前自检 / 检索评测（CI 门禁）|
 | 移动端 | 响应式/安全区/老年大字/语音（PWA 可选）|
 
 ## 📁 项目结构
@@ -117,7 +117,7 @@ campus-insight-agent/
 
 | 验证项 | 命令 | 实测 |
 |---|---|---|
-| 功能与回归 | `python -m pytest tests/ -q` | **675 passed / 1 skipped**（可运行 676） |
+| 功能与回归 | `python -m pytest tests/ -q` | **680 passed / 1 skipped**（可运行 681） |
 | **端到端验收（真实服务）** | `python scripts/demo_acceptance.py` | **12/12 通过**（三角色登录、AI 对话、政策命中、老年天气、工作台指标、图谱反查、留痕、属地化两社区对比） |
 | 演示前一键自检 | `python scripts/demo_preflight.py` | **9/9 通过**（schema、手机号加密覆盖、演示账号、服务身份…） |
 | UI 无障碍/一致性 | `python scripts/ui_audit.py` | **54 页/视口 × 9 类检查 0 违规**（**覆盖全部 34 个路由页**：三端 + 大屏 + 详情/表单页 + 暗色 + 320/390/1366/1440/1920 档） |

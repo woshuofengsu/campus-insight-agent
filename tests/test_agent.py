@@ -799,6 +799,16 @@ def test_llm_polish_pass_uses_llm(client, monkeypatch):
     import urllib.request as U
     monkeypatch.setattr(U, "urlopen", lambda *a, **k: _FakeResp())
 
+    # 姿态钉死（不依赖本机 .env 有没有真 key）：
+    # `business_agents` 是在**函数内** `from config import DEEPSEEK_API_KEY`（调用时读，patch config 有效），
+    # 而 `agent.llm_client` 是**模块导入时**抓的常量 → 两边都要打，否则本机没配 key 时函数会在
+    # "无 key 直接回退"处早返回，用例换台机器就红。熔断器由 conftest 的 autouse 夹具统一复位。
+    import config as _cfg
+    import agent.llm_client as _llm
+    monkeypatch.setattr(_cfg, "DEEPSEEK_API_KEY", "fake-key", raising=False)
+    monkeypatch.setattr(_llm, "DEEPSEEK_API_KEY", "fake-key", raising=False)
+    _llm.reset_circuit()
+
     out = B._llm_polish_health_suggestion("高温橙色", "提醒老人注意防暑/保暖，减少外出")
     assert "高温天气" in out  # LLM 合规文案被采用
     assert "确诊" not in out
