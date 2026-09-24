@@ -123,9 +123,11 @@ class GridAssistantAgent(BaseAgent):
 
     def process(self, ctx: dict) -> dict:
         from agent.web_agent_service import _grid_todos, _grid_stats, _grid_search
+        from utils.tenant import tenant_of_user
         text = ctx.get("user_input") or ""
         intent = ctx.get("intent") or "grid"
         st = ctx.get("state") or {}
+        tenant = tenant_of_user(ctx.get("uid"))
 
         # 导出确认续接（停机点：导出需负责人确认）
         if st.get("pending_export"):
@@ -169,7 +171,7 @@ class GridAssistantAgent(BaseAgent):
                                chain_note="返回人工处理包列表（含上下文摘要）")
 
         if intent in ("待办提醒", "grid") and any(k in text for k in ("待办", "超时", "今天要做什么", "要处理", "待处理")):
-            r_text, status, _ = _grid_todos()
+            r_text, status, _ = _grid_todos(tenant)
             return self._reply(r_text, status, "待办提醒",
                                actions=[{"type": "navigate", "to": "/grid/work-orders", "label": "跳转处理工单"},
                                         {"type": "navigate", "to": "/grid/health", "label": "处理咨询"}],
@@ -180,11 +182,11 @@ class GridAssistantAgent(BaseAgent):
                                actions=[{"type": "buttons", "options": ["确认导出", "取消"]}],
                                chain_note="停机点：导出需负责人确认")
         if intent == "统计查询" or ("统计" in text or "多少" in text or "本周" in text or "本月" in text):
-            r_text, status, _ = _grid_stats(text)
+            r_text, status, _ = _grid_stats(text, tenant)
             return self._reply(r_text, status, "统计查询", chain_note="返回统计数字")
         if intent == "搜索资料" or ("查一下" in text or "搜索" in text or "帮我查" in text):
             kw = text.replace("查一下", "").replace("搜索", "").replace("找一下", "").replace("帮我查", "").strip()
-            r_text, status, _ = _grid_search(kw or text)
+            r_text, status, _ = _grid_search(kw or text, tenant)
             return self._reply(r_text, status, "搜索资料",
                                actions=[{"type": "navigate", "to": "/grid/work-orders", "label": "去工单页"}],
                                chain_note="按关键词检索工单/提案/知识库")

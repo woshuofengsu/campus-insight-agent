@@ -10,6 +10,7 @@ import json
 import logging
 import re
 from data.db_core import get_db
+from utils.tenant import stamp_tenant, tenant_clause
 from utils.pii import scrub_field
 from data.db_notifications import log_activity
 
@@ -199,6 +200,8 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
              _enc_phone(reporter_phone), _enc_phone(agent_phone)),
         )
         issue_id = cur.lastrowid
+        # 多租户（v48）：写入侧必须落租户——报修人
+        stamp_tenant(conn, "community_issues", issue_id, reporter_id)
         if draft_id:
             conn.execute("DELETE FROM issue_drafts WHERE id=?", (draft_id,))
         conn.commit()
@@ -663,7 +666,7 @@ def get_issue(issue_id: int) -> dict | None:
 def get_issues(status: str | None = None, issue_type: str | None = None,
                category: str | None = None, reporter_id: int | None = None,
                urgency: str | None = None, keyword: str | None = None,
-               limit: int = 50) -> list[dict]:
+               limit: int = 50, tenant: str | None = None) -> list[dict]:
     q = "SELECT * FROM community_issues WHERE 1=1"
     args: list = []
     if status:
@@ -685,6 +688,10 @@ def get_issues(status: str | None = None, issue_type: str | None = None,
     if reporter_id is not None:
         q += " AND reporter_id=?"
         args.append(reporter_id)
+    tc = tenant_clause(tenant, args, self_scoped=reporter_id is not None)
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY reported_at DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:

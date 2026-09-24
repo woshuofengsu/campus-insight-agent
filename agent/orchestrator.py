@@ -13,6 +13,7 @@ from datetime import datetime
 
 from agent.blackboard import Blackboard, BlackboardLockError
 from agent.roles import create_agents, role_list
+from utils.tenant import tenant_of_user
 
 _log = logging.getLogger(__name__)
 
@@ -548,7 +549,8 @@ class Orchestrator:
         try:
             from data.db_notice import get_visible_notices
             role = ctx.get("role") if ctx.get("role") in ("elderly", "resident") else "resident"
-            rows = get_visible_notices(role, ctx.get("uid"), limit=3) or []
+            rows = get_visible_notices(role, ctx.get("uid"), limit=3,
+                                                    tenant=tenant_of_user(ctx.get("uid"))) or []
             if rows:
                 parts.append("📢 最新通知：" + "；".join(n.get("title", "") for n in rows))
         except Exception:  # noqa: BLE001
@@ -600,7 +602,8 @@ class Orchestrator:
             role = ctx.get("role") if ctx.get("role") in ("elderly", "resident") else "resident"
             try:
                 from data.db_notice import get_visible_notices
-                rows = get_visible_notices(role, ctx.get("uid"), limit=5)
+                rows = get_visible_notices(role, ctx.get("uid"), limit=5,
+                                                 tenant=tenant_of_user(ctx.get("uid")))
                 if rows:
                     lines = [f"· {n.get('title', '')}" for n in rows]
                     reply = "🔔 最近通知：\n" + "\n".join(lines)

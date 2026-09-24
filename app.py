@@ -11,6 +11,12 @@ from ui.session_state import SS
 import altair as alt
 from config import DEEPSEEK_API_KEY, OFFLINE_MODE
 
+# 多租户（v48）：必须在**页面模块被 import 之前**给跨用户查询注入 tenant 默认值，
+# 否则备线的 get_issues()/get_sos_calls() 这类调用会按 fail-closed 契约大声报错。
+# 详见 ui/_tenant.py 头部说明（只影响备线；主服务从 JWT 取租户）。
+from ui._tenant import install_tenant_defaults  # noqa: E402
+install_tenant_defaults()
+
 # 全局图表配色，个别图表可以在 configure_altair() 里覆盖
 @alt.theme.register("community", enable=True)
 def _alt_theme():

@@ -742,6 +742,84 @@ def _m47_elderly_vitals(conn):
         log.warning("v47 健康记录回填失败（不影响建表）：%s", e)
 
 
+def _m48_tenant_isolation(conn):
+    """v48：多租户真隔离（核心表）——加列 → 归一化 → 按归属人回填 → 索引。
+
+    ⚠️ v41 的教训：当年只做了"给 3 张表加列 + 回填默认值"，业务代码**从不写入**，
+    于是新数据租户为空、隔离静默退化成"空租户"（实测 community_issues 曾积压 128 行空租户）。
+    所以本迁移只是**一半**，另一半是写入侧（所有社区范围数据 INSERT 带 tenant_id）与
+    读取侧（显式传 tenant 过滤）——见 `utils/tenant.py` 头部说明与
+    `docs/spec/多租户改造清单-明细.md`。
+
+    归一化规则：租户键 = `user_profile.community` 的**社区名**；历史值 `'海淀区'` 这类行政区
+    与社区名不同域，按归属人重算；无归属人的（如历史通知）落 `config.DEFAULT_COMMUNITY`
+    并**计数告警**——绝不静默。
+    """
+    import os
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from utils.tenant import normalize_tenant
+
+    # (表, 归属人列 or None=无归属人)
+    tables = [
+        ("community_issues", "reporter_id"),
+        ("proposals", "reporter_id"),
+        ("notices", None),
+        ("health_consults", "user_id"),
+        ("policy_questions", "user_id"),
+        ("medication_reminders", "user_id"),
+        ("emergency_contacts", "user_id"),
+        ("emergency_calls", "user_id"),
+        ("agent_logs", "user_id"),
+        ("agent_handoffs", "user_id"),
+        ("agent_dialogs", "user_id"),
+        ("care_event_log", "user_id"),
+        ("weather_check_tasks", None),
+    ]
+    try:
+        import config
+        fallback = normalize_tenant(getattr(config, "DEFAULT_COMMUNITY", "") or "")
+    except Exception:  # noqa: BLE001
+        fallback = ""
+
+    valid = ("SELECT community FROM user_profile "
+             "WHERE community IS NOT NULL AND community != ''")
+    for table, owner in tables:
+        _add_column(conn, table, "tenant_id", "tenant_id TEXT DEFAULT ''")
+        if owner:
+            # ① 有归属人的：按归属人的社区重算（同时纠正历史行政区值）
+            conn.execute(
+                f"UPDATE {table} SET tenant_id = COALESCE(("
+                f"  SELECT u.community FROM user_profile u "
+                f"  WHERE u.id = {table}.{owner} AND u.community IS NOT NULL AND u.community != ''"
+                f"), '') "
+                f"WHERE tenant_id IS NULL OR tenant_id = '' OR tenant_id NOT IN ({valid})"
+            )
+        # ② 兜底：仍拿不到租户的行（无归属人 / 归属人不存在或没社区）落默认社区，并**计数告警**。
+        #    实测这类行是压根没有归属人的历史与种子数据（reporter_id IS NULL、user_id=0），
+        #    让它们对所有租户不可见没有意义，按默认社区归档更诚实——但必须让人看见归档了多少行。
+        if fallback:
+            cur = conn.execute(
+                f"UPDATE {table} SET tenant_id=? WHERE tenant_id IS NULL OR tenant_id = '' "
+                f"OR tenant_id NOT IN ({valid})", (fallback,))
+            if cur.rowcount:
+                log.info("v48：%s 有 %d 行无归属人（或归属人无社区），按默认社区「%s」归档",
+                         table, cur.rowcount, fallback)
+        conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_tenant ON {table}(tenant_id)")
+
+    # ③ 收尾核对：还剩多少行拿不到租户？这些行对所有租户都不可见（fail-closed），必须让人看见
+    leftover = []
+    for table, _owner in tables:
+        row = conn.execute(
+            f"SELECT COUNT(*) AS c FROM {table} WHERE tenant_id IS NULL OR tenant_id = '' "
+            f"OR tenant_id NOT IN ({valid})").fetchone()
+        if row and row["c"]:
+            leftover.append(f"{table}={row['c']}")
+    if leftover:
+        log.warning("v48：以下历史行无法归属到任何社区，将对所有租户不可见（fail-closed）：%s",
+                    "、".join(leftover))
+
+
 def _m43_kb_query_log(conn):
     """U3/v43：知识库查询日志（RAG 可观测：命中率 / 零命中问题 / 检索路线）。
 
@@ -1135,12 +1213,19 @@ def init_db(db_path: str):
         (45, "knowledge_graph", _m45_knowledge_graph),
         (46, "phone_enc_all_and_schema_drift", _m46_phone_enc_and_schema_drift),
         (47, "elderly_vitals", _m47_elderly_vitals),
+        (48, "tenant_isolation", _m48_tenant_isolation),
     ]
     for version, name, fn in post:
         if version <= current:
             continue
         fn(conn)
         _set_schema_version(conn, version, name)
+        conn.commit()
+
+    # v48 的租户归一化是"数据回填"而非一次性结构变更：每次 init_db 重跑以纠正漂移
+    # （历史行政区值被人工写脏、归属人社区变更等）。幂等，只动 tenant_id 为 NULL/空/非法值的行。
+    if current >= 48:
+        _m48_tenant_isolation(conn)
         conn.commit()
 
     conn.close()

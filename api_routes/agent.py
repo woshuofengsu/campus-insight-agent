@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid
+from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant
 
 _log = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ def agent_logs(request: Request, role: str = "", intent: str = "",
         return _require_role(request, "grid")
     from data.db_agent import get_agent_logs
     return _ok(get_agent_logs(role=role, intent=intent, status=status,
-                              keyword=keyword, limit=limit))
+                              keyword=keyword, limit=limit, tenant=_tenant(request)))
 
 
 @router.get("/handoffs")
@@ -161,7 +161,7 @@ def agent_self_resolution(request: Request, days: int = 7):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_agent import get_self_resolution_stats
-    return _ok(get_self_resolution_stats(days=days))
+    return _ok(get_self_resolution_stats(days=days, tenant=_tenant(request)))
 
 
 @router.get("/board")
@@ -170,7 +170,7 @@ def agent_red_black_board(request: Request, days: int = 30, limit: int = 5):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_board import get_red_black_board
-    return _ok(get_red_black_board(days=days, limit=limit))
+    return _ok(get_red_black_board(days=days, limit=limit, tenant=_tenant(request)))
 
 
 @router.get("/satisfaction-drilldown")
@@ -181,7 +181,8 @@ def agent_satisfaction_drilldown(request: Request, category: str = "",
         return _require_role(request, "grid")
     from data.db_board import get_satisfaction_drilldown
     return _ok(get_satisfaction_drilldown(category=category, assignee=assignee,
-                                          satisfaction=satisfaction, limit=limit))
+                                          satisfaction=satisfaction, limit=limit,
+                                          tenant=_tenant(request)))
 
 
 @router.get("/analytics")
@@ -190,9 +191,10 @@ def agent_analytics(request: Request, days: int = 7):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from agent.analytics import get_issue_clusters, get_weekly_trend, build_data_brief
-    return _ok({"clusters": get_issue_clusters(days=days),
-                "trend": get_weekly_trend(days=days),
-                "brief": build_data_brief()})
+    _t = _tenant(request)
+    return _ok({"clusters": get_issue_clusters(days=days, tenant=_t),
+                "trend": get_weekly_trend(days=days, tenant=_t),
+                "brief": build_data_brief(tenant=_t)})
 
 
 @router.get("/care-metrics")

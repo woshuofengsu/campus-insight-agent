@@ -21,6 +21,7 @@ import sqlite3
 from datetime import date, datetime
 
 from data.db_core import get_db
+from utils.tenant import stamp_tenant, tenant_clause
 from data.db_notifications import create_notification, log_activity
 from data.db_repair import _dec_phone, _enc_phone
 from utils.timeutil import utcnow
@@ -282,6 +283,8 @@ def add_medication_reminder(user_id: int, patient_name: str, drug_name: str,
              note, photo, setter_id),
         )
         rid = cur.lastrowid
+        # 多租户（v48）：写入侧必须落租户——用药老人
+        stamp_tenant(conn, "medication_reminders", rid, user_id)
         conn.commit()
 
     log_activity(actor, "提交用药提醒", "medication_reminder", rid,
@@ -707,7 +710,8 @@ def get_medication_reminder(reminder_id: int) -> dict | None:
 
 
 def list_medication_reminders(user_id: int | None = None,
-                              status: str | None = None) -> list[dict]:
+                              status: str | None = None,
+                              tenant: str | None = None) -> list[dict]:
     """列表。排序：待审核/审核不通过最前，审核通过按用药时间，已暂停/已结束最后。"""
     q = "SELECT * FROM medication_reminders WHERE 1=1"
     args: list = []
@@ -717,6 +721,10 @@ def list_medication_reminders(user_id: int | None = None,
     if status:
         q += " AND status=?"
         args.append(status)
+    tc = tenant_clause(tenant, args, self_scoped=bool(user_id))
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY created_at DESC"
     with get_db() as conn:
         _ensure_pending_table(conn)
@@ -831,6 +839,8 @@ def add_emergency_contact(user_id: int, name: str, phone: str, relation: str,
             (user_id, name, "", _enc_phone(phone), relation, setter_id),
         )
         cid = cur.lastrowid
+        # 多租户（v48）：写入侧必须落租户——联系人所属老人
+        stamp_tenant(conn, "emergency_contacts", cid, user_id)
         conn.commit()
 
     log_activity(actor or name, "提交紧急联系人", "emergency_contact", cid,
@@ -963,13 +973,18 @@ def _dec_call_phone(r: dict) -> dict:
     return r
 
 
-def list_emergency_contacts(user_id: int | None = None) -> list[dict]:
+def list_emergency_contacts(user_id: int | None = None,
+                            tenant: str | None = None) -> list[dict]:
     """列表。审核通过在前，其余按创建时间倒序。"""
     q = "SELECT * FROM emergency_contacts WHERE 1=1"
     args: list = []
     if user_id:
         q += " AND user_id=?"
         args.append(user_id)
+    tc = tenant_clause(tenant, args, self_scoped=bool(user_id))
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY created_at DESC"
     with get_db() as conn:
         rows = conn.execute(q, args).fetchall()
@@ -1040,6 +1055,8 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
             (user_id, first["name"], _enc_phone(first["phone"])),
         )
         call_id = cur.lastrowid
+        # 多租户（v48）：求助记录归到老人的社区
+        stamp_tenant(conn, "emergency_calls", call_id, user_id)
         conn.commit()
 
     actor = actor or "老人"
@@ -1194,7 +1211,7 @@ def get_latest_sos(user_id: int) -> dict | None:
 
 
 def get_sos_calls(user_id: int | None = None, status: str | None = None,
-                  limit: int = 20) -> list[dict]:
+                  limit: int = 20, tenant: str | None = None) -> list[dict]:
     """求助记录（网格员端列表用）。
 
     ⚠️ 2026-09-24 修：原来 `SELECT *` 不 join `user_profile`，前端只能把 `target_name`
@@ -1210,6 +1227,10 @@ def get_sos_calls(user_id: int | None = None, status: str | None = None,
     if status:
         q += " AND ec.status=?"
         args.append(status)
+    tc = tenant_clause(tenant, args, self_scoped=bool(user_id), column="ec.tenant_id")
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY ec.id DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:

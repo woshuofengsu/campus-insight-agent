@@ -142,6 +142,23 @@ def _region(request: Request):
         return Region()
 
 
+def _tenant(request: Request) -> str:
+    """当前请求用户的租户（社区名），读取侧多租户隔离统一来源。
+
+    两级来源：① JWT 里的 community（新 token）；② 老 token 没带 → 按 uid 查库（带缓存）。
+    一律经 `normalize_tenant` 归一化：历史行政区值（如「海淀区」）→ 空串（fail-closed，
+    调用方会拿到空集），绝不接受前端传来的 community 作为过滤依据。
+    """
+    try:
+        from utils.tenant import normalize_tenant
+        u = _user(request) or {}
+        community = (u.get("community") or "").strip() or _community_of(u.get("uid"))
+        return normalize_tenant(community)
+    except Exception as e:  # noqa: BLE001  解析失败绝不放行全量
+        _log.warning("租户解析失败，按空租户处理（fail-closed，不会放行全量）：%s", e)
+        return ""
+
+
 def _require_role(request: Request, role: str):
     u = _user(request)
     if u.get("role") != role:

@@ -27,6 +27,7 @@ import re
 from datetime import datetime, timedelta
 
 from data.db_core import get_db
+from utils.tenant import stamp_tenant, tenant_clause
 from utils.pii import scrub_field
 from data.db_notifications import log_activity
 from data.db_repair import _dec_phone, _enc_phone
@@ -663,6 +664,8 @@ def submit_consult(user_id: int, name: str, phone: str, consult_type: str,
              attachment_json, is_agent_report, agent_name, "", _enc_phone(agent_phone), agent_relation),
         )
         consult_id = cur.lastrowid
+        # 多租户（v48）：写入侧必须落租户——咨询人
+        stamp_tenant(conn, "health_consults", consult_id, user_id)
         conn.commit()
 
     code = get_consult_code(consult_id)
@@ -936,7 +939,8 @@ def _decrypt_consult_phone(d: dict) -> dict:
 
 
 def list_consults(status: str | None = None, consult_type: str | None = None,
-                  keyword: str | None = None, limit: int = 100) -> list[dict]:
+                  keyword: str | None = None, limit: int = 100,
+                  tenant: str | None = None) -> list[dict]:
     """负责人端咨询管理列表（电话脱敏；列表不直接展示内容和附件）。"""
     q = "SELECT * FROM health_consults WHERE 1=1"
     args: list = []
@@ -949,6 +953,10 @@ def list_consults(status: str | None = None, consult_type: str | None = None,
     if keyword:
         q += " AND (name LIKE ? OR phone LIKE ? OR content LIKE ?)"
         args += [f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"]
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY id DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
@@ -1273,13 +1281,14 @@ def export_contents_csv(status: str | None = None,
 
 
 def export_consults_csv(status: str | None = None,
-                        consult_type: str | None = None) -> tuple[str, str]:
+                        consult_type: str | None = None,
+                        tenant: str | None = None) -> tuple[str, str]:
     """导出健康咨询列表 CSV（电话脱敏，不含附件与内部备注）。"""
     import csv
     import io
     from datetime import datetime
 
-    rows = list_consults(status=status, consult_type=consult_type)
+    rows = list_consults(status=status, consult_type=consult_type, tenant=tenant)
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["咨询编号", "昵称", "电话", "类型", "提交时间", "状态", "回复人", "回复时间", "是否超时"])

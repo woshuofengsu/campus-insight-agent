@@ -80,9 +80,9 @@ def test_followup_not_on_pending():
 def test_inactive_elderly_lists_old_users():
     """久未活跃（无活动记录）→ 被列出。"""
     with get_db() as conn:
-        conn.execute("INSERT OR REPLACE INTO user_profile (id, username, role, name, is_active) "
-                     "VALUES (92001, 'inactive_elder1', 'elderly', '李阿姨', 1)")
+        conn.execute("INSERT OR REPLACE INTO user_profile (id, username, role, name, is_active, community) "
+                     "VALUES (92001, 'inactive_elder1', 'elderly', '李阿姨', 1, '海淀小区')")
         conn.execute("INSERT OR REPLACE INTO elderly_profile (user_id) VALUES (92001)")
         conn.commit()
-    lst = cp.list_inactive_elderly(days=5, limit=20)
+    lst = cp.list_inactive_elderly(days=5, limit=20, tenant="海淀小区")
     assert any(x["user_id"] == 92001 for x in lst)

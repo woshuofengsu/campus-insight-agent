@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from data.db_core import get_db
 from data.db_notifications import log_activity
 from utils.timeutil import utcnow
+from utils.tenant import tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -829,7 +830,7 @@ def get_check_task(task_id: int) -> dict | None:
 
 
 def list_check_tasks(status: str | None = None, alert_type: str | None = None,
-                     limit: int = 100) -> list[dict]:
+                     limit: int = 100, tenant: str | None = None) -> list[dict]:
     q = "SELECT * FROM weather_check_tasks WHERE 1=1"
     args: list = []
     if status:
@@ -838,6 +839,10 @@ def list_check_tasks(status: str | None = None, alert_type: str | None = None,
     if alert_type:
         q += " AND alert_type=?"
         args.append(alert_type)
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY id DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
@@ -846,9 +851,9 @@ def list_check_tasks(status: str | None = None, alert_type: str | None = None,
 
 
 def get_check_task_history(alert_type: str | None = None, status: str | None = None,
-                           limit: int = 100) -> list[dict]:
+                           limit: int = 100, tenant: str | None = None) -> list[dict]:
     """历史检查任务记录（支持按时间/类型/状态筛选，时间筛选由 UI 传参做）。"""
-    return list_check_tasks(status=status, alert_type=alert_type, limit=limit)
+    return list_check_tasks(status=status, alert_type=alert_type, limit=limit, tenant=tenant)
 
 
 def get_task_remaining_hours(task_id: int) -> dict:

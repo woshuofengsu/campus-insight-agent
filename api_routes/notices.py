@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
 
 import logging
 _log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def web_notice_create(req: NoticeCreate, request: Request):
         body=req.body, elderly_summary=req.elderly_summary, publisher=actor,
         is_pinned=req.is_pinned, is_urgent=req.is_urgent, expire_at=req.expire_at,
         attachment_json=req.attachment_json, scope_target_json=req.scope_target_json,
-        actor=actor,
+        actor=actor, publisher_id=_user(request).get("uid"),
     )
     if nid <= 0:
         return _fail(2001, "通知类型或敏感词校验不通过")
@@ -65,7 +65,7 @@ def web_notice_list(request: Request, limit: int = 100):
     u = _user(request)
     role = u.get("role")
     client_type = "elderly" if role == "elderly" else "resident"
-    rows = get_visible_notices(client_type, u.get("uid"), limit=limit)
+    rows = get_visible_notices(client_type, u.get("uid"), limit=limit, tenant=_tenant(request))
     out = [{
         "id": n.get("id"), "title": n.get("title"), "notice_type": n.get("notice_type"),
         "body": n.get("body"), "is_urgent": n.get("is_urgent"), "is_pinned": n.get("is_pinned"),
@@ -83,7 +83,7 @@ def web_notice_manage(request: Request, status: str = "", limit: int = 200):
     _r = _require_role(request, "grid")
     if _r:
         return _r
-    rows = cached_notices_with_stats(status=status or None, limit=limit)
+    rows = cached_notices_with_stats(status=status or None, limit=limit, tenant=_tenant(request))
     return _ok(rows)
 
 
@@ -151,7 +151,7 @@ def web_notice_detail(nid: int, request: Request):
         try:
             from data.db_notice import get_visible_notices
             visible = get_visible_notices("elderly" if u.get("role") == "elderly" else "resident",
-                                          u.get("uid"), limit=500)
+                                          u.get("uid"), limit=500, tenant=_tenant(request))
         except Exception:
             return _fail(1003, "无权查看该通知")  # fail-closed：校验失败 → 拒绝
         if not any(v.get("id") == nid for v in visible):

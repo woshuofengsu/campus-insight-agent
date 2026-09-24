@@ -8,6 +8,7 @@
 import logging
 
 from data.db_core import get_db
+from utils.tenant import tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -39,27 +40,34 @@ def _resolve_hours(reported_at, resolved_at) -> float | None:
         return None
 
 
-def get_red_black_board(days: int = 30, limit: int = 5) -> dict:
+def get_red_black_board(days: int = 30, limit: int = 5,
+                        tenant: str | None = None) -> dict:
     """红黑榜（近 days 天）。
 
     - red_board: 满意工单 Top（按处理快）+ 高效网格员 Top（满意率高+件数多）+ 已完成满意提案
     - black_board: 不满意工单（含原因）+ SLA 超时工单 + 低效网格员（不满意数多）
     """
+    targs: list = []
+    tc = tenant_clause(tenant, targs)
+    if tc is None:
+        return {"days": days,
+                "red_board": {"satisfied_issues": [], "good_workers": [], "done_proposals": []},
+                "black_board": {"dissatisfied_issues": [], "slow_workers": [], "sla_breaches": []}}
     try:
         with get_db() as conn:
             # 满意工单（近 N 天解决）
             red_issues = conn.execute(
                 "SELECT * FROM community_issues WHERE satisfaction=? "
                 "AND resolved_at >= datetime('now', ?) "
-                "ORDER BY resolved_at DESC LIMIT ?",
-                (_SATISFIED, f"-{days} days", limit * 2),
+                f"{tc} ORDER BY resolved_at DESC LIMIT ?",
+                (_SATISFIED, f"-{days} days", *targs, limit * 2),
             ).fetchall()
             # 不满意工单（近 N 天）
             black_issues = conn.execute(
                 "SELECT * FROM community_issues WHERE satisfaction=? "
                 "AND resolved_at >= datetime('now', ?) "
-                "ORDER BY resolved_at DESC LIMIT ?",
-                (_DISSATISFIED, f"-{days} days", limit),
+                f"{tc} ORDER BY resolved_at DESC LIMIT ?",
+                (_DISSATISFIED, f"-{days} days", *targs, limit),
             ).fetchall()
             # 网格员聚合：按 assignee 统计已解决数 / 满意数 / 不满意数
             workers = conn.execute(
@@ -69,17 +77,17 @@ def get_red_black_board(days: int = 30, limit: int = 5) -> dict:
                 "AVG(julianday(resolved_at) - julianday(reported_at)) * 24 AS avg_hours "
                 "FROM community_issues "
                 "WHERE assignee_name != '' AND resolved_at >= datetime('now', ?) "
-                "AND satisfaction != '' "
+                f"AND satisfaction != ''{tc} "
                 "GROUP BY assignee_name ORDER BY sat DESC, avg_hours ASC",
-                (_SATISFIED, _DISSATISFIED, f"-{days} days"),
+                (_SATISFIED, _DISSATISFIED, f"-{days} days", *targs),
             ).fetchall()
             # 已完成且满意的提案
             done_proposals = conn.execute(
                 "SELECT id, title, category, status, satisfaction, created_at "
                 "FROM proposals WHERE satisfaction=? AND status='已完成' "
                 "AND created_at >= datetime('now', ?) "
-                "ORDER BY created_at DESC LIMIT ?",
-                (_SATISFIED, f"-{days} days", limit),
+                f"{tc} ORDER BY created_at DESC LIMIT ?",
+                (_SATISFIED, f"-{days} days", *targs, limit),
             ).fetchall()
     except Exception:
         _log.warning("get_red_black_board 查询失败", exc_info=True)
@@ -140,7 +148,8 @@ def get_red_black_board(days: int = 30, limit: int = 5) -> dict:
 
 
 def get_satisfaction_drilldown(category: str = "", assignee: str = "",
-                               satisfaction: str = "", limit: int = 50) -> dict:
+                               satisfaction: str = "", limit: int = 50,
+                               tenant: str | None = None) -> dict:
     """满意度下钻：按分类/网格员/评价筛选工单明细 + 汇总。
 
     返回 {summary: {satisfied, dissatisfied, total, rate}, items: [...]}。
@@ -156,6 +165,10 @@ def get_satisfaction_drilldown(category: str = "", assignee: str = "",
     if satisfaction in (_SATISFIED, _DISSATISFIED):
         q += " AND satisfaction=?"
         args.append(satisfaction)
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return {"summary": {}, "items": []}
+    q += tc
     q += " ORDER BY resolved_at DESC LIMIT ?"
     args.append(limit)
     try:

@@ -1990,3 +1990,58 @@ recorder_id/source/note` + `(user_id, kind, measured_at)` 索引），并把旧�
 承载信息的页面必须 `await speak()` 并处理返回值；能力探测必须用真值判断（只查代码行、忽略注释）。
 
 **门禁**：全量用例全绿 · 移动端审计（22 页 + 降级专项 8 页）全过 · 全站 UI 审计 0 处 HIGH · ruff 0。
+
+
+## 五十五、多租户真隔离（B5）：从"仅预留字段"到跨租户不可见 ✅
+
+**需求**：老师要求把"多租户之类的未完成项"做完。此前只有 3 张表有 `tenant_id`、且**业务代码从不写入**、
+查询层零过滤——材料里写的是"预留，未做隔离"。
+
+### 一、租户键与地基
+- 租户键 = **社区名**（`user_profile.community`）。否决行政区：同区两社区会互相看见。
+- 新增 `utils/tenant.py`（统一入口）：`normalize_tenant`（历史行政区值如「海淀区」视为无效）、
+  `tenant_of_user`（带缓存）、`tenant_clause(tenant, args, self_scoped)`（**读取侧唯一的过滤出口**）、
+  `stamp_tenant(conn, 表, 行id, 归属人id)`（**写入侧唯一盖章口**）。
+- `config.DEFAULT_COMMUNITY = "海淀小区"`：历史/无归属数据的归档社区（`DEFAULT_TENANT` 是 v41 的行政区旧口径，仅兼容）。
+
+### 二、迁移 v48（加列 → 归一化 → 按归属人回填 → 索引）
+13 张核心表：community_issues / proposals / notices / health_consults / policy_questions /
+medication_reminders / emergency_contacts / emergency_calls / agent_logs / agent_dialogs / care_event_log /
+weather_check_tasks / agent_handoffs。
+- 归一化把历史 `'海淀区'` 按归属人重算成社区名；无归属人的行（实测是 `reporter_id IS NULL`、`user_id=0` 的种子/历史数据）
+  落默认社区**并计数告警**；收尾核对"仍拿不到租户的行数"并 warning——绝不静默。
+- 真库实测：13 张表全部有租户、零残留、13 个 `idx_*_tenant` 索引。
+
+### 三、写入侧（v41 的教训）
+7 张表 9 处写入点在 INSERT 后调 `stamp_tenant(...)`：工单、提案（两处入口）、通知、健康咨询、
+政策提问、用药提醒、紧急联系人、求助呼叫。通知无归属人 → 落默认社区（有日志）。
+
+### 四、读取侧（fail-closed 三条语义）
+所有跨用户列表/聚合函数加 `tenant=`，统一走 `tenant_clause`：
+合法社区名 → 过滤；**空串 → 空集**；**两者都没给 → 抛 ValueError**（拒绝无范围全量查询）。
+覆盖：工单、提案与导出、通知（管理列表/可见列表/已读统计/CSV）、健康咨询与 CSV、政策提问与高频问题、
+老年用药/联系人/SOS/久未活跃、红黑榜与下钻、agent 日志与自转率、天气检查任务、analytics 聚类与周趋势。
+API 层统一用 `deps._tenant(request)`（JWT 的 community）传租户；批量操作（`api_routes/batch.py`）逐条校验 id 归属本租户；
+导出（`api_routes/export.py`）全覆盖。
+
+### 五、三个"只在数据层加过滤也会漏"的洞（侦察报告已预警，全部堵上）
+1. **缓存键**：`utils/cache.py` 的 7 个 `st.cache_data` 包装加 `tenant` 参数（进缓存键）——
+   否则 15s TTL 内会把 A 社区结果发给 B 社区；
+2. **Agent 工具层**：`agent/web_agent_service.py` 的 `_grid_todos/_grid_stats/_grid_search` 按租户过滤——
+   它是对话式回答，泄漏会直接出现在回复文本里，页面审计抓不到；
+3. **通知可见范围**：`get_visible_notices` 的「全体居民」改为**本社区全体居民**；
+   未读数与紧急弹窗也带上租户（此前跨社区串味）。
+
+### 六、演示闭环（真库真服务实测）
+补了第二社区网格员账号 `demo_grid_cy`（此前 `/auth/demo` 只取"该角色第一个账号"，第二个社区永远拿不到 token），
+`/auth/demo` 支持 `community` 参数（指定社区取账号，取不到**明确失败**，不悄悄回落）。
+实测：朝阳居民建单 #354 → **海淀网格员列表 352 条看不到它、导出也不含它**；朝阳网格员 2 条看得到。
+
+### 七、验证
+- `tests/test_tenant_isolation.py`（16 例，**契约测试**）：归一化、v48 加列/幂等/回填、
+  写入侧盖章、跨租户不可见（工单/提案/导出/咨询/政策/老年用药与联系人/SOS/通知）、
+  空租户返回空集、无范围查询报错、居民自身范围行为不变。
+- 全量用例全绿；`ruff` 0；备线不受影响（`ui/_tenant.py` + `app.py` 入口注入，避免 29 处调用点改动改坏多行 import）。
+
+**已知边界（诚实登记，未做）**：`tools/query_proposals.py` 等无用户上下文的工具用默认社区兜底（非真多租户）；
+`settings` 表未按租户分键；跨社区共享的政策知识库（`knowledge_base`）刻意**不**加租户（属地由 `applicable_area` 处理）。

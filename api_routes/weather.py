@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
 
 router = APIRouter(prefix="/api/web/weather", tags=["weather"])
 
@@ -17,7 +17,7 @@ def web_weather_history(request: Request, status: str = "", limit: int = 200):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_weather import get_check_task_history
-    rows = get_check_task_history(status=status or None, limit=limit)
+    rows = get_check_task_history(status=status or None, limit=limit, tenant=_tenant(request))
     return _ok([dict(r) for r in rows])
 
 
@@ -106,7 +106,7 @@ def web_check_task_confirm(task_id: int, req: CheckTaskConfirm, request: Request
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     actor = _user(request).get("name") or "负责人"
-    rows = list_check_tasks(limit=1000)
+    rows = list_check_tasks(limit=1000, tenant=_tenant(request))
     row = next((t for t in rows if t["id"] == task_id), None)
     if not row:
         return _fail(1004, "检查任务不存在")
@@ -127,5 +127,5 @@ def web_weather_tasks(request: Request, status: str = ""):
     from data.db_weather import list_check_tasks
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
-    rows = list_check_tasks(status=status or None, limit=200)
+    rows = list_check_tasks(status=status or None, limit=200, tenant=_tenant(request))
     return _ok([dict(r) for r in rows])

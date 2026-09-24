@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、681 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、697 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -19,7 +19,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ```
 
 - **主服务**：`uvicorn api_web:app --port 8000`（FastAPI）
-- **数据库**：SQLite（`data/community_insight.db`），schema **v46**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
+- **数据库**：SQLite（`data/community_insight.db`），schema **v48**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
 
 ## 多智能体核心（9 个声明式角色）
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 681 项：680 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 697 项：696 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -54,7 +54,7 @@ elderly:  demo_elderly（免登录）
 ## 数据库迁移约定
 
 - schema 版本在 `data/db_core.py`，迁移函数命名 `_m{N}_{name}`，注册进 `post` 列表（`(version, name, fn)`），幂等（`_add_column` 用 PRAGMA 检查）
-- **当前版本 v47**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
+- **当前版本 v48**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
 - 迁移脚本放 `scripts/`（照 `migrate_phone_encryption_v39.py` 模式：含 `_ensure_db()`、可回滚 `--rollback`、幂等）
 - **D12（评审建议）**：`data/db_policy.proposal/elderly_care/health_content/weather/notice` 各 800–1240 行，**比赛期不做大重构**；答辩后按 read/write 拆分（纯计算抽 `data/_*_logic.py` + 单测），其结构写入 WS11
 
@@ -70,14 +70,23 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 681 项测试**（680 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 697 项测试**（696 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
   两条命令的"服务开/关"要求正好相反，别搞混。
 - 测试用临时库隔离（`test_issue_phone_encryption.py` 的 `_fresh_db` fixture 模式），避免污染全局 `config.DB_PATH`。
 - `stress_test.py`/`smoke_test.py` 是独立脚本（读取 `sys.argv`），**pytest 不要收集根目录脚本**（跑测试用 `tests/`）。
-- `config.DEFAULT_TENANT` 为多租户默认值（演示级，仅预留字段不改查询）；`AGENT_CLASSES` 角色 id 不得随意改（有状态）。
+- **多租户（v48 起真隔离）**：租户键 = **社区名**（`user_profile.community`）。三条硬规则：
+  ① **写入侧必须落租户**——社区范围数据的 INSERT 后要调 `utils.tenant.stamp_tenant(conn, 表, 新行id, 归属人id)`
+     （v41 的教训：只加列+回填、业务从不写入 → 租户为空、隔离静默失效）；
+  ② **读取侧 fail-closed**——跨用户列表/聚合函数必须显式传 `tenant=`（走 `utils.tenant.tenant_clause`）：
+     合法社区名 → `AND tenant_id=?`；**空串 → 返回空集**；两者都没给（也没给 `reporter_id/user_id` 自身范围）
+     → **抛 ValueError**，绝不悄悄查全库；
+  ③ **租户只从服务端身份来**（`api_routes/deps._tenant(request)`，源自 JWT 的 `community`），
+     绝不接受前端传的 tenant/community 作为过滤依据。
+  `config.DEFAULT_COMMUNITY` 是历史/无归属数据的归档社区（`DEFAULT_TENANT` 是 v41 旧口径的行政区值，仅兼容保留）；
+  Streamlit 备线在入口 `app.py` 调 `install_tenant_defaults()` 统一注入（见 `ui/_tenant.py`）。
 - LLM 默认**规则优先降本**：代码默认 `LLM_NEGOTIATION`/`LLM_ORCHESTRATION`/`POLICY_LLM_RAG`/`RECEPTION_LLM_FALLBACK` 全关；
   **使用姿态**（`.env` / `.env.demo`）可全开——本机 `.env` 已全开，实测每轮对话约 **+0.9 秒 / +¥0.0002**。
   改 `.env` 后**必须重启服务**才生效（否则你测的是旧姿态）。
@@ -119,7 +128,7 @@ elderly:  demo_elderly（免登录）
 | `agent/orchestrator.py` | 多 Agent 编排（黑板、协商、Verifier/Arbiter 接入、转人工）|
 | `agent/roles/business_agents.py` | 5 个业务角色（报修/提案/政策/健康/通知）|
 | `agent/roles/auto_agents.py` | 天气守护 + 网格助手 |
-| `data/db_core.py` | schema + 迁移注册（**v46**）|
+| `data/db_core.py` | schema + 迁移注册（**v48**）|
 | `web/src/views/{resident,grid,elderly}/` | 三端页面 |
 | `docs/mobile-deploy.md` | 移动端部署 + 发布检查清单 |
 | `scripts/serve_public.py` | **本机常开一键工具**：起服务（默认只绑 127.0.0.1）+ 公网 HTTPS 隧道 + 抓新域名 + 刷新扫码页（`--status` / `--stop` / `--lan` / `--autostart`）|

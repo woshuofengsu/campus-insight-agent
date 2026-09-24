@@ -155,9 +155,10 @@ def _exec_weather(text: str, region=None) -> tuple[str, str, None]:
 
 
 def _exec_notices(uid: int) -> tuple[str, str, None]:
-    """通知查询：返回最近列表。"""
+    """通知查询：返回最近列表（按本人社区租户隔离）。"""
     from data.db_notice import get_visible_notices
-    rows = get_visible_notices("resident", uid, limit=5)
+    from utils.tenant import tenant_of_user
+    rows = get_visible_notices("resident", uid, limit=5, tenant=tenant_of_user(uid))
     if not rows:
         return "最近没有新通知。", "成功", None
     lines = [f"· {n.get('title', '')}" for n in rows]
@@ -172,25 +173,25 @@ def _exec_community_phone() -> str:
 # 负责人端路由
 # ---------------------------------------------------------------------------
 
-def _grid_todos() -> tuple[str, str, None]:
-    """待办统计：待审工单/待回咨询/待审用药/超时。"""
+def _grid_todos(tenant: str) -> tuple[str, str, None]:
+    """待办统计：待审工单/待回咨询/待审用药/超时（按本社区租户隔离）。"""
     from data.db_repair import get_issues, get_overdue_issues
     from data.db_health_content import list_consults
     from data.db_elderly_care import list_medication_reminders
-    pend_issues = len([i for i in get_issues(limit=1000) if i.get("status") == "待审核"])
-    pend_consults = len([c for c in list_consults(limit=1000) if c.get("status") == "待回复"])
-    pend_meds = len([m for m in list_medication_reminders() if m.get("status") == "待审核"])
+    pend_issues = len([i for i in get_issues(limit=1000, tenant=tenant) if i.get("status") == "待审核"])
+    pend_consults = len([c for c in list_consults(limit=1000, tenant=tenant) if c.get("status") == "待回复"])
+    pend_meds = len([m for m in list_medication_reminders(tenant=tenant) if m.get("status") == "待审核"])
     overdue = len(get_overdue_issues())
     return (f"今日待办：\n· 待审工单 {pend_issues} 条\n· 待回咨询 {pend_consults} 条\n"
             f"· 待审用药 {pend_meds} 条\n· 超时工单 {overdue} 条\n建议优先处理超时工单。"), "成功", None
 
 
-def _grid_stats(text: str) -> tuple[str, str, None]:
-    """统计查询（本周/本月/总量）。"""
+def _grid_stats(text: str, tenant: str) -> tuple[str, str, None]:
+    """统计查询（本周/本月/总量，按本社区租户隔离）。"""
     from data.db_policy import get_frequency_stats
     from data.db_repair import get_issues
     from data.db_notice import get_notices_with_stats
-    issues = get_issues(limit=1000)
+    issues = get_issues(limit=1000, tenant=tenant)
     total = len(issues)
     closed = len([i for i in issues if i.get("status") in ("处理结束", "已关闭")])
     stats = {}
@@ -200,7 +201,7 @@ def _grid_stats(text: str) -> tuple[str, str, None]:
         pass
     notices = {}
     try:
-        notices = get_notices_with_stats(limit=1000)
+        notices = get_notices_with_stats(limit=1000, tenant=tenant)
     except Exception:
         pass
     return (f"统计概览：\n· 工单总数 {total} 条（已结束 {closed} 条）\n"
@@ -209,22 +210,22 @@ def _grid_stats(text: str) -> tuple[str, str, None]:
             f"· 居民已读 {notices.get('resident_read', 0) if isinstance(notices, dict) else 0} 人次"), "成功", None
 
 
-def _grid_search(text: str) -> tuple[str, str, None]:
-    """搜索资料：按关键词搜工单/提案/知识库。"""
+def _grid_search(text: str, tenant: str) -> tuple[str, str, None]:
+    """搜索资料：按关键词搜工单/提案/知识库（工单/提案按本社区租户隔离）。"""
     from data.db_repair import get_issues
     from data.db_proposal import get_proposals
     from data.db_policy import get_knowledge_list
     kw = text
     parts = []
     try:
-        issues = [i for i in get_issues(limit=1000)
+        issues = [i for i in get_issues(limit=1000, tenant=tenant)
                   if kw in (i.get("title") or "") or kw in (i.get("location") or "") or kw in (i.get("reporter_name") or "")]
         if issues:
             parts.append(f"工单 {len(issues)} 条：" + "；".join(f"#{i.get('id')} {i.get('title', '')[:12]}" for i in issues[:5]))
     except Exception:
         pass
     try:
-        props = [p for p in get_proposals(limit=1000) if kw in (p.get("title") or "")]
+        props = [p for p in get_proposals(limit=1000, tenant=tenant) if kw in (p.get("title") or "")]
         if props:
             parts.append(f"提案 {len(props)} 条：" + "；".join(f"P{p.get('id')} {p.get('title', '')[:12]}" for p in props[:5]))
     except Exception:
@@ -470,8 +471,10 @@ def _proposal_confirm(s, uid, name):
 
 
 def _grid_handle(s, uid, name, text, intent):
+    from utils.tenant import tenant_of_user
+    tenant = tenant_of_user(uid)
     if intent == "待办提醒":
-        r_text, st, _ = _grid_todos()
+        r_text, st, _ = _grid_todos(tenant)
         return _reply(s, intent, r_text, st,
                       [{"type": "navigate", "to": "/grid/work-orders", "label": "跳转处理工单"},
                        {"type": "navigate", "to": "/grid/health", "label": "处理咨询"}], uid, "grid", text)
@@ -481,11 +484,11 @@ def _grid_handle(s, uid, name, text, intent):
         return _reply(s, intent, "确认导出数据报表？（将生成脱敏文件）", "需确认",
                       [{"type": "buttons", "options": ["确认导出", "取消"]}], uid, "grid", text)
     if intent == "统计查询":
-        r_text, st, _ = _grid_stats(text)
+        r_text, st, _ = _grid_stats(text, tenant)
         return _reply(s, intent, r_text, st, [], uid, "grid", text)
     if intent == "搜索资料":
         kw = text.replace("查一下", "").replace("搜索", "").replace("找一下", "").replace("帮我查", "").strip()
-        r_text, st, _ = _grid_search(kw or text)
+        r_text, st, _ = _grid_search(kw or text, tenant)
         return _reply(s, intent, r_text, st, [{"type": "navigate", "to": "/grid/work-orders", "label": "去工单页"}],
                       uid, "grid", text)
     if intent == "页面跳转":

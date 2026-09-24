@@ -15,6 +15,8 @@ class LoginRequest(BaseModel):
 
 class DemoLoginRequest(BaseModel):
     role: str = Field(..., pattern="^(resident|grid|elderly)$")
+    # 多租户演示（v48）：指定社区时只取该社区的演示账号（如 community="朝阳试点社区"）
+    community: str = Field(default="")
 
 
 class ChangePassword(BaseModel):
@@ -60,7 +62,11 @@ def login(req: LoginRequest, request: Request):
 
 @router.post("/api/web/auth/demo")
 def demo_login(req: DemoLoginRequest):
-    """演示快速登录：直接取该角色第一个演示账号。
+    """演示快速登录：直接取该角色的演示账号（可按社区指定，多租户演示用）。
+
+    多租户（v48）：带 `community` 时只在该社区的账号里取——否则第二个社区的网格员
+    永远拿不到 token（取的是"该角色第一个账号"），也就演示不了"另一个社区看不到"。
+    取不到指定社区的账号时**明确失败**，不悄悄回落给第一个账号（那会让演示结论出错）。
 
     WS0.1 安全止血：生产（DEMO_MODE=false）硬关闭，杜绝无密领取任意角色 JWT 的越权。
     """
@@ -68,7 +74,14 @@ def demo_login(req: DemoLoginRequest):
     if not getattr(config, "DEMO_MODE", True):
         return _fail(1003, "演示登录未开启")
     from data.db_user import list_users
-    for u in list_users(role=req.role):
+    from utils.tenant import normalize_tenant
+    want = normalize_tenant(getattr(req, "community", "") or "")
+    candidates = list_users(role=req.role)
+    if want:
+        candidates = [u for u in candidates if normalize_tenant(u.get("community")) == want]
+        if not candidates:
+            return _fail(1004, f"{want} 没有 {req.role} 演示账号")
+    for u in candidates:
         u["_token"] = make_token(u["id"], u["role"], u.get("name") or u.get("username") or "",
                                  community=u.get("community") or "")
         return _ok(_user_payload(u))

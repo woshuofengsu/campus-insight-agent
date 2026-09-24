@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _fail, _ok, _require_role, _user
+from api_routes.deps import _fail, _ok, _require_role, _user, _tenant
 
 import logging
 _log = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ def web_qa_questions(request: Request, status: str = "", limit: int = 50):
     from data.db_policy import get_question_deadline_info, get_questions
     u = _user(request)
     if u.get("role") == "grid":
-        rows = get_questions(status=status or None, limit=limit)
+        rows = get_questions(status=status or None, limit=limit, tenant=_tenant(request))
     else:
         rows = get_questions(user_id=u.get("uid"), limit=limit)
     out = []
@@ -152,7 +152,7 @@ def web_knowledge_list(request: Request, category: str = "", limit: int = 50):
 @router.get("/high-freq")
 def web_qa_high_freq(request: Request, limit: int = 10):
     from data.db_policy import get_common_questions
-    return _ok(get_common_questions(limit=limit))
+    return _ok(get_common_questions(limit=limit, tenant=_tenant(request)))
 
 
 # ---- 政策知识库管理（创建/审核/下架） ----

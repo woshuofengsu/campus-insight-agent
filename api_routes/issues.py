@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
 
 import logging
 from utils.timeutil import utcnow
@@ -149,7 +149,7 @@ def issue_list(request: Request, status: str = "", category: str = "",
     if u.get("role") == "grid":
         rows = get_issues(status=status or None, category=category or None,
                           urgency=urgency or None, issue_type=issue_type or None,
-                          keyword=keyword or None, limit=limit)
+                          keyword=keyword or None, limit=limit, tenant=_tenant(request))
     else:
         rows = get_issues(reporter_id=u.get("uid"), status=status or None, limit=limit)
     # 非负责人：手机号脱敏；M2：状态人话化

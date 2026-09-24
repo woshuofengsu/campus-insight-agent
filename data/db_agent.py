@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 
 from data.database import get_db
+from utils.tenant import stamp_tenant, tenant_clause, default_community
 
 MODULE = "Agent"
 
@@ -33,6 +34,7 @@ def add_dialog(user_id: int, role: str, text: str, is_bot: int = 0,
             "VALUES (?, ?, ?, ?, ?, ?)",
             (user_id, role, (text or "")[:500], is_bot, intent or "", related_id),
         )
+        stamp_tenant(conn, "agent_dialogs", cur.lastrowid, user_id)
         conn.commit()
         return cur.lastrowid
 
@@ -95,12 +97,20 @@ def log_agent(user_id: int | None, role: str, user_input: str, intent: str,
              (intent or "")[:100], (routed or "")[:200], status, (error or "")[:500],
              related_id, trace_id),
         )
+        # 多租户（v48）：留痕落租户；系统级留痕（user_id=None，如仲裁）无归属人 → 归档默认社区，
+        # 否则会因空租户对所有社区不可见（fail-closed 过头，连仲裁留痕都查不到）。
+        tenant = stamp_tenant(conn, "agent_logs", cur.lastrowid, user_id)
+        if not tenant:
+            dc = default_community()
+            if dc:
+                conn.execute("UPDATE agent_logs SET tenant_id=? WHERE id=?", (dc, cur.lastrowid))
         conn.commit()
         return cur.lastrowid
 
 
 def get_agent_logs(role: str = "", intent: str = "", status: str = "",
-                   keyword: str = "", limit: int = 200) -> list[dict]:
+                   keyword: str = "", limit: int = 200,
+                   tenant: str | None = None) -> list[dict]:
     """负责人查 Agent 留痕（按模块来源=Agent、时间、状态筛选）。"""
     q = "SELECT * FROM agent_logs WHERE 1=1"
     args: list = []
@@ -117,6 +127,10 @@ def get_agent_logs(role: str = "", intent: str = "", status: str = "",
         q += " AND (user_input LIKE ? OR routed LIKE ? OR error LIKE ?)"
         kw = f"%{keyword}%"
         args += [kw, kw, kw]
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY id DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
@@ -261,23 +275,33 @@ def resolve_handoff(handoff_id: int, actor: str = "负责人") -> bool:
 # 自转率量化（P0-3：AI 对话自解决率 + 工单社区自办结率）
 # ---------------------------------------------------------------------------
 
-def get_self_resolution_stats(days: int = 30) -> dict:
+def get_self_resolution_stats(days: int = 30, tenant: str | None = None) -> dict:
     """自转率量化：AI 对话自解决率 + 工单社区自办结率。
 
     - ai_self_resolution_rate = (总对话轮数 - 转人工次数) / 总对话轮数
     - issue_self_resolution_rate = 社区内办结工单 / 总工单
+
+    多租户：对话与工单按 tenant 过滤；`agent_handoffs` 表无 tenant_id 列（v48 未纳入），
+    其「转人工」计数暂按全局口径（见报告「需确认」）。
     """
     since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    targs: list = []
+    tc = tenant_clause(tenant, targs)
+    if tc is None:
+        return {"days": days, "total_dialogs": 0, "transferred": 0,
+                "ai_self_resolution_rate": 0.0, "total_issues": 0, "done_issues": 0,
+                "issue_self_resolution_rate": 0.0}
     with get_db() as conn:
         total_dialogs = conn.execute(
-            "SELECT COUNT(*) c FROM agent_dialogs WHERE created_at>=? AND is_bot=0",
-            (since,)).fetchone()["c"]
+            f"SELECT COUNT(*) c FROM agent_dialogs WHERE created_at>=? AND is_bot=0{tc}",
+            (since, *targs)).fetchone()["c"]
         transferred = conn.execute(
             "SELECT COUNT(*) c FROM agent_handoffs WHERE created_at>=?", (since,)).fetchone()["c"]
-        total_issues = conn.execute("SELECT COUNT(*) c FROM community_issues").fetchone()["c"]
+        total_issues = conn.execute(
+            f"SELECT COUNT(*) c FROM community_issues WHERE 1=1{tc}", targs).fetchone()["c"]
         done_issues = conn.execute(
-            "SELECT COUNT(*) c FROM community_issues WHERE status IN ('已解决','已办结','已完成')"
-        ).fetchone()["c"]
+            f"SELECT COUNT(*) c FROM community_issues WHERE status IN ('已解决','已办结','已完成'){tc}",
+            targs).fetchone()["c"]
     ai_rate = round((total_dialogs - transferred) / total_dialogs * 100, 1) if total_dialogs else 0.0
     issue_rate = round(done_issues / total_issues * 100, 1) if total_issues else 0.0
     return {"days": days, "total_dialogs": total_dialogs, "transferred": transferred,

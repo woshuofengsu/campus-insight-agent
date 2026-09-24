@@ -488,8 +488,8 @@ def test_red_black_board(client):
     # 造数：一个满意工单 + 一个不满意工单（独立测试用户）
     with get_db() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO user_profile (username, role, name, is_active) "
-            "VALUES ('board_user', 'resident', '红黑榜测试', 1)")
+            "INSERT OR REPLACE INTO user_profile (username, role, name, is_active, community) "
+            "VALUES ('board_user', 'resident', '红黑榜测试', 1, '海淀小区')")
         conn.commit()
         ru = conn.execute("SELECT id FROM user_profile WHERE username='board_user'").fetchone()["id"]
     iid_ok = submit_issue("红榜测试灯坏了", "公共设施", "室内", "幸福小区1号楼1单元101",
@@ -506,13 +506,13 @@ def test_red_black_board(client):
         resolve_issue(iid, "已维修完成", no_photo_reason="现场已清理", actor="李师傅")
     feedback_issue(iid_ok, True, actor="红黑榜测试")
     feedback_issue(iid_bad, False, reason="修完还在漏水", actor="红黑榜测试")
-    board = get_red_black_board(days=30, limit=5)
+    board = get_red_black_board(days=30, limit=5, tenant="海淀小区")
     red_ids = [i["id"] for i in board["red_board"]["satisfied_issues"]]
     black_ids = [i["id"] for i in board["black_board"]["dissatisfied_issues"]]
     assert iid_ok in red_ids
     assert iid_bad in black_ids
     # 下钻：不满意筛选能查到具体工单和原因
-    dd = get_satisfaction_drilldown(satisfaction="不满意", limit=50)
+    dd = get_satisfaction_drilldown(satisfaction="不满意", limit=50, tenant="海淀小区")
     assert any(i["id"] == iid_bad for i in dd["items"])
     assert dd["summary"]["dissatisfied"] >= 1
     # grid 端点可查；居民 403
@@ -732,7 +732,7 @@ def test_arbiter_decision_audited(client):
 
     # 直接查数据层留痕
     from data.db_agent import get_agent_logs
-    logs = get_agent_logs(intent="仲裁")
+    logs = get_agent_logs(intent="仲裁", tenant="海淀小区")
     assert len(logs) >= 2
     routed = {l.get("routed") for l in logs}
     assert any("compliance_first" in str(r) for r in routed)

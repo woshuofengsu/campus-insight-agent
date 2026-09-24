@@ -22,6 +22,7 @@ import logging
 from datetime import date, datetime, timedelta
 
 from data.db_core import get_db
+from utils.tenant import stamp_tenant, tenant_clause, tenant_of_user
 from data.db_notifications import log_activity
 
 _log = logging.getLogger(__name__)
@@ -212,7 +213,8 @@ def create_notice(title: str, notice_type: str, publish_scope: str, body: str,
                   elderly_summary: str = "", publisher: str = "",
                   is_pinned: int = 0, is_urgent: int = 0,
                   expire_at: str = "", attachment_json: str = "[]",
-                  scope_target_json: str = "[]", actor: str = "负责人") -> int:
+                  scope_target_json: str = "[]", actor: str = "负责人",
+                  publisher_id: int | None = None) -> int:
     """新建通知（保存为草稿）。返回通知 ID。非法类型/敏感词创建时即拦截（0 表示拒绝）。"""
     if not (title or "").strip():
         raise ValueError("通知标题不能为空")
@@ -242,6 +244,8 @@ def create_notice(title: str, notice_type: str, publish_scope: str, body: str,
              STATUS_DRAFT),
         )
         notice_id = cur.lastrowid
+        # 多租户（v48）：通知也要落租户——发布人（网格员）的社区；无归属人则落空（读取侧 fail-closed）
+        stamp_tenant(conn, "notices", notice_id, publisher_id)
         conn.commit()
     log_activity(actor, "新建通知", "notice", notice_id, title.strip(),
                  module=MODULE, after_value=STATUS_DRAFT,
@@ -772,7 +776,9 @@ def get_notice_read_stats(notice_id: int) -> dict:
 def get_notice_unread_count(client_type: str, user_id: int) -> int:
     """用户当前未读广播通知数（居民端/老年端分开）。"""
     try:
-        return sum(1 for n in get_visible_notices(client_type, user_id, limit=1000)
+        return sum(1 for n in get_visible_notices(
+            client_type, user_id, limit=1000,
+            tenant=tenant_of_user(user_id))          # 多租户：未读数不能跨社区
                    if not n.get("is_read"))
     except Exception:
         _log.debug("计算未读广播通知数失败", exc_info=True)
@@ -787,7 +793,8 @@ def get_active_urgent_notices(client_type: str, user_id: int) -> list[dict]:
     """
     now = _now()
     out = []
-    for n in get_visible_notices(client_type, user_id, limit=1000):
+    for n in get_visible_notices(client_type, user_id, limit=1000,
+                                 tenant=tenant_of_user(user_id)):   # 多租户：紧急弹窗不能跨社区
         if not n.get("is_urgent") or n.get("is_read"):
             continue
         exp = n.get("expire_at") or ""
@@ -810,7 +817,7 @@ def get_notice(notice_id: int) -> dict | None:
 
 def get_notices(notice_type: str | None = None, status: str | None = None,
                 publish_scope: str | None = None, keyword: str | None = None,
-                limit: int = 200) -> list[dict]:
+                limit: int = 200, tenant: str | None = None) -> list[dict]:
     """负责人端查询：按类型/状态/范围/关键词筛选，紧急优先、新的在前。"""
     q = "SELECT * FROM notices WHERE 1=1"
     args: list = []
@@ -827,6 +834,10 @@ def get_notices(notice_type: str | None = None, status: str | None = None,
         q += " AND (title LIKE ? OR body LIKE ?)"
         like = f"%{keyword}%"
         args += [like, like]
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY is_urgent DESC, status='已发布' DESC, "
     q += "COALESCE(published_at, scheduled_at, created_at) DESC, id DESC LIMIT ?"
     args.append(limit)
@@ -837,21 +848,26 @@ def get_notices(notice_type: str | None = None, status: str | None = None,
 
 def get_notices_with_stats(notice_type: str | None = None, status: str | None = None,
                            publish_scope: str | None = None, keyword: str | None = None,
-                           limit: int = 200) -> list[dict]:
+                           limit: int = 200, tenant: str | None = None) -> list[dict]:
     """负责人端列表：每条通知附带已读统计。"""
     out = []
-    for n in get_notices(notice_type, status, publish_scope, keyword, limit):
+    for n in get_notices(notice_type, status, publish_scope, keyword, limit, tenant=tenant):
         n["stats"] = get_notice_read_stats(n["id"])
         out.append(n)
     return out
 
 
 def get_visible_notices(client_type: str, user_id: int, notice_type: str | None = None,
-                        keyword: str | None = None, limit: int = 100) -> list[dict]:
-    """居民端/老年端可见的已发布广播通知（按发布范围过滤 + 已读标记）。
+                        keyword: str | None = None, limit: int = 100,
+                        tenant: str | None = None) -> list[dict]:
+    """居民端/老年端可见的已发布广播通知（按发布范围过滤 + 已读标记 + 租户隔离）。
 
     排序：紧急置顶 → 普通置顶 → 普通，同级按发布时间倒序。
     """
+    targs: list = []
+    tc = tenant_clause(tenant, targs, self_scoped=True)
+    if tc is None:
+        return []
     with get_db() as conn:
         me_row = conn.execute(
             "SELECT id, community, building, role FROM user_profile WHERE id=? AND is_active=1",
@@ -864,8 +880,8 @@ def get_visible_notices(client_type: str, user_id: int, notice_type: str | None 
             "SELECT notice_id FROM notice_reads WHERE client_type=? AND user_id=?",
             (client_type, user_id)).fetchall()}
         rows = conn.execute(
-            "SELECT * FROM notices WHERE status=? ORDER BY id DESC LIMIT 500",
-            (STATUS_PUBLISHED,),
+            f"SELECT * FROM notices WHERE status=?{tc} ORDER BY id DESC LIMIT 500",
+            (STATUS_PUBLISHED, *targs),
         ).fetchall()
     out = []
     for r in rows:
@@ -903,7 +919,7 @@ def get_notice_timeline(notice_id: int) -> list[dict]:
 
 def export_notices_csv(notice_type: str | None = None, status: str | None = None,
                        publish_scope: str | None = None, keyword: str | None = None,
-                       actor: str = "负责人") -> tuple[str, str]:
+                       actor: str = "负责人", tenant: str | None = None) -> tuple[str, str]:
     """导出通知列表 + 已读统计（不含正文和附件）。返回 (csv 内容, 文件名)。
 
     导出异常时记异常日志并返回空（不中断页面）。
@@ -912,7 +928,8 @@ def export_notices_csv(notice_type: str | None = None, status: str | None = None
     import io
 
     try:
-        notices = get_notices_with_stats(notice_type, status, publish_scope, keyword, limit=500)
+        notices = get_notices_with_stats(notice_type, status, publish_scope, keyword,
+                                         limit=500, tenant=tenant)
     except Exception as e:  # noqa: BLE001
         _log.warning("通知导出数据查询失败：%s", e)
         try:

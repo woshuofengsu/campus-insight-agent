@@ -168,10 +168,10 @@ def test_sos_calls_carry_elder_name():
     _seed(elder_active_hours_ago=30)
     with get_db() as conn:
         conn.execute("INSERT INTO emergency_calls (user_id, call_type, target_name, target_phone, "
-                     "result, status) VALUES (?, 'sos', '张小明', '13900001111', '', '求助中')",
+                     "result, status, tenant_id) VALUES (?, 'sos', '张小明', '13900001111', '', '求助中', '海淀小区')",
                      (ELDER_UID,))
         conn.commit()
-    calls = get_sos_calls(status="求助中", limit=5)
+    calls = get_sos_calls(status="求助中", limit=5, tenant="海淀小区")
     assert calls, "应能查到求助记录"
     assert calls[0].get("elder_name") == "张奶奶", "必须 join 出求助者（老人）姓名"
 

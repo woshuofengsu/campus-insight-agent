@@ -7,7 +7,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid
+from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant
 
 import logging
 _log = logging.getLogger(__name__)
@@ -375,7 +375,7 @@ def web_manage_medications(request: Request, status: str = ""):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_elderly_care import list_medication_reminders
-    rows = list_medication_reminders(status=status or None)
+    rows = list_medication_reminders(status=status or None, tenant=_tenant(request))
     return _ok([dict(r) for r in rows])
 
 
@@ -398,7 +398,7 @@ def web_manage_contacts(request: Request, status: str = ""):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_elderly_care import list_emergency_contacts
-    rows = list_emergency_contacts()
+    rows = list_emergency_contacts(tenant=_tenant(request))
     out = [dict(r) for r in rows]
     if status:
         out = [c for c in out if c.get("status") == status]
@@ -425,7 +425,7 @@ def web_manage_inactive(request: Request, days: int = 5, limit: int = 20):
         return _require_role(request, "grid")
     try:
         from data.db_care_proactive import list_inactive_elderly
-        return _ok(list_inactive_elderly(days=days, limit=limit))
+        return _ok(list_inactive_elderly(days=days, limit=limit, tenant=_tenant(request)))
     except Exception as e:  # noqa: BLE001
         return _fail(2001, "查询失败，请重试")
 
@@ -436,7 +436,7 @@ def web_manage_sos(request: Request, status: str = ""):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_elderly_care import get_sos_calls
-    rows = get_sos_calls(status=status or None, limit=50)
+    rows = get_sos_calls(status=status or None, limit=50, tenant=_tenant(request))
     return _ok([dict(r) for r in rows])
 
 

@@ -106,7 +106,7 @@ def test_dispatch_encrypts_assignee_phone():
 def test_issues_list_decrypts_reporter_phone():
     iid = _submit()
     from data.db_repair import get_issues
-    rows = get_issues(limit=10)
+    rows = get_issues(reporter_id=1, limit=10)
     hit = next(r for r in rows if r["id"] == iid)
     assert hit["reporter_phone"] == "13800001111"
 

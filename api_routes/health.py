@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
 
 router = APIRouter(prefix="/api/web/health", tags=["health"])
 
@@ -308,7 +308,7 @@ def web_consult_list(request: Request, status: str = "", consult_type: str = "",
     u = _user(request)
     if u.get("role") == "grid":
         rows = list_consults(status=status or None, consult_type=consult_type or None,
-                             keyword=keyword or None, limit=100)
+                             keyword=keyword or None, limit=100, tenant=_tenant(request))
     else:
         rows = get_my_consults(u.get("uid"), limit=50)
     out = []

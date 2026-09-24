@@ -93,17 +93,18 @@ def cached_my_stats(author: str):
 # ---------------- 新模块列表缓存（报修/提案/通知/天气/政策/健康，操作后由各页 invalidate） ----------------
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_repair_issues(status=None, issue_type=None, category=None, reporter_id=None, limit=200):
+def cached_repair_issues(status=None, issue_type=None, category=None, reporter_id=None, limit=200,
+                         tenant=None):
     """报修工单列表（db_repair.get_issues）。"""
     from data.db_repair import get_issues as _get
     return _get(status=status, issue_type=issue_type, category=category,
-                reporter_id=reporter_id, limit=limit)
+                reporter_id=reporter_id, limit=limit, tenant=tenant)
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_repair_stats():
+def cached_repair_stats(tenant=None):
     from data.db_repair import get_issues as _get
-    rows = _get(limit=1000)
+    rows = _get(limit=1000, tenant=tenant)
     by_status: dict[str, int] = {}
     for r in rows:
         by_status[r.get("status", "")] = by_status.get(r.get("status", ""), 0) + 1
@@ -111,17 +112,18 @@ def cached_repair_stats():
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_proposals_full(status=None, limit=500):
+def cached_proposals_full(status=None, limit=500, tenant=None):
     """提案全量列表（db_proposal.get_proposals）。"""
     from data.db_proposal import get_proposals as _get
-    return _get(status=status, limit=limit)
+    return _get(status=status, limit=limit, tenant=tenant)
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_notices_with_stats(notice_type=None, status=None, publish_scope=None, keyword=None, limit=200):
+def cached_notices_with_stats(notice_type=None, status=None, publish_scope=None, keyword=None,
+                              limit=200, tenant=None):
     """通知列表 + 已读统计。"""
     from data.db_notice import get_notices_with_stats as _get
-    return _get(notice_type, status, publish_scope, keyword, limit=limit)
+    return _get(notice_type, status, publish_scope, keyword, limit=limit, tenant=tenant)
 
 
 @st.cache_data(ttl=15, show_spinner=False)
@@ -139,17 +141,17 @@ def cached_weather_overview(limit=50):
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_check_tasks(status=None, limit=100):
+def cached_check_tasks(status=None, limit=100, tenant=None):
     """天气检查任务列表。"""
     from data.db_weather import list_check_tasks as _get
-    return _get(status=status, limit=limit)
+    return _get(status=status, limit=limit, tenant=tenant)
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_check_task_history(alert_type=None, status=None, limit=200):
+def cached_check_task_history(alert_type=None, status=None, limit=200, tenant=None):
     """天气检查任务历史。"""
     from data.db_weather import get_check_task_history as _get
-    return _get(alert_type=alert_type, status=status, limit=limit)
+    return _get(alert_type=alert_type, status=status, limit=limit, tenant=tenant)
 
 
 @st.cache_data(ttl=15, show_spinner=False)
@@ -167,10 +169,10 @@ def cached_my_consults(user_id: int, limit=50):
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def cached_consults(status=None, limit=100):
+def cached_consults(status=None, limit=100, tenant=None):
     """负责人端咨询列表。"""
     from data.db_health_content import list_consults as _get
-    return _get(status=status, limit=limit)
+    return _get(status=status, limit=limit, tenant=tenant)
 
 
 # 失效：操作后调用，保证列表即时刷新

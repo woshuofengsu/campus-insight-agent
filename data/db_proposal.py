@@ -28,6 +28,7 @@ _log = logging.getLogger(__name__)
 from datetime import datetime
 
 from data.db_core import get_db
+from utils.tenant import stamp_tenant, tenant_clause
 from utils.pii import scrub_field
 from data.db_notifications import log_activity, notify_proposal_status_change
 # 手机号加解密：与工单表（db_repair）用**同一实现**，避免两套 crypto 调用与两套降级逻辑
@@ -265,6 +266,8 @@ def submit_proposal(title: str, description: str, category: str,
              community_building, attachment),
         )
         pid = cur.lastrowid
+        # 多租户（v48）：写入侧必须落租户——提案人
+        stamp_tenant(conn, "proposals", pid, reporter_id)
         if draft_id:
             conn.execute("DELETE FROM proposal_drafts WHERE id=?", (draft_id,))
         conn.commit()
@@ -1173,7 +1176,7 @@ def get_proposal(pid: int) -> dict | None:
 def get_proposals(status: str | None = None, category: str | None = None,
                   is_public: int | None = None, keyword: str = "",
                   exclude_statuses: list[str] | None = None,
-                  limit: int = 100) -> list[dict]:
+                  limit: int = 100, tenant: str | None = None) -> list[dict]:
     """按状态/类别/公开方式/关键词筛选提案，最新在前。"""
     q = "SELECT * FROM proposals WHERE 1=1"
     args: list = []
@@ -1193,6 +1196,10 @@ def get_proposals(status: str | None = None, category: str | None = None,
     if kw:
         q += " AND (title LIKE ? OR description LIKE ?)"
         args.extend([f"%{kw}%", f"%{kw}%"])
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY created_at DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
@@ -1211,23 +1218,23 @@ def get_my_proposals(user_id: int, limit: int = 50) -> list[dict]:
         return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
-def get_pending_audit(limit: int = 100) -> list[dict]:
+def get_pending_audit(limit: int = 100, tenant: str | None = None) -> list[dict]:
     """负责人待审核列表（待审核 + 退回修改）。"""
     return get_proposals(exclude_statuses=[s for s in STATUS_ALL if s not in ("待审核", "退回修改")],
-                         limit=limit)
+                         limit=limit, tenant=tenant)
 
 
-def get_pending_confirm(limit: int = 100) -> list[dict]:
+def get_pending_confirm(limit: int = 100, tenant: str | None = None) -> list[dict]:
     """待确认公示/私有列表。"""
-    return get_proposals(status="待确认公示/私有", limit=limit)
+    return get_proposals(status="待确认公示/私有", limit=limit, tenant=tenant)
 
 
-def get_active_public(limit: int = 100) -> list[dict]:
+def get_active_public(limit: int = 100, tenant: str | None = None) -> list[dict]:
     """居民可见的公开提案（公示中/待执行/执行中/待提案人反馈/已完成/重新执行/不予执行/违规下架/已结束）。"""
     return get_proposals(
         is_public=1,
         exclude_statuses=["待审核", "退回修改", "待确认公示/私有", "已撤回", "已关闭"],
-        limit=limit,
+        limit=limit, tenant=tenant,
     )
 
 
@@ -1267,9 +1274,9 @@ def get_proposal_timeline(pid: int, limit: int = 100) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def get_export_rows() -> list[dict]:
+def get_export_rows(tenant: str | None = None) -> list[dict]:
     """导出数据（字段脱敏，不含个体投票明细、附件、其他隐私）。"""
-    props = get_proposals(limit=1000)
+    props = get_proposals(limit=1000, tenant=tenant)
     stats = get_vote_stats_batch([p["id"] for p in props])
     # 排名：按投票人数降序（并列同票同名次，按出现顺序推进），没投票的不占排名
     ranked_ids = sorted(

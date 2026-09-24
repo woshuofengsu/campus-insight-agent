@@ -25,6 +25,7 @@ import re
 from datetime import datetime, timedelta
 
 from data.db_core import get_db
+from utils.tenant import stamp_tenant, tenant_clause
 from data.db_notifications import log_activity
 
 MODULE = "政策问答"
@@ -1018,6 +1019,8 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
                         "auto_answer,cited_knowledge_id) VALUES (?,?,?,?,?,'已自动回答',?,?)",
                         (user_id, q, summary, q_type, source, auto_answer, cited.get("id")))
                     qid = cur.lastrowid
+                    # 多租户（v48）：提问落问到提问人的社区
+                    stamp_tenant(conn, "policy_questions", qid, user_id)
                     conn.execute("UPDATE knowledge_base SET cite_count=cite_count+1 WHERE id=?",
                                  (cited.get("id"),))
                     conn.commit()
@@ -1273,7 +1276,7 @@ def get_my_questions(user_id: int, limit: int = 100) -> list[dict]:
 
 
 def get_questions(status: str | None = None, user_id: int | None = None,
-                  limit: int = 200) -> list[dict]:
+                  limit: int = 200, tenant: str | None = None) -> list[dict]:
     q = "SELECT * FROM policy_questions WHERE 1=1"
     args: list = []
     if status:
@@ -1282,6 +1285,10 @@ def get_questions(status: str | None = None, user_id: int | None = None,
     if user_id:
         q += " AND user_id=?"
         args.append(user_id)
+    tc = tenant_clause(tenant, args, self_scoped=bool(user_id))
+    if tc is None:
+        return []
+    q += tc
     q += " ORDER BY created_at DESC LIMIT ?"
     args.append(limit)
     with get_db() as conn:
@@ -1289,14 +1296,18 @@ def get_questions(status: str | None = None, user_id: int | None = None,
         return [dict(r) for r in rows]
 
 
-def get_pending_reply_questions(limit: int = 100) -> list[dict]:
+def get_pending_reply_questions(limit: int = 100, tenant: str | None = None) -> list[dict]:
     """人工待回复列表（最早提问的排前面，最紧急）。"""
+    q = "SELECT * FROM policy_questions WHERE status='已转人工'"
+    args: list = []
+    tc = tenant_clause(tenant, args)
+    if tc is None:
+        return []
+    q += tc
+    q += " ORDER BY created_at ASC LIMIT ?"
+    args.append(limit)
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM policy_questions WHERE status='已转人工' "
-            "ORDER BY created_at ASC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        rows = conn.execute(q, args).fetchall()
         return [dict(r) for r in rows]
 
 
@@ -1498,20 +1509,25 @@ def get_frequency_stats(days: int | None = None) -> dict:
     }
 
 
-def get_common_questions(limit: int = 10, q_type: str | None = None) -> list[dict]:
+def get_common_questions(limit: int = 10, q_type: str | None = None,
+                         tenant: str | None = None) -> list[dict]:
     """常见问题（按提问次数倒序），居民端/负责人端展示。可按类型过滤。"""
+    targs: list = []
+    tc = tenant_clause(tenant, targs)
+    if tc is None:
+        return []
     with get_db() as conn:
         if q_type:
             rows = conn.execute(
-                "SELECT summary, q_type, COUNT(*) c FROM policy_questions "
-                "WHERE q_type=? GROUP BY summary ORDER BY c DESC LIMIT ?",
-                (q_type, limit),
+                f"SELECT summary, q_type, COUNT(*) c FROM policy_questions "
+                f"WHERE q_type=?{tc} GROUP BY summary ORDER BY c DESC LIMIT ?",
+                (q_type, *targs, limit),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT summary, q_type, COUNT(*) c FROM policy_questions "
-                "GROUP BY summary ORDER BY c DESC LIMIT ?",
-                (limit,),
+                f"SELECT summary, q_type, COUNT(*) c FROM policy_questions "
+                f"WHERE 1=1{tc} GROUP BY summary ORDER BY c DESC LIMIT ?",
+                (*targs, limit),
             ).fetchall()
         return [dict(r) for r in rows]
 

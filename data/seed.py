@@ -31,6 +31,9 @@ def _seed_users():
         # 而海淀小区用户会命中社区/区级指引 —— 见 docs/competition/演示脚本.md 场景 2。
         # ⚠ 必须放在海淀账号之后：/auth/demo 取该角色第一个账号，顺序变了演示首页就换人了。
         ("demo_resident_cy", "demo123", "resident", "朝阳试点社区", "2号楼", "1单元101", "李叔", "CY0201101", "13600136000"),
+        # 第二社区的网格员：**多租户隔离演示必需**——没有它就只能证明"居民看不到"，
+        # 证明不了"另一个社区的网格员也看不到本社区工单"（v48 隔离的另一半）。
+        ("demo_grid_cy", "demo123", "grid", "朝阳试点社区", "网格一组", "", "赵网格员", "G2026003", "13900139002"),
     ]
     with get_db() as conn:
         try:
@@ -744,6 +747,10 @@ def seed_all(db_path: str):
     except Exception as e:
         _log.debug("回填活动日志失败：%s", e, exc_info=True)
         print(f"[seed] Activity log backfill skipped: {e}")
+    # 多租户回填：种子走裸 INSERT（不经过 stamp_tenant 的写入口），tenant_id 全为空；
+    # 这里重跑一次 init_db（幂等）让 v48 归一化给种子行盖上 tenant_id——否则读取侧 fail-closed
+    # 会把演示种子数据全部"看不见"。
+    init_db(db_path)
     # 汇报**实际入库量**（从库里数，不写死——写死的数字迟早和库内容对不上）
     rows = [("knowledge_base", "条知识"), ("community_issues", "条工单"),
             ("proposals", "条提案"), ("discussion_topics", "个议题"),

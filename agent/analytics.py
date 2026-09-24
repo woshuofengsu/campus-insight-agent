@@ -11,6 +11,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from data.database import get_db
+from utils.tenant import tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -20,19 +21,24 @@ def _bigrams(s: str) -> list[str]:
     return [s[i:i + 2] for i in range(max(0, len(s) - 1))]
 
 
-def get_issue_clusters(days: int = 7, top: int = 5) -> list[dict]:
+def get_issue_clusters(days: int = 7, top: int = 5,
+                       tenant: str | None = None) -> list[dict]:
     """近 N 天报修主题聚类：双字特征频次 → 主题词 + 数量 + 环比（vs 前 N 天）。"""
+    targs: list = []
+    tc = tenant_clause(tenant, targs)
+    if tc is None:
+        return []
     with get_db() as conn:
         rows = conn.execute(
             "SELECT description, title FROM community_issues "
-            "WHERE reported_at >= datetime('now', ? || ' days')",
-            (f"-{days}",),
+            f"WHERE reported_at >= datetime('now', ? || ' days'){tc}",
+            (f"-{days}", *targs),
         ).fetchall()
         prev = conn.execute(
             "SELECT description, title FROM community_issues "
             "WHERE reported_at >= datetime('now', ? || ' days') "
-            "AND reported_at < datetime('now', ? || ' days')",
-            (f"-{days * 2}", f"-{days}"),
+            f"AND reported_at < datetime('now', ? || ' days'){tc}",
+            (f"-{days * 2}", f"-{days}", *targs),
         ).fetchall()
     cur_cnt = Counter()
     prev_cnt = Counter()
@@ -54,13 +60,17 @@ def get_issue_clusters(days: int = 7, top: int = 5) -> list[dict]:
     return out
 
 
-def get_weekly_trend(days: int = 7) -> list[dict]:
+def get_weekly_trend(days: int = 7, tenant: str | None = None) -> list[dict]:
     """近 N 天按日工单量趋势（驾驶舱折线数据）。"""
+    targs: list = []
+    tc = tenant_clause(tenant, targs)
+    if tc is None:
+        return []
     with get_db() as conn:
         rows = conn.execute(
             "SELECT DATE(reported_at, 'localtime') d, COUNT(*) c FROM community_issues "
-            "WHERE reported_at >= datetime('now', ? || ' days') GROUP BY d ORDER BY d",
-            (f"-{days}",),
+            f"WHERE reported_at >= datetime('now', ? || ' days'){tc} GROUP BY d ORDER BY d",
+            (f"-{days}", *targs),
         ).fetchall()
         by_day = {r["d"]: r["c"] for r in rows}
         trend = []
@@ -70,12 +80,12 @@ def get_weekly_trend(days: int = 7) -> list[dict]:
         return trend
 
 
-def build_data_brief() -> str:
+def build_data_brief(tenant: str | None = None) -> str:
     """数据简报（P3-03 数据叙事，规则生成）：趋势/异常/机会。"""
     parts = []
     try:
-        clusters = get_issue_clusters(days=7)
-        prev_clusters = get_issue_clusters(days=14)  # 近两周（粗略环比）
+        clusters = get_issue_clusters(days=7, tenant=tenant)
+        prev_clusters = get_issue_clusters(days=14, tenant=tenant)  # 近两周（粗略环比）
         rising = [c for c in clusters if c["change_pct"] >= 10]
         if rising:
             t = rising[0]["topic"]

@@ -446,3 +446,16 @@
 - 新增 `tests/test_elderly_speech_guard.py`（5 例静态守卫，含"onMounted 里不许自动播报"）。
 - 检查本身抓出两个真问题并修掉：注入脚本写成了未调用的箭头函数；能力探测用 `in window`
   在"属性存在但值为 undefined"时误判成支持（改真值判断）。
+
+### 2026-09-24 · B5：多租户真隔离（schema v48）
+
+- 租户键 = **社区名**；新增 `utils/tenant.py`（`normalize_tenant` / `tenant_of_user` / `tenant_clause` / `stamp_tenant`）。
+- **v48 迁移**：13 张核心表加 `tenant_id` + 归一化历史行政区值 + 按归属人回填 + 索引；无归属人行落默认社区并计数告警。
+- **写入侧**：7 张表 9 处 INSERT 后盖章（v41 的教训：只回填不写入 = 隔离静默失效）。
+- **读取侧 fail-closed**：跨用户查询显式带 `tenant=`；**空租户返回空集**；**无范围查询抛 ValueError**；
+  覆盖工单/提案/导出/通知/咨询/政策/老年用药与 SOS/红黑榜/agent 日志/天气任务/analytics。
+- **堵住三个"只加 SQL 过滤也会漏"的口子**：缓存键加租户（`utils/cache.py`）、agent 工具层按租户过滤、
+  通知「全体居民」改为本社区；未读数与紧急弹窗同样带租户。
+- **演示闭环**：新增第二社区网格员 `demo_grid_cy`，`/auth/demo` 支持按社区取账号；
+  实测朝阳居民建单 → 海淀网格员列表与导出均看不到、朝阳网格员看得到。
+- 验证：`tests/test_tenant_isolation.py` 16 例契约测试 + 全量用例全绿。

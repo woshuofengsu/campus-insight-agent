@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
 
 import logging
 from utils.timeutil import utcnow
@@ -118,7 +118,7 @@ def proposal_list(request: Request, status: str = "", limit: int = 300):
     limit = min(limit, 500)
     from data.db_proposal import get_proposals, get_proposal_vote_stats, has_voted
     u = _user(request)
-    rows = get_proposals(status=status or None, limit=limit)
+    rows = get_proposals(status=status or None, limit=limit, tenant=_tenant(request))
     out = []
     for p in rows:
         # 居民：只看自己提交的（含私有/待审核等）+ 公开公示链上的，且他人姓名脱敏

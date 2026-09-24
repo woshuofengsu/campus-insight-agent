@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from api_routes.deps import _user, _require_role
+from api_routes.deps import _user, _require_role, _tenant
 
 router = APIRouter(prefix="/api/web/export", tags=["export"])
 
@@ -23,7 +23,7 @@ def export_issues(request: Request):
     from data.db_notifications import log_activity
     import csv
     from io import StringIO
-    rows = get_issues(limit=1000)
+    rows = get_issues(limit=1000, tenant=_tenant(request))
     buf = StringIO()
     w = csv.writer(buf)
     w.writerow(["编号", "标题", "分类", "类型", "紧急度", "状态", "地址", "报修人", "电话", "维修人员", "提交时间"])
@@ -46,7 +46,7 @@ def export_proposals(request: Request):
     from data.db_proposal import get_export_rows, log_export
     import csv
     from io import StringIO
-    rows = get_export_rows()
+    rows = get_export_rows(tenant=_tenant(request))
     buf = StringIO()
     if rows:
         w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
@@ -62,7 +62,8 @@ def export_notices(request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_notice import export_notices_csv
-    content, fname = export_notices_csv(actor=_user(request).get("name") or "负责人")
+    content, fname = export_notices_csv(actor=_user(request).get("name") or "负责人",
+                                        tenant=_tenant(request))
     return Response(content.encode("utf-8-sig"), media_type="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={fname}"})
 
@@ -107,7 +108,8 @@ def export_health_consults(request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_health_content import export_consults_csv
-    content, fname = export_consults_csv(actor=_user(request).get("name") or "负责人")
+    content, fname = export_consults_csv(actor=_user(request).get("name") or "负责人",
+                                         tenant=_tenant(request))
     return Response(content.encode("utf-8-sig"), media_type="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={fname}"})
 
@@ -121,7 +123,7 @@ def export_weather_tasks(request: Request):
     from data.db_notifications import log_activity
     import csv
     from io import StringIO
-    rows = list_check_tasks(limit=1000)
+    rows = list_check_tasks(limit=1000, tenant=_tenant(request))
     buf = StringIO()
     w = csv.writer(buf)
     w.writerow(["编号", "预警类型", "等级", "状态", "确认人", "备注", "检查时间", "创建时间"])
@@ -143,7 +145,7 @@ def export_agent_logs(request: Request):
     from data.db_notifications import log_activity
     import csv
     from io import StringIO
-    rows = get_agent_logs(limit=1000)
+    rows = get_agent_logs(limit=1000, tenant=_tenant(request))
     buf = StringIO()
     w = csv.writer(buf)
     w.writerow(["ID", "角色", "用户输入", "纠正后", "识别意图", "路由结果", "状态", "异常", "关联编号", "时间"])

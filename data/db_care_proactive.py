@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 
 from data.database import get_db
 from utils.timeutil import local_to_utc_naive, utcnow
+from utils.tenant import tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -89,13 +90,20 @@ def run_followup(now: datetime | None = None) -> int:
     return created
 
 
-def list_inactive_elderly(days: int = 5, limit: int = 20) -> list[dict]:
+def list_inactive_elderly(days: int = 5, limit: int = 20,
+                          tenant: str | None = None) -> list[dict]:
     """返回最近 days 天无活动的老年用户（供网格员端顶部"关怀提示"）。
 
     ⚠️ 截止时间用 **UTC**：被比较的 `agent_dialogs.created_at` / `community_issues.reported_at` /
     `medication_intake_log.taken_at` 都是库内 UTC 时间；之前这里用本地 `datetime.now()`，
     会带来 8 小时偏差（临界点上把"刚活跃过的老人"误判为久未活跃）。
+
+    多租户：老人的租户 = `user_profile.community`（老人没有独立 tenant_id 列）。
     """
+    targs: list = []
+    tc = tenant_clause(tenant, targs, column="u.community")
+    if tc is None:
+        return []
     cutoff = (utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     out = []
     try:
@@ -103,7 +111,7 @@ def list_inactive_elderly(days: int = 5, limit: int = 20) -> list[dict]:
             elders = conn.execute(
                 "SELECT p.user_id, u.name FROM elderly_profile p "
                 "LEFT JOIN user_profile u ON u.id = p.user_id "
-                "WHERE u.name != '' AND u.role = 'elderly'").fetchall()
+                f"WHERE u.name != '' AND u.role = 'elderly'{tc}", targs).fetchall()
             for e in elders:
                 uid = e["user_id"]
                 last = conn.execute(

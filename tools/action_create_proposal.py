@@ -10,7 +10,9 @@ from data.db_proposal import (
 
 def _check_duplicate(title: str) -> list[dict]:
     """看看是不是已经有过类似提案（简单算关键词重叠）。"""
-    existing = _db_get_proposals(limit=50)
+    # 多租户：查重限定在本社区（工具无用户上下文，用默认社区兜底）。
+    from utils.tenant import default_community
+    existing = _db_get_proposals(limit=50, tenant=default_community())
     title_keywords = set(title)
     duplicates = []
     for p in existing:

@@ -2,6 +2,7 @@
 import hashlib
 import logging
 from data.db_core import get_db
+from utils.tenant import stamp_tenant
 from utils.pii import scrub_field
 
 _log = logging.getLogger(__name__)
@@ -459,6 +460,8 @@ def create_proposal(title: str, description: str, category: str = "其他",
         )
         conn.commit()
         pid = cur.lastrowid
+        # 多租户（v48）：写入侧必须落租户——提案人
+        stamp_tenant(conn, "proposals", pid, reporter_id)
     try:
         from data.db_notifications import log_activity
         log_activity(author, "提交提案", "proposal", pid, title, category, module=MODULE)
