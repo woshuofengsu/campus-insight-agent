@@ -22,7 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 待迁移清单（文件名 -> 处数）。迁移一处删一处，不许新增。
 BASELINE = {
     "db_elderly_care.py": 1,    # SOS 升级通知（_notify_grids）——用药审核超时已迁移
-    "db_elderly.py": 2,         # 久未活跃老人提醒、SOS 指派
+    "db_elderly.py": 1,         # SOS 指派（notify_sos_targeted）——久未活跃已迁移
     "db_repair.py": 3,          # 工单流转通知（受理/派单/解决）
     "db_policy.py": 5,          # 知识到期、提问转人工等
     "db_health_content.py": 2,  # 咨询超时/回复提醒

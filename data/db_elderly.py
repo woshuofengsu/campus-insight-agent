@@ -129,11 +129,9 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
         return 0
     try:
         from data.db_notifications import create_notification
-        from data.db_user import list_users, list_guardians_of
+        from data.db_user import list_guardians_of, managers_of
         from utils.pii import mask_phone
-        grids = list_users(role="grid")
-        if not grids:
-            return 0
+        from utils.tenant import tenant_of_user
         notified = 0
         for elder in inactive:
             uid = elder.get("user_id")
@@ -156,7 +154,17 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
                 cname, cphone = first.get("name", ""), first.get("phone", "")
                 if cname or cphone:
                     body += f" 家属：{cname} {mask_phone(cphone)}".rstrip()
-            for g in grids:
+            # 多租户（Codex 评审 I2 / 任务卡 4）：**逐位老人取其所在社区**，只通知该社区网格员。
+            # 原来 `grids` 是"全部网格员"，等于把"A 社区某老人 24 小时没互动 + 独居 + 家属电话（脱敏）"
+            # 投递给**所有社区**（正文含老人姓氏与家属联系方式）。
+            # 社区取不到就不发给网格员（fail-closed）；家属照常收（本就是直系关系）。
+            _tenant = tenant_of_user(uid)
+            if not _tenant:
+                _log.warning("老人 %s 无归属社区：安全留意提醒不发给网格员（避免跨社区投递）", uid)
+                grids_for_elder = []
+            else:
+                grids_for_elder = managers_of(_tenant)
+            for g in grids_for_elder:
                 create_notification(
                     g["id"], "elderly_safety",
                     f"👴 老人安全留意：{elder.get('name', '')}",
