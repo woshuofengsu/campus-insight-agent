@@ -518,7 +518,14 @@ class Orchestrator:
             # 通知负责人（消息中心）
             from data.db_notifications import create_notification
             from data.db_user import list_users
-            for gu in list_users(role="grid"):
+            from utils.tenant import tenant_of_user
+            # 多租户（Codex 评审 I2）：**只通知本社区的网格员**。原来 `list_users(role="grid")`
+            # 会把"某用户需人工处理 + AI 整理的上下文"投递给**所有社区**的网格员（跨社区投递，
+            # 内容含用户诉求）。社区取不到就不投递通知（fail-closed；处理包已建、消息中心仍可见）。
+            handoff_tenant = tenant_of_user(uid)
+            if not handoff_tenant:
+                _log.warning("转人工用户 %s 无归属社区：处理包 #%s 已建但不投递通知", uid, hid)
+            for gu in (list_users(role="grid", community=handoff_tenant) if handoff_tenant else []):
                 try:
                     create_notification(gu["id"], "agent_handoff",
                                         f"🤝 人工处理：{package['intent']}",

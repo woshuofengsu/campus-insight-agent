@@ -141,21 +141,52 @@ def get_user_by_username(username: str) -> dict | None:
         return dict(row) if row else None
 
 
-def list_users(role: str | None = None) -> list[dict]:
-    """列所有启用中的用户，可按角色过滤。"""
+def list_users(role: str | None = None, community: str | None = None) -> list[dict]:
+    """列所有启用中的用户，可按角色过滤。
+
+    `community`（多租户 · 限收件人用）：**只列该社区的用户**。
+    为什么必须能按社区过滤：转人工、健康异常这类通知原来遍历"所有 grid" → **跨社区投递**，
+    A 社区网格员会收到 B 社区老人的姓名与健康读数（Codex 评审 I2：
+    消息中心只让本人看自己的消息，但敏感内容**已经投递给错误收件人**）。
+    传 None/空串 = 不限社区（保持老调用方行为）；**通知类调用必须传具体社区**。
+    """
+    from utils.tenant import normalize_tenant
+    # ⚠️ fail-closed：`community` **传了就一定要过滤**——归一化后为空（历史行政区值/空串）
+    # 意味着"这个身份没有合法社区"，此时返回**空表**，绝不能退化成"不过滤=返回所有人"
+    # （第一版就是这么错的：managers_of("海淀区") 返回了全部网格员）。
+    if community is not None:
+        t = normalize_tenant(community)
+        if not t:
+            return []
+    else:
+        t = None
     with get_db() as conn:
+        q = ("SELECT id, username, role, name, community, resident_id, building, unit "
+             "FROM user_profile WHERE is_active = 1")
+        args: list = []
         if role:
-            rows = conn.execute(
-                "SELECT id, username, role, name, community, resident_id, building, unit "
-                "FROM user_profile WHERE is_active = 1 AND role = ? ORDER BY role, id",
-                (role,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT id, username, role, name, community, resident_id, building, unit "
-                "FROM user_profile WHERE is_active = 1 ORDER BY role, id"
-            ).fetchall()
+            q += " AND role = ?"
+            args.append(role)
+        if t:
+            q += " AND community = ?"
+            args.append(t)
+        rows = conn.execute(q + " ORDER BY role, id", args).fetchall()
         return [dict(r) for r in rows]
+
+
+def managers_of(tenant: str) -> list[dict]:
+    """**某个社区的事件该通知哪些网格员**（结构化收件人入口，多租户 Codex 评审 I2）。
+
+    为什么需要这个函数：项目里曾有 19 处 `list_users(role="grid")` 直接把"所有网格员"
+    当收件人 → 跨社区投递（A 社区的事投给 B 社区的网格员，内容常含居民诉求、老人健康读数）。
+    根因不是"忘了加 WHERE"，而是**收件人选择没有统一入口**。
+    今后凡是"社区内发生的事要通知负责人"，一律走本函数；`tenant` 为空返回空表（fail-closed）。
+    """
+    from utils.tenant import normalize_tenant
+    t = normalize_tenant(tenant)
+    if not t:
+        return []
+    return list_users(role="grid", community=t)
 
 
 def create_user(username: str, password: str = "", role: str = "resident",

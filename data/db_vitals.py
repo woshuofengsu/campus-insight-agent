@@ -198,9 +198,16 @@ def notify_abnormal_vital(user_id: int, kind: str, level: str, hint: str,
         body = f"最近一次{label}记录：{value_text}。{hint}" if value_text else hint
 
         sent = 0
-        for g in list_users(role="grid"):
-            create_notification(g["id"], "elderly_health", title, body, related_id=uid)
-            sent += 1
+        # 多租户（Codex 评审 I2）：**只发给老人所属社区的网格员**——原来遍历所有 grid 属跨社区投递，
+        # 而正文含老人姓名与健康读数。归属社区取不到就不发给网格员（fail-closed），家属照常收。
+        from utils.tenant import tenant_of_user
+        elder_tenant = tenant_of_user(uid)
+        if elder_tenant:
+            for g in list_users(role="grid", community=elder_tenant):
+                create_notification(g["id"], "elderly_health", title, body, related_id=uid)
+                sent += 1
+        else:
+            _log.warning("老人 %s 无归属社区，健康提醒不发给网格员（避免跨社区投递）", uid)
         for guardian in list_guardians_of(uid):
             create_notification(guardian["id"], "elderly_health", title,
                                 f"{body}（社区网格员也收到了这条提醒）", related_id=uid)
