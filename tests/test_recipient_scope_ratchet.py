@@ -27,7 +27,7 @@ BASELINE = {
     "db_policy.py": 5,          # 知识到期、提问转人工等
     "db_health_content.py": 2,  # 咨询超时/回复提醒
     "db_notice.py": 1,          # 通知发布提醒
-    "db_weather.py": 1,         # 极端天气巡查任务提醒
+
     "db_dispatch.py": 3,        # 派单候选（按楼栋匹配，仍需按社区收口）
 }
 

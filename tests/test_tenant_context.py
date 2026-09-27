@@ -87,7 +87,7 @@ def test_escalate_uses_task_community(monkeypatch):
 
     notified: list = []
     monkeypatch.setattr(db_weather, "_notify_managers",
-                        lambda title, content, related_id=None, online_user_ids=None:
+                        lambda title, content, related_id=None, online_user_ids=None, tenant=None:
                         notified.append((related_id, list(online_user_ids or []))) or 1)
     monkeypatch.setattr(db_weather, "_last_escalation_log", lambda tid: None)
     monkeypatch.setattr(db_weather, "log_activity", lambda *a, **k: None)
@@ -108,7 +108,7 @@ def test_escalate_explicit_list_still_wins(monkeypatch):
     from data import db_weather
     notified: list = []
     monkeypatch.setattr(db_weather, "_notify_managers",
-                        lambda title, content, related_id=None, online_user_ids=None:
+                        lambda title, content, related_id=None, online_user_ids=None, tenant=None:
                         notified.append(list(online_user_ids or [])) or 1)
     monkeypatch.setattr(db_weather, "_last_escalation_log", lambda tid: None)
     monkeypatch.setattr(db_weather, "log_activity", lambda *a, **k: None)

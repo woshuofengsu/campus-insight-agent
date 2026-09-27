@@ -819,6 +819,8 @@ def create_check_task(alert_id: int, alert_type: str, level: str,
         f"⚠️ 极端天气检查任务：{alert_type}{level}预警",
         f"请按检查清单在{CHECK_HOURS}小时内完成公共设施检查并确认。{ALERT_TEXTS.get(alert_type, '')}",
         related_id=task_id,
+        # 多租户（任务卡 4）：与该任务盖章的社区一致（预警源本身没有社区维度 → 默认社区）
+        tenant=default_community(),
     )
     return task_id
 
@@ -984,16 +986,27 @@ def mark_overdue_tasks() -> list[int]:
 
 
 def _notify_managers(title: str, content: str, related_id: int | None = None,
-                     online_user_ids: list[int] | None = None) -> int:
-    """通知负责人（在线名单由调用方传入；默认通知全部 grid 角色负责人）。"""
+                     online_user_ids: list[int] | None = None,
+                     tenant: str | None = None) -> int:
+    """通知负责人（在线名单由调用方传入；默认通知**该社区的** grid 角色负责人）。
+
+    多租户（Codex 评审 I2 / 任务卡 4）：`tenant` 给了就只通知该社区——
+    极端天气巡查任务本身是社区范围的事，原来不传就是**全平台广播**。
+    `tenant` 为空且没有显式在线名单时**不通知任何人**（fail-closed），
+    并记一条 warning（宁可漏发也要让人看见，不允许悄悄投给所有社区）。
+    """
     try:
         from data.db_notifications import create_notification
         users = []
         if online_user_ids:
             users = [{"id": uid} for uid in online_user_ids]
         else:
-            from data.db_user import list_users
-            users = list_users(role="grid")
+            from data.db_user import managers_of
+            if not tenant:
+                _log.warning("_notify_managers 未指定社区且无在线名单：不投递（避免跨社区广播）"
+                             "｜title=%s", title)
+                return 0
+            users = managers_of(tenant)
         count = 0
         for u in users:
             try:
@@ -1097,6 +1110,9 @@ def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
 
     for t in tasks:
         task_id = t["id"]
+        # 任务所属社区（B6 起 weather_check_tasks 有 tenant_id）——通知只发给这个社区，
+        # 避免把"某社区的极端天气巡查任务"广播到全平台（任务卡 4）。
+        task_tenant = normalize_tenant(t.get("tenant_id"))
         title = f"紧急天气检查任务：{t['alert_type']}{t['level']}预警"
         content = (
             f"检查任务 #{task_id} 已超时未确认，请立即安排检查并确认。"
@@ -1116,11 +1132,13 @@ def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
 
         # 第 1 层：通知所有在线负责人
         sent = _notify_managers(title, content, related_id=task_id,
-                                online_user_ids=online_user_ids)
+                                online_user_ids=online_user_ids,
+                                tenant=task_tenant)
         if sent == 0:
             # 升级通知失败：重试一次
             sent = _notify_managers(title, content, related_id=task_id,
-                                    online_user_ids=online_user_ids)
+                                    online_user_ids=online_user_ids,
+                                    tenant=task_tenant)
             if sent == 0:
                 log_activity("系统", "升级通知失败", "weather_check_task", task_id,
                              target_title=title, module=MODULE, detail="重试一次后仍失败，标记升级通知失败")
@@ -1135,7 +1153,8 @@ def escalate_overdue_tasks(online_user_ids: list[int] | None = None,
                        if per_task_senior else senior_user_ids)
         if task_senior:
             senior_sent = _notify_managers(title, content, related_id=task_id,
-                                           online_user_ids=task_senior)
+                                           online_user_ids=task_senior,
+                                           tenant=task_tenant)
             results["senior_notified"] += senior_sent
             if senior_sent == 0:
                 log_activity("系统", "升级通知失败", "weather_check_task", task_id,
