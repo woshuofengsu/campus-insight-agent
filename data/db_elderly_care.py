@@ -20,7 +20,11 @@ import re
 import sqlite3
 from datetime import date, datetime
 
+import logging
+
 from data.db_core import get_db
+
+_log = logging.getLogger(__name__)
 from utils.tenant import stamp_tenant, tenant_clause
 from data.db_notifications import create_notification, log_activity
 from data.db_repair import _dec_phone, _enc_phone
@@ -191,6 +195,23 @@ def _notify_user(user_id: int | None, type_: str, title: str, content: str = "",
         create_notification(user_id, type_, title, content, related_id)
     except Exception:
         pass
+
+
+def _medication_owner(reminder_id: int) -> int:
+    """取用药提醒的归属老人 uid；查不到/异常返回 0（fail-closed，调用方据此不投递）。"""
+    try:
+        with get_db() as conn:
+            row = conn.execute("SELECT user_id FROM medication_reminders WHERE id=?",
+                               (reminder_id,)).fetchone()
+    except Exception as e:  # noqa: BLE001 — 查不动绝不放行
+        _log.warning("查用药提醒归属失败 reminder=%s：%s", reminder_id, e)
+        return 0
+    if not row:
+        return 0
+    try:
+        return int(row["user_id"] or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _notify_grids(title: str, content: str = "", related_id: int | None = None) -> int:
@@ -786,14 +807,23 @@ def remind_unreviewed_medications() -> list[dict]:
                          target_title=item["drug"], module=MODULE,
                          detail="用药提醒待审核超过 24 小时，请尽快审核")
             try:
-                from data.db_user import list_users
-                for u in list_users(role="grid"):
-                    from data.db_notifications import create_notification
+                # 多租户（Codex 评审 I2 / 任务卡 4）：**只通知该用药提醒归属老人所在社区**的网格员。
+                # 原来 list_users(role="grid") 把"某老人的用药待审核"广播给所有社区；
+                # 社区取不到就不投递（fail-closed），提醒仍留在管理页可查。
+                from data.db_notifications import create_notification
+                from data.db_user import managers_of
+                from utils.tenant import tenant_of_user
+                _owner = _medication_owner(item["id"])
+                _tenant = tenant_of_user(_owner) if _owner else ""
+                if not _tenant:
+                    _log.warning("用药提醒 #%s 无归属社区，超时提醒不广播（避免跨社区投递）",
+                                 item["id"])
+                for u in managers_of(_tenant):
                     create_notification(u["id"], "medication",
                                         "⏰ 用药提醒待审核超时",
                                         f"「{item['drug']}」用药提醒待审核已超过 24 小时，请尽快处理。")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001 — 不静默：记日志
+                _log.warning("用药审核超时提醒投递失败 reminder=%s：%s", item["id"], e)
         else:
             log_activity("系统", "用药修改超期提醒", "medication_reminder", item["id"],
                          target_title=item["drug"], module=MODULE,
