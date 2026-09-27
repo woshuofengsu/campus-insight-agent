@@ -227,14 +227,68 @@ def web_medication_create(req: MedicationCreate, request: Request):
     return _ok({"reminder_id": mid}, "已提交，待审核")
 
 
+# 老年端资源的归属列（授权矩阵 §三：同社区 ≠ 有权操作这个人）
+_RESOURCE_OWNER_COL = {
+    "emergency_contacts": "user_id",
+    "medication_reminders": "user_id",
+    "emergency_calls": "user_id",
+}
+
+
+def _resource_owner_uid(table: str, row_id: int) -> int:
+    """取资源归属人 uid；查不到/异常返回 0（fail-closed，绝不放行）。"""
+    from data.db_core import get_db
+    if table not in _RESOURCE_OWNER_COL:
+        _log.warning("未登记的老年端资源表：%s（按无权处理）", table)
+        return 0
+    col = _RESOURCE_OWNER_COL[table]
+    try:
+        with get_db() as conn:
+            row = conn.execute(f"SELECT {col} FROM {table} WHERE id=?", (row_id,)).fetchone()
+    except Exception as e:  # noqa: BLE001 — 查不动绝不放行
+        _log.warning("查资源归属失败 table=%s id=%s：%s", table, row_id, e)
+        return 0
+    if not row:
+        return 0
+    try:
+        return int(row[col] or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _owns_resource(request: Request, table: str, row_id: int, *,
+                   allow_family: bool = True) -> bool:
+    """授权矩阵落点：**这道校验解决"有权操作这个人"**（`_same_tenant` 只解决"同社区"）。
+
+    - `allow_family=True`（默认）：本人，或**已绑定家属**代本人操作
+      （绑定关系由 `_resolve_elder_uid` 校验：`?elder_id=X` 且当前用户是 X 的绑定家属）；
+    - `allow_family=False`：**只有本人**——用于"打卡"这类只能老人自己做的事（矩阵 D1/D4）。
+    """
+    u = _user(request)
+    acting = None
+    if allow_family:
+        acting = _resolve_elder_uid(request)
+    acting = acting or u.get("uid")
+    owner = _resource_owner_uid(table, row_id)
+    if not owner or not acting:
+        return False
+    return int(owner) == int(acting)
+
+
 @router.post("/medications/{rid}/modify")
 def web_medication_modify(rid: int, req: MedicationCreate, request: Request):
-    """修改用药提醒 → 重新审核（审核期间原规则继续播报）。"""
+    """修改用药提醒 → 重新审核（审核期间原规则继续播报）。
+
+    授权（矩阵 D1）：**本人或已绑定家属**可改；网格员不代改（只审核）。
+    """
     from data.db_elderly_care import modify_medication
     u = _user(request)
     # 多租户（B6）：按 id 直取只能改本社区的用药提醒（否则可跨社区改别人家老人的药）
     if not _same_tenant(request, "medication_reminders", rid):
         return _fail(1003, "无权限修改该用药提醒（非本社区）")
+    # 同社区所有权（Codex 评审 F2）：同社区 ≠ 有权操作这个人
+    if not _owns_resource(request, "medication_reminders", rid):
+        return _fail(1003, "无权限修改该用药提醒（非本人或未绑定家属）")
     times = [t.strip() for t in req.times.replace("，", ",").split(",") if t.strip()]
     ok_, msg = modify_medication(
         rid, u.get("name") or "老人", req.drug_name, req.dosage, times,
@@ -313,11 +367,19 @@ def web_contacts_create(req: ContactCreate, request: Request):
 
 @router.post("/emergency-contacts/{cid}/delete")
 def web_contacts_delete(cid: int, request: Request):
+    """删除紧急联系人。
+
+    授权（矩阵 D1）：**本人或已绑定家属**；网格员不代改（只审核）。
+    原来只有 `_same_tenant` → 同社区任何居民都能删别人家老人的联系人（Codex 评审 F2）。
+    """
     from data.db_elderly_care import delete_emergency_contact
     u = _user(request)
     # 多租户（B6）：紧急联系人按 id 直取只能删本社区的
     if not _same_tenant(request, "emergency_contacts", cid):
         return _fail(1003, "无权限删除该联系人（非本社区）")
+    # 同社区所有权（Codex 评审 F2）
+    if not _owns_resource(request, "emergency_contacts", cid):
+        return _fail(1003, "无权限删除该联系人（非本人或未绑定家属）")
     ok_, msg = delete_emergency_contact(cid, actor=u.get("name") or "老人")
     if not ok_:
         return _fail(2001, msg)
@@ -326,7 +388,14 @@ def web_contacts_delete(cid: int, request: Request):
 
 @router.post("/emergency/{call_id}/action")
 def web_sos_action(call_id: int, req: SosAction, request: Request):
+    """SOS 响应/结束（处置）。
+
+    授权（矩阵）：**只有本社区网格员能处置**——原来只查同社区，
+    于是同社区普通居民也能"处置"别人家老人的求助（Codex 评审 F2）。
+    """
     from data.db_elderly_care import respond_sos, end_sos
+    if _require_role(request, "grid"):
+        return _fail(1003, "无权限处置求助（仅本社区网格员）")
     actor = _user(request).get("name") or "负责人"
     # 多租户（B6）：SOS 处置按 id 直取只能动本社区的求助（含位置与老人信息）
     if not _same_tenant(request, "emergency_calls", call_id):
@@ -342,25 +411,35 @@ def web_sos_action(call_id: int, req: SosAction, request: Request):
 
 @router.post("/medications/{rid}/toggle")
 def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
+    """用药：打卡（taken/snooze）与暂停/恢复。
+
+    授权（矩阵 D1/§二）：
+      · **打卡只能老人本人**（`allow_family=False`）——家属替老人打卡等于伪造服药记录；
+      · 暂停/恢复同理只限本人（家属要停就走去审核的修改流程）。
+    原来这两类只查 `_same_tenant`（Codex 评审 F2）。
+    """
     from data.db_elderly_care import pause_medication, resume_medication, mark_intake
     from agent.tone import human_status  # noqa: F401
     actor = _user(request).get("name") or "老人"
-    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    uid = _user(request).get("uid")          # 打卡/暂停只能本人，不用 elder_id 代操作
     _touch(uid)
     if req.action == "taken" or req.action == "snooze":
+        if not _owns_resource(request, "medication_reminders", rid, allow_family=False):
+            return _fail(1003, "无权限操作该用药提醒（打卡只能本人）")
         ok_, msg, streak = mark_intake(uid, rid, action=req.action)
         encourage = f"连续 {streak} 天按时吃药，真棒！" if streak >= 3 else msg
         if not ok_:
             return _ok({"reminder_id": rid, "streak": streak, "already": True}, msg)  # 重复打卡幂等
         return _ok({"reminder_id": rid, "streak": streak}, encourage)
+    # 多租户（B6）：暂停/恢复按 id 直取，只能动本社区的用药提醒
+    if not _same_tenant(request, "medication_reminders", rid):
+        return _fail(1003, "无权限操作该用药提醒（非本社区）")
+    # 同社区所有权（Codex 评审 F2）
+    if not _owns_resource(request, "medication_reminders", rid, allow_family=False):
+        return _fail(1003, "无权限操作该用药提醒（只能本人）")
     if req.action == "pause":
-        # 多租户（B6）：暂停/恢复按 id 直取，只能动本社区的用药提醒
-        if not _same_tenant(request, "medication_reminders", rid):
-            return _fail(1003, "无权限操作该用药提醒（非本社区）")
         ok_, msg = pause_medication(rid, actor=actor)
     else:
-        if not _same_tenant(request, "medication_reminders", rid):
-            return _fail(1003, "无权限操作该用药提醒（非本社区）")
         ok_, msg = resume_medication(rid, actor=actor)
     if not ok_:
         return _fail(2001, msg)
@@ -475,10 +554,16 @@ class VitalCreate(BaseModel):
 
 @router.post("/vitals")
 def web_vital_create(req: VitalCreate, request: Request):
-    """老年端（或家属代录）录一条血压/血糖，返回分级与固定提示语（不诊断）。"""
+    """老年端录一条血压/血糖，返回分级与固定提示语（不诊断）。
+
+    授权（矩阵 D4）：**只能本人录入**——家属"代录"等于替老人造健康数据，
+    展示与告警都会失真，所以不开放；家属仍可**查看**（走 `manage/vitals` 且限本社区、需绑定）。
+    """
     from data.db_vitals import add_vital, notify_abnormal_vital
     u = _user(request)
-    uid = _resolve_elder_uid(request) or u.get("uid")
+    if _resolve_elder_uid(request) and _resolve_elder_uid(request) != u.get("uid"):
+        return _fail(1003, "健康记录只能老人本人录入（家属可查看，不可代录）")
+    uid = u.get("uid")
     _touch(uid)
     vid, level, meta = add_vital(uid, req.kind, req.sys, req.dia, req.glucose,
                                  req.measure_when, req.measured_at,
