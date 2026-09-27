@@ -209,19 +209,27 @@ def agent_analytics(request: Request, days: int = 7):
 
 @router.get("/care-metrics")
 def agent_care_metrics(request: Request, days: int = 7):
-    """关怀量化（U4）：情绪识别 / 关怀触达率 / 情绪→转人工率 / 场景分布（grid 专属）。"""
+    """关怀量化（U4）：情绪识别 / 关怀触达率 / 情绪→转人工率 / 场景分布（grid 专属）。
+
+    多租户（Codex 评审 I1）：**只统计本社区**——派生指标不能跨社区汇总。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_care_metrics import get_care_metrics
-    return _ok(get_care_metrics(days=days))
+    return _ok(get_care_metrics(days=days, tenant=_tenant(request)))
 
 
 @router.get("/kb-health")
 def agent_kb_health(request: Request, days: int = 7, top_n: int = 10):
-    """知识库健康度（U3）：命中率 / 零命中问题 top / 检索路线 / 语料规模（grid 专属）。"""
+    """知识库健康度（U3）：命中率 / 零命中问题 top / 检索路线 / 语料规模（grid 专属）。
+
+    多租户（Codex 评审 I1）：**提问类聚合只算本社区**（零命中榜是居民问题原文）；
+    知识库本身的规模/分类是跨社区共享语料，保持全局。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_kb_metrics import get_kb_health
+    return _ok(get_kb_health(days=days, top_n=top_n, tenant=_tenant(request)))
     return _ok(get_kb_health(days=days, top_n=top_n))
 
 

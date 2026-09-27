@@ -17,6 +17,17 @@ def fresh_db():
     tmp = tempfile.mkdtemp(prefix="care_metrics_")
     db_core._DB_PATH = ""
     db_core.init_db(os.path.join(tmp, "care.db"))
+    # 多租户（任务卡 4）：关怀指标按社区聚合，事件按归属人盖章 → 夹具用户必须有社区
+    with db_core.get_db() as conn:
+        for uid in (1, 2, 3):
+            conn.execute(
+                "INSERT OR REPLACE INTO user_profile "
+                "(id, username, role, name, is_active, community) "
+                "VALUES (?, ?, 'resident', ?, 1, '海淀小区')",
+                (uid, "u%d" % uid, "用户%d" % uid))
+        conn.commit()
+    from utils.tenant import clear_cache
+    clear_cache()
     yield
     db_core._DB_PATH = orig
 
@@ -34,7 +45,7 @@ def test_care_metrics_aggregation(fresh_db):
     # 3) 无情绪，仅场景共情
     log_care_event(3, "resident", emotion_tag="", comfort_used=False,
                    scene="fail", scene_line_used=True, intent="policy_expert", status="失败")
-    m = get_care_metrics(days=7)
+    m = get_care_metrics(days=7, tenant="海淀小区")
     assert m["care_events"] == 3
     assert m["emotion_events"] == 2
     # 触达数只在「识别到情绪」的事件里统计 → 2 条情绪事件都有安抚，触达率 100%
@@ -51,7 +62,7 @@ def test_care_metrics_aggregation(fresh_db):
 
 def test_care_metrics_empty_safe(fresh_db):
     from data.db_care_metrics import get_care_metrics
-    m = get_care_metrics(days=7)
+    m = get_care_metrics(days=7, tenant="海淀小区")
     assert m["care_events"] == 0 and m["touch_rate"] == 0.0
     assert m["by_emotion"] == {} and m["by_scene"] == {}
 

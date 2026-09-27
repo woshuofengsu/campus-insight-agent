@@ -16,8 +16,15 @@ from data.db_core import get_db
 _log = logging.getLogger(__name__)
 
 
-def get_kb_health(days: int = 7, top_n: int = 10) -> dict:
-    """知识库健康度（近 days 天）。任何异常都返回零值结构，不影响页面。"""
+def get_kb_health(days: int = 7, top_n: int = 10, tenant: str | None = None) -> dict:
+    """知识库健康度（近 days 天）。任何异常都返回零值结构，不影响页面。
+
+    多租户（Codex 评审 I1）：**居民提问的聚合只算本社区**——
+    `kb_query_log` 存的是居民问题原文，原来"零命中问题榜"把所有社区的问题聚合在一起，
+    等于让每个社区的网格员都能读到别社区居民问了什么。知识库本身（`knowledge_base`）
+    是**跨社区共享**的公开语料，其规模/分类统计保持全局。
+    `tenant` 传空串 → 只返回零值结构（fail-closed，不回落到"统计全部"）。
+    """
     out = {
         "days": days, "queries": 0, "hits": 0, "hit_rate": 0.0,
         "avg_score": 0.0, "retrieval": {}, "zero_hit_top": [],
@@ -29,13 +36,22 @@ def get_kb_health(days: int = 7, top_n: int = 10) -> dict:
         out["embedding"] = describe()
     except Exception:
         pass
+    from utils.tenant import normalize_tenant
+    scope = normalize_tenant(tenant) if tenant is not None else None
+    if tenant is not None and not scope:
+        return out          # 身份没有合法社区 → 不返回别社区的问题聚合
+    # 社区过滤：kb_query_log 没有租户列，按其归属用户所在社区筛（子查询，避免 N 次往返）
+    _scope_sql, _scope_args = "", []
+    if scope:
+        _scope_sql = (" AND user_id IN (SELECT id FROM user_profile WHERE community=?)")
+        _scope_args = [scope]
     try:
         with get_db() as conn:
             row = conn.execute(
                 "SELECT COUNT(*) c, SUM(CASE WHEN matched=1 THEN 1 ELSE 0 END) h, "
                 "AVG(CASE WHEN matched=1 THEN top_score ELSE NULL END) s "
-                "FROM kb_query_log WHERE created_at >= datetime('now', ?)",
-                (f"-{days} days",)).fetchone()
+                "FROM kb_query_log WHERE created_at >= datetime('now', ?)" + _scope_sql,
+                [f"-{days} days"] + _scope_args).fetchone()
             out["queries"] = row["c"] or 0
             out["hits"] = row["h"] or 0
             out["hit_rate"] = round(out["hits"] * 100.0 / out["queries"], 1) if out["queries"] else 0.0
@@ -43,16 +59,16 @@ def get_kb_health(days: int = 7, top_n: int = 10) -> dict:
 
             for r in conn.execute(
                 "SELECT retrieval, COUNT(*) c FROM kb_query_log "
-                "WHERE created_at >= datetime('now', ?) GROUP BY retrieval",
-                (f"-{days} days",)):
+                "WHERE created_at >= datetime('now', ?)" + _scope_sql + " GROUP BY retrieval",
+                [f"-{days} days"] + _scope_args):
                 out["retrieval"][r["retrieval"] or "unknown"] = r["c"]
 
             # 零命中问题 top N（未命中的问题按原文聚合，指出知识库缺口）
             for r in conn.execute(
                 "SELECT question, COUNT(*) c, MAX(top_score) s FROM kb_query_log "
-                "WHERE matched=0 AND created_at >= datetime('now', ?) "
-                "GROUP BY question ORDER BY c DESC, s DESC LIMIT ?",
-                (f"-{days} days", top_n)):
+                "WHERE matched=0 AND created_at >= datetime('now', ?)" + _scope_sql +
+                " GROUP BY question ORDER BY c DESC, s DESC LIMIT ?",
+                [f"-{days} days"] + _scope_args + [top_n]):
                 out["zero_hit_top"].append({
                     "question": r["question"], "count": r["c"],
                     "best_score": round(r["s"], 2) if r["s"] else 0.0})

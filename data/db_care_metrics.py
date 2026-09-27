@@ -12,6 +12,7 @@
 import logging
 
 from data.db_core import get_db
+from utils.tenant import tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -39,8 +40,12 @@ def log_care_event(user_id: int | None, role: str = "resident", emotion_tag: str
         _log.debug("记录关怀事件失败（已忽略）", exc_info=True)
 
 
-def get_care_metrics(days: int = 7) -> dict:
-    """关怀量化指标（近 days 天）。任何异常返回零值结构，不影响页面。"""
+def get_care_metrics(days: int = 7, tenant: str | None = None) -> dict:
+    """关怀量化指标（近 days 天）。任何异常返回零值结构，不影响页面。
+
+    多租户（Codex 评审 I1）：`tenant` 给了就**只统计本社区**的关怀事件——原来这个聚合跨所有
+    社区，网格端"关怀触达率"里混进了别的社区的数据。空串 → 返回零值结构（fail-closed）。
+    """
     out = {
         "days": days, "care_events": 0, "emotion_events": 0,
         "touch_events": 0, "touch_rate": 0.0, "scene_line_events": 0,
@@ -49,6 +54,10 @@ def get_care_metrics(days: int = 7) -> dict:
         "by_emotion": {}, "by_scene": {},
     }
     try:
+        args: list = [f"-{days} days"]
+        tc = tenant_clause(tenant, args)
+        if tc is None:
+            return out          # 空租户 → 零值（绝不回落到"统计全部"）
         with get_db() as conn:
             row = conn.execute(
                 "SELECT COUNT(*) c, "
@@ -60,8 +69,8 @@ def get_care_metrics(days: int = 7) -> dict:
                 "SUM(CASE WHEN emotion_tag != '' AND status IN "
                 "    ('transferred_to_human','needs_human') THEN 1 ELSE 0 END) to_human, "
                 "SUM(CASE WHEN emotion_tag != '' AND status='成功' THEN 1 ELSE 0 END) closed "
-                "FROM care_event_log WHERE created_at >= datetime('now', ?)",
-                (f"-{days} days",)).fetchone()
+                "FROM care_event_log WHERE created_at >= datetime('now', ?)" + tc,
+                args).fetchone()
             out["care_events"] = row["c"] or 0
             out["emotion_events"] = row["emo"] or 0
             out["touch_events"] = row["touch"] or 0
