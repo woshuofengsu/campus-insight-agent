@@ -120,16 +120,27 @@ def _log_once(action: str, detail: str, target_type: str = "") -> None:
 
 
 def _notify_managers(title: str, content: str, related_id: int | None = None,
-                     online_user_ids: list[int] | None = None) -> int:
-    """通知负责人（默认全部 grid 角色；在线名单由调用方传入）。"""
+                     online_user_ids: list[int] | None = None,
+                     tenant: str | None = None) -> int:
+    """通知负责人（在线名单由调用方传入；默认通知本社区 grid 角色）。
+
+    多租户（任务卡 4）：`tenant` 给了就只通知该社区。
+    ⚠️ **本文件 6 个调用方尚未逐个迁移**（3 处是全局内容到期提醒、3 处是咨询类应取咨询自身社区）——
+    在迁移完成前，未传 tenant 时**保持原行为并打 warning**，绝不静默不投递
+    （fail-closed 用在这里会造成"通知悄悄消失"，比跨社区广播更难发现）。
+    """
     try:
         from data.db_notifications import create_notification
         users = []
         if online_user_ids:
             users = [{"id": uid} for uid in online_user_ids]
+        elif tenant:
+            from data.db_user import managers_of
+            users = managers_of(tenant)
         else:
             from data.db_user import list_users
-            users = list_users(role="grid")
+            users = list_users(role="grid")          # 待迁移：见 docstring
+            _log.warning("_notify_managers 未指定社区，暂按全部网格员投递（待迁移）｜title=%s", title)
         count = 0
         for u in users:
             try:

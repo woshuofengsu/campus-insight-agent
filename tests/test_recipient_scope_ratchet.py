@@ -25,7 +25,7 @@ BASELINE = {
     "db_elderly.py": 1,         # SOS 指派（notify_sos_targeted）——久未活跃已迁移
     "db_repair.py": 3,          # 工单流转通知（受理/派单/解决）
     "db_policy.py": 5,          # 知识到期、提问转人工等
-    "db_health_content.py": 2,  # 咨询超时/回复提醒
+    "db_health_content.py": 3,  # _notify_managers 待迁移（6 个调用方未逐个迁移）+ list_consult_handlers
 
 
     "db_dispatch.py": 3,        # 派单候选（按楼栋匹配，仍需按社区收口）
