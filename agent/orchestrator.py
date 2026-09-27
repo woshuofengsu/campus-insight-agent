@@ -511,6 +511,7 @@ class Orchestrator:
                 package["user"].pop(f, None)
             collected.pop("phone", None)
 
+        notify_failed = 0
         try:
             hid = db_agent.create_handoff(self.bb.session_id, uid, role,
                                           package["intent"], reason, package)
@@ -523,17 +524,30 @@ class Orchestrator:
                                         f"🤝 人工处理：{package['intent']}",
                                         f"用户「{ctx.get('name') or uid}」需人工处理：{reason}（AI 已整理上下文）",
                                         related_id=hid)
-                except Exception:
-                    pass
+                except Exception as ne:  # noqa: BLE001
+                    notify_failed += 1
+                    _log.warning("转人工通知投递失败（处理包 #%s 已建，消息中心仍可见）：%s", hid, ne)
         except Exception as e:  # noqa: BLE001
-            _log.warning("转人工落库/通知失败：%s", e)
+            _log.warning("转人工处理包**未建立**：%s", e)
             hid = None
 
         self._log("negotiation", "转人工", f"{reason}（处理包 #{hid or '—'}）")
         result = dict(result)
-        result["reply"] = (result.get("reply", "") +
-                           "\n\n已为您转接工作人员，他们会直接联系您，不用重新说一遍。").strip()
-        result["status"] = "transferred_to_human"
+        # ⚠️ Codex 评审 F3 修复（2026-09-25）：**没建包就不能说"已转接"**。
+        # 原实现无论 create_handoff 成败都回复"已为您转接工作人员"并置 transferred_to_human，
+        # 于是"居民以为有人接手、工作人员实际没有待办"——一个失败案例就能推翻
+        # 「不会编造办理结果 / 有人工兜底」的全部说法（也违反本项目"不许吞异常后返回成功"的门禁）。
+        if hid:
+            result["reply"] = (result.get("reply", "") +
+                               "\n\n已为您转接工作人员，他们会直接联系您，不用重新说一遍。").strip()
+            result["status"] = "transferred_to_human"
+            if notify_failed:
+                _log.warning("处理包 #%s 已建，但有 %d 位负责人通知未投递成功", hid, notify_failed)
+        else:
+            result["reply"] = (result.get("reply", "") +
+                               "\n\n⚠️ 这次没转接成功（系统繁忙），请稍后再试一次，"
+                               "或直接拨打社区服务电话——我这边**没有**生成人工待办。").strip()
+            result["status"] = "转人工失败"
         result["handoff_id"] = hid
         return result
 

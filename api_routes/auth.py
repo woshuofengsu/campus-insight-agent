@@ -1,9 +1,13 @@
 # api_routes/auth.py
 """认证路由模块（从 api_web.py 拆出，P2-04 / P1-F2-01）：登录 / 演示登录 / 当前用户 / 改密 / PIPL 导出与注销。"""
+import logging
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, make_token
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -149,16 +153,30 @@ def me_export(request: Request):
     u = _user(request)
     uid = u.get("uid")
     out = {"user_id": uid, "name": u.get("name") or "", "role": u.get("role") or ""}
+    # ⚠️ Codex 评审 REL-04 修复（2026-09-25）：
+    #   ① 各表的"归属用户列"**不一样**——community_issues / proposals 用的是 `reporter_id`，
+    #      原来统一按 `user_id` 查 → SQL 直接报 no such column，再被裸 except 吞掉 →
+    #      **居民自己的工单与提案从导出里静默消失**（PIPL 导出不完整且无人知道）；
+    #   ② 导出失败必须**显式报告**：把出错的表与原因写进导出内容，而不是当没这回事。
+    _USER_COL = {"community_issues": "reporter_id", "proposals": "reporter_id",
+                 "health_consults": "user_id", "agent_dialogs": "user_id"}
+    export_errors: list[str] = []
     with get_db() as conn:
         for table, cols in (("community_issues", "reported_at"), ("proposals", "created_at"),
                             ("health_consults", "created_at"), ("agent_dialogs", "created_at")):
+            col = _USER_COL.get(table, "user_id")
             try:
                 rows = conn.execute(
-                    f"SELECT * FROM {table} WHERE user_id=? ORDER BY {cols} DESC LIMIT 50",
+                    f"SELECT * FROM {table} WHERE {col}=? ORDER BY {cols} DESC LIMIT 50",
                     (uid,)).fetchall()
-            except Exception:
+            except Exception as e:  # noqa: BLE001 — 不静默：记日志 + 写进导出内容
+                _log.warning("导出本人数据失败 table=%s col=%s：%s", table, col, e)
+                export_errors.append(f"{table}（按 {col} 查询失败：{type(e).__name__}）")
+                out[table] = []
                 continue
             out[table] = [dict(r) for r in rows]
+    if export_errors:
+        out["export_incomplete"] = export_errors
     # 脱敏：手机号打码
     def mask(obj):
         if isinstance(obj, dict):

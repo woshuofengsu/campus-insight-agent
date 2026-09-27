@@ -509,24 +509,56 @@ def web_vitals_summary(request: Request, limit: int = 7):
 
 @manage_router.get("/vitals")
 def web_manage_vitals(request: Request, uid: int = 0, kind: str = "", limit: int = 14):
-    """负责人端：看某位老人的健康记录（网格员关怀页用）。"""
+    """负责人端：看某位老人的健康记录（网格员关怀页用）。
+
+    多租户（Codex 评审 F1 修复）：**先按社区授权，再取数据**。
+    原实现只校验 grid 角色就按传入 uid 取值 → A 社区网格员可读到 B 社区老人的健康记录。
+    现先确认目标老人在请求者本社区；不在则一律 1003，不区分"不存在"与"非本社区"
+    （否则可用错误码探测其他社区有哪些老人）。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     if not uid:
         return _fail(1003, "请指定老人")
+    if not _elder_in_tenant(request, uid):
+        return _fail(1003, "无权限查看该老人（非本社区）")
     from data.db_vitals import list_vitals, vitals_summary
     return _ok({"records": list_vitals(uid, kind, limit=limit),
                 "summary": vitals_summary(uid)})
 
 
+def _elder_in_tenant(request: Request, uid: int) -> bool:
+    """目标用户是否属于请求者所在社区（fail-closed：租户为空/查不到/跨社区一律 False）。"""
+    tenant = _tenant(request)
+    if not tenant:
+        return False
+    from data.db_core import get_db
+    from utils.tenant import normalize_tenant
+    try:
+        with get_db() as conn:
+            row = conn.execute("SELECT community FROM user_profile WHERE id=?", (uid,)).fetchone()
+    except Exception as e:  # noqa: BLE001 — 查不动绝不放行
+        _log.warning("校验老人归属失败 uid=%s：%s", uid, e)
+        return False
+    return bool(row) and normalize_tenant(row["community"]) == tenant
+
+
 @manage_router.get("/elders")
 def web_manage_elders(request: Request):
-    """负责人端：老人下拉列表（网格员选对象用，避免手输用户 ID）。"""
+    """负责人端：老人下拉列表（网格员选对象用，避免手输用户 ID）。
+
+    多租户（Codex 评审 F1 修复）：**只列本社区老人**——原实现只筛 role/is_active，
+    会把全平台老人（含姓名与社区）返回给任意社区的网格员。租户为空时返回空列表。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
+    tenant = _tenant(request)
+    if not tenant:
+        return _ok([])
     from data.db_core import get_db
     with get_db() as conn:
         rows = conn.execute(
             "SELECT id, name, community FROM user_profile "
-            "WHERE role='elderly' AND is_active=1 ORDER BY id").fetchall()
+            "WHERE role='elderly' AND is_active=1 AND community=? ORDER BY id",
+            (tenant,)).fetchall()
     return _ok([dict(r) for r in rows])

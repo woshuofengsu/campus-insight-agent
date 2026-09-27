@@ -156,7 +156,16 @@ class GridAssistantAgent(BaseAgent):
         # 人工处理包（无缝转人工：AI 已整理上下文，可直接处理）
         if any(k in text for k in ("处理包", "人工待办", "转人工的")):
             from data.db_agent import list_handoffs
-            rows = list_handoffs(status="待处理", limit=10)
+            # 多租户（Codex 评审 I4 修复）：**必须传本社区**——`list_handoffs` 走 fail-closed，
+            # 不传 tenant 会直接抛错，被编排层捕获后用户只看到"服务暂不可用"
+            # （即"功能存在、主入口没接完整"）。社区取不到时不查全库，如实说明。
+            from utils.tenant import tenant_of_user
+            tenant = tenant_of_user(ctx.get("uid"))
+            if not tenant:
+                return self._reply("暂时无法确定您所在的社区，请重新登录后再试。",
+                                   "失败", "网格员工作助手",
+                                   chain_note="缺社区上下文，按 fail-closed 拒绝查询")
+            rows = list_handoffs(status="待处理", limit=10, tenant=tenant)
             if not rows:
                 return self._reply("当前没有待处理的人工处理包。", "成功", "网格员工作助手",
                                    chain_note="查询人工处理包（空）")

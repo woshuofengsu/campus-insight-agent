@@ -460,18 +460,21 @@ class NotificationManagerAgent(BaseAgent):
         """
         payload = msg.get("payload") or {}
         if payload.get("event") == "extreme_weather":
+            # Codex 评审 I3 修复（2026-09-25）：这里**没有真的建通知草稿对象**（不写库、不返回草稿 id），
+            # 说"已生成草稿"属于把建议说成事实。文案改为"建议生成…（待负责人在通知管理页创建并发布）"，
+            # 与系统真实状态一致；等真正实现持久化草稿后再改回"已生成"。
             return {
                 "accepted": True,
-                "reply": "已生成天气预警通知草稿（含老人防护提示），需负责人确认后发布",
+                "reply": "建议生成天气预警通知（含老人防护提示）：需负责人在通知管理页创建并确认后发布",
                 "draft_ready": True,
             }
-        # P2 扩展2：报修调度员上报安全隐患 → 生成紧急预警通知草稿（停机点：仍需负责人确认发布）
+        # P2 扩展2：报修调度员上报安全隐患 → 建议生成紧急预警通知（仍由负责人创建后发布）
         if payload.get("event") == "safety_hazard":
             hazard = payload.get("hazard", "安全隐患")
             return {
                 "accepted": True,
-                "reply": f"【通知管理员】已生成「{hazard}」紧急预警通知草稿"
-                         f"（提醒相关楼栋居民避险），待负责人确认后立即发布",
+                "reply": f"【通知管理员】建议生成「{hazard}」紧急预警通知"
+                         f"（提醒相关楼栋居民避险）：需负责人在通知管理页创建并确认后发布",
                 "draft_ready": True, "hazard": hazard,
             }
         return None
