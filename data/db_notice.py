@@ -507,14 +507,21 @@ def _auto_publish(n: dict) -> tuple[bool, str]:
                                  module=MODULE, before_value=STATUS_PENDING, after_value=STATUS_FAILED,
                                  detail=f"发布范围失效：{'、'.join(str(x) for x in _invalid[:5])}")
                     try:
-                        from data.db_user import list_users
-                        for u in list_users(role="grid"):
-                            from data.db_notifications import create_notification
+                        # 多租户（任务卡 4）：**只通知该通知所属社区**的网格员。
+                        # 原来 list_users(role="grid") 会把"某社区的定时通知发布失败"广播到全部社区。
+                        from data.db_notifications import create_notification
+                        from data.db_user import managers_of
+                        from utils.tenant import normalize_tenant
+                        _nt = normalize_tenant(n.get("tenant_id"))
+                        if not _nt:
+                            _log.warning("通知 #%s 无归属社区，发布范围失效提醒不广播（避免跨社区投递）",
+                                         n["id"])
+                        for u in managers_of(_nt):
                             create_notification(u["id"], "notice",
                                                 "⚠️ 定时通知发布范围失效",
                                                 f"通知「{n['title'][:20]}」定时发布失败：发布范围（{'、'.join(str(x) for x in _invalid[:5])}）已失效。")
-                    except Exception:
-                        pass
+                    except Exception as _e:  # noqa: BLE001 — 不静默：记日志
+                        _log.warning("发布范围失效提醒投递失败 notice=%s：%s", n.get("id"), _e)
                     return False, "发布范围失效"
     except Exception:
         pass
