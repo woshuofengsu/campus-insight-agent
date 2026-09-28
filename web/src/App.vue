@@ -4,6 +4,10 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from './stores/user'
 import { useThemeStore } from './stores/theme'
 import { darkTheme } from 'naive-ui'
+// 设计令牌同源（v2 §12.3/§12.7-1）：与 style.css 共用的颜色从 tokens.js 取，
+// 不在这里内联裸 hex —— 两边各写一份是"改了一半就悄悄漂移"的根源。
+// 一致性由 tests/test_design_tokens.py 逐条核对（不是靠自觉）。
+import { LIGHT, DARK, THEME_ONLY as T } from './config/tokens'
 
 const store = useUserStore()
 const theme = useThemeStore()
@@ -31,43 +35,49 @@ const FONT = '"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei","Inte
 const themeOverrides = computed(() => theme.isDark
   ? {
       common: {
-        primaryColor: '#6A8DFF', primaryColorHover: '#8FA8FF', primaryColorPressed: '#2D5BFF',
-        successColor: '#34D399', warningColor: '#FBBF24', errorColor: '#F87171', infoColor: '#38BDF8',
-        bodyColor: '#0F172A', cardColor: '#1E293B', modalColor: '#1E293B', popoverColor: '#1E293B',
-        textColorBase: '#E2E8F0', textColor1: '#E2E8F0', textColor2: '#CBD5E1', textColor3: '#94A3B8',
-        borderColor: '#334155', dividerColor: '#334155', tableColor: '#1E293B',
-        inputColor: '#0F172A', borderRadius: '10px', borderRadiusSmall: '8px',
+        primaryColor: T.darkPrimary, primaryColorHover: T.darkPrimaryHover,
+        // 按下态用品牌蓝本体（style.css 里 `--primary` 在暗色下**没有**被重定义，两种模式同值）
+        primaryColorPressed: LIGHT.primary,
+        successColor: T.darkSuccess, warningColor: T.darkWarning, errorColor: T.darkError, infoColor: T.darkInfo,
+        bodyColor: DARK.bg, cardColor: DARK.cardBg, modalColor: DARK.cardBg, popoverColor: DARK.cardBg,
+        textColorBase: DARK.text, textColor1: DARK.text, textColor2: '#CBD5E1', textColor3: DARK.muted,
+        borderColor: DARK.border, dividerColor: DARK.border, tableColor: DARK.cardBg,
+        inputColor: DARK.bg, borderRadius: '10px', borderRadiusSmall: '8px',
         fontFamily: FONT,
       },
       Button: { borderRadiusMedium: '10px', fontWeight: '600' },
       Card: { borderRadius: '16px' },
-      Input: { borderRadius: '10px', placeholderColor: '#8B95A8' },
+      Input: { borderRadius: '10px', placeholderColor: T.placeholder },
       // Select/级联等的占位符走 InternalSelection 自己的 --n-placeholder-color
       // （不改就是 Naive 默认 #C2C2C2，白底 1.78:1；审计在提案类别下拉里实测抓到）
-      Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: '#8B95A8' } } },
+      Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: T.placeholder } } },
       Modal: { borderRadius: '20px' },
       // 无障碍修正：Naive 默认 placeholder(#C2C2C2, 1.78:1) / Divider 文字(#9CA3AF, 2.54:1) /
       // success 标签文字(2.27:1) 都低于 WCAG AA 4.5:1，这里统一提到达标值
-      Divider: { textColor: '#94A3B8' },
-      Empty: { textColor: '#94A3B8', iconColor: '#475569' },
+      Divider: { textColor: DARK.muted },
+      Empty: { textColor: DARK.muted, iconColor: '#475569' },
       Tag: {
-        textColorSuccess: '#6EE7B7', textColorWarning: '#FCD34D', textColorError: '#FCA5A5',
-        textColorInfo: '#7DD3FC', textColorPrimary: '#93B4FF',
+        textColorSuccess: DARK.inkSuccess, textColorWarning: DARK.inkWarning,
+        textColorError: DARK.inkDanger, textColorInfo: DARK.inkInfo,
+        textColorPrimary: DARK.primaryInk,
         colorSuccess: 'rgba(52,211,153,0.16)',
       },
     }
   : {
       common: {
-        primaryColor: '#2D5BFF', primaryColorHover: '#4F74FF', primaryColorPressed: '#1E3A8A',
-        primaryColorSuppl: '#6A8DFF',
+        primaryColor: LIGHT.primary, primaryColorHover: T.lightPrimaryHover,
+        primaryColorPressed: LIGHT.primaryDeep,
+        primaryColorSuppl: T.lightPrimarySuppl,
         // errorColor 由 #EF4444 调深：白字配 #EF4444 只有 3.76:1，不达 AA；#DC2626 为 4.84:1
-        successColor: '#10B981', warningColor: '#F59E0B', errorColor: '#DC2626', infoColor: '#0EA5E9',
+        successColor: T.lightSuccess, warningColor: T.lightWarning,
+        errorColor: LIGHT.dangerSolid, infoColor: T.lightInfo,
         // 无障碍修正（第九轮）：Naive 的 errorColorHover 默认是 #de576d，而**弹窗确认按钮会被自动聚焦**
         // （focus 态取 errorColorHover），实测白字只有 3.69:1。这里把 hover/pressed/focus 也一起调深：
         // hover #C0223B = 5.94:1，pressed #A11C33 = 7.69:1。
-        errorColorHover: '#C0223B', errorColorPressed: '#A11C33', errorColorSuppl: '#C0223B',
-        textColorBase: '#16233B', textColor1: '#16233B', textColor2: '#334155', textColor3: '#64748B',
-        borderColor: '#E7ECF3', dividerColor: '#E7ECF3',
+        errorColorHover: T.lightErrorHover, errorColorPressed: T.lightErrorPressed,
+        errorColorSuppl: T.lightErrorHover,
+        textColorBase: LIGHT.text, textColor1: LIGHT.text, textColor2: '#334155', textColor3: '#64748B',
+        borderColor: LIGHT.border, dividerColor: LIGHT.border,
         borderRadius: '10px', borderRadiusSmall: '8px',
         fontFamily: FONT,
       },
@@ -76,20 +86,23 @@ const themeOverrides = computed(() => theme.isDark
         // 无障碍修正：Naive 语义色填充按钮用的是**白字**，白字配 #10B981/#F59E0B/#0EA5E9
         // 实测只有 2.5~2.8:1。这里只把「填充按钮」的底色调深（标签/图表仍用上面的亮色），
         // 白字对比度：success 5.54 / warning 5.05 / error 4.84 / info 5.94，全部达标。
-        colorSuccess: '#047857', colorHoverSuccess: '#036B4E', colorPressedSuccess: '#02543D',
-        colorWarning: '#B45309', colorHoverWarning: '#92400E', colorPressedWarning: '#78350F',
-        colorInfo: '#0369A1', colorHoverInfo: '#075985', colorPressedInfo: '#0C4A6E',
+        colorSuccess: LIGHT.inkSuccess, colorHoverSuccess: T.lightSuccessFillHover,
+        colorPressedSuccess: T.lightSuccessFillPressed,
+        colorWarning: LIGHT.inkWarning, colorHoverWarning: T.lightWarningFillHover,
+        colorPressedWarning: T.lightWarningFillPressed,
+        colorInfo: T.lightInfoFill, colorHoverInfo: T.lightInfoFillHover,
+        colorPressedInfo: T.lightInfoFillPressed,
       },
       Card: { borderRadius: '16px' },
       Input: { borderRadius: '10px', placeholderColor: '#66738A' },
       Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: '#66738A' } } },
       Modal: { borderRadius: '20px' },
-      Divider: { textColor: '#5B6B80' },
+      Divider: { textColor: LIGHT.muted },
       Empty: { textColor: '#66738A', iconColor: '#CBD5E1' },
       // Tag 文字色：Naive 默认直接用 warning/error 的亮色作文字（实测 1.96:1），改为深色变体
       Tag: {
-        textColorSuccess: '#0A6B39', textColorWarning: '#92400E', textColorError: '#B91C1C',
-        textColorInfo: '#0369A1', textColorPrimary: '#1E40AF',
+        textColorSuccess: '#0A6B39', textColorWarning: '#92400E', textColorError: LIGHT.inkDanger,
+        textColorInfo: T.lightInfoFill, textColorPrimary: '#1E40AF',
         colorSuccess: 'rgba(16,185,129,0.14)',
       },
     })

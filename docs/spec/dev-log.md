@@ -2247,7 +2247,7 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
 ### 四、验证（本次实测）
 
 - `python scripts/journey_check.py` → **8 条旅程 / 58 项全过**
-- `pytest tests/ -q` → **971 passed + 1 skipped（可运行 972）**，`ruff` 0，`check_claims` 3/3
+- `pytest tests/ -q` → **976 passed + 1 skipped（可运行 977）**，`ruff` 0，`check_claims` 3/3
 - `demo_preflight --fast` 9/9 · `ui_audit` 0 HIGH（37 路由页 / 58 视口）· `mobile_audit` 全通过
 - `mobile_flow_check` 39/39 · `demo_flow_check --mutate --handoff --faults` 26/26
 - 新增门禁：`tests/test_repro_guide.py::test_journey_checker_covers_the_eight_journeys`
@@ -2304,4 +2304,20 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
   **换用户/换社区时直接丢弃**（门禁里有一条专门验它）。
 - 验证：`mobile_flow_check.py` **39/39**（新增 4 项：恢复卡出现 / 接着填恢复原话与摘要 /
   选过后不再提示 / 归属是别人时不带入）；`journey_check` 58/58；`ui_audit` 0 HIGH；`mobile_audit` 全通过；
-  `pytest` 971 passed + 1 skipped（可运行 972）；`ruff` 0。
+  `pytest` 976 passed + 1 skipped（可运行 977）；`ruff` 0。
+
+**七、同日再追加：v2 §12.3 设计令牌同源（style.css ↔ Naive 主题）**
+
+问题：品牌蓝、边框色这些**两边共用**的颜色原来在 `style.css` 和 `App.vue` 的
+`themeOverrides` 里各写一份 hex —— 改一边没改另一边就会出现"页面里是新的、组件里是旧的"，
+页面上只是"有点不协调"，没人会去查。
+
+做法：新增 `web/src/config/tokens.js`，把共用色列成一张表（键 → [CSS 变量名, 取值]），
+App.vue 从这里取常量；`tests/test_design_tokens.py` 解析 `style.css` 的 `:root` / `body.dark`
+**逐条核对两边取值一致**，并断言主题里不再出现未登记的裸 hex。纯主题色（hover/pressed/占位符）
+集中在同文件的 `THEME_ONLY` 并注明"没有 CSS 对应变量、故不参与核对"——不做假核对。
+门禁自检：把 tokens.js 的值改掉必须被比出来（`test_gate_actually_detects_drift`）。
+顺带对齐两处历史偏差：暗色 Tag 的信息色/主色文字改用暗色令牌（`--ink-info` / `--primary-ink`）。
+
+验证：`pytest` 976 passed + 1 skipped（可运行 977）；`ruff` 0；`ui_audit` 0 HIGH（37 路由页 / 58 视口，
+含暗色对比度）；`mobile_audit` 全通过；`demo_preflight --fast` 9/9。
