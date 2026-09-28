@@ -281,8 +281,22 @@ def _notify_worker(worker_name: str, worker_phone: str, action: str,
         try:
             # 维修人员若有系统账号（按姓名/电话匹配）则站内通知，否则留痕即可
             from data.db_user import list_users
+            # 多租户（任务卡 4）：**这不是广播，而是「查找特定维修人员」**——
+            # 应先在**该工单所属社区**内查找，否则跨社区同名会被误通知。
+            # 取不到工单社区时保持原行为 + 告警（通知类不做 fail-closed，否则该收到的人收不到）。
+            from data.db_core import get_db as _gdb
+            from utils.tenant import normalize_tenant
+            with _gdb() as _conn:
+                _row = _conn.execute("SELECT tenant_id FROM community_issues WHERE id=?",
+                                     (issue_id,)).fetchone()
+            _issue_tenant = normalize_tenant(_row["tenant_id"]) if _row else ""
+            if _issue_tenant:
+                _candidates = list_users(role="grid", community=_issue_tenant)
+            else:
+                _log.warning("工单 #%s 无归属社区：改派通知按全部网格员查找（待迁移）", issue_id)
+                _candidates = list_users(role="grid")
             notified = False
-            for u in list_users(role="grid"):
+            for u in _candidates:
                 if (u.get("name") and u["name"] == worker_name) or (
                     u.get("phone") and u["phone"] == worker_phone
                 ):
