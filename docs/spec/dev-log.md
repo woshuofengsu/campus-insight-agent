@@ -2249,7 +2249,7 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
 - `python scripts/journey_check.py` → **8 条旅程 / 58 项全过**
 - `pytest tests/ -q` → **971 passed + 1 skipped（可运行 972）**，`ruff` 0，`check_claims` 3/3
 - `demo_preflight --fast` 9/9 · `ui_audit` 0 HIGH（37 路由页 / 58 视口）· `mobile_audit` 全通过
-- `mobile_flow_check` 35/35 · `demo_flow_check --mutate --handoff --faults` 26/26
+- `mobile_flow_check` 39/39 · `demo_flow_check --mutate --handoff --faults` 26/26
 - 新增门禁：`tests/test_repro_guide.py::test_journey_checker_covers_the_eight_journeys`
   （编号必须连续 1–8、八个实现都在、标记按运行区分、必须自带备份）
 
@@ -2291,3 +2291,17 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
 **验证（本次实测）**：`pytest tests/ -q` → **971 passed + 1 skipped（可运行 972）**；`ruff` 0；`check_claims` 3/3；
 `journey_check` 58/58；`mobile_flow_check` **35/35**；`demo_flow_check --mutate --handoff --faults` 26/26；
 `ui_audit` 0 HIGH（37 路由页 / 58 视口）；`mobile_audit` 全通过；`demo_preflight --fast` 9/9。
+
+**六、同日再追加：v3 卡6 收尾（播报可停 + 中断可恢复）**
+
+- **§7.3 播报可停**：`stopSpeaking()` 让 Promise 立刻落地（不用等念完），播报中出现「⏹ 别念了」；
+  开始新播报前先 `cancel()`，避免多段音频叠加。
+- **§7.4 中断可恢复**：没填完的报修存进 **sessionStorage**（带「用户+社区」标记）。
+  刷新/返回后再进报修页，先出一张「📝 上次有一条没填完的报修…」卡，让老人自己选
+  「▶️ 接着填」/「🗑 重新开始」；接着填时**从服务端重算摘要**，不拿旧结论当事实。
+  ⚠️ 不用 localStorage：社区活动室平板、子女手机都是共享设备，localStorage 会把上一个人的报修
+  留在下一个人眼前；sessionStorage 随标签页关闭失效，并按身份标记校验——
+  **换用户/换社区时直接丢弃**（门禁里有一条专门验它）。
+- 验证：`mobile_flow_check.py` **39/39**（新增 4 项：恢复卡出现 / 接着填恢复原话与摘要 /
+  选过后不再提示 / 归属是别人时不带入）；`journey_check` 58/58；`ui_audit` 0 HIGH；`mobile_audit` 全通过；
+  `pytest` 971 passed + 1 skipped（可运行 972）；`ruff` 0。

@@ -143,6 +143,19 @@ export function useSpeech() {
   // （没有语音包、被系统静音掐断、后台标签页等）。没有这个兜底，调用方的 `await say(...)`
   // **会永远挂住**——老年端报修页的后果是「确认上报」按钮永久转圈：老人既看不到结果，
   // 也点不了第二次（首批八条浏览器旅程排查时用无语音的 headless 浏览器复现的）。
+  // 当前播报的"停下"句柄（v3 §7.3：允许重听、暂停与停止）
+  let _speakStop = null
+
+  /** 停止正在进行或排队的播报（页面离开、老人按「别念了」时调用）。 */
+  function stopSpeaking() {
+    const had = !!_speakStop
+    if (_speakStop) _speakStop()
+    try {
+      if (window.speechSynthesis) window.speechSynthesis.cancel()
+    } catch { /* 忽略：停不了也不该影响页面 */ }
+    return had
+  }
+
   function speak(text, volume = 1.0, rate = 1.0) {
     return new Promise((resolve) => {
       if (typeof window === 'undefined' || !window.speechSynthesis || !text) return resolve(false)
@@ -155,8 +168,10 @@ export function useSpeech() {
         if (settled) return
         settled = true
         clearTimeout(guard)
+        _speakStop = null
         resolve(ok)
       }
+      _speakStop = () => finish(false)
       function attempt() {
         tries++
         const u = new SpeechSynthesisUtterance(text)
@@ -179,5 +194,5 @@ export function useSpeech() {
     })
   }
 
-  return { recognize, speak, stopListening }
+  return { recognize, speak, stopListening, stopSpeaking }
 }

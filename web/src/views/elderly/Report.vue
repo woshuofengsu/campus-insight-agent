@@ -17,7 +17,77 @@ import { useSpeech, speechCapability, reasonText } from '../../composables/useSp
 
 const router = useRouter()
 const message = useMessage()
-const { recognize, speak, stopListening } = useSpeech()
+const { recognize, speak, stopListening, stopSpeaking } = useSpeech()
+
+// 未提交草稿的**本会话**留存（v3 §7.4「中断可恢复」）：
+// 刷新/返回回来要能找到没填完的内容，恢复时**先说摘要再让老人选**（继续 / 重新开始）。
+// 为什么用 sessionStorage 而不是 localStorage：这是共享设备（社区活动室的平板、子女的手机），
+// 用 localStorage 会把上一个人的报修留在下一个人眼前。sessionStorage 随标签页关闭即失效，
+// 并且这里再按「用户+社区」标记校验一次——**绝不把上一个人的草稿带进来**。
+const DRAFT_KEY = 'ci_elderly_report_draft'
+const resumeOffer = ref(null)     // 待恢复的草稿摘要（有值才显示恢复卡）
+const speaking = ref(false)       // 正在播报（用于显示「⏹ 别念了」）
+
+function whoAmI() {
+  try {
+    const u = JSON.parse(localStorage.getItem('ci_user') || 'null') || {}
+    return `${u.user_id || ''}|${u.community || ''}`
+  } catch { return '' }
+}
+
+/** 把"没提交完的这一步"留在本会话里（刷新可恢复）。存不下也不影响办理，故只忽略错误。 */
+function saveLocalDraft() {
+  try {
+    const t = (text.value || '').trim()
+    if (!t) return
+    const summary = (draft.value && draft.value.fields && draft.value.fields.title) || t.slice(0, 30)
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+      who: whoAmI(), text: t, answer: { ...answer.value }, summary, at: Date.now(),
+    }))
+  } catch { /* 忽略：存不下不影响办理 */ }
+}
+
+function clearLocalDraft() {
+  try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* 忽略 */ }
+}
+
+/** 页面打开时看看有没有**同一个人**没填完的草稿（换人就当没有）。 */
+function loadLocalDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+    const d = JSON.parse(raw)
+    if (!d || !d.text) return
+    if (d.who !== whoAmI()) {     // 换用户/换社区 → 直接丢掉，不提示、不展示
+      clearLocalDraft()
+      return
+    }
+    resumeOffer.value = d
+  } catch {
+    clearLocalDraft()
+  }
+}
+
+/** 老人选「接着填」：把原话与已确认字段放回去，再**从服务端重算一遍摘要**（不拿旧结论当事实）。 */
+async function resumeDraft() {
+  const d = resumeOffer.value
+  resumeOffer.value = null
+  if (!d) return
+  text.value = d.text || ''
+  answer.value = { location: '', scope: '', urgency: '一般', ...(d.answer || {}) }
+  await loadDraft(true)
+}
+
+/** 老人选「重新开始」：把本会话的草稿丢掉（明确的选择，不是悄悄清掉）。 */
+function dropLocalDraft() {
+  resumeOffer.value = null
+  clearLocalDraft()
+  message.info('好，那就重新说')
+}
+
+onMounted(() => {
+  loadLocalDraft()
+})
 
 // 预置短语（v3 §7.1：**语音不是唯一入口**）——
 // 说不出来 / 听不清 / 麦克风不能用时，点一个最接近的说法就能走到同一套办理流程。
@@ -67,9 +137,21 @@ async function say(text) {
   const t = (text || '').trim()
   if (!t) return false
   lastSpoken.value = t
-  const ok = await speak(t, 1.0, 0.9)
-  if (!ok) ttsOk.value = false
+  speaking.value = true
+  let ok = false
+  try {
+    ok = await speak(t, 1.0, 0.9)
+  } finally {
+    speaking.value = false
+  }
+  if (!ok && ttsOk.value) ttsOk.value = false
   return ok
+}
+
+/** 老人按「⏹ 别念了」：立刻停下播报（v3 §7.3：允许重听、暂停与停止）。 */
+function hush() {
+  stopSpeaking()
+  speaking.value = false
 }
 
 async function startListen() {
@@ -113,6 +195,15 @@ async function usePhrase(p) {
   await loadDraft()
 }
 
+/** 先不提交了：不建单、也不假装存了草稿，直接回首页（本会话里的临时草稿一并清掉）。 */
+function giveUp() {
+  restart()
+  text.value = ''
+  clearLocalDraft()
+  message.info('好，这次没有提交，也没有建工单')
+  router.push('/elderly/home')
+}
+
 /** 说错了/不是这个位置 → 明确入口：清空重来（v3 §7.2 纠错是一等功能）。 */
 function restart() {
   draft.value = null
@@ -120,16 +211,9 @@ function restart() {
   resultVia.value = ''
   unknownToken.value = ''
   answer.value = { location: '', scope: '', urgency: '一般' }
+  clearLocalDraft()
   if (listening.value) stopListening()
   listening.value = false
-}
-
-/** 先不提交了：不建单、也不假装存了草稿，直接回首页。 */
-function giveUp() {
-  restart()
-  text.value = ''
-  message.info('好，这次没有提交，也没有建工单')
-  router.push('/elderly/home')
 }
 
 /** 让服务端把原话解析成结构化摘要（缺什么会明说，且**此时不会建单**）。
@@ -161,6 +245,7 @@ async function loadDraft(withAnswer = false) {
     // （实测踩到：某些机型 speak() 既不回 onend 也不回 onerror，按钮会一直转圈，
     //  老人既看不到结果也点不了第二次——现在 speak() 有兜底超时，这里再把顺序摆正。）
     loadingDraft.value = false
+    saveLocalDraft()          // 刷新/返回回来还能接着填（v3 §7.4）
     if (d.need_more) {
       // 补充值被判"不够用"时，先说明为什么（否则老人不知道要改成什么样）
       if (d.reject_hint) message.warning(d.reject_hint)
@@ -218,6 +303,7 @@ async function submit() {
     }
     draft.value = null
     text.value = ''
+    clearLocalDraft()             // 已经建单了：本会话的临时草稿失效（v3 §7.4 不许旧确认再提交）
   } catch (e) {
     // ⚠️ 断网/超时时**不能**说"提交失败"就完事 —— 可能其实已经提交成功了。
     // 如实告诉老人"结果还不确定"，并给一个"查一下"的出口，**不诱导他再点一次**（§6-I5）。
@@ -257,6 +343,7 @@ async function checkSubmitted() {
       unknownToken.value = ''
       draft.value = null
       text.value = ''
+      clearLocalDraft()
       message.success(`核对到了：已经提交成功，工单号 ${s.issue_id}`)
       await say(`核对到了，已经提交成功，工单号 ${s.issue_id}`)
     } else if (s && s.in_flight) {
@@ -292,6 +379,20 @@ async function checkSubmitted() {
     <div v-if="asrBlocked" data-speech-fallback
          class="card panel-warm" style="border-radius:14px;font-size:1.3rem;">
       🔇 {{ banner }}
+    </div>
+
+    <!-- 上次没填完的报修（v3 §7.4 中断可恢复）：**先给摘要再让老人选**，
+         不替他决定继续还是新建；换人/换社区时这张卡根本不会出现（见 loadLocalDraft）。 -->
+    <div v-if="resumeOffer" class="card panel-lemon" data-resume-draft
+         style="border-radius:14px;font-size:1.25rem;">
+      <b>📝 上次有一条没填完的报修</b>
+      <div style="margin-top:6px;">{{ resumeOffer.summary }}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <n-button type="primary" size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
+                  @click="resumeDraft">▶️ 接着填</n-button>
+        <n-button size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
+                  @click="dropLocalDraft">🗑 重新开始</n-button>
+      </div>
     </div>
 
     <div class="card" style="font-size:1.3rem;">
@@ -330,6 +431,11 @@ async function checkSubmitted() {
       <n-button v-if="lastSpoken && ttsOk" block size="large"
                 style="margin-top:10px;min-height:60px;font-size:1.25rem;" @click="say(lastSpoken)">
         🔊 听一遍
+      </n-button>
+      <!-- v3 §7.3：允许重听、暂停与停止 —— 念到一半不想听了要能停（不能只能等它念完） -->
+      <n-button v-if="speaking" block size="large" data-hush
+                style="margin-top:8px;min-height:56px;font-size:1.2rem;" @click="hush">
+        ⏹ 别念了
       </n-button>
       <div v-else-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
         🔇 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）

@@ -289,7 +289,47 @@ def main() -> int:
                           ok_tap and "/elderly/home" in page.url,
                           page.url if ok_tap else "没点中「先不报修了」按钮")
 
-        # ---------- 5. 老年端 SOS：误触不发、长按才发、可取消 ----------
+        # ---------- 3-3. 中断可恢复：刷新回来能找到没填完的报修（v3 §7.4） ----------
+        print("\n【3-3】老年端报修：刷新后能恢复没填完的草稿（先给摘要再让老人选）")
+        page.goto(f"{base}/elderly/report", wait_until="networkidle")
+        page.wait_for_timeout(1500)
+        page.fill("textarea", "六号楼一层楼道灯闪")
+        tap_at(page, page.locator("button", has_text="看看还缺什么"))
+        deadline = time.time() + 15
+        while time.time() < deadline and not page.locator("[data-resume-draft], [data-restart]").count():
+            page.wait_for_timeout(400)
+        page.reload(wait_until="networkidle")          # 老人按了刷新/返回又回来
+        page.wait_for_timeout(1800)
+        card = page.locator("[data-resume-draft]")
+        check("刷新后出现「上次没填完的报修」卡片（带摘要）", card.count() > 0,
+              card.first.inner_text().replace("\n", " ")[:40] if card.count() else "没有出现")
+        if card.count():
+            tap_at(page, page.locator("button", has_text="接着填"))
+            deadline = time.time() + 15
+            while time.time() < deadline and "请您核对这几项" not in page.inner_text("body"):
+                page.wait_for_timeout(400)
+            body = page.inner_text("body")
+            check("点「接着填」把原话与摘要恢复回来（不是空白重来）",
+                  "六号楼一层楼道灯闪" in body and "请您核对这几项" in body)
+            # 恢复面板消失（选过了就不再反复问）
+            check("选过之后恢复卡片不再出现", page.locator("[data-resume-draft]").count() == 0)
+            # 隐私：草稿带着「谁」的标记，换用户/换社区**绝不带入**（共享设备上这是硬要求）
+            page.evaluate("""() => {
+              const raw = sessionStorage.getItem('ci_elderly_report_draft');
+              if (!raw) return;
+              const d = JSON.parse(raw);
+              d.who = '999|别的小区';          // 假装这份草稿是上一个人留下的
+              sessionStorage.setItem('ci_elderly_report_draft', JSON.stringify(d));
+            }""")
+            page.reload(wait_until="networkidle")
+            page.wait_for_timeout(1600)
+            left = page.evaluate(
+                "() => sessionStorage.getItem('ci_elderly_report_draft')")
+            check("草稿属于别人时不带入（换用户/换社区直接丢掉，不展示、不提示）",
+                  page.locator("[data-resume-draft]").count() == 0 and not left,
+                  "已丢弃且输入框为空" if not left else f"残留：{str(left)[:40]}")
+
+        # ---------- 4. 老年端 SOS：误触不发、长按才发、可取消 ----------
         print("\n【4】老年端紧急求助：误触不发 / 长按弹确认 / 可取消")
         page.goto(f"{base}/elderly/home", wait_until="networkidle")
         page.wait_for_timeout(1800)
