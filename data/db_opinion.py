@@ -58,8 +58,16 @@ def list_opinions(level: str = "", status: str = "", limit: int = 100) -> list[d
         return [dict(r) for r in rows]
 
 
-def convert_to_issue(opinion_id: int, actor: str = "负责人") -> tuple[bool, str, int | None]:
-    """舆情一键转工单（自动填充描述+来源）。"""
+def convert_to_issue(opinion_id: int, actor: str = "负责人",
+                     tenant: str = "") -> tuple[bool, str, int | None]:
+    """舆情一键转工单（自动填充描述+来源）。
+
+    `tenant`：**转单操作人所在社区**（卡7 扫描时发现的漏洞修复）。
+    为什么必须传：舆情源是全局采集的，而这个函数建的是 `community_issues`（**租户表**）。
+    原来 `reporter_id=0` → `stamp_tenant` 拿到空租户 → 工单**租户为空**：
+    网格端所有按社区过滤的列表都看不到它（B6 那个"自己人也看不见"的老毛病又出现了）。
+    现在由调用方把操作人的社区传进来并按值盖章。
+    """
     from data.db_repair import submit_issue
     row = None
     with get_db() as conn:
@@ -81,6 +89,15 @@ def convert_to_issue(opinion_id: int, actor: str = "负责人") -> tuple[bool, s
     )
     if iid <= 0:
         return False, "转工单失败", None
+    # 租户盖章：按**操作人所在社区**（无归属人的行用 stamp_tenant_value）
+    from utils.tenant import normalize_tenant, stamp_tenant_value
+    t = normalize_tenant(tenant)
+    if t:
+        with get_db() as conn:
+            stamp_tenant_value(conn, "community_issues", iid, t)
+            conn.commit()
+    else:
+        _log.warning("舆情转工单 #%s 未拿到操作人社区 → 工单租户为空（网格端按社区过滤时看不到）", iid)
     with get_db() as conn:
         conn.execute("UPDATE public_opinion SET status='已转工单', related_issue_id=? WHERE id=?",
                      (iid, opinion_id))

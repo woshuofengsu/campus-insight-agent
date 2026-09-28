@@ -325,7 +325,11 @@ _ID_ROUTE_EXEMPT = {
 
 
 def _by_id_routes():
-    """扫 api_routes/*.py，返回 [(文件, 函数名, 路径, 函数源码)]（只取带 {参数} 的路由）。"""
+    """扫 api_routes/*.py，返回 [(文件, 函数名, 路径, 函数源码, 是否有 write_route 声明)]。
+
+    **卡7 起**：租户闸门可以由统一写入口装饰器 `@write_route(...)` 提供（见 `api_routes/guards.py`），
+    所以"有没有闸门"要同时看函数体和装饰器声明——只看函数体会把"声明式迁移"误判成漏检查。
+    """
     root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "api_routes")
     out = []
     for fn in sorted(os.listdir(root)):
@@ -336,6 +340,10 @@ def _by_id_routes():
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
+            declared = False
+            for dec in node.decorator_list:
+                if isinstance(dec, ast.Call) and getattr(dec.func, "id", "") == "write_route":
+                    declared = True
             for dec in node.decorator_list:
                 if not isinstance(dec, ast.Call) or not hasattr(dec.func, "attr"):
                     continue
@@ -345,7 +353,8 @@ def _by_id_routes():
                     continue
                 path = str(dec.args[0].value)
                 if "{" in path:
-                    out.append((fn, node.name, path, ast.get_source_segment(src, node) or ""))
+                    out.append((fn, node.name, path, ast.get_source_segment(src, node) or "",
+                                declared))
     return out
 
 
@@ -354,21 +363,26 @@ def test_all_by_id_routes_are_guarded():
 
     这条是**防锈**用的：以后新加一个 `@router.get("/{id}")` 而忘了 `_same_tenant`，
     这里会直接红，而不是等到演示当天被人跨社区读走数据。
+    **卡7 起**两处任一即算合规：函数体里的 `_same_tenant(...)`，或 `@write_route(table=..., id_param=...)`。
     """
     missing = []
-    for fn, fname, path, body in _by_id_routes():
-        if "_same_tenant(" in body:
+    for fn, fname, path, body, declared in _by_id_routes():
+        if "_same_tenant(" in body or declared:
             continue
         if (fn, fname) in _ID_ROUTE_EXEMPT and _ID_ROUTE_EXEMPT[(fn, fname)]:
             continue
         missing.append(f"{fn}::{fname}  {path}")
     assert not missing, (
-        "以下按-id 路由既没有 _same_tenant 闸门，也没有豁免理由：\n  "
+        "以下按-id 路由既没有 _same_tenant 闸门，也没有 write_route 声明，也没有豁免理由：\n  "
         + "\n  ".join(missing)
         + "\n（多租户 B6：按 id 直取的详情/操作接口必须校验行归属社区）")
 
 
 def test_guarded_route_count_is_meaningful():
-    """护栏本身别退化：带闸门的按 id 路由不能少于 15 条（漏改会在这里暴露）。"""
-    guarded = [f"{fn}::{fname}" for fn, fname, _p, body in _by_id_routes() if "_same_tenant(" in body]
+    """护栏本身别退化：带闸门的按 id 路由不能少于 15 条（漏改会在这里暴露）。
+
+    卡7 起闸门可能来自两处（函数体 `_same_tenant` 或 `@write_route` 声明），两处都算。
+    """
+    guarded = [f"{fn}::{fname}" for fn, fname, _p, body, declared in _by_id_routes()
+               if "_same_tenant(" in body or declared]
     assert len(guarded) >= 15, f"带租户闸门的按 id 路由只有 {len(guarded)} 条，疑似漏改：{guarded}"

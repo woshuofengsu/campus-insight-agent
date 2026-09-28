@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant, _same_tenant
+from api_routes.guards import write_route
 
 import logging
 _log = logging.getLogger(__name__)
@@ -412,6 +413,9 @@ def _owns_resource(request: Request, table: str, row_id: int, *,
 
 
 @router.post("/medications/{rid}/modify")
+@write_route(table="medication_reminders", id_param="rid", owner_column="user_id",
+             allow_family=True,
+             note="改用药：本人或已绑定家属；租户闸门 + 所有权由装饰器统一执行")
 def web_medication_modify(rid: int, req: MedicationCreate, request: Request):
     """修改用药提醒 → 重新审核（审核期间原规则继续播报）。
 
@@ -419,12 +423,6 @@ def web_medication_modify(rid: int, req: MedicationCreate, request: Request):
     """
     from data.db_elderly_care import modify_medication
     u = _user(request)
-    # 多租户（B6）：按 id 直取只能改本社区的用药提醒（否则可跨社区改别人家老人的药）
-    if not _same_tenant(request, "medication_reminders", rid):
-        return _fail(1003, "无权限修改该用药提醒（非本社区）")
-    # 同社区所有权（Codex 评审 F2）：同社区 ≠ 有权操作这个人
-    if not _owns_resource(request, "medication_reminders", rid):
-        return _fail(1003, "无权限修改该用药提醒（非本人或未绑定家属）")
     times = [t.strip() for t in req.times.replace("，", ",").split(",") if t.strip()]
     ok_, msg = modify_medication(
         rid, u.get("name") or "老人", req.drug_name, req.dosage, times,
@@ -502,6 +500,9 @@ def web_contacts_create(req: ContactCreate, request: Request):
 
 
 @router.post("/emergency-contacts/{cid}/delete")
+@write_route(table="emergency_contacts", id_param="cid", owner_column="user_id",
+             allow_family=True,
+             note="删联系人：本人或已绑定家属；网格员不代改（只审核）")
 def web_contacts_delete(cid: int, request: Request):
     """删除紧急联系人。
 
@@ -510,12 +511,6 @@ def web_contacts_delete(cid: int, request: Request):
     """
     from data.db_elderly_care import delete_emergency_contact
     u = _user(request)
-    # 多租户（B6）：紧急联系人按 id 直取只能删本社区的
-    if not _same_tenant(request, "emergency_contacts", cid):
-        return _fail(1003, "无权限删除该联系人（非本社区）")
-    # 同社区所有权（Codex 评审 F2）
-    if not _owns_resource(request, "emergency_contacts", cid):
-        return _fail(1003, "无权限删除该联系人（非本人或未绑定家属）")
     ok_, msg = delete_emergency_contact(cid, actor=u.get("name") or "老人")
     if not ok_:
         return _fail(2001, msg)
@@ -523,19 +518,17 @@ def web_contacts_delete(cid: int, request: Request):
 
 
 @router.post("/emergency/{call_id}/action")
+@write_route(roles=("grid",), table="emergency_calls", id_param="call_id",
+             note="SOS 处置：只有本社区网格员，且必须过租户闸门")
 def web_sos_action(call_id: int, req: SosAction, request: Request):
     """SOS 响应/结束（处置）。
 
     授权（矩阵）：**只有本社区网格员能处置**——原来只查同社区，
     于是同社区普通居民也能"处置"别人家老人的求助（Codex 评审 F2）。
+    现在角色 + 租户闸门由 `@write_route` 统一执行（见 `api_routes/guards.py`）。
     """
     from data.db_elderly_care import respond_sos, end_sos
-    if _require_role(request, "grid"):
-        return _fail(1003, "无权限处置求助（仅本社区网格员）")
     actor = _user(request).get("name") or "负责人"
-    # 多租户（B6）：SOS 处置按 id 直取只能动本社区的求助（含位置与老人信息）
-    if not _same_tenant(request, "emergency_calls", call_id):
-        return _fail(1003, "无权限处置该求助（非本社区）")
     if req.action == "respond":
         ok_, msg = respond_sos(call_id, actor=actor)
     else:
@@ -546,13 +539,15 @@ def web_sos_action(call_id: int, req: SosAction, request: Request):
 
 
 @router.post("/medications/{rid}/toggle")
+@write_route(table="medication_reminders", id_param="rid", owner_column="user_id",
+             allow_family=False,
+             note="打卡/暂停/恢复：**只能老人本人**（家属代打卡等于伪造服药记录）")
 def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
     """用药：打卡（taken/snooze）与暂停/恢复。
 
-    授权（矩阵 D1/§二）：
-      · **打卡只能老人本人**（`allow_family=False`）——家属替老人打卡等于伪造服药记录；
-      · 暂停/恢复同理只限本人（家属要停就走去审核的修改流程）。
-    原来这两类只查 `_same_tenant`（Codex 评审 F2）。
+    授权（矩阵 D1/§二）：**只能老人本人**（`allow_family=False`）——
+    家属替老人打卡等于伪造服药记录；家属要停就走去审核的修改流程。
+    租户闸门 + 所有权由 `@write_route` 统一执行（原来这两类检查是手写的）。
     """
     from data.db_elderly_care import pause_medication, resume_medication, mark_intake
     from agent.tone import human_status  # noqa: F401
@@ -560,19 +555,11 @@ def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
     uid = _user(request).get("uid")          # 打卡/暂停只能本人，不用 elder_id 代操作
     _touch(uid)
     if req.action == "taken" or req.action == "snooze":
-        if not _owns_resource(request, "medication_reminders", rid, allow_family=False):
-            return _fail(1003, "无权限操作该用药提醒（打卡只能本人）")
         ok_, msg, streak = mark_intake(uid, rid, action=req.action)
         encourage = f"连续 {streak} 天按时吃药，真棒！" if streak >= 3 else msg
         if not ok_:
             return _ok({"reminder_id": rid, "streak": streak, "already": True}, msg)  # 重复打卡幂等
         return _ok({"reminder_id": rid, "streak": streak}, encourage)
-    # 多租户（B6）：暂停/恢复按 id 直取，只能动本社区的用药提醒
-    if not _same_tenant(request, "medication_reminders", rid):
-        return _fail(1003, "无权限操作该用药提醒（非本社区）")
-    # 同社区所有权（Codex 评审 F2）
-    if not _owns_resource(request, "medication_reminders", rid, allow_family=False):
-        return _fail(1003, "无权限操作该用药提醒（只能本人）")
     if req.action == "pause":
         ok_, msg = pause_medication(rid, actor=actor)
     else:
@@ -702,15 +689,12 @@ def web_manage_medications(request: Request, status: str = ""):
 
 
 @manage_router.post("/medications/{rid}/audit")
+@write_route(roles=("grid",), table="medication_reminders", id_param="rid",
+             note="负责人审核用药提醒：本社区 + 网格员角色")
 def web_manage_medication_audit(rid: int, req: MedicationAudit, request: Request):
-    """负责人审核用药提醒。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
+    """负责人审核用药提醒（角色与租户闸门由 `@write_route` 统一执行）。"""
     from data.db_elderly_care import audit_medication
     actor = _user(request).get("name") or "负责人"
-    # 多租户（B6）：审核是按 id 直取，只能审本社区老人的用药提醒
-    if not _same_tenant(request, "medication_reminders", rid):
-        return _fail(1003, "无权限审核该用药提醒（非本社区）")
     ok_, msg = audit_medication(rid, req.approve, opinion=req.opinion, actor=actor)
     if not ok_:
         return _fail(2001, msg)
@@ -731,15 +715,12 @@ def web_manage_contacts(request: Request, status: str = ""):
 
 
 @manage_router.post("/contacts/{cid}/audit")
+@write_route(roles=("grid",), table="emergency_contacts", id_param="cid",
+             note="负责人审核紧急联系人：本社区 + 网格员角色")
 def web_manage_contact_audit(cid: int, req: ContactAudit, request: Request):
-    """负责人审核紧急联系人。"""
-    if _require_role(request, "grid"):
-        return _require_role(request, "grid")
+    """负责人审核紧急联系人（角色与租户闸门由 `@write_route` 统一执行）。"""
     from data.db_elderly_care import audit_emergency_contact
     actor = _user(request).get("name") or "负责人"
-    # 多租户（B6）：审核是按 id 直取，只能审本社区老人的紧急联系人
-    if not _same_tenant(request, "emergency_contacts", cid):
-        return _fail(1003, "无权限审核该联系人（非本社区）")
     ok_, msg = audit_emergency_contact(cid, req.approve, opinion=req.opinion, actor=actor)
     if not ok_:
         return _fail(2001, msg)

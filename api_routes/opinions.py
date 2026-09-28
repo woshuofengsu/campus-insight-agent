@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from api_routes.deps import _ok, _fail, _user, _require_role
+from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
 
 router = APIRouter(prefix="/api/web/opinions", tags=["opinions"])
 
@@ -36,11 +36,17 @@ def web_opinion_list(request: Request, level: str = "", status: str = "", limit:
 
 @router.post("/{oid}/convert")
 def web_opinion_convert(oid: int, request: Request):
-    """舆情一键转工单（自动填充描述+来源，红色/橙色为紧急）。"""
+    """舆情一键转工单（自动填充描述+来源，红色/橙色为紧急）。
+
+    ⚠️ 卡7 扫描发现的漏洞：原来只校验了角色，而它建的 `community_issues` 是**租户表**，
+    `reporter_id=0` 导致**租户为空** → 网格端按社区过滤的列表里看不到这张单（等于没建）。
+    现在把操作人所在社区（服务端身份）传给数据层按值盖章。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_opinion import convert_to_issue
-    okp, msg, iid = convert_to_issue(oid, _user(request).get("name") or "负责人")
+    okp, msg, iid = convert_to_issue(oid, _user(request).get("name") or "负责人",
+                                     tenant=_tenant(request))
     if not okp:
         return _fail(2001, msg)
     return _ok({"issue_id": iid}, msg)
