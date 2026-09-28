@@ -60,8 +60,29 @@ class MedicationToggle(BaseModel):
 
 
 class ContactCall(BaseModel):
-    target_name: str = Field(default="")
-    target_phone: str = Field(default="")
+    """联系家属/社区 —— **诚实呼叫**第一步（只到"准备拨打"为止）。
+
+    ⚠️ **不再接受前端传姓名与号码**（v3 复核 §6-I8）：原来是 `target_name`/`target_phone`，
+    等于"前端说打过谁就留痕谁"——号码可以随便传，留痕与真实行为无关。
+    现在只接受**服务端能自己解析**的目标：
+      · `contact_id`：紧急联系人 id（必须是本人或本人绑定老人名下的联系人）；
+      · `community=True`：拨社区服务中心（号码取服务端配置）。
+    """
+    contact_id: int | None = None
+    community: bool = False
+
+
+class CallOutcome(BaseModel):
+    """诚实呼叫第二步：把**手机上真实发生的事**报回来（卡 §6-B2）。
+
+    允许的取值（与前端按钮一一对应）：
+      · `dialer_opened` —— 已调起系统拨号盘（**只是打开拨号，不代表已接通**）；
+      · `cancelled`     —— 老人在确认框/拨号盘上取消了；
+      · `failed`        —— 没拨出去（设备不支持、权限被拒等）。
+    ⚠️ **没有 `connected`（已接通）**：网页拿不到通话结果，任何"已接通/已通话"都只能是编的。
+    真要证明接通，得接系统电话 API 或可信呼叫服务——本项目明确不做（也不宣称）。
+    """
+    stage: str = Field(..., pattern="^(dialer_opened|cancelled|failed)$")
 
 
 class VoiceReport(BaseModel):
@@ -448,16 +469,109 @@ def web_medication_toggle(rid: int, req: MedicationToggle, request: Request):
 
 @router.post("/contact")
 def web_elderly_contact(req: ContactCall, request: Request):
-    """联系家属/社区（拨号留痕）。"""
-    from data.db_elderly_care import log_emergency_call
+    """联系家属/社区（诚实呼叫 · 第一步：准备拨打）。
+
+    **为什么改成两步**（v3 复核 §6-B2）：原来后端只写一条"已结束"的记录，前端却显示
+    "正在呼叫 XXX" —— 页面在**替手机撒谎**。真实的 H5 只能做一件事：调起系统拨号盘
+    （`tel:`），**拨出/接通/挂断都由手机掌控，网页看不到**。所以：
+      第一步（本接口）：服务端解析号码 → 落一条「准备拨打」的记录 → 返回号码供 `tel:` 导航；
+      第二步（`/contact/{call_id}/outcome`）：前端按**实际发生的事**回填
+      「已打开拨号盘 / 已取消 / 拨打失败」。
+    留痕里**不会出现"已接通"**，因为网页没有任何证据能支撑它。
+    """
+    from data.db_elderly_care import get_emergency_contact, log_emergency_call
     u = _user(request)
+    uid = u.get("uid")
+    actor = u.get("name") or "老人"
+    # 记录归属：**老人本人**（家属代操作时归到被绑定的老人名下，与老年关怀模块其它数据一致）
+    subject_uid = _resolve_elder_uid(request) or uid
+
+    name, phone = "", ""
+    if req.community:
+        # 社区服务中心号码由**服务端配置**解析（不接受前端传值）
+        try:
+            from data.db_elderly import get_profile
+            prof = get_profile(subject_uid) or {}
+            phone = str(prof.get("community_phone") or "").strip()
+        except Exception as e:  # noqa: BLE001
+            _log.warning("读取社区电话失败：%s", e)
+        name = "社区服务中心"
+        if not phone:
+            return _fail(2001, "暂无社区服务电话，请联系网格员补充")
+    else:
+        if not req.contact_id:
+            return _fail(1003, "请选择要联系的紧急联系人")
+        row = get_emergency_contact(req.contact_id)
+        if not row:
+            return _fail(1004, "联系人不存在")
+        # ⚠️ 号码是**加密列**：`get_emergency_contact` 返回原始行（`phone` 明文列为空），
+        # 必须解密后再用——旧代码之所以没踩到这个坑，是因为它**根本没用库里的号码**，
+        # 而是直接用前端传来的 target_phone（这正是 §6-I8 的问题所在）。
+        from data.db_elderly_care import _dec_contact
+        row = _dec_contact(row)
+        # 授权（矩阵 D2/D3）：只能拨**本人或已绑定家属名下**的联系人
+        # ——与联系人删除/修改同一口径，避免"知道 id 就能拨别人家老人的家属"
+        if not _owns_resource(request, "emergency_contacts", req.contact_id, allow_family=True):
+            return _fail(1003, "无权限联系该联系人（不是您名下的联系人）")
+        if (row.get("status") or "") != "审核通过":
+            return _fail(2001, "该联系人还在审核中，暂时不能呼叫")
+        name = row.get("name") or ""
+        phone = (row.get("phone") or "").strip()
+        if not phone:
+            return _fail(2001, "该联系人号码不可用，请联系网格员")
+
     try:
-        log_emergency_call(u.get("uid"), "contact", req.target_name, req.target_phone,
-                           "拨出", status="已结束", actor=u.get("name") or "老人")
-        return _ok({"dialed": req.target_name or req.target_phone}, "已记录拨打")
+        call_id = log_emergency_call(subject_uid, "contact", name, phone,
+                                     "准备拨打", status="待确认", actor=actor)
     except Exception as e:  # noqa: BLE001
         _log.warning("拨打记录异常：%s", e)
         return _fail(2001, "拨打记录失败，请稍后再试")
+    return _ok({
+        "call_id": call_id,
+        "name": name,
+        "phone": phone,          # 号码由服务端给出，前端只用于 `tel:` 导航
+        "tel": f"tel:{phone}",
+        "stage": "准备拨打",
+        "hint": "已准备好拨打，请在手机上完成呼叫（网页无法知道是否接通）",
+    }, "准备拨打")
+
+
+@router.post("/contact/{call_id}/outcome")
+def web_elderly_contact_outcome(call_id: int, req: CallOutcome, request: Request):
+    """诚实呼叫 · 第二步：回填**手机上真实发生的事**（打开拨号盘 / 取消 / 失败）。
+
+    只允许改**自己**刚才那条「准备拨打」记录，且只能改一次语义明确的终态；
+    「已接通」在数据层被显式排除（网页拿不到通话结果，不许编）。
+    """
+    from data.db_core import get_db as _gdb
+    if not _same_tenant(request, "emergency_calls", call_id):
+        return _fail(1003, "无权限更新该拨打记录（非本社区）")
+    # 所有权：记录归**老人本人**名下，所以"本人或已绑定家属"都可以回填结果
+    if not _owns_resource(request, "emergency_calls", call_id, allow_family=True):
+        return _fail(1003, "无权限更新他人的拨打记录")
+    with _gdb() as conn:
+        row = conn.execute(
+            "SELECT user_id, call_type, result FROM emergency_calls WHERE id=?", (call_id,)
+        ).fetchone()
+        if not row:
+            return _fail(1004, "拨打记录不存在")
+        if row["call_type"] != "contact":
+            return _fail(2001, "该记录不是联系拨打记录")
+        result_map = {
+            "dialer_opened": ("已打开拨号盘（是否接通以手机通话记录为准）", "已结束"),
+            "cancelled": ("已取消", "已结束"),
+            "failed": ("拨打失败", "已结束"),
+        }
+        new_result, new_status = result_map[req.stage]
+        conn.execute("UPDATE emergency_calls SET result=?, status=? WHERE id=?",
+                     (new_result, new_status, call_id))
+        conn.commit()
+    from data.db_elderly_care import MODULE as CARE_MODULE
+    from data.db_notifications import log_activity
+    log_activity(_user(request).get("name") or "老人", "联系拨打结果", "emergency_call",
+                 call_id, "", module=CARE_MODULE, after_value=new_result,
+                 detail=f"前端回填阶段：{req.stage}（网页最多只能记录到「已打开拨号盘」）")
+    return _ok({"call_id": call_id, "stage": req.stage, "result": new_result}, new_result)
 
 
 # ---------------- 负责人端老年关怀管理 ----------------

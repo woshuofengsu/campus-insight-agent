@@ -103,7 +103,13 @@ def log_kb_query(user_id: int | None, question: str, matched: bool, reason: str 
         from utils.text import mask_phones
         safe_q = mask_phones(safe_q)
     except Exception:
-        pass
+        # ⚠️ **隐私类处理必须 fail-closed**（任务卡 5）：原来这里是 `pass` ——
+        # 掩码组件一坏，**原文（可能含居民顺口说出的手机号）照样落库**，
+        # 等于"脱敏失败时放行"，正是本项目最忌讳的口径（安全校验破了要拒绝，不许放行）。
+        # 现在：掩码失败 → **不留原文**（只留一个明确的占位符），并打 warning 让人知道有东西丢了。
+        _log.warning("手机号掩码失败 → 本次问题文本不落库（fail-closed，避免明文手机号入 kb_query_log）",
+                     exc_info=True)
+        safe_q = "[脱敏失败，文本已丢弃]"
     try:
         with get_db() as conn:
             conn.execute(

@@ -27,7 +27,7 @@ from data.db_core import get_db
 _log = logging.getLogger(__name__)
 from utils.tenant import normalize_tenant, stamp_tenant, tenant_clause, tenant_of_user
 from data.db_notifications import create_notification, log_activity
-from data.db_repair import _dec_phone, _enc_phone
+from data.db_repair import _dec_phone, _enc_phone, _mask_phone
 from utils.timeutil import utcnow
 
 MODULE = "老年端"
@@ -1102,7 +1102,9 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
         first = approved[0]
         cur = conn.execute(
             "INSERT INTO emergency_calls (user_id, call_type, target_name, target_phone, "
-            "target_phone_enc, result, status) VALUES (?, 'sos', ?, '', ?, '已触发，正在呼叫', '求助中')",
+            # ⚠️ 文案诚实化（§6-B2）：网页**不会自动拨号**，所以不能写"正在呼叫"——
+            # 这里只发生了两件事：求助已登记 + 负责人已收到通知。
+            "target_phone_enc, result, status) VALUES (?, 'sos', ?, '', ?, '已触发，已通知负责人', '求助中')",
             (user_id, first["name"], _enc_phone(first["phone"])),
         )
         call_id = cur.lastrowid
@@ -1114,7 +1116,8 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
     names = "、".join(c["name"] for c in approved)
     log_activity(actor, "触发紧急求助", "emergency_call", call_id, "紧急求助",
                  module=MODULE, after_value="求助中",
-                 detail=f"将依次呼叫：{names}；紧急联系人：{names}")
+                 detail=f"已通知负责人处理；页面只能一键打开手机拨号（不自动连续拨号）；"
+                        f"已审核紧急联系人：{names}")
 
     from data.db_elderly import get_profile
     elder = get_profile(user_id)
@@ -1338,10 +1341,46 @@ def log_sos_dial(call_id: int, target_name: str, target_phone: str, result: str,
 
     emergency_calls 里 call_type='sos' 的行只存「求助事件」本身（状态机流转），
     每次拨号的时间/对象/结果统一走 activity_log，避免事件行被拨号记录污染。
+    ⚠️ 留痕**不得含完整手机号**（项目硬约定，`demo_preflight` 第 8 项现场核对）：
+    这里原来是原样打印 —— 已改为掩码。
     """
+    masked = _mask_phone(str(target_phone or ""))
     log_activity(actor or target_name or "老人", "紧急求助拨号", "emergency_call", call_id,
                  target_name or "", module=MODULE, after_value=result,
-                 detail=f"拨打：{target_name} {target_phone}；结果：{result}")
+                 detail=f"拨打：{target_name} {masked}；结果：{result}")
+
+
+def resolve_stale_contact_calls(minutes: int = 5) -> int:
+    """把**没有回填结果**的联系拨打记录标成「结果未知（未回填）」（调度器调用）。
+
+    诚实呼叫是两步协议（§6-B2）：① 准备拨打 → ② 前端回填「已打开拨号盘/已取消/失败」。
+    老人中途关掉页面、或电话来时把浏览器切走，第二步就可能永远不来 —— 那条记录会一直停在
+    「待确认」。**不能**替它猜一个"已拨打"（猜测就是编造），但也**不能**让它悬着让人误以为是
+    进行中的呼叫：所以超时后如实标注为「**结果未知**」。
+
+    这与"提交成功没有结果未知状态"（§6-I5）是同一个口径：**没证据就写没证据**。
+    返回处理条数。
+
+    ⚠️ 时间比较用 **UTC**（`datetime('now', ...)`）：`created_at` 的默认值是 `CURRENT_TIMESTAMP`
+    = **UTC**，而 `datetime('now','localtime')` 在东八区会**快 8 小时** —— 拿它去比
+    `created_at` 会把"刚刚发生的拨打"全判成陈旧（实测踩到：新记录立刻被标成结果未知）。
+    """
+    try:
+        with get_db() as conn:
+            cur = conn.execute(
+                "UPDATE emergency_calls SET result=?, status='已结束' "
+                "WHERE call_type='contact' AND status='待确认' "
+                "AND created_at < datetime('now', ?)",
+                ("结果未知（未回填：老人可能中途离开页面）", f"-{int(minutes)} minutes"),
+            )
+            conn.commit()
+            n = cur.rowcount or 0
+        if n:
+            _log.info("把 %d 条未回填的联系拨打记录标为「结果未知」", n)
+        return n
+    except Exception:
+        _log.warning("未回填的联系拨打记录清理失败", exc_info=True)
+        return 0
 
 
 def get_latest_contact_call(user_id: int) -> dict | None:

@@ -93,6 +93,27 @@ def test_mask_phones_util():
     assert mask_phones("13812345678 和 15987654321") == "138****5678 和 159****4321"
 
 
+def test_kb_query_log_fail_closed_when_mask_broken(fresh_db, monkeypatch):
+    """掩码组件坏掉时**不得落原文**（任务卡 5：隐私类 fail-closed，不是"失败就放行"）。
+
+    原实现是 `except: pass` → 掩码一坏，居民顺口说的手机号就原样入库。
+    """
+    import utils.text
+    from data.db_kb_metrics import log_kb_query
+    from data.db_core import get_db
+
+    def _boom(_text):
+        raise RuntimeError("掩码组件坏了")
+
+    monkeypatch.setattr(utils.text, "mask_phones", _boom)
+    log_kb_query(1, "我家电话是13812345678，漏水了找谁", True)
+    with get_db() as conn:
+        row = conn.execute("SELECT question FROM kb_query_log ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None, "掩码失败不应导致整条日志丢失（指标仍要记账）"
+    assert "13812345678" not in (row["question"] or ""), f"明文手机号不得落库：{row['question']}"
+    assert row["question"] == "[脱敏失败，文本已丢弃]"
+
+
 def test_rag_eval_reports_hit_at_1(fresh_db):
     """评测输出应同时给 top-k 命中率与 hit@1（Top-1 正确率）。"""
     from scripts.rag_eval import run

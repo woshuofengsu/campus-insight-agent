@@ -153,6 +153,9 @@ def run_all() -> dict:
     results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
     results["proactive_followup"] = _safe("主动关怀-办结回访", lambda: _proactive_care())
     results["elderly_safety"] = _safe("老人安全巡检", lambda: _elderly_safety())
+    # 诚实呼叫（§6-B2）：没回填结果的拨打记录 → 如实标「结果未知」，不让它悬成"待确认"
+    results["contact_call_resolved"] = _safe(
+        "联系拨打结果未知标注", lambda: _ec.resolve_stale_contact_calls(minutes=5))
     return results
 
 

@@ -110,12 +110,23 @@ function voiceHelp() {
 }
 
 function callCommunity() {
-  const phone = home.value?.community_phone || '62319876'
-  speak(`正在呼叫社区服务中心，电话 ${phone}`, vol.value, rate.value)
-  message.info(`正在呼叫社区服务中心：${phone}`)
+  const phone = home.value?.community_phone || ''
+  if (!phone) {
+    message.warning('暂无社区电话，请联系网格员补充')
+    return
+  }
+  // 诚实呼叫（§6-B2）：号码由**服务端**给出并留痕，页面只说"帮您打开拨号"，
+  // 绝不说"正在呼叫"（网页根本不知道有没有拨出去、接通没有）
   try {
-    elderly.contactCall({ target_name: '社区服务中心', target_phone: phone })
-  } catch { /* 留痕失败不阻塞 */ }
+    elderly.contactCall({ community: true }).then((info) => {
+      window.location.href = (info && info.tel) || `tel:${phone}`
+      message.info('已帮您打开手机拨号，请在手机上按绿色按钮拨出')
+      speak('已帮您打开手机拨号，请在手机上拨出', vol.value, rate.value)
+      if (info && info.call_id) elderly.contactOutcome(info.call_id, 'dialer_opened').catch(() => {})
+    }).catch((e) => message.error(e.message || '打开拨号失败'))
+  } catch {
+    window.location.href = `tel:${phone}`
+  }
 }
 
 // ---- 紧急求助：长按 3 秒进入确认，10 秒超时自动取消 ----
@@ -175,12 +186,21 @@ async function callPerson(c) {
 async function confirmCall() {
   clearTimeout(callTimer)
   callConfirm.value = false
+  const c = callContact.value
+  if (!c) return
   try {
-    await elderly.contactCall({ target_name: callContact.value.name, target_phone: callContact.value.phone })
-    message.success(`正在呼叫 ${callContact.value.name}（${callContact.value.phone}）`)
-    speak(`正在呼叫${callContact.value.name}`, vol.value, rate.value)
+    // 只传 contact_id：姓名/号码由服务端解析（§6-I8）
+    const info = await elderly.contactCall({ contact_id: c.id })
+    const phone = (info && info.phone) || c.phone
+    window.location.href = (info && info.tel) || `tel:${phone}`
+    // 只承诺"已打开拨号盘"——接通与否网页无从得知（§6-B2）
+    message.info(`已帮您打开手机拨号，请在手机上按绿色按钮拨给 ${info?.name || c.name}`)
+    speak(`已帮您打开手机拨号，请拨给${info?.name || c.name}`, vol.value, rate.value)
+    if (info && info.call_id) {
+      elderly.contactOutcome(info.call_id, 'dialer_opened').catch(() => {})
+    }
   } catch (e) {
-    message.error(e.message)
+    message.error(e.message || '打开拨号失败')
   }
 }
 

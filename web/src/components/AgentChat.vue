@@ -92,7 +92,14 @@ async function onAction(a) {
   if (a.type === 'navigate') {
     router.push(a.to)
   } else if (a.type === 'confirm_call') {
-    message.info(`正在呼叫 ${a.phone}`)
+    // 诚实呼叫（v3 复核 §6-B2）：网页只能"打开手机拨号盘"，不知道是否拨出/接通，
+    // 所以**不说"正在呼叫"**——说了就是替手机撒谎。
+    if (a.phone) {
+      window.location.href = `tel:${a.phone}`
+      message.info(`已帮您打开手机拨号：${a.phone}`)
+    } else {
+      message.warning('没有可用号码，请联系网格员')
+    }
   } else if (a.type === 'download') {
     // Agent 导出（负责人端）→ 下载工单报表
     try {

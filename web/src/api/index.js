@@ -146,6 +146,9 @@ export const elderly = {
   emergency: () => api.post('/elderly/emergency'),
   emergencyStatus: () => api.get('/elderly/emergency/status'),
   contactCall: (data) => api.post('/elderly/contact', data),
+  // 诚实呼叫第二步（v3 复核 §6-B2）：把**手机上真实发生的事**回填
+  // （dialer_opened=已打开拨号盘 / cancelled=取消 / failed=失败；没有 connected——网页拿不到通话结果）
+  contactOutcome: (callId, stage) => api.post(`/elderly/contact/${callId}/outcome`, { stage }),
   contacts: () => api.get('/elderly/emergency-contacts'),
   addContact: (data) => api.post('/elderly/emergency-contacts', data),
   deleteContact: (id) => api.post(`/elderly/emergency-contacts/${id}/delete`),

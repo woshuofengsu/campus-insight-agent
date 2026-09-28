@@ -3,7 +3,7 @@
 布局（按《06-老年端.md》第七节）：
 - 第一行：天气 / 通知 / 报修 / 政策问答
 - 第二行：联系社区 / 用药提醒 / 语音帮助
-- 底部固定：紧急求助红色大按钮（长按 3 秒触发 → 确认弹窗 → 依次呼叫紧急联系人）
+- 底部固定：紧急求助红色大按钮（长按 3 秒触发 → 确认弹窗 → 通知负责人 + 引导老人自己拨号）
 - 顶部：未读通知数量、最近一条联系记录、到点用药提醒
 """
 import time
@@ -146,8 +146,8 @@ def _render_sos_confirm(uid, name):
         st.rerun()
     contacts = get_approved_contacts(uid) if uid else []
     names = "、".join(c["name"] for c in contacts) or "（暂无已审核联系人）"
-    big_card(f"⚠️ <strong>将依次呼叫：{names}。确认呼叫吗？</strong><br>"
-             f"确认后将通知社区负责人（10 秒内未操作自动取消）",
+    big_card(f"⚠️ <strong>将通知紧急联系人：{names}。确认求助吗？</strong><br>"
+             f"确认后将通知社区负责人；手机不能自动连续拨号，页面会给出拨打按钮（10 秒内未操作自动取消）",
              bg="#fef2f2", border="#dc2626")
     st.components.v1.html(_TIMEOUT_CANCEL_JS, height=0)
     cc1, cc2 = st.columns(2)
@@ -176,19 +176,19 @@ def _render_sos_confirm(uid, name):
 
 
 def _render_sos_dialing(uid, name, latest, contacts):
-    """拨打状态：正在呼叫第 N 个；全部未接通提示；社区/120/撤销常驻。"""
+    """拨打状态：**请老人自己按按钮拨打第 N 个**（H5 不会自动拨号，文案不说"正在呼叫"）。"""
     all_failed = st.session_state.get("_sos_all_failed", False)
     idx = st.session_state.get("_sos_dial_idx", 0)
 
     if contacts and not all_failed and idx < len(contacts):
         c = contacts[idx]
-        big_card(f"📞 <strong>正在呼叫：{c['name']}（第 {idx + 1} 个）</strong><br>电话：{c['phone']}",
+        big_card(f"📞 <strong>请按下面按钮拨打：{c['name']}（第 {idx + 1} 个）</strong><br>电话：{c['phone']}",
                  bg="#fef2f2", border="#dc2626")
         if not st.session_state.get("_sos_calling_announced"):
             st.session_state["_sos_calling_announced"] = True
-            tts_speak(f"正在呼叫：{c['name']}，电话 {c['phone']}")
+            tts_speak(f"请按按钮拨打：{c['name']}，电话 {c['phone']}")
         st.link_button(f"📞 拨打 {c['name']}（{c['phone']}）", f"tel:{c['phone']}", width="stretch")
-        st.caption("点号码手机会弹出拨号界面；未接通请点下方按钮继续。")
+        st.caption("点按钮后手机会弹出拨号界面（是否接通手机才知道）；未接通请点下方按钮继续。")
         nc1, nc2 = st.columns(2)
         with nc1:
             if st.button("📵 未接通，拨打下一个", key="sos_next", width="stretch"):
