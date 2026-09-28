@@ -52,9 +52,24 @@ def _corpus_report() -> dict:
     return out
 
 
-def _rag_once(topk: int, no_embedding: bool) -> dict:
+def _rag_once(topk: int, no_embedding: bool, path: str = "threshold") -> dict:
     from scripts.rag_eval import run
-    return run(topk=topk, verbose=False, no_embedding=no_embedding)
+    return run(topk=topk, verbose=False, no_embedding=no_embedding, path=path)
+
+
+def _refusal_eval() -> dict:
+    """无证据不许编（v2 §11.4）：走产品入口 `ask_question`，在**临时副本**上判"该不该答"。
+
+    显式把评测库传进去（`config.DB_PATH`）：它是模块级全局，测试里可能被改过，
+    不校验就可能悄悄测到"另一个库"上并给出看似正常的数字。
+    返回值里带 `kb_published`（本次测的库里有几条已发布知识）——**数字可比性的前提**，
+    报告与门禁都会核对它。
+    """
+    try:
+        from scripts.rag_eval import run_refusal
+        return run_refusal(db_path=config.DB_PATH)
+    except Exception as e:  # noqa: BLE001 — 评测不可用要如实说明，不许悄悄给 0
+        return {"error": f"拒答评测不可用：{str(e)[:120]}"}
 
 
 def _intent_eval() -> dict:
@@ -89,12 +104,20 @@ def _write_md(path: str, report: dict) -> None:
         L.append("- 语料与快照一致（本次数字与快照可比）")
     L.append(f"- 用例：{rag['cases']} 条（top-{rag['topk']}）\n")
     L.append("## 指标（dev / holdout 分开报）\n")
-    L.append("| 版本 | 分母 | 条数 | top-k 命中率 | hit@1 |")
-    L.append("|---|---|---:|---:|---:|")
-    for name, m in (("混合检索", rag["splits"]), ("纯词法（对比基线）", lex["splits"])):
+    L.append("> **每条数字都要看它来自哪条检索入口**（v2 §11.2）：两条线上路径客观并存、用途不同——"
+             "`阈值判定路径`是居民端政策问答作答用的（词法分+语义加分 vs 业务阈值），"
+             "`RRF 融合路径`是 Agent 侧注入 LLM 上下文用的。只报一条就等于「评测测 A、产品用 B」。\n")
+    L.append("| 版本 | 检索入口 | 分母 | 条数 | top-k 命中率 | hit@1 |")
+    L.append("|---|---|---|---:|---:|---:|")
+    hyb = report.get("rag_agent_path") or {}
+    for name, m, path_label in (("混合检索", rag["splits"], "阈值判定路径（居民端问答）"),
+                                ("混合检索", (hyb.get("splits") or {}), "RRF 融合路径（Agent 上下文）"),
+                                ("纯词法（对比基线）", lex["splits"], "阈值判定路径（关向量）")):
         for split in ("all", "dev", "holdout"):
-            s = m[split]
-            L.append(f"| {name} | {split} | {s['n']} | {s['hit_rate']}% | {s['hit1_rate']}% |")
+            s = m.get(split)
+            if not s:
+                continue
+            L.append(f"| {name} | {path_label} | {split} | {s['n']} | {s['hit_rate']}% | {s['hit1_rate']}% |")
     L.append("")
     L.append("## 负收益对照（混合检索 vs 纯词法）\n")
     L.append(f"- 整体：{cmp_['baseline_hit_rate']}% → {cmp_['variant_hit_rate']}%"
@@ -108,6 +131,29 @@ def _write_md(path: str, report: dict) -> None:
     for d in rag["details"]:
         L.append(f"- {'✅' if d['hit_at_1'] else ('~' if d['hit'] else '❌')} `{d['query']}`"
                  f" → 路径 {d['route']} | top1: {(d['top'] or ['—'])[0]}")
+    rf = report.get("refusal") or {}
+    L.append("\n## 拒答口径：无证据不许编（v2 §11.4）\n")
+    if rf.get("error"):
+        L.append(f"- ⚠️ 本次没跑成：{rf['error']}")
+    elif not rf.get("cases"):
+        L.append("- ⚠️ 评测集为空（tests/llm_eval/refusal_set.jsonl）")
+    else:
+        L.append(f"- 走**产品入口** `ask_question`（阈值按社区取、敏感/医疗法律先转人工、弱证据转人工），"
+                 f"在数据库**临时副本**上跑（不污染库里的真实提问记录）")
+        L.append(f"- 评测库：`{rf.get('db', '')}`，已发布知识 **{rf.get('kb_published')} 条**"
+                 f"（数字可比性的前提：换了库/换了语料，本节的百分比不可直接沿用）")
+        L.append(f"- 样本指纹：`{rf.get('set_digest', '')}`（`tests/llm_eval/refusal_set.jsonl`，"
+                 f"{rf.get('cases')} 条 —— 加注释/调序不改指纹，改用例必变）")
+        L.append(f"- 无依据问题（{rf['refuse_total']} 条）：**{rf['refused']} 条没有自动回答**"
+                 f"（{rf['refusal_rate']}%，要求 100%）")
+        L.append(f"- 控制组（{rf['answer_total']} 条，库里明确有依据）：**{rf['answered']} 条答上来了**"
+                 f"（{rf['answer_rate']}%，要求 100% —— 防止「为了拒答把能答的也拒了」）")
+        if rf.get("fabricated"):
+            L.append(f"- ❌ **编造/张冠李戴（红线）**：{'、'.join(rf['fabricated'])}")
+        else:
+            L.append("- ✅ 无「无依据却自动回答」的条目")
+        if rf.get("over_refused"):
+            L.append(f"- ❌ **误拒**：{'、'.join(rf['over_refused'])}")
     ie = report["intent"]
     L.append("\n## 意图/文案评测\n")
     L.append(f"- {'已跳过：' + str(ie.get('reason')) if ie.get('skipped') else json.dumps(ie, ensure_ascii=False)[:400]}")
@@ -140,22 +186,39 @@ def main() -> int:
 
     rag = _rag_once(args.topk, no_embedding=False)
     lex = _rag_once(args.topk, no_embedding=True)
+    # **另一条线上检索入口**（Agent 侧 LLM 上下文用 RRF 融合）：必须单独测，
+    # 否则"100%"会被误当成"产品整条链路都 100%"（§11.2：评测测 A、产品用 B 是明确要避免的）
+    rag_hybrid = _rag_once(args.topk, no_embedding=False, path="hybrid")
     rag["splits"] = metrics_for_split(rag["details"], cases)
     lex["splits"] = metrics_for_split(lex["details"], cases)
+    rag_hybrid["splits"] = metrics_for_split(rag_hybrid["details"], cases)
 
     from utils.eval_split import compare
     cmp_ = compare(lex, rag)   # baseline=纯词法，variant=混合检索
 
     intent = {"skipped": True, "reason": "fast 模式"} if args.fast else _intent_eval()
+    refusal = _refusal_eval()
 
     report = {"generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
               "corpus": corpus, "cases": len(cases),
-              "rag": rag, "rag_lexical_only": lex, "compare": cmp_, "intent": intent}
+              "rag": rag, "rag_lexical_only": lex, "rag_agent_path": rag_hybrid,
+              "compare": cmp_, "intent": intent, "refusal": refusal}
 
-    print(f"\nRAG（混合检索） 全部 {rag['splits']['all']['hit_rate']}% | "
+    print(f"\nRAG（阈值判定路径·居民端问答） 全部 {rag['splits']['all']['hit_rate']}% | "
           f"dev {rag['splits']['dev']['hit_rate']}% | holdout {rag['splits']['holdout']['hit_rate']}%")
-    print(f"RAG（纯词法）   全部 {lex['splits']['all']['hit_rate']}% | "
+    print(f"RAG（RRF 融合路径·Agent 上下文） 全部 {rag_hybrid['splits']['all']['hit_rate']}% | "
+          f"dev {rag_hybrid['splits']['dev']['hit_rate']}% | "
+          f"holdout {rag_hybrid['splits']['holdout']['hit_rate']}%")
+    print(f"RAG（纯词法·对比基线） 全部 {lex['splits']['all']['hit_rate']}% | "
           f"dev {lex['splits']['dev']['hit_rate']}% | holdout {lex['splits']['holdout']['hit_rate']}%")
+    if refusal.get("error"):
+        print(f"拒答口径：{refusal['error']}")
+    else:
+        print(f"拒答口径（无证据不许编，评测库已发布知识 {refusal.get('kb_published')} 条）："
+              f"无依据 {refusal['refused']}/{refusal['refuse_total']}"
+              f" = {refusal['refusal_rate']}% 不自动回答 | 控制组 {refusal['answered']}/"
+              f"{refusal['answer_total']} = {refusal['answer_rate']}% 能答上"
+              + (f" | ⚠️ 编造 {refusal['fabricated']}" if refusal.get("fabricated") else ""))
     print(f"对照：{cmp_['baseline_hit_rate']}% → {cmp_['variant_hit_rate']}%（{cmp_['delta']:+}）"
           f"｜变好 {cmp_['better_n']} / 变差 {cmp_['worse_n']} → {cmp_['verdict']}")
     if cmp_["worse"]:

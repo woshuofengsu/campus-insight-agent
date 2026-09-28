@@ -218,12 +218,39 @@ def _cosine(vec_a: dict[str, float], vec_b: dict[str, float]) -> float:
     return dot / (na * nb)
 
 
+# 「泛化程序词」：**不能作为"有依据"的证据**。
+# 为什么单列（v2 §11.4「无证据拒答」实测发现的真问题）：居民问"个人护照怎么办理，去哪办"时，
+# 「办理」命中了「居住证办理」的关键词、字面相似度也高 → 分数越过阈值 → 系统**自动回答了居住证**
+# （问的是护照，答的是居住证）。这就是"张冠李戴式的编造"：内容本身没错，但**和问题不是一回事**。
+# 所以：只有泛化词命中时，判为**弱证据**，不自动回答（转人工），由人来判断。
+_GENERIC_TERMS = (
+    "办理", "流程", "手续", "怎么", "如何", "怎样", "需要", "什么", "哪些", "材料", "条件",
+    "规定", "政策", "咨询", "问题", "情况", "可以", "能否", "是否", "哪里", "去哪", "在哪",
+    "多少钱", "费用", "时间", "多久", "咋办", "咋整", "怎么办",
+    # 2026-09-29 补：新装库（只有 seed 的 17 条知识、阈值回落默认 2.0）实测，
+    # 「我想申请个专利」被《加装电梯财政补贴办法》答上 —— 只因它的关键词里有"申请"。
+    # 「申请/我要/我想」这类**动作词**同样不构成主题依据。
+    "申请", "我要", "我想", "请问", "求助", "了解", "查询", "帮忙", "帮我",
+)
+
+
+def _is_generic_term(kw: str) -> bool:
+    """这个词是不是"任何办事问题都会说"的泛化词（不算主题证据）。"""
+    k = (kw or "").strip()
+    if not k:
+        return True
+    return any(k == g or k in g or g in k for g in _GENERIC_TERMS)
+
+
 def _score_entry(question: str, entry: dict) -> tuple[float, list[str]]:
     """单条知识条目与提问的匹配度。
 
     关键词命中 +2/个、标题整句命中 +3、n-gram 余弦相似度折算最高 +5。
     U1：关键词与余弦均使用「同义词扩展后」的查询（口语→政策书面语），
     例如「老楼装电梯」可召回标题含「增设电梯」的条目。
+
+    ⚠️ 分数**不区分**泛化词与主题词（保持与升级前的排序逐字节一致）；
+    "这条算不算有依据"由 `has_topic_evidence()` 另判（见该函数与 `ask_question` 的用法）。
     """
     from utils.text import expand_query
     q_expanded = expand_query(question or "")
@@ -243,6 +270,33 @@ def _score_entry(question: str, entry: dict) -> tuple[float, list[str]]:
         score += 3.0
     score += 5.0 * _cosine(_tf(_text_ngrams(q_expanded)), _tf(_text_ngrams(text)))
     return round(score, 4), kw_hits
+
+
+def has_topic_evidence(question: str, entry: dict) -> bool:
+    """这条命中算不算"**有主题依据**"（而不是只靠"办理/怎么/流程"这类泛化词）。
+
+    判据（任一成立即算有依据）：
+      · 命中了**非泛化**关键词（如"电梯""失业保险金""居住证"）；
+      · 问题里出现了该条目的**标题**（整句命中）；
+      · 命中了标题里的**实体词**（标题去掉泛化词后的片段出现在问题里）。
+    只有泛化词 + 字面相似 → False（弱证据，宁可转人工也不张冠李戴）。
+    """
+    from utils.text import expand_query
+    q = (question or "").strip()
+    q_expanded = expand_query(q)
+    title = (entry.get("title") or "").strip()
+    if title and (title in q or title in q_expanded):
+        return True
+    for k in split_keywords(entry.get("keywords")):
+        if len(k) >= 2 and not _is_generic_term(k) and (k in q or k in q_expanded):
+            return True
+    # 标题里的实体片段（去掉泛化词后的 2 字以上片段）
+    for frag in re.split(r"[（）()、,，。·\-—\s]+", title):
+        if len(frag) < 2 or _is_generic_term(frag):
+            continue
+        if frag in q or frag in q_expanded:
+            return True
+    return False
 
 
 def _dense_boost(query: str, entries: list[dict]) -> dict[int, float]:
@@ -347,6 +401,8 @@ def search_published_knowledge(query: str, top_k: int = 5,
         e["score"] = round(final, 4)
         e["region_level"] = level
         e["retrieval"] = "hybrid" if dense else "lexical"
+        # 「有主题依据吗」随结果一起带出去：作答判定要用它（见 ask_question 的弱证据分支）
+        e["topic_evidence"] = has_topic_evidence(query, e)
         scored.append((e, final))
     scored.sort(key=lambda x: -x[1])
     return [e for e, _ in scored[:top_k]]
@@ -1033,6 +1089,20 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
                  if float(e.get("base_score", e.get("score", 0.0))) >= threshold]
     applicable = [e for e in qualified if (e.get("region_level") or "national") != "other"]
     answer_entry = (applicable or qualified or [None])[0]
+    # 弱证据闸门（v2 §11.4「无证据拒答」实测发现的真问题）：
+    # 分数达标**不等于**"答的是同一件事"。居民问「个人护照怎么办理，去哪办」时，
+    # 「办理」这个泛化词命中了《居住证办理》的关键词、字面相似度也高 → 分数过线 →
+    # 系统会**自动回答居住证**（问护照答居住证，内容没错但张冠李戴）。
+    # 所以：达标条目若**只有泛化词+字面相似**（没有主题词/标题实体命中），判为弱证据 → 转人工。
+    # 方向明确：宁可多转一次人工，也不许把"别的东西"当答案讲给居民听。
+    if answer_entry is not None and not answer_entry.get("topic_evidence", True):
+        log_activity(actor, "弱证据转人工", "policy_question", None, summary,
+                     module=MODULE, after_value="需人工确认",
+                     detail=f"{q_type} · 仅有泛化词命中（{answer_entry.get('title') or ''}）· {q[:50]}")
+        return {"matched": False, "reason": "weak_evidence", "question": q,
+                "summary": summary, "q_type": q_type,
+                "best_score": answer_entry.get("score"),
+                "manual_text": "没找到跟您这个问题直接对应的依据，已转人工帮您确认。"}
     if answer_entry is None:
         # WS3：弱命中尝试真 RAG（开关关闭 / 无片段 / 引用校验失败 → 维持原转人工逻辑，行为不变）
         rag_out = None

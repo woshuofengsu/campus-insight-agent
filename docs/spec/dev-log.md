@@ -2247,7 +2247,7 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
 ### 四、验证（本次实测）
 
 - `python scripts/journey_check.py` → **8 条旅程 / 58 项全过**
-- `pytest tests/ -q` → **976 passed + 1 skipped（可运行 977）**，`ruff` 0，`check_claims` 3/3
+- `pytest tests/ -q` → **986 passed + 1 skipped（可运行 987）**，`ruff` 0，`check_claims` 3/3
 - `demo_preflight --fast` 9/9 · `ui_audit` 0 HIGH（37 路由页 / 58 视口）· `mobile_audit` 全通过
 - `mobile_flow_check` 39/39 · `demo_flow_check --mutate --handoff --faults` 26/26
 - 新增门禁：`tests/test_repro_guide.py::test_journey_checker_covers_the_eight_journeys`
@@ -2304,7 +2304,7 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
   **换用户/换社区时直接丢弃**（门禁里有一条专门验它）。
 - 验证：`mobile_flow_check.py` **39/39**（新增 4 项：恢复卡出现 / 接着填恢复原话与摘要 /
   选过后不再提示 / 归属是别人时不带入）；`journey_check` 58/58；`ui_audit` 0 HIGH；`mobile_audit` 全通过；
-  `pytest` 976 passed + 1 skipped（可运行 977）；`ruff` 0。
+  `pytest` 986 passed + 1 skipped（可运行 987）；`ruff` 0。
 
 **七、同日再追加：v2 §12.3 设计令牌同源（style.css ↔ Naive 主题）**
 
@@ -2321,3 +2321,41 @@ App.vue 从这里取常量；`tests/test_design_tokens.py` 解析 `style.css` �
 
 验证：`pytest` 976 passed + 1 skipped（可运行 977）；`ruff` 0；`ui_audit` 0 HIGH（37 路由页 / 58 视口，
 含暗色对比度）；`mobile_audit` 全通过；`demo_preflight --fast` 9/9。
+
+**八、同日再追加：RAG 口径复核（v2 §11）——两条入口都测 + 无证据不许编**
+
+按 §11 的 7 条逐条对账后发现两个口径问题，都修了：
+
+1. **两条线上检索入口，原来只测了一条**。项目里客观并存：
+   `data.db_policy.search_published_knowledge()`（居民端政策问答作答用：词法分+语义加分 vs 业务阈值）
+   与 `agent.rag.search_hybrid()`（Agent 侧注入 LLM 上下文用：RRF 融合）。离线评测只测了前者，
+   而两处 docstring 还互相写错（一个说评测走 RRF）。现在 `run_all_paths()` **两条都测**，
+   报告逐行标明"数字来自哪条入口"，并把过时注释改准。实测两条都是 48/48 = 100%（top-1 也 100%），
+   属地 Top-1 4/4 —— 结论没变，但**现在才知道它对两条入口都成立**。
+
+2. **新增「无证据不许编」评测**（§11.4 的"无证据拒答"）：`tests/llm_eval/refusal_set.jsonl`
+   = 8 条库里确实没有依据的问题（专利/入学/出入境/工商/土地/证券/留学/资格证）
+   + 8 条控制组（居住证、加装电梯表决、装修垃圾、独居老人关爱、失业保险金、生育津贴、
+   楼道堆物与充电、高龄津贴）。走**产品入口** `ask_question`（不是复刻一套匹配逻辑），
+   在数据库**临时副本**上跑（`ask_question` 命中会落 `policy_questions`，不能污染演示库的真实提问记录）。
+   报告里带**评测集指纹**，换样本必变。
+
+**当场抓到一个真问题（红线级）**：问「个人护照怎么办理，去哪办」→「办理」这个泛化词命中了
+《居住证办理》的关键词、字面相似度也高 → 越过阈值 → **系统自动回答了居住证**。
+内容没错，但和问题不是一回事 —— 这就是"张冠李戴式的编造"。
+修法：新增 `has_topic_evidence()`（非泛化关键词命中 / 标题整句命中 / 标题实体片段命中才算有依据），
+只靠泛化词+字面相似 → 判**弱证据**，`ask_question` 转人工（`reason=weak_evidence`）。
+新装库（只有 seed 的 17 条、阈值回落默认 2.0）实测同一句又被《加装电梯财政补贴办法》答上
+（它的关键词里有"申请"）→ 把「申请/我想/我要」这类动作词一并加进泛化词表。
+修完：无依据 8/8 = 100% 不自动回答、控制组 8/8 = 100% 能答上，**golden 48 条命中率不变**（没伤到正常答题）。
+
+**门禁**：`tests/test_rag_refusal_eval.py`（10 例）——两个方向都要有用例且各写 why、
+样本指纹"调序/加注释不变、改用例必变"、**给错库就报错**（空库/条数不符 → 报错而不是给个看似正常的百分比）、
+两条入口都要有数字且标明来源、报告必须写清入口与拒答节、以及**门禁自检**（把弱证据闸门关掉，
+拒答用例必须变红）。另修好一个测试隔离坑：`config.DB_PATH` 是模块级全局，pytest 先导入全部模块再跑用例，
+个别模块导入期就把全局指向自己的临时库 —— 评测因此可能悄悄测到"另一个库"上
+（实测：全量跑时指向 17 条 seed 知识的临时库，阈值 2.0，"居住证怎么办理"被拒答而百分比看着正常）；
+现在评测**显式传库 + 校验已发布知识条数**，门禁也会核对库里条数与落盘报告一致。
+
+验证：`pytest` 986 passed + 1 skipped（可运行 987）；`ruff` 0；`check_claims` 3/3；
+`docs/eval/eval-report.{json,md}` 已重新生成（含两条入口 + 拒答节 + 指纹）。
