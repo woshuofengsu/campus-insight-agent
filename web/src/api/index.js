@@ -144,6 +144,8 @@ export const elderly = {
   reportSubmit: (data) => api.post('/elderly/report/submit', data),
   // 「我刚才到底提交成功了吗」：断网/超时后按幂等 token 查真实结果（§6-I5）
   reportStatus: (token) => api.get('/elderly/report/status', { params: { token } }),
+  // 老人端「我的报修」：服务端附上**老人看得懂的进度**（现在到哪步/下一步谁做/还要多久/是否超时）
+  orders: (params) => api.get('/elderly/orders', { params }),
   medications: () => api.get('/elderly/medications'),
   createMedication: (data) => api.post('/elderly/medications', data),
   toggleMedication: (id, action) => api.post(`/elderly/medications/${id}/toggle`, { action }),

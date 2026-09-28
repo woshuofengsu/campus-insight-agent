@@ -265,6 +265,32 @@ def _report_draft_payload(text: str, profile: dict) -> dict:
     }
 
 
+@router.get("/orders")
+def web_elderly_orders(request: Request, limit: int = 10):
+    """老人端「我的报修」：**带老人看得懂的进度**（v3 复核 §6-I9）。
+
+    只返回**本人**（或已绑定家属名下的老人）报的工单，并按社区过滤；
+    每条都附一段纯函数算出来的进度块：现在到哪一步 / 下一步谁做 / 按社区规定还要多久 /
+    **是否已经超时**（超时就明说，不让老人干等）。
+    """
+    from data.db_repair import get_issues
+    from utils.issue_progress import elderly_progress
+    u = _user(request)
+    uid = _resolve_elder_uid(request) or u.get("uid")
+    if not uid:
+        return _fail(1001, "请先登录")
+    rows = get_issues(reporter_id=uid, limit=max(1, min(int(limit or 10), 50)))
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["progress"] = elderly_progress(d)
+        # 老人端不需要看到完整手机号等敏感字段
+        for k in ("reporter_phone", "agent_phone", "reporter_phone_enc", "agent_phone_enc"):
+            d.pop(k, None)
+        out.append(d)
+    return _ok(out)
+
+
 @router.post("/report/draft")
 def web_elderly_report_draft(req: ReportDraftIn, request: Request):
     """老人报修 · 第一步：把原话变成**可确认的结构化摘要**（不写库、不建单）。

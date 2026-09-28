@@ -1,20 +1,47 @@
 <script setup>
 // 老年端：我的报修工单进度 + 满意度反馈
+//
+// v3 复核 §6-I9（老人订单缺少可理解的完整进度）：进度**由服务端算好**（`/elderly/orders`），
+// 页面只负责用大字说实话，四件事必须一眼看到：
+//   ① 现在到哪一步（五步进度条）② 下一步谁做 ③ 按社区规定还要多久 ④ **有没有超时**（超时明说）。
+// 原来的问题：只把状态字段换个说法（"👷 等待派单"），老人既不知道该等谁、也不知道要等多久，
+// 只能反复打电话问。
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { issues } from '../../api'
+import { elderly, issues } from '../../api'
+import { useSpeech, speechCapability } from '../../composables/useSpeech'
 
 const message = useMessage()
+const { speak } = useSpeech()
+const cap = speechCapability()
+const ttsOk = ref(cap.hasTTS)
+const lastSpoken = ref('')
 const list = ref([])
 const loading = ref(true)
 const fbReason = ref({})
 
 async function load() {
   loading.value = true
-  try { list.value = (await issues.list()) || [] } catch (e) { message.error(e.message) }
+  try { list.value = (await elderly.orders({ limit: 10 })) || [] } catch (e) { message.error(e.message) }
   finally { loading.value = false }
 }
 onMounted(load)
+
+/** 统一播报入口：接住返回值，播不出来就如实降级（不假装老人听到了）。 */
+async function say(text) {
+  const t = (text || '').trim()
+  if (!t) return false
+  lastSpoken.value = t
+  const ok = await speak(t, 1.0, 0.9)
+  if (!ok) ttsOk.value = false
+  return ok
+}
+
+/** 把一条工单的进度念出来（老人可以选择"听进度"而不是看小字）。 */
+function speakProgress(i) {
+  const p = i.progress || {}
+  say(`工单${i.id}，${i.title}。${p.now_line || ''}。${p.next_line || ''}。${p.eta_line || ''}`)
+}
 
 async function act(id, data, okMsg) {
   try {
@@ -25,35 +52,65 @@ async function act(id, data, okMsg) {
     message.error(e.message)
   }
 }
-
-const STATUS_TEXT = {
-  待审核: '⏳ 等待负责人审核', 退回补充信息: '↩️ 需补充信息', 已审核待派单: '👷 等待派单',
-  已派单: '🔧 已派维修人员', 处理中: '🔨 正在处理', 待居民反馈: '📨 已处理，请确认',
-  处理结束: '✅ 已完成', 已关闭: '🚫 已关闭', 已撤回: '↩️ 已撤回', 待协商: '🤝 待协商', 已转出: '📤 已转出',
-}
 </script>
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">🔧 我的报修</div>
-    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">查看报修进度</p>
+    <div class="elderly-title">📋 我的报修</div>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">现在到哪一步、下一步谁来做，都写在这里</p>
+
+    <div v-if="lastSpoken && !ttsOk" data-speech-fallback class="card muted" style="font-size:1.2rem;">
+      🔇 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
+    </div>
 
     <div v-for="i in list" :key="i.id" class="card" style="font-size:1.25rem;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <b>#{{ i.id }} {{ i.title }}</b>
       </div>
-      <div style="margin-top:8px;font-size:1.25rem;font-weight:700;color:var(--ink-info);">{{ STATUS_TEXT[i.status] || i.status }}</div>
-      <div class="muted" style="font-size:1rem;margin-top:4px;">{{ i.issue_type }} · {{ i.category }} · 📍{{ i.location }}</div>
-      <div v-if="i.assignee_name" class="muted" style="font-size:1rem;margin-top:4px;">👷 维修人员：{{ i.assignee_name }}</div>
+
+      <!-- 五步进度：已走过的高亮 -->
+      <div style="display:flex;gap:4px;margin-top:10px;">
+        <div v-for="(s, si) in (i.progress?.steps || [])" :key="s"
+             :style="`flex:1;text-align:center;font-size:1.05rem;padding:6px 2px;border-radius:8px;` +
+                     (si < (i.progress?.step_index || 0)
+                       ? 'background:var(--success-light,#dcfce7);color:var(--ink-success);font-weight:700;'
+                       : 'background:var(--bg);color:var(--muted);')">
+          {{ si < (i.progress?.step_index || 0) ? '✅' : '○' }}{{ s }}
+        </div>
+      </div>
+
+      <!-- 四句话说清：现在 / 下一步 / 谁 / 还要多久（超时就明说） -->
+      <div style="margin-top:10px;font-weight:800;color:var(--ink-info);">
+        {{ i.progress?.now_line || i.status }}
+      </div>
+      <div style="margin-top:6px;">➡️ {{ i.progress?.next_line }}</div>
+      <div class="muted" style="margin-top:4px;font-size:1.15rem;">👤 这一步由：{{ i.progress?.who }}</div>
+      <div :style="`margin-top:6px;font-size:1.15rem;` +
+                   (i.progress?.overdue ? 'color:var(--ink-danger);font-weight:700;' : '')">
+        ⏱️ {{ i.progress?.eta_line }}
+      </div>
+
+      <div class="muted" style="font-size:1.05rem;margin-top:6px;">
+        {{ i.issue_type }} · {{ i.category }} · 📍{{ i.location }}
+        <span v-if="i.assignee_name"> · 👷{{ i.assignee_name }}</span>
+      </div>
       <div v-if="i.resolve_note" style="margin-top:6px;">📋 {{ i.resolve_note }}</div>
 
+      <n-button block size="large" style="margin-top:10px;min-height:60px;font-size:1.2rem;"
+                @click="speakProgress(i)">🔊 听一遍这条进度</n-button>
+
       <!-- 满意度反馈 -->
-      <div v-if="i.status === '待居民反馈'" style="margin-top:12px;background:#fefce8;border-radius:10px;padding:10px;">
-        <div style="font-weight:700;">修好了吗？</div>
-        <n-input v-model:value="fbReason[i.id]" placeholder="不满意原因（可选）" size="large" style="margin-top:8px;font-size:1.25rem;" />
+      <div v-if="i.status === '待居民反馈'" class="panel-warm" style="margin-top:12px;border-radius:10px;padding:10px;">
+        <div style="font-weight:700;font-size:1.25rem;">修好了吗？</div>
+        <n-input v-model:value="fbReason[i.id]" placeholder="不满意原因（可选）" size="large"
+                 style="margin-top:8px;font-size:1.25rem;" />
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-          <n-button type="success" size="large" style="min-height:52px;" @click="act(i.id, { action: 'feedback', satisfied: true }, '✅ 已结单')">✅ 满意，结单</n-button>
-          <n-button type="warning" size="large" style="min-height:52px;" @click="act(i.id, { action: 'feedback', satisfied: false, reason: fbReason[i.id] || '还需处理' }, '已反馈，将重新处理')">😕 不满意</n-button>
+          <n-button type="success" size="large" style="min-height:56px;font-size:1.2rem;"
+                    @click="act(i.id, { action: 'feedback', satisfied: true }, '✅ 已结单')">✅ 满意，结单</n-button>
+          <n-button type="warning" size="large" style="min-height:56px;font-size:1.2rem;"
+                    @click="act(i.id, { action: 'feedback', satisfied: false, reason: fbReason[i.id] || '还需处理' }, '已反馈，将重新处理')">
+            😕 不满意
+          </n-button>
         </div>
       </div>
     </div>
