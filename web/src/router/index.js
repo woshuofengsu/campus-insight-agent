@@ -44,6 +44,8 @@ const routes = [
       { path: '', redirect: '/grid/dashboard' },
       { path: 'dashboard', name: 'g-dashboard', component: () => import('../views/grid/Dashboard.vue'), meta: { title: '工作台' } },
       { path: 'work-orders', name: 'g-issues', component: () => import('../views/grid/Issues.vue'), meta: { title: '工单管理' } },
+      // 卡11 / v3 卡7：人工待办工作台（领取/补问/回复/关闭）
+      { path: 'handoffs', name: 'g-handoffs', component: () => import('../views/grid/Handoffs.vue'), meta: { title: '人工待办' } },
       { path: 'proposals', name: 'g-proposals', component: () => import('../views/grid/Proposals.vue'), meta: { title: '提案管理' } },
       { path: 'notices', name: 'g-notices', component: () => import('../views/grid/Notices.vue'), meta: { title: '通知管理' } },
       { path: 'qa', name: 'g-qa', component: () => import('../views/grid/QA.vue'), meta: { title: '政策问答管理' } },

@@ -211,6 +211,8 @@ export const agent = {
   clearHistory: () => api.delete('/agent/history'),
   logs: (params) => api.get('/agent/logs', { params }),
   handoffs: (params) => api.get('/agent/handoffs', { params }),
+  // 卡11 / v3 卡7：人工处理包流转（claim 领取 / ask 补问 / reply 回复 / close 关闭）
+  handoffAction: (id, data) => api.post(`/agent/handoffs/${id}/action`, data),
   resolveHandoff: (id) => api.post(`/agent/handoffs/${id}/resolve`),
   llmUsage: (params) => api.get('/agent/llm-usage', { params }),
   selfResolution: (params) => api.get('/agent/self-resolution', { params }),

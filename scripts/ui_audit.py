@@ -254,6 +254,8 @@ PAGES = [
     ("grid-dashboard", "grid", "/grid/dashboard", (1440, 900), False, False, False),
     ("grid-dashboard-1366", "grid", "/grid/dashboard", (1366, 768), False, False, False),
     ("grid-workorders", "grid", "/grid/work-orders", (1440, 900), False, False, False),
+    # 卡11 / v3 卡7：人工待办工作台（新页面必须进审计，否则"新页面没人看"）
+    ("grid-handoffs", "grid", "/grid/handoffs", (1440, 900), False, False, False),
     ("grid-proposals", "grid", "/grid/proposals", (1440, 900), False, False, False),
     ("grid-notices", "grid", "/grid/notices", (1440, 900), False, False, False),
     ("grid-qa", "grid", "/grid/qa", (1440, 900), False, False, False),

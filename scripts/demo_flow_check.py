@@ -141,6 +141,8 @@ def main() -> int:
     ap.add_argument("--mutate", action="store_true", help="真的推进一张工单到已解决")
     ap.add_argument("--faults", action="store_true",
                     help="额外做故障注入（接口超时/500/关掉语音），验「失败时不谎报成功」")
+    ap.add_argument("--handoff", action="store_true",
+                    help="额外走一遍「AI 转人工 → 人工待办 领取/回复/关闭」（会改数据）")
     args = ap.parse_args()
     base = args.base.rstrip("/")
 
@@ -262,6 +264,60 @@ def main() -> int:
             page.wait_for_timeout(1500)
             check("⑪ 「更多服务」页可打开并能进用药提醒",
                   "/elderly/more" in page.url, page.url)
+
+        if args.handoff:
+            # ---------- 场景 7：AI 转人工 → 网格端工作台办结（卡11 / v3 卡7） ----------
+            # 走**真实链路**：居民对 AI 说"转人工" → 生成处理包 → 网格员在「人工待办」领取/回复/关闭。
+            print("\n【场景 7】AI 转人工 → 网格端「人工待办」办结（领取 → 回复 → 关闭）")
+            clear_session(page, base)
+            page.locator("text=居民").first.click()
+            page.wait_for_url("**/resident/**")
+            page.goto(f"{base}/resident/home", wait_until="networkidle")
+            page.wait_for_timeout(2000)
+            # AgentChat 的输入是 n-input（渲染成 <input>，不是 textarea），回车或点「发送」都能提交
+            box = page.locator("input[placeholder*='请输入您的问题']")
+            if not box.count():
+                box = page.locator("input[placeholder*='漏水']")
+            if box.count():
+                box.first.fill("我要转人工，请人工客服帮我查一下医保报销")
+                _btn(page, "发送").first.click()
+                page.wait_for_timeout(4000)
+            else:
+                check("⓪ 找到对话框输入框", False, "首页找不到 Agent 对话框输入框")
+            res_text = page.inner_text("body")
+            check("⓪ 居民要求转人工得到回应", ("人工" in res_text) or ("转接" in res_text),
+                  "AI 走转人工链路")
+
+            clear_session(page, base)
+            page.locator("text=网格员").first.click()
+            page.wait_for_url("**/grid/**")
+            page.goto(f"{base}/grid/handoffs", wait_until="networkidle")
+            page.wait_for_timeout(2500)
+            check("① 打开「人工待办」工作台", "人工待办" in page.inner_text("body"), page.url)
+
+            if _has_btn(page, "🙋 领取"):
+                _btn(page, "🙋 领取").first.click()
+                page.wait_for_timeout(2000)
+                body_h = page.inner_text("body")
+                # 判据要**看状态**，不能看"待处理还在不在"（列表里还有别人的待处理包）
+                check("② 领取成功（记录谁领的）",
+                      ("已领取" in body_h) and ("办理中" in body_h), "状态变为已领取")
+                if page.locator("input[placeholder='回复内容（会通知居民）']").count():
+                    page.fill("input[placeholder='回复内容（会通知居民）']",
+                              "已帮您核实：带身份证与医保卡到社区服务站即可办理。")
+                    _btn(page, "✅ 回复").first.click()
+                    page.wait_for_timeout(2000)
+                check("③ 回复居民成功", "已回复" in page.inner_text("body"),
+                      "回复内容已记录并通知居民")
+                if page.locator("input[placeholder='关闭说明（居民看得到的处理结果）']").count():
+                    page.fill("input[placeholder='关闭说明（居民看得到的处理结果）']",
+                              "已电话告知居民办理流程，居民确认理解。")
+                    _btn(page, "🏁 关闭").first.click()
+                    page.wait_for_timeout(2200)
+                check("④ 关闭办结（带说明）", "已办结" in page.inner_text("body"),
+                      "关闭说明会成为居民看到的处理结果")
+            else:
+                check("② 有可领取的待办包", False, "工作台里没有「待处理」的处理包")
 
         if args.faults:
             _fault_drills(page, base)

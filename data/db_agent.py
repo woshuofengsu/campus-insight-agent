@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 
 from data.database import get_db
+from data.db_notifications import log_activity
 from utils.tenant import stamp_tenant, tenant_clause, default_community
 
 MODULE = "Agent"
@@ -280,11 +281,130 @@ def list_handoffs(status: str = "", limit: int = 50, tenant: str | None = None) 
         return out
 
 
+def handle_handoff(handoff_id: int, action: str, *, actor_id: int = 0, actor_name: str = "",
+                   text: str = "", tenant: str = "") -> tuple[bool, str]:
+    """人工处理包的状态流转（卡11 / v3 卡7）：**领取 / 补问 / 回复 / 关闭**。
+
+    **为什么要一个统一入口**：原来只有"待处理 → 已处理"一步（`resolve_handoff`），
+    网格端看得到包却办不了事 —— 谁领的、向居民问了什么、回了什么、为什么关，全都没有记录。
+    这里把四件事做成**显式状态机**，每次流转都：
+      ① 校验当前状态是否允许该动作（不允许就明确说不允许，不放行）；
+      ② 写清"谁在什么时候做了什么"（`assignee_*` / `asked_at` / `replied_at` / `closed_at`）；
+      ③ 需要告知居民的动作（补问 / 回复）**给原提问人发通知**（通知失败不影响办理事实，但要留痕）。
+
+    `action` 取值与允许来源状态：
+      · `claim`  领取：待处理 → 已领取（已领取时不许别人抢，明确报出当前负责人）
+      · `ask`    补问：已领取 / 等居民补充 → 等居民补充（需要文本）
+      · `reply`  回复：已领取 / 等居民补充 → 已回复（需要文本，并通知居民）
+      · `close`  关闭：已领取 / 等居民补充 / 已回复 → 已处理（需要关闭说明）
+    返回 `(是否成功, 给操作人看的话)`。
+    """
+    from utils.tenant import normalize_tenant
+    t = normalize_tenant(tenant) if tenant else ""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM agent_handoffs WHERE id=?", (handoff_id,)).fetchone()
+        if not row:
+            return False, "处理包不存在"
+        cur_status = row["status"] or "待处理"
+        d = dict(row)
+
+    def _allowed(states):
+        return cur_status in states
+
+    if action == "claim":
+        if cur_status == "已处理":
+            return False, "这个处理包已经办完了"
+        if cur_status != "待处理":
+            who = d.get("assignee_name") or "另一位负责人"
+            return False, f"已经被「{who}」领取了（{str(d.get('claimed_at') or '')[:16]}）"
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE agent_handoffs SET status='已领取', assignee_id=?, assignee_name=?, "
+                "claimed_at=CURRENT_TIMESTAMP WHERE id=? AND status='待处理'",
+                (int(actor_id or 0), actor_name or "负责人", handoff_id))
+            conn.commit()
+        log_activity(actor_name or "负责人", "领取人工处理包", "agent_handoff", handoff_id,
+                     d.get("reason") or "", module=MODULE, before_value=cur_status,
+                     after_value="已领取")
+        return True, "已领取，请在办结后填写回复与关闭说明"
+
+    if action == "ask":
+        if not _allowed(("已领取", "等居民补充")):
+            return False, ("请先「领取」这个处理包再补问" if cur_status == "待处理"
+                           else f"当前状态「{cur_status}」不能补问")
+        text = (text or "").strip()
+        if not text:
+            return False, "补问内容不能为空"
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE agent_handoffs SET status='等居民补充', ask_back=?, asked_at=CURRENT_TIMESTAMP "
+                "WHERE id=?", (text, handoff_id))
+            conn.commit()
+        _notify_handoff_owner(d, "您的报修/咨询需要补充信息", text)
+        log_activity(actor_name or "负责人", "补问居民", "agent_handoff", handoff_id,
+                     d.get("reason") or "", module=MODULE, detail=text[:200])
+        return True, "已向居民发出补充询问"
+
+    if action == "reply":
+        if not _allowed(("已领取", "等居民补充")):
+            return False, ("请先「领取」这个处理包再回复" if cur_status == "待处理"
+                           else f"当前状态「{cur_status}」不能回复（已回复过就直接关闭）")
+        text = (text or "").strip()
+        if not text:
+            return False, "回复内容不能为空"
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE agent_handoffs SET status='已回复', reply=?, replied_at=CURRENT_TIMESTAMP "
+                "WHERE id=?", (text, handoff_id))
+            conn.commit()
+        _notify_handoff_owner(d, "工作人员已回复您的问题", text)
+        log_activity(actor_name or "负责人", "回复居民", "agent_handoff", handoff_id,
+                     d.get("reason") or "", module=MODULE, detail=text[:200])
+        return True, "已回复并通知居民"
+
+    if action == "close":
+        if not _allowed(("已领取", "等居民补充", "已回复")):
+            return False, ("请先「领取」这个处理包" if cur_status == "待处理"
+                           else "这个处理包已经关闭了")
+        note = (text or "").strip()
+        if not note:
+            return False, "关闭说明不能为空（写清怎么处理的，居民看得到）"
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE agent_handoffs SET status='已处理', close_note=?, closed_at=CURRENT_TIMESTAMP "
+                "WHERE id=?", (note, handoff_id))
+            conn.commit()
+        log_activity(actor_name or "负责人", "办结人工处理包", "agent_handoff", handoff_id,
+                     d.get("reason") or "", module=MODULE, before_value=cur_status,
+                     after_value="已处理", detail=note[:200])
+        return True, "已办结"
+
+    return False, f"不支持的动作：{action}"
+
+
+def _notify_handoff_owner(row: dict, title: str, body: str) -> None:
+    """把补问/回复告诉**原提问人**（一个人，不是广播）；失败只留痕，不影响办理事实。"""
+    uid = row.get("user_id")
+    if not uid:
+        return
+    try:
+        from data.db_notifications import create_notification
+        create_notification(int(uid), "agent_handoff", title, body,
+                            related_id=row.get("id"))
+    except Exception as e:  # noqa: BLE001 — 通知不是硬依赖，但发不出去必须可见
+        _log.warning("人工处理包通知居民失败（办理事实不受影响）handoff=%s：%s", row.get("id"), e)
+
+
 def resolve_handoff(handoff_id: int, actor: str = "负责人") -> bool:
-    """负责人处理完成（关闭处理包）。"""
+    """负责人处理完成（关闭处理包）。
+
+    ⚠️ 卡11 起新流程请走 `handle_handoff(..., action="close", text=...)`：
+    那是**带关闭说明**的状态机；本函数保留给旧调用方，行为与原来一致（待处理 → 已处理）。
+    """
     with get_db() as conn:
         cur = conn.execute(
-            "UPDATE agent_handoffs SET status='已处理' WHERE id=? AND status='待处理'",
+            "UPDATE agent_handoffs SET status='已处理', closed_at=CURRENT_TIMESTAMP "
+            "WHERE id=? AND status='待处理'",
             (handoff_id,))
         conn.commit()
         return cur.rowcount > 0

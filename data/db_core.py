@@ -742,6 +742,30 @@ def _m47_elderly_vitals(conn):
         log.warning("v47 健康记录回填失败（不影响建表）：%s", e)
 
 
+def _m50_handoff_workbench(conn):
+    """v50（卡11 / v3 卡7）：人工处理包**能办完**所需的字段。
+
+    原来 `agent_handoffs` 只有"待处理 → 已处理"两个状态，网格端**看得到包、办不了事**：
+    没有"谁领的"、不能向居民补问、也没地方写回复与关闭说明。
+    这里补齐：领取人（`assignee_*`）、补问（`ask_back`/`asked_at`）、
+    回复（`reply`/`replied_at`）、关闭说明（`close_note`/`closed_at`）。
+    状态机在 `data/db_agent.py` 里**显式校验**（每次流转都过闸 + 留痕）。
+    """
+    from data.db_core import _add_column
+    for col, ddl in (
+        ("assignee_id", "assignee_id INTEGER DEFAULT 0"),
+        ("assignee_name", "assignee_name TEXT DEFAULT ''"),
+        ("claimed_at", "claimed_at TIMESTAMP"),
+        ("ask_back", "ask_back TEXT DEFAULT ''"),
+        ("asked_at", "asked_at TIMESTAMP"),
+        ("reply", "reply TEXT DEFAULT ''"),
+        ("replied_at", "replied_at TIMESTAMP"),
+        ("close_note", "close_note TEXT DEFAULT ''"),
+        ("closed_at", "closed_at TIMESTAMP"),
+    ):
+        _add_column(conn, "agent_handoffs", col, ddl)
+
+
 def _m49_draft_versioning_and_idempotency(conn):
     """v49（卡8 / v3 卡4）：草稿带**出处**、写操作带**幂等键**。
 
@@ -1242,6 +1266,7 @@ def init_db(db_path: str):
         (47, "elderly_vitals", _m47_elderly_vitals),
         (48, "tenant_isolation", _m48_tenant_isolation),
         (49, "draft_versioning_and_idempotency", _m49_draft_versioning_and_idempotency),
+        (50, "handoff_workbench", _m50_handoff_workbench),
     ]
     for version, name, fn in post:
         if version <= current:

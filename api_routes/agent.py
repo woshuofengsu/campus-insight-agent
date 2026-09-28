@@ -7,10 +7,21 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role, _resolve_elder_uid, _tenant, _same_tenant
+from api_routes.guards import write_route
 
 _log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/agent", tags=["agent"])
+
+
+class HandoffAction(BaseModel):
+    """人工处理包流转动作（卡11 / v3 卡7）。
+
+    `action`：claim（领取）/ ask（补问）/ reply（回复）/ close（关闭）；
+    `text`：补问内容 / 回复内容 / 关闭说明 —— 三个动作都**必填**（写进留痕与居民通知里）。
+    """
+    action: str = Field(..., pattern="^(claim|ask|reply|close)$")
+    text: str = Field(default="", max_length=1000)
 
 _MAX_AGENT_SESSIONS = 500
 
@@ -142,9 +153,32 @@ def agent_handoffs(request: Request, status: str = "", limit: int = 50):
     return _ok(list_handoffs(status=status, limit=limit, tenant=_tenant(request)))
 
 
+@router.post("/handoffs/{hid}/action")
+@write_route(roles=("grid",), table="agent_handoffs", id_param="hid",
+             note="人工处理包流转（领取/补问/回复/关闭）：本社区 + 网格员")
+def agent_handoff_action(hid: int, req: HandoffAction, request: Request):
+    """人工处理包流转（卡11 / v3 卡7）：**领取 → 补问 → 回复 → 关闭**。
+
+    为什么要有这一条：原来只有"关闭"一个动作，网格端看得到包却办不了事。
+    现在四个动作走同一个**状态机**（`data/db_agent.handle_handoff`），
+    每次流转都校验允许的来源状态、记录"谁在什么时候做了什么"，并给居民发通知（补问/回复）。
+    """
+    from data.db_agent import handle_handoff
+    u = _user(request)
+    ok_, msg = handle_handoff(hid, req.action, actor_id=u.get("uid") or 0,
+                              actor_name=u.get("name") or "负责人",
+                              text=req.text, tenant=_tenant(request))
+    if not ok_:
+        return _fail(2001, msg)
+    return _ok({"handoff_id": hid, "action": req.action}, msg)
+
+
 @router.post("/handoffs/{hid}/resolve")
 def agent_handoff_resolve(hid: int, request: Request):
-    """负责人处理完成（关闭人工处理包）。"""
+    """负责人处理完成（关闭人工处理包）——**旧入口**，保留兼容。
+
+    ⚠️ 新流程请用 `POST /handoffs/{hid}/action`（`close` 要带关闭说明，居民看得到）。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_agent import resolve_handoff

@@ -19,6 +19,8 @@ const drawerOpen = ref(false) // 网格员端移动端抽屉导航
 const gridMenus = [
   { key: '/grid/dashboard', label: '工作台', icon: '📊' },
   { key: '/grid/work-orders', label: '工单管理', icon: '🔧' },
+  // 卡11 / v3 卡7：转人工处理包工作台（领取/补问/回复/关闭）——原来只能"看"，办不了事
+  { key: '/grid/handoffs', label: '人工待办', icon: '🧑‍💻' },
   { key: '/grid/proposals', label: '提案管理', icon: '💡' },
   { key: '/grid/notices', label: '通知管理', icon: '📢' },
   { key: '/grid/qa', label: '政策问答', icon: '📖' },

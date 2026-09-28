@@ -160,6 +160,8 @@ PAGES = [
     ("grid-workorders", "grid", "/grid/work-orders", (390, 844), False),
     ("grid-dashboard", "grid", "/grid/dashboard", (390, 844), False),
     ("grid-elderly-care", "grid", "/grid/elderly-care", (390, 844), False),
+    # 卡11 / v3 卡7：人工待办工作台
+    ("grid-handoffs", "grid", "/grid/handoffs", (390, 844), False),
     ("screen-mobile", "grid", "/screen", (390, 844), False),
     ("elderly-home", "elderly", "/elderly/home", (390, 844), True),
     ("elderly-agent", "elderly", "/elderly/agent", (390, 844), True),
