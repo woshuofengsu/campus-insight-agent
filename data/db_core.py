@@ -742,6 +742,33 @@ def _m47_elderly_vitals(conn):
         log.warning("v47 健康记录回填失败（不影响建表）：%s", e)
 
 
+def _m49_draft_versioning_and_idempotency(conn):
+    """v49（卡8 / v3 卡4）：草稿带**出处**、写操作带**幂等键**。
+
+    背景（都是实测踩到的，不是假想）：
+      · **旧草稿顶替新报修**：`draft_contents` 每轮从库里回填黑板，且没有"这条草稿是哪次对话、
+        从哪句话来的"信息 —— 于是老人**新说一件事**时，页面上的确认卡可能还带着上一件事的描述
+        （状态机把新的位置合并进旧草稿）。修法：草稿记下 `source_session`（同一场对话才允许回填）
+        与 `source_text`（原话，可展示"上次没提交的是…"）。
+      · **重复提交建两张单**：网络重试/用户连点会让同一件事建出多张工单。修法：`idempotency_keys`
+        表按 `(scope, key)` 记住"这个请求做过什么"，重复请求直接返回上次的结果。
+
+    幂等表设计：`(scope, key)` 主键 + `user_id` + `result_json` + `created_at`；
+    `scope` 区分业务（如 `elderly_report`），`key` 由客户端生成（前端每次"准备提交"生成一次，
+    重试沿用同一个）。**只存结果摘要，不存业务正文**，避免这张表变成第二个业务库。
+    """
+    from data.db_core import _add_column
+    _add_column(conn, "draft_contents", "source_session", "source_session TEXT DEFAULT ''")
+    _add_column(conn, "draft_contents", "source_text", "source_text TEXT DEFAULT ''")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS idempotency_keys ("
+        "scope TEXT NOT NULL, key TEXT NOT NULL, user_id INTEGER DEFAULT 0, "
+        "result_json TEXT DEFAULT '{}', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+        "PRIMARY KEY (scope, key))")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_keys(created_at)")
+
+
 def _m48_tenant_isolation(conn):
     """v48：多租户真隔离（核心表）——加列 → 归一化 → 按归属人回填 → 索引。
 
@@ -1214,6 +1241,7 @@ def init_db(db_path: str):
         (46, "phone_enc_all_and_schema_drift", _m46_phone_enc_and_schema_drift),
         (47, "elderly_vitals", _m47_elderly_vitals),
         (48, "tenant_isolation", _m48_tenant_isolation),
+        (49, "draft_versioning_and_idempotency", _m49_draft_versioning_and_idempotency),
     ]
     for version, name, fn in post:
         if version <= current:

@@ -3,8 +3,12 @@
 process() 复用现有数据层与规则引擎（web_agent_service / data/*），不复制业务逻辑。
 会话状态（追问/草稿）存黑板：user:{uid}:state / user:{uid}:{draft_key}。
 """
+import logging
+
 from agent import web_agent as A
 from agent.roles.base import BaseAgent
+
+_log = logging.getLogger(__name__)
 
 
 def _llm_polish_health_suggestion(tags: str, base: str) -> str:
@@ -47,6 +51,35 @@ def _state_key(uid):
 
 def _draft_key(uid, name):
     return f"user:{uid}:{name}"
+
+
+# ---- 卡8 / v3 卡4：判断这一句是"回答刚才的追问"还是"新的一件事" ----
+# 为什么必须有它：老人在**上一件事还没确认完**时又说了一件新事（很常见：先说家里漏水，
+# 又想起楼道灯坏），状态机原来会把新句子当成"对上一个问题的回答"，
+# 于是**把新位置合并进旧草稿** → 确认卡里出现"上一件事的描述 + 这一件事的位置"的混合体。
+# 判据刻意保守（宁可多问一句，也不猜）：
+#   · 短句且不含问题描述特征 → 当成回答（"家里"、"公共区域"、"紧急"）；
+#   · 长句或含问题特征（坏/漏/堵/不亮/停…）→ 当成**新报修**，另起草稿并说清旧草稿的去向。
+_PROBLEM_WORDS = ("坏", "漏", "堵", "不亮", "不亮", "停", "坏掉", "破", "冒", "响", "塌",
+                  "脱落", "松动", "积水", "堵住", "异响", "不转", "不制冷", "不热", "没水", "没电")
+
+
+def _is_new_repair_utterance(text: str, step: str) -> bool:
+    """这一句是不是"又一件新事"（而不是在回答追问）。`step` 决定"期望的回答"长什么样。"""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if any(k in t for k in _PROBLEM_WORDS):
+        return True
+    # 期待作答时，短句视为回答（"家里" / "公共区域" / "紧急" / "不着急"）
+    if step == "ask_type" and len(t) <= 8:
+        return False
+    if step == "ask_urgency" and len(t) <= 12:
+        return False
+    # 确认阶段：只有明确的确认/取消词才算在流程里，其余长句按新事处理
+    if step == "confirm" and len(t) <= 6:
+        return False
+    return len(t) > 12
 
 
 # 报修地点归一类：区分「室内(家里)」vs「室外(公共区域)」。
@@ -129,6 +162,23 @@ class RepairDispatchAgent(BaseAgent):
 
         # 追问/确认阶段
         step = st.get("step")
+        # 卡8 / v3 卡4：**上一件事还没走完，老人又说了新的一件事** →
+        # 绝不把它当成"对上一个问题的回答"合并进旧草稿（那会生成"旧描述 + 新位置"的混合工单）。
+        # 处理：旧草稿如实丢弃（留痕），按新的一句话重新起草，并明确告诉老人。
+        superseded = ""
+        if step and draft and _is_new_repair_utterance(text, step):
+            superseded = str(draft.get("desc") or "")[:40]
+            _log.info("报修草稿被新报修顶替（旧：%s）→ 按新描述重新起草", superseded)
+            self.bb.unlock(_draft_key(uid, "work_order_draft"))
+            self._write(_draft_key(uid, "work_order_draft"), None, lock=False)
+            try:
+                from data.db_draft import delete_draft
+                delete_draft(uid, "work_order_draft")   # 库里也别留，免得下一轮回填
+            except Exception as e:  # noqa: BLE001
+                _log.warning("清理被顶替的草稿失败：%s", e)
+            draft = None
+            st.clear()
+            step = None
         if step == "ask_type":
             draft["type"] = _classify_repair_location(text)
             st["step"] = "ask_urgency" if draft.get("urgency") is None else "confirm"
@@ -147,6 +197,13 @@ class RepairDispatchAgent(BaseAgent):
                                    chain_note="用户确认，工单已创建")
             st.clear()
             self._write(_state_key(uid), st)
+            self.bb.unlock(_draft_key(uid, "work_order_draft"))
+            self._write(_draft_key(uid, "work_order_draft"), None, lock=False)
+            try:
+                from data.db_draft import delete_draft
+                delete_draft(uid, "work_order_draft")
+            except Exception as e:  # noqa: BLE001
+                _log.warning("取消报修时清理草稿失败：%s", e)
             return self._reply("已取消，没有生成工单。", "已取消", "报修", chain_note="用户取消")
 
         # 新报修
@@ -193,8 +250,14 @@ class RepairDispatchAgent(BaseAgent):
                                actions=[{"type": "buttons", "options": ["紧急", "一般"]}],
                                chain_note="追问紧急程度")
         urgent_txt = "紧急" if draft.get("urgency") == "紧急" else "一般"
+        prefix = ""
+        if superseded:
+            # 诚实告知：上一次那条没提交的报修**已被这条替换**（不是"顺手改一改"，是两件事）
+            prefix = (f"（说明：刚才那条「{superseded}」还没确认，我按您现在说的这件事重新开了工单草稿，"
+                      f"刚才那条没有提交。）\n")
         return self._reply(
-            f"请您确认报修信息：\n· 问题：{draft.get('desc', '')[:60]}\n· 分类：{draft.get('type')}\n· 紧急程度：{urgent_txt}",
+            f"{prefix}请您确认报修信息：\n· 问题：{draft.get('desc', '')[:60]}\n"
+            f"· 分类：{draft.get('type')}\n· 紧急程度：{urgent_txt}",
             "需确认", "报修",
             actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],
             chain_note="生成草稿，等待用户确认")

@@ -98,16 +98,20 @@ class ReportDraftIn(BaseModel):
 
 
 class ReportSubmitIn(BaseModel):
-    """报修提交输入（v3 卡1）：原话 + **老人确认/补充**的值。
+    """报修提交输入（v3 卡1 + 卡8）：原话 + **老人确认/补充**的值 + 幂等键。
 
     为什么原话要一起传：`location`/`scope` 是"老人说的"或"老人确认的"，
     而 title/description 永远是**原话**——分开保存才能做到
     「原始话语 / 系统建议 / 用户确认值 / 最终入库值」四者可区分（v3 复核 §6-I7）。
+
+    `client_token`（卡8 / §6-I5）：前端**每次准备提交时生成一次**，网络重试/连点沿用同一个。
+    服务端据此认出重复请求并返回**上一次的结果**（而不是再建一张工单）。
     """
     text: str = Field(..., min_length=2, max_length=500)
     location: str = Field(default="", max_length=80)
     scope: str = Field(default="", max_length=8)      # 室内 / 室外 / 空=按原话推断
     urgency: str = Field(default="", max_length=8)    # 一般 / 中等 / 紧急 / 空=按原话推断
+    client_token: str = Field(default="", max_length=64)
 
 
 class MedicationCreate(BaseModel):
@@ -285,12 +289,25 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
       `original_text`（老人原话）/ `suggestion`（系统建议）/ `confirmed`（最终入库值）/ `sources`（每个字段来源）。
     缺必填 → 返回 2002 + 追问话术，**不建单**；资料里没手机号 → 明确拒绝，**不写 13800000000 这种假号**。
     """
+    from data.db_idempotency import recall, remember
     from data.db_repair import submit_issue
     from tools.action_report_issue import _llm_classify
     from utils.elderly_report import build_report_confirm_payload
     u = _user(request)
     uid = _resolve_elder_uid(request) or u.get("uid")
     _touch(uid)
+
+    # 幂等（卡8 / §6-I5）：同一个 token 重复提交 → 直接返回**上一次的结果**。
+    # 这一步在"校验必填"之前：重试的请求本来就带着完整的已确认字段，
+    # 但即便字段被前端改动了，也不该凭同一个 token 建第二张单（老人的意图只有一次）。
+    if req.client_token:
+        prev = recall("elderly_report", req.client_token, uid)
+        if prev is not None:
+            _log.info("老人报修重复提交（幂等命中）：uid=%s token=%s → 工单 #%s",
+                      uid, req.client_token, prev.get("issue_id"))
+            return _ok({**prev, "duplicate": True},
+                       f"这条报修已经提交过了，工单号 {prev.get('issue_id')}")
+
     profile = _elderly_profile(uid)
 
     ok_, r, ask = build_report_confirm_payload(
@@ -315,17 +332,49 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
     )
     if iid <= 0:
         if hint == "safety":
-            return _ok({"issue_id": 0, "safety": True, "confirmed": fields},
-                       "已记为安全提醒（这类情况不生成工单，负责人会看到）")
+            payload = {"issue_id": 0, "safety": True, "confirmed": fields,
+                       "original_text": req.text, "suggestion": r["suggestion"],
+                       "sources": r["sources"]}
+            if req.client_token:
+                remember("elderly_report", req.client_token, uid, payload)
+            return _ok(payload, "已记为安全提醒（这类情况不生成工单，负责人会看到）")
         return _fail(2001, hint or "上报失败")
-    return _ok({
+    payload = {
         "issue_id": iid,
         "original_text": req.text,
         "suggestion": r["suggestion"],
         "confirmed": fields,
         "sources": r["sources"],
         "category": category,
-    }, f"上报成功，工单号 {iid}，请等待审核")
+        "client_token": req.client_token,
+    }
+    if req.client_token:
+        remember("elderly_report", req.client_token, uid, payload)
+    return _ok(payload, f"上报成功，工单号 {iid}，请等待审核")
+
+
+@router.get("/report/status")
+def web_elderly_report_status(request: Request, token: str = ""):
+    """「我刚才到底提交成功了吗？」—— 按幂等 token 查询（v3 复核 §6-I5）。
+
+    **为什么必须有这个接口**：老人点了上报之后如果断网/超时，页面只知道"没收到回应"，
+    既不知道成没成、也拿不到工单号。这时候**不能诱导老人再点一次**（会重复建单），
+    正确做法是给出一个"结果未知 → 正在核对"的出口，由服务端按 token 查真实结果：
+      · `submitted=True` → 带工单号（页面可以放心告诉老人"已经报上了"）；
+      · `submitted=False` → 明确"这次没有提交成功"，可以重试（token 仍可复用）。
+
+    这不是"伪造一个成功状态"，而是**把不确定如实展示**并把真实结果查出来。
+    """
+    from data.db_idempotency import recall, valid_key
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    if not valid_key(token):
+        return _fail(1003, "缺少有效的提交编号")
+    prev = recall("elderly_report", token, uid)
+    if prev is None:
+        return _ok({"submitted": False, "issue_id": 0, "known": False},
+                   "这次没有查到已提交的记录，可以重新提交")
+    return _ok({"submitted": True, "known": True, **prev},
+               f"已经提交过了，工单号 {prev.get('issue_id')}")
 
 
 @router.post("/voice-report")

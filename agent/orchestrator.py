@@ -85,12 +85,21 @@ class Orchestrator:
             st = persisted or {}
             self.bb.write(_state_key(uid), st, "orchestrator")
         # 草稿内容落库恢复（P1-A5-02）：从 draft_contents 回填黑板草稿
+        # 卡8 / v3 卡4：**只回填"同一场对话"的草稿** —— 否则旧草稿会顶替新报修
+        # （实测症状：老人新说一件事，确认卡里还带着上一件事的描述）。
+        # 不同对话的草稿不丢：它留在库里，由 `load_stale_drafts()` 提供给页面做
+        # "上次有一条没提交的，要继续吗？"，**绝不冒充当前这件事**。
         try:
             from data.db_draft import load_draft
             for key in _draft_keys(uid):
                 d = load_draft(uid, _draft_type_of(key))
-                if d and d.get("content"):
-                    self.bb.write(key, d["content"], "system_restore")
+                if not d or not d.get("content"):
+                    continue
+                if (d.get("source_session") or "") != self.bb.session_id:
+                    _log.info("库里有一条来自其它对话的草稿（%s），不回填到当前请示：%s",
+                              d.get("source_session") or "未知会话", key)
+                    continue
+                self.bb.write(key, d["content"], "system_restore")
         except Exception:
             pass
         # 属地（地区识别 WS4）：会话建立时解析一次放进 ctx，天气/政策等工具复用，避免每轮重复查库。
@@ -658,8 +667,12 @@ class Orchestrator:
             for key in _draft_keys(uid):
                 val = self.bb.read(key)
                 if val and isinstance(val, dict):
+                    # 草稿带上"哪场对话、从哪句话来"（卡8 / v3 卡4）——
+                    # 回填侧据此判断是否属于当前这件事，避免旧草稿顶替新报修
                     save_draft(uid, _draft_type_of(key), val,
-                               step=(ctx.get("state") or {}).get("step", ""))
+                               step=(ctx.get("state") or {}).get("step", ""),
+                               source_session=self.bb.session_id,
+                               source_text=str(val.get("desc") or ""))
                 elif status == "成功" and intent in ("repair_dispatch", "proposal_collab"):
                     delete_draft(uid, _draft_type_of(key))
         except Exception as e:  # noqa: BLE001

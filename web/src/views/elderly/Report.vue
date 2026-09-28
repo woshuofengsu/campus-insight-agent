@@ -25,6 +25,7 @@ const submitting = ref(false)
 const loadingDraft = ref(false)
 const draft = ref(null)          // 结构化摘要（服务端返回）
 const submitted = ref(null)      // 提交成功后的四段值
+const unknownToken = ref('')     // 提交结果未知时的幂等编号（§6-I5：不诱导老人重复点提交）
 // 老人补充/确认的字段（预填系统的建议，老人可改）
 const answer = ref({ location: '', scope: '', urgency: '一般' })
 
@@ -111,17 +112,30 @@ async function recheck() {
   await loadDraft()
 }
 
+/** 每次"准备提交"生成一个幂等编号：网络重试沿用同一个（卡8 / §6-I5）。 */
+function newToken() {
+  try {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID().replace(/-/g, '')
+  } catch { /* 忽略：回落下面的方案 */ }
+  return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+}
+
 async function submit() {
   if (!draft.value) return
   submitting.value = true
+  // 同一个草稿只在第一次生成 token，重试沿用（否则重试会变成"新的一次提交"）
+  if (!unknownToken.value) unknownToken.value = newToken()
+  const token = unknownToken.value
   try {
     const d = await elderly.reportSubmit({
       text: text.value,
       location: answer.value.location || '',
       scope: answer.value.scope || '',
       urgency: answer.value.urgency || '',
+      client_token: token,
     })
     submitted.value = d
+    unknownToken.value = ''
     if (d.issue_id > 0) {
       message.success(`已上报，工单号 ${d.issue_id}（待审核）`)
       await say(`已经帮您报上去了，工单号 ${d.issue_id}，请等负责人联系您`)
@@ -133,9 +147,39 @@ async function submit() {
     draft.value = null
     text.value = ''
   } catch (e) {
-    message.error(e.message || '上报失败，请稍后再试')
+    // ⚠️ 断网/超时时**不能**说"提交失败"就完事 —— 可能其实已经提交成功了。
+    // 如实告诉老人"结果还不确定"，并给一个"查一下"的出口，**不诱导他再点一次**（§6-I5）。
+    const maybe = /超时|timeout|Network|Failed to fetch|网络/i.test(String(e && e.message) || '')
+    if (maybe) {
+      message.warning('网络没回话，我先帮您核对一下是否已经报上去了')
+      await say('网络没有回话，我帮您核对一下是不是已经报上去了')
+      await checkSubmitted()
+    } else {
+      message.error(e.message || '上报失败，请稍后再试')
+    }
   } finally {
     submitting.value = false
+  }
+}
+
+/** 按幂等编号查真实结果：已经报上了就报工单号，没报上就明说可以重试。 */
+async function checkSubmitted() {
+  if (!unknownToken.value) return
+  try {
+    const s = await elderly.reportStatus(unknownToken.value)
+    if (s && s.submitted && s.issue_id > 0) {
+      submitted.value = s
+      unknownToken.value = ''
+      draft.value = null
+      text.value = ''
+      message.success(`核对到了：已经提交成功，工单号 ${s.issue_id}`)
+      await say(`核对到了，已经提交成功，工单号 ${s.issue_id}`)
+    } else {
+      message.info('核对结果：这次没有提交成功，可以再点一次「确认上报」')
+      await say('核对过了，这次没有提交成功，可以再点一次确认上报')
+    }
+  } catch (e) {
+    message.warning(e.message || '暂时查不到，请稍后再点「查一下是否已提交」')
   }
 }
 </script>
@@ -242,6 +286,9 @@ async function submit() {
         </div>
         <n-button type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
                   :loading="submitting" @click="submit">✅ 确认上报</n-button>
+        <!-- 结果未知的出口（§6-I5）：不诱导老人重复点提交，而是帮他查清楚 -->
+        <n-button v-if="unknownToken" block size="large" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
+                  @click="checkSubmitted">🔍 查一下是否已经提交了</n-button>
         <div class="muted" style="margin-top:6px;font-size:1rem;">
           上报后工单进入待审核，负责人会在「我的报修」里回复您。
         </div>
