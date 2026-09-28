@@ -793,6 +793,30 @@ def _m49_draft_versioning_and_idempotency(conn):
         "CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_keys(created_at)")
 
 
+def _m51_notification_outbox(conn):
+    """v51（卡9）：把通知**投递**与业务**提交**拆开——发不出去的通知进"待重试"队列。
+
+    为什么要这张表：通知一直是"现发现写"，写失败只留一行 warning/异常日志 ——
+    表现出来就是"业务成功了、该收到的人没收到"，而且**没有任何地方能看出漏了多少、还能不能补**。
+    现在 `create_notification` 写失败时把这条通知放进 `notification_outbox`（待发送），
+    调度器定期 `flush_outbox()` 补发；补发成功标 `已发送`，试满 N 次标 `放弃` 并记异常。
+
+    与本项目价值观一致的三点：
+      · 业务事实**永远不依赖**通知是否发出（调用方拿到的是"业务已成功"）；
+      · 队列保留 `related_id`（真实业务编号），补发后仍指向同一张工单/提案；
+      · `attempts` / `last_error` 可查 —— 漏发是**可观测**的，不是静默的。
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notification_outbox ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+        "type TEXT DEFAULT '', title TEXT DEFAULT '', content TEXT DEFAULT '', "
+        "related_id INTEGER, status TEXT DEFAULT '待发送', attempts INTEGER DEFAULT 0, "
+        "last_error TEXT DEFAULT '', next_try_at TIMESTAMP, "
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, tenant_id TEXT DEFAULT '')")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status, id)")
+
+
 def _m48_tenant_isolation(conn):
     """v48：多租户真隔离（核心表）——加列 → 归一化 → 按归属人回填 → 索引。
 
@@ -1267,6 +1291,7 @@ def init_db(db_path: str):
         (48, "tenant_isolation", _m48_tenant_isolation),
         (49, "draft_versioning_and_idempotency", _m49_draft_versioning_and_idempotency),
         (50, "handoff_workbench", _m50_handoff_workbench),
+        (51, "notification_outbox", _m51_notification_outbox),
     ]
     for version, name, fn in post:
         if version <= current:

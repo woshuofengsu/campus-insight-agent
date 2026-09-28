@@ -156,7 +156,30 @@ def run_all() -> dict:
     # 诚实呼叫（§6-B2）：没回填结果的拨打记录 → 如实标「结果未知」，不让它悬成"待确认"
     results["contact_call_resolved"] = _safe(
         "联系拨打结果未知标注", lambda: _ec.resolve_stale_contact_calls(minutes=5))
+    # 卡9：补发"当时没发出去"的通知（业务事实早已提交，这里只负责把该收的人补齐）
+    results["outbox_sent"] = _safe("通知补发", _flush_outbox)
+    results["outbox_cleaned"] = _safe("通知队列清理", _clean_outbox)
     return results
+
+
+def _flush_outbox() -> int:
+    """补发待重试通知，返回成功条数。"""
+    try:
+        from data.db_outbox import flush
+        return flush(limit=100).get("sent", 0)
+    except Exception:
+        _log.warning("通知补发失败", exc_info=True)
+        return 0
+
+
+def _clean_outbox() -> int:
+    """清理已完成的队列行（30 天）。"""
+    try:
+        from data.db_outbox import clean_finished
+        return clean_finished(days=30)
+    except Exception:
+        _log.warning("通知队列清理失败", exc_info=True)
+        return 0
 
 
 def _draft_clean() -> int:

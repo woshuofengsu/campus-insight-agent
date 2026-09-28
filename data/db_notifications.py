@@ -16,15 +16,37 @@ _log = logging.getLogger(__name__)
 
 def create_notification(user_id: int, type_: str, title: str,
                         content: str = "", related_id: int | None = None) -> int:
-    """给某个用户发一条通知，返回新通知的 ID。"""
-    with get_db() as conn:
-        cur = conn.execute(
-            "INSERT INTO notifications (user_id, type, title, content, related_id) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (user_id, type_, title, content, related_id),
-        )
-        conn.commit()
-        nid = cur.lastrowid
+    """给某个用户发一条通知，返回新通知的 ID。
+
+    **卡9：通知投递与业务提交拆开** —— 写失败时不再只是留一行 warning，
+    而是把这条通知放进**待重试队列**（`data/db_outbox.py`），由调度器补发。
+    这样"业务成功了、但该收到的人没收到"就变成**可观测、可补发**的事：
+      · 调用方拿到的仍然是 0（失败），**业务事实不受影响**；
+      · 队列保留真实业务编号 `related_id`，补发后仍指向同一张工单/提案；
+      · `pending_count()` 能直接看出还欠多少条。
+    """
+    try:
+        with get_db() as conn:
+            cur = conn.execute(
+                "INSERT INTO notifications (user_id, type, title, content, related_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, type_, title, content, related_id),
+            )
+            conn.commit()
+            nid = cur.lastrowid
+    except Exception as e:  # noqa: BLE001 — 写不进去就排队重试，绝不抛给业务调用方
+        _log.warning("通知写入失败，转入待重试队列：user=%s type=%s title=%s（%s）",
+                     user_id, type_, (title or "")[:30], e)
+        try:
+            from data.db_outbox import enqueue
+            enqueue(user_id, type_, title, content, related_id, error=str(e))
+        except Exception as e2:  # noqa: BLE001 — 队列也不可用：留异常记录（漏发必须可见）
+            _log.warning("待重试队列也不可用，这条通知会丢：user=%s（%s）", user_id, e2)
+            try:
+                log_exception("通知投递", f"通知写入与入队都失败 user={user_id}：{str(e)[:120]}")
+            except Exception:  # noqa: BLE001
+                pass
+        return 0
     # P2-4：实时通知推送（仅当有在线 WebSocket 连接时触发，失败静默不阻断）
     try:
         from utils.ws_hub import notify_sync
