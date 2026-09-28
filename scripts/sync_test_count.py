@@ -54,6 +54,57 @@ def detect_runnable() -> int:
     return int(m.group(1)) if m else -1
 
 
+def detect_audit_coverage() -> tuple[int, int]:
+    """从 `scripts/ui_audit.py` 的 PAGES 里数出「路由页数 / 页面视口数」。
+
+    **为什么要自动数**：文档里长期写着「34 个路由页 / 54 个页面视口」，而脚本早就涨到更多了 ——
+    这类"对外数字与工具实际不符"是评审最容易抓的点（也是本项目最忌讳的"宣称与事实不一致"）。
+    以后加页面只要跑本脚本，数字自动跟上。
+    """
+    p = os.path.join(ROOT, "scripts", "ui_audit.py")
+    try:
+        src = io.open(p, encoding="utf-8").read()
+    except OSError:
+        return (-1, -1)
+    import ast
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "PAGES":
+            paths = {el.elts[2].value for el in node.value.elts}
+            return len(paths), len(node.value.elts)
+    return (-1, -1)
+
+
+def sync_audit_counts(check_only: bool = False) -> int:
+    """把文档里的「N 个路由页 / M 个页面视口」同步成 ui_audit 的真实值。"""
+    routes, views = detect_audit_coverage()
+    if routes <= 0:
+        print("⚠️ 未能从 scripts/ui_audit.py 读出覆盖面，跳过同步")
+        return 0
+    print(f"UI 审计覆盖面：{routes} 个路由页 / {views} 个页面视口")
+    changed = []
+    for doc in DOCS:
+        fp = os.path.join(ROOT, doc)
+        if not os.path.exists(fp):
+            continue
+        s = io.open(fp, encoding="utf-8").read()
+        orig = s
+        s = re.sub(r"\d+\s*个路由页", f"{routes} 个路由页", s)
+        s = re.sub(r"\d+\s*个页面视口", f"{views} 个页面视口", s)
+        s = re.sub(r"\*\*\d+\s*页/视口", f"**{views} 页/视口", s)
+        s = re.sub(r"覆盖全部\s*\d+\s*个路由页", f"覆盖全部 {routes} 个路由页", s)
+        s = re.sub(r"全站\s*\d+\s*个路由页", f"全站 {routes} 个路由页", s)
+        s = re.sub(r"\b\d+\s*页视口\s*UI\s*客观审计（全站\s*\d+\s*个路由页）",
+                   f"{views} 页视口 UI 客观审计（全站 {routes} 个路由页）", s)
+        if s != orig:
+            if not check_only:
+                io.open(fp, "w", encoding="utf-8", newline="").write(s)
+            changed.append(doc)
+    if changed:
+        print(("  " if not check_only else "❌ 需要同步：") + "、".join(changed))
+    return len(changed)
+
+
 def current_meta() -> int:
     m = re.search(r"key:\s*'tests',\s*value:\s*(\d+)", io.open(META, encoding="utf-8").read())
     return int(m.group(1)) if m else -1
@@ -72,9 +123,12 @@ def main() -> int:
     detail = f"{passed} passed / 1 skipped"
 
     print(f"可运行用例数：{new}（{detail}）｜登录页 meta.js 现值：{old}")
+    stale = sync_audit_counts(check_only=check_only)
     if check_only:
         if old != new:
             print(f"❌ 不一致：请跑 `python scripts/sync_test_count.py {new}`")
+            return 1
+        if stale:
             return 1
         print("✅ meta.js 与实测一致")
         return 0

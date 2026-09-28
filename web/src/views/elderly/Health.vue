@@ -12,10 +12,21 @@ const message = useMessage()
 const { speak } = useSpeech()
 const cap = speechCapability()
 const ttsOk = ref(cap.hasTTS)     // 播不出来就隐藏「听一遍」，并说明原因（不假装能念）
+const lastSpoken = ref('')
 const kind = ref('bp')
 const form = ref({ sys: '', dia: '', glucose: '', measure_when: 'random' })
 const records = ref([])
 const summary = ref({})
+
+/** 统一播报入口：接住 speak() 的返回值，失败就把 🔊 降级成"请看大字"（v3 复核 B3）。 */
+async function say(text) {
+  const t = (text || '').trim()
+  if (!t) return false
+  lastSpoken.value = t
+  const ok = await speak(t, 1.0, 0.9)
+  if (!ok) ttsOk.value = false
+  return ok
+}
 
 // 语义色一律用**亮/暗成对令牌**（写死 hex 在暗色下对比度不达标，ui_audit 会抓）
 const LEVEL_COLOR = { normal: 'var(--ink-success)', attention: 'var(--ink-warning)', alert: 'var(--ink-danger)' }
@@ -45,7 +56,7 @@ async function save() {
   try {
     const r = await elderly.addVital(payload)
     message.success(r?.hint || '已记录')
-    if (r?.hint) speak(r.hint)      // 录完把提示语念出来（老人不一定看清小字）
+    if (r?.hint) await say(r.hint)      // 录完把提示语念出来（老人不一定看清小字）
     form.value = { sys: '', dia: '', glucose: '', measure_when: 'random' }
     load()
   } catch (e) {
@@ -58,7 +69,7 @@ function readAloud() {
   if (latestBp.value) parts.push(`最近一次血压，高压${latestBp.value.sys}，低压${latestBp.value.dia}`)
   if (latestGlu.value) parts.push(`最近一次血糖${latestGlu.value.glucose}`)
   parts.push(summary.value.bp_trend_label || '')
-  speak(parts.filter(Boolean).join('。'))
+  say(parts.filter(Boolean).join('。'))
 }
 </script>
 

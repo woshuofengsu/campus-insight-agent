@@ -170,6 +170,8 @@ PAGES = [
     ("elderly-contacts", "elderly", "/elderly/contacts", (390, 844), True),
     ("elderly-orders", "elderly", "/elderly/orders", (390, 844), True),
     ("elderly-qa", "elderly", "/elderly/qa", (390, 844), True),
+    # v3 复核 B4：导航收敛后新增的「更多服务」页
+    ("elderly-more", "elderly", "/elderly/more", (390, 844), True),
     ("elderly-landscape", "elderly", "/elderly/home", (844, 390), True),
 ]
 

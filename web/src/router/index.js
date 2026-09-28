@@ -70,6 +70,9 @@ const routes = [
       { path: 'orders', name: 'e-orders', component: () => import('../views/elderly/Orders.vue'), meta: { title: '我的报修' } },
       { path: 'qa', name: 'e-qa', component: () => import('../views/elderly/QA.vue'), meta: { title: '政策问答' } },
       { path: 'health', name: 'e-health', component: () => import('../views/elderly/Health.vue'), meta: { title: '我的健康' } },
+      // v3 复核 B4：顶层导航收敛到 5 个高频入口 + 独立紧急求助，
+      // 其余能力（小助手/政策/用药/健康）收进这一页 —— **路由保留，展示入口收敛**
+      { path: 'more', name: 'e-more', component: () => import('../views/elderly/More.vue'), meta: { title: '更多服务' } },
     ],
   },
 

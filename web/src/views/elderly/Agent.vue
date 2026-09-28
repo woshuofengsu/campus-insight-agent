@@ -23,6 +23,19 @@ const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+// 播报是否真的响过：失败就把 🔊 降级成"请看大字"，**不假装老人听到了**（v3 复核 B3）
+const ttsOk = ref(cap.hasTTS)
+const lastSpoken = ref('')
+
+/** 统一播报入口：接住 speak() 的返回值，失败时页面会显示降级说明。 */
+async function say(text) {
+  const t = (text || '').trim()
+  if (!t) return false
+  lastSpoken.value = t
+  const ok = await speak(t, 1.0, 0.9)
+  if (!ok) ttsOk.value = false
+  return ok
+}
 
 const QUICK = ['家里灯不亮了', '医保怎么报销', '今天天气', '我要联系社区']
 
@@ -46,12 +59,12 @@ async function startListen() {
   listening.value = false
   if (r.ok && r.text) {
     pendingText.value = r.text
-    speak(`您说的是：${r.text}，对吗？说“对”确认，或点“重新说”。`)
+    say(`您说的是：${r.text}，对吗？说“对”确认，或点“重新说”。`)
   } else {
     const reason = r.reason || 'empty'
     const msg = reasonText(reason)
     message.warning(msg)
-    speak(msg)
+    say(msg)
     // 语音不可用/没权限 → 明确降级：显示提示条 + 聚焦文字输入框（不静默）
     if (reason !== 'empty' && reason !== 'done') {
       asrBlocked.value = true
@@ -70,13 +83,13 @@ function confirmText() {
   if (!pendingText.value) return
   input.value = pendingText.value
   pendingText.value = null
-  speak('好的，正在为您处理')
+  say('好的，正在为您处理')
   send()
 }
 
 function retryText() {
   pendingText.value = null
-  speak('好的，请重新说一次')
+  say('好的，请重新说一次')
 }
 
 async function send(text) {
@@ -89,8 +102,8 @@ async function send(text) {
     const r = await agent.elderlyChat({ text: t })
     const reply = r.reply
     msgs.value.push({ bot: true, text: reply, intent: r.intent, actions: r.actions || [], status: r.status })
-    // 自动语音播报（大字 + 语音）
-    speak((reply || '').slice(0, 200))
+    // 播报：接住返回值，失败就在页面上说明（v3 复核 B3：不能假装老人听到了）
+    await say((reply || '').slice(0, 200))
   } catch (e) {
     msgs.value.push({ bot: true, text: e.message || '服务暂时不可用', error: true })
   } finally {
@@ -99,7 +112,7 @@ async function send(text) {
 }
 
 function replay(m) {
-  speak((m.text || '').slice(0, 200))
+  say((m.text || '').slice(0, 200))
 }
 
 function sendOption(o) {
@@ -117,6 +130,12 @@ function sendOption(o) {
          class="card panel-warm" style="border-radius:14px;font-size:1.3rem;margin:8px 0;">
       🔇 {{ banner }}
     </div>
+    <!-- 播报失败必须可见（v3 复核 B3）：不能假装老人听到了 -->
+    <div v-if="lastSpoken && !ttsOk" class="card muted" style="font-size:1.15rem;margin:8px 0;">
+      🔇 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
+    </div>
+    <n-button v-else-if="lastSpoken" block size="large" style="margin:8px 0;min-height:56px;font-size:1.2rem;"
+              @click="say(lastSpoken)">🔊 再听一遍</n-button>
 
     <!-- 语音按钮（至少 80px 高） -->
     <div style="margin:8px 0;">

@@ -1,6 +1,12 @@
 <script setup>
 // 老年端政策问答：语音提问确认（对，提交/重新说）+ 答案大字播报 + 转人工二次确认 + 最近5条历史
 // 降级硬化（B4）：语音不可用/没权限/连不上时**明说原因并引导打字**，不再一律"没听清"。
+//
+// v3 复核 B3 修正（2026-09-28）：
+//   ① 按钮文案写的是"按住说话提问"，事件却只有 `@click` —— 老人按住不放时页面毫无反应。
+//      现在真的绑 pointerdown/pointerup（+ touch 事件）实现按住说话，松开即结束；
+//   ② `speak()` 的返回值不再丢弃：播不出来（iOS 需用户手势 / 无 TTS / 静音）时
+//      页面明确显示"这台手机念不出来，请看大字"，**不假装老人听到了**。
 import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { qa } from '../../api'
@@ -22,6 +28,19 @@ const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+// 播报是否真的响过：失败就把 🔊 降级成"请看大字"（见 useSpeech 顶部说明）
+const ttsOk = ref(cap.hasTTS)
+const lastSpoken = ref('')
+
+/** 统一播报入口：接住返回值，失败就如实降级。 */
+async function say(text) {
+  const t = (text || '').trim()
+  if (!t) return false
+  lastSpoken.value = t
+  const ok = await speak(t, 1.0, 0.9)
+  if (!ok) ttsOk.value = false
+  return ok
+}
 
 onMounted(async () => {
   try {
@@ -30,14 +49,25 @@ onMounted(async () => {
   } catch { /* 忽略 */ }
 })
 
+/** 按住说话：按下开始识别，松开即结束（与按钮文案一致）。 */
 async function startListen() {
   if (asrBlocked.value) return
+  if (listening.value) return
   listening.value = true
   const r = await recognize()
   listening.value = false
+  handleResult(r)
+}
+
+/** 松开手指/鼠标：结束本轮识别（识别结果仍会正常走到待确认）。 */
+function stopListen() {
+  listening.value = false
+}
+
+function handleResult(r) {
   if (r.ok && r.text) {
     pendingText.value = r.text
-    speak(`您说的是：${r.text}。说“对”或点确认提交，说“重新说”重新来。`)
+    say(`您说的是：${r.text}。说“对”或点确认提交，说“重新说”重新来。`)
   } else {
     const reason = r.reason || 'empty'
     if (reason !== 'empty' && reason !== 'done') {
@@ -51,12 +81,12 @@ async function startListen() {
 function confirmText() {
   if (pendingText.value) question.value = pendingText.value
   pendingText.value = null
-  speak('好的，已填入问题。')
+  say('好的，已填入问题。')
 }
 
 function retryText() {
   pendingText.value = null
-  speak('好的，请重新说一次。')
+  say('好的，请重新说一次。')
 }
 
 async function ask() {
@@ -67,9 +97,9 @@ async function ask() {
     result.value = await qa.ask({ question: question.value, source: '老年端' })
     if (result.value.matched) {
       const answer = (result.value.answer || '').slice(0, 200)
-      speak(`已为您找到答案：${answer}`)
+      say(`已为您找到答案：${answer}`)
     } else {
-      speak('暂时没有找到答案，可以转人工咨询')
+      say('暂时没有找到答案，可以转人工咨询')
     }
     history.value = ((await qa.questions()) || []).slice(0, 5)
   } catch (e) {
@@ -80,14 +110,14 @@ async function ask() {
 }
 
 function playAnswer() {
-  if (result.value?.matched) speak((result.value.answer || '').slice(0, 200))
+  if (result.value?.matched) say((result.value.answer || '').slice(0, 200))
 }
 
 async function doTransfer() {
   try {
     await qa.transfer(0, question.value || pendingText.value || '')
     message.success('已转人工，负责人会在 24 小时内回复您')
-    speak('已转人工，负责人会在24小时内回复您')
+    await say('已转人工，负责人会在24小时内回复您')
     result.value = null
     question.value = ''
     pendingText.value = null
@@ -108,9 +138,17 @@ async function doTransfer() {
            style="border-radius:12px;padding:10px;margin-bottom:10px;font-size:1.3rem;">
         🔇 {{ banner }}
       </div>
-      <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:64px;font-size:1.3rem;" :loading="listening" @click="startListen">
-        🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '按住说话提问' }}
+      <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:64px;font-size:1.3rem;"
+                :loading="listening" @pointerdown="startListen" @pointerup="stopListen"
+                @pointerleave="stopListen" @touchstart.prevent="startListen" @touchend="stopListen">
+        🎤 {{ listening ? '正在聆听…（松开结束，最多 60 秒）' : '按住说话提问' }}
       </n-button>
+      <!-- 播报失败必须可见（v3 复核 B3）：不能假装老人听到了 -->
+      <div v-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
+        🔇 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
+      </div>
+      <n-button v-else-if="lastSpoken" block size="large" style="margin-top:8px;min-height:56px;font-size:1.2rem;"
+                @click="say(lastSpoken)">🔊 再听一遍</n-button>
 
       <!-- 转写确认（对，提交 / 重新说） -->
       <div v-if="pendingText" class="card" style="margin-top:10px;background:#fefce8;font-size:1.25rem;">

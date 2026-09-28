@@ -32,6 +32,10 @@ const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+// 播报是否真的响过：iOS Safari 的 TTS 必须由**用户手势**触发，挂载即播会静默不响，
+// 所以本页**不自动播报**，只提供"🔊 听一遍"，并且播不出来时如实说明（不假装老人听到了）
+const ttsOk = ref(cap.hasTTS)
+const lastSpoken = ref('')
 
 const SOURCE_LABEL = {
   text: '来自您说的话',
@@ -43,7 +47,15 @@ const SOURCE_LABEL = {
 }
 const srcTip = (k) => SOURCE_LABEL[k] || ''
 
-onMounted(() => speak('请说出或写下您遇到的问题'))
+/** 统一播报入口：返回是否真的响了；失败就把 🔊 降级成"请看大字"的说明。 */
+async function say(text) {
+  const t = (text || '').trim()
+  if (!t) return false
+  lastSpoken.value = t
+  const ok = await speak(t, 1.0, 0.9)
+  if (!ok) ttsOk.value = false
+  return ok
+}
 
 async function startListen() {
   if (asrBlocked.value) return                      // 已知不可用：直接给打字路径，不空转
@@ -52,7 +64,8 @@ async function startListen() {
   listening.value = false
   if (r.ok && r.text) {
     text.value = r.text
-    speak(`您说的是：${r.text}。请确认下面的信息`)
+    // 识别结果**显示**在页面上即可，播报交给"🔊 听一遍"（挂载/自动播在 iOS 不响）
+    await say(`您说的是：${r.text}。请确认下面的信息`)
     await loadDraft()
   } else {
     // 按真实原因分派文案：不支持/没权限/网络 → 引导打字；空识别 → 请再说一次
@@ -80,10 +93,10 @@ async function loadDraft() {
       urgency: d.fields.urgency || '一般',
     }
     if (d.need_more) {
-      speak(d.ask)
+      await say(d.ask)
       message.info(d.ask)
     } else {
-      speak('信息我记好了，请确认后上报')
+      await say('信息我记好了，请确认后上报')
     }
     if (d.phone_hint) message.warning(d.phone_hint)
   } catch (e) {
@@ -111,11 +124,11 @@ async function submit() {
     submitted.value = d
     if (d.issue_id > 0) {
       message.success(`已上报，工单号 ${d.issue_id}（待审核）`)
-      speak(`已经帮您报上去了，工单号 ${d.issue_id}，请等负责人联系您`)
+      await say(`已经帮您报上去了，工单号 ${d.issue_id}，请等负责人联系您`)
     } else {
       // 例：安全隐患只记提醒不建单 —— 如实告诉老人，不假装建了工单
       message.success('已记录为安全提醒，负责人会看到')
-      speak('已经记录下来，负责人会看到')
+      await say('已经记录下来，负责人会看到')
     }
     draft.value = null
     text.value = ''
@@ -131,6 +144,16 @@ async function submit() {
   <div class="elderly-page">
     <div class="elderly-title">🗣️ 一句话报修</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">说一句或打几个字，我帮您整理成工单</p>
+
+    <!-- 页面提示也做成"点一下听"（不在挂载时自动播：iOS 需要用户手势，否则静默不响） -->
+    <n-button v-if="ttsOk && !lastSpoken" block size="large"
+              style="margin-bottom:10px;min-height:60px;font-size:1.2rem;"
+              @click="say('说一句或打几个字，我帮您整理成工单。位置要说清楚是哪个楼、哪一层。')">
+      🔊 听一遍怎么用
+    </n-button>
+    <div v-else-if="!ttsOk" class="card muted" style="font-size:1.1rem;">
+      🔇 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
+    </div>
 
     <!-- 降级提示条：语音不可用时明说"打字就行"（审计靠 data-speech-fallback 做机器验证） -->
     <div v-if="asrBlocked" data-speech-fallback
@@ -149,6 +172,15 @@ async function submit() {
 
       <n-input v-model:value="text" type="textarea" :rows="3" placeholder="比如：五号楼二层楼道灯坏了"
                style="font-size:1.3rem;margin-top:12px;" />
+
+      <!-- 播报一律"点一下听"（v3 复核 B3）：挂载自动播在 iOS 静默不响，不能假装老人听到了 -->
+      <n-button v-if="lastSpoken && ttsOk" block size="large"
+                style="margin-top:10px;min-height:60px;font-size:1.25rem;" @click="say(lastSpoken)">
+        🔊 听一遍
+      </n-button>
+      <div v-else-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
+        🔇 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
+      </div>
 
       <n-button type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;"
                 :loading="loadingDraft" @click="loadDraft">

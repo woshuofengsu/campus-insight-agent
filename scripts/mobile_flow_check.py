@@ -148,7 +148,7 @@ def main() -> int:
             check("切页后几何与触控", ok, detail)
 
         # ---------- 3. 老年端：大字 + 顶部大按钮导航 ----------
-        print("\n【3】老年端：点「老年」→ 首页大字 → 顶部大按钮切「用药」")
+        print("\n【3】老年端：点「老年」→ 首页大字 → 顶部大按钮进「更多服务」→ 切「用药提醒」")
         clear_session(page, base)
         page.locator("text=老年").first.tap()
         page.wait_for_url("**/elderly/**", timeout=20000)
@@ -167,22 +167,37 @@ def main() -> int:
                  .filter(x => x.h > 0 && (x.h < 56 || x.fs < 20))""")
         if smalls:
             print(f"    ↳ 未达「56px/20px 理想值」的按钮（次要操作可接受，已登记）：{smalls}")
-        btn = page.locator(".elderly-nav button", has_text="用药")
-        check("老年端导航「用药」大按钮在位", btn.count() > 0)
+        # v3 复核 B4：顶层导航已收敛为 5 个高频入口 + 独立紧急求助；
+        # 「用药」这类能力收进「更多服务」——所以这里走两步（真实老人的路径也是两步）。
+        nav_btns = page.locator(".elderly-nav button")
+        check("老年端导航收敛到 6 个大按钮以内", nav_btns.count() <= 6,
+              f"实际 {nav_btns.count()} 个：{nav_btns.all_inner_texts()}")
+        sos_top = page.locator(".elderly-nav, div", has_text="紧急求助")
+        check("顶部导航带独立紧急求助入口", sos_top.count() > 0)
+        btn = page.locator(".elderly-nav button", has_text="更多服务")
+        check("老年端导航「更多服务」大按钮在位", btn.count() > 0)
         if btn.count():
             btn.first.tap()
             page.wait_for_timeout(1500)
-            check("大按钮能切页", "/elderly/medication" in page.url, page.url)
+            check("大按钮能切页", "/elderly/more" in page.url, page.url)
             ok, detail = geometry(page, 48)
-            check("用药页几何与触控（阈值 48px）", ok, detail)
-            ms = page.evaluate(
-                """() => [...document.querySelectorAll('button')]
-                     .map(e => ({ t: (e.innerText||'').trim().slice(0, 12),
-                                  h: Math.round(e.getBoundingClientRect().height),
-                                  fs: Math.round(parseFloat(getComputedStyle(e).fontSize)) }))
-                     .filter(x => x.h > 0 && x.h < 48)""")
-            if ms:
-                print(f"    ↳ 仍小于 48px 的按钮（需要处理）：{ms}")
+            check("更多服务页几何与触控（阈值 48px）", ok, detail)
+            med = page.locator("button", has_text="用药提醒")
+            check("更多服务页里有「用药提醒」大按钮", med.count() > 0)
+            if med.count():
+                med.first.tap()
+                page.wait_for_timeout(1500)
+                check("进得了用药提醒页", "/elderly/medication" in page.url, page.url)
+                ok, detail = geometry(page, 48)
+                check("用药页几何与触控（阈值 48px）", ok, detail)
+                ms = page.evaluate(
+                    """() => [...document.querySelectorAll('button')]
+                         .map(e => ({ t: (e.innerText||'').trim().slice(0, 12),
+                                      h: Math.round(e.getBoundingClientRect().height),
+                                      fs: Math.round(parseFloat(getComputedStyle(e).fontSize)) }))
+                         .filter(x => x.h > 0 && x.h < 48)""")
+                if ms:
+                    print(f"    ↳ 仍小于 48px 的按钮（需要处理）：{ms}")
 
         # ---------- 4. 老年端 SOS：误触不发、长按才发、可取消 ----------
         print("\n【4】老年端紧急求助：误触不发 / 长按弹确认 / 可取消")

@@ -1,11 +1,17 @@
 <script setup>
-// 老年端首页：大字天气(可播放) + 两行三列大按钮 + 用药/通知摘要 + 长按紧急求助 + 联系家属/社区拨打 + 语音帮助
+// 老年端首页：大字天气(可播放) + 今日提醒 + 通知/用药摘要 + 长按紧急求助 + 拨打 120 + 小助手入口
+//
+// v3 复核 B4（导航收敛）：首页原来又摆了一套"天气/通知/报修/联系社区/用药/健康"入口，
+// 和顶部导航重复 —— 老人"每个都在、等于每个都找不到"。现在首页只保留**首页特有**的内容
+// （问候/关怀/天气/今日提醒/紧急求助/120/小助手），高频入口统一由顶部导航承担，
+// 其余能力收进「更多服务」。**功能一个没少，只是入口不再重复。**
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
 import { elderly, notices } from '../../api'
 import { useSpeech, speechCapability } from '../../composables/useSpeech'
+import { useSos } from '../../composables/useSos'
 
 const router = useRouter()
 const store = useUserStore()
@@ -19,10 +25,6 @@ const volLabels = { 低: 0.5, 中: 1.0, 高: 1.5 }
 const greetText = ref('')
 const careLine = ref('')
 const urgentNotice = ref(null)
-// 紧急求助（长按 3 秒 → 确认 → 10 秒超时自动取消）
-const sosConfirm = ref(false)
-let sosTimer = null
-let sosCountdown = ref(10)
 // 联系家属确认
 const callConfirm = ref(false)
 let callTimer = null
@@ -88,13 +90,14 @@ async function closeUrgent() {
 }
 
 onBeforeUnmount(() => {
-  if (sosTimer) clearInterval(sosTimer)
   if (callTimer) clearTimeout(callTimer)
 })
 
-const rows = [
-  [{ icon: '🌤️', label: '天气', action: 'weather' }, { to: '/elderly/notices', icon: '🔊', label: '通知' }, { to: '/elderly/report', icon: '🗣️', label: '报修' }],
-  [{ icon: '🏛️', label: '联系社区', action: 'community' }, { to: '/elderly/medication', icon: '💊', label: '用药提醒' }, { to: '/elderly/health', icon: '🩺', label: '我的健康' }],
+// 首页保留的"首页特有"快捷入口（高频的报修/进度/联系人/通知已由顶部导航承担，不再重复）
+const quick = [
+  { to: '/elderly/report', icon: '🗣️', label: '我要报修' },
+  { to: '/elderly/orders', icon: '📋', label: '看看进度' },
+  { to: '/elderly/more', icon: '🧰', label: '更多服务' },
 ]
 
 function playWeather() {
@@ -106,7 +109,7 @@ function playWeather() {
 }
 
 function voiceHelp() {
-  speak('您好，我是社区智能助手。您可以点击天气、通知、报修、联系社区、联系人、用药提醒按钮，也可以长按红色紧急求助按钮联系社区。', vol.value, rate.value)
+  speak('您好，我是社区智能助手。最上面有首页、我要报修、看进度、联系家人、今日提醒、更多服务；红色的紧急求助按钮长按三秒就能找社区。', vol.value, rate.value)
 }
 
 function callCommunity() {
@@ -130,47 +133,13 @@ function callCommunity() {
 }
 
 // ---- 紧急求助：长按 3 秒进入确认，10 秒超时自动取消 ----
-let pressTimer = null
-function pressStart() {
-  if (pressTimer) clearTimeout(pressTimer)
-  pressTimer = setTimeout(() => {
-    sosConfirm.value = true
-    sosCountdown.value = 10
-    if (sosTimer) clearInterval(sosTimer)
-    sosTimer = setInterval(() => {
-      sosCountdown.value -= 1
-      if (sosCountdown.value <= 0) {
-        clearInterval(sosTimer)
-        sosConfirm.value = false
-        message.info('10 秒未确认，求助已自动取消')
-        speak('求助已取消', vol.value, rate.value)
-      }
-    }, 1000)
-  }, 3000)
-}
-function pressCancel() {
-  if (pressTimer) clearTimeout(pressTimer)
-  if (!sosConfirm.value && sosTimer) {
-    clearInterval(sosTimer)
-    sosTimer = null
-  }
-}
-
-async function confirmSos() {
-  clearInterval(sosTimer)
-  sosTimer = null
-  sosConfirm.value = false
-  try {
-    const names = contacts.value.filter((c) => c.status === '审核通过').slice(0, 3).map((c) => c.name).join('、')
-    await elderly.emergency()
-    // 诚实化：H5 无法真实连续拨号，改为「已通知紧急联系人 + 可手动打 120」
-    const suffix = names ? `，已通知紧急联系人：${names}` : ''
-    speak(`紧急求助已发出${suffix}，需要时请点拨打120`, vol.value, rate.value)
-    message.success(`紧急求助已发出${suffix}。手机无法自动连续呼叫，请点下方“拨打120”手动求助。`)
-  } catch (e) {
-    message.error(e.message || '触发失败')
-  }
-}
+// v3 复核 B4：逻辑抽到 `composables/useSos.js`，与顶部导航的红色求助键**共用同一套状态机**
+const sos = useSos({ onMessage: message, speakOpts: () => [vol.value, rate.value] })
+const sosConfirm = sos.sosConfirm
+const sosCountdown = sos.sosCountdown
+const pressStart = sos.pressStart
+const pressCancel = sos.pressCancel
+const confirmSos = sos.confirmSos
 
 // ---- 联系家属/社区：确认 → 拨号留痕，10 秒超时 ----
 async function callPerson(c) {
@@ -292,7 +261,7 @@ function cancelCall() {
       <div style="padding:14px;">
         <n-button type="error" block size="large" style="min-height:76px;font-size:1.3rem;font-weight:700;border-radius:18px;"
                   @click="router.push('/elderly/agent')">
-          🎤 按住说话，报修 / 查政策 / 问天气
+          🎤 点这里说话：报修 / 查政策 / 问天气
         </n-button>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:center;">
           <n-button v-for="(q, i) in ['家里灯不亮了', '医保怎么报销', '今天天气', '我要联系社区']" :key="i" size="large"
@@ -302,15 +271,12 @@ function cancelCall() {
       </div>
     </div>
 
-    <!-- 两行三列大按钮（.elderly-grid-3 = minmax(0,1fr)，避免内容顶破容器横向溢出） -->
-    <div v-for="(row, ri) in rows" :key="ri" class="wave elderly-grid-3" style="margin:14px 0;">
-      <n-badge v-for="b in row" :key="b.label" :value="b.label === '用药提醒' ? home?.due_medications || 0 : 0"
-               :show="b.label === '用药提醒' && home?.due_medications > 0" :offset="[-8, 8]">
-        <n-button size="large" type="primary" ghost class="elderly-btn"
-                  @click="b.action === 'help' ? voiceHelp() : b.action === 'weather' ? playWeather() : b.action === 'community' ? callCommunity() : router.push(b.to)">
-          <span style="font-size:2rem;">{{ b.icon }}</span>{{ b.label }}
-        </n-button>
-      </n-badge>
+    <!-- 首页特有入口（高频的报修/进度/联系人/通知已由**顶部导航**承担，这里不重复摆放） -->
+    <div class="elderly-grid-3" style="margin:14px 0;">
+      <n-button v-for="q in quick" :key="q.to" size="large" type="primary" ghost class="elderly-btn"
+                @click="router.push(q.to)">
+        <span style="font-size:2rem;">{{ q.icon }}</span>{{ q.label }}
+      </n-button>
     </div>
 
     <!-- 最近联系（留痕记录） -->
@@ -318,11 +284,13 @@ function cancelCall() {
       最近联系：{{ home.latest_contact }}
     </div>
 
-    <!-- 紧急求助（长按 3 秒）——老年端唯一动效：呼吸光圈，让最重要的按钮被看见 -->
+    <!-- 紧急求助（长按 3 秒）——老年端唯一动效：呼吸光圈，让最重要的按钮被看见
+         v3 复核 B4：与顶部导航的红色求助键共用 `composables/useSos.js` 的同一套状态机 -->
     <div style="margin-top:22px;">
       <n-button size="large" type="error" block class="elderly-btn sos-breathe" data-longpress
                 style="min-height:92px;font-size:1.7rem;background:linear-gradient(135deg,#DC2626,#B91C1C);border-radius:20px;"
-                @mousedown="pressStart" @mouseup="pressCancel" @mouseleave="pressCancel" @touchstart="pressStart" @touchend="pressCancel">
+                @pointerdown="pressStart" @pointerup="pressCancel" @pointerleave="pressCancel"
+                @touchstart.prevent="pressStart" @touchend="pressCancel">
         🆘 紧急求助（长按 3 秒）
       </n-button>
       <div class="muted" style="text-align:center;margin-top:6px;">按住 3 秒后确认呼叫</div>
@@ -337,11 +305,16 @@ function cancelCall() {
 
     <!-- 紧急求助确认弹窗 -->
     <n-modal v-model:show="sosConfirm" preset="dialog" type="error" title="确认紧急求助？"
-             :content="`将向已审核的紧急联系人（${contacts.filter(c => c.status === '审核通过').slice(0, 3).map(c => c.name).join('、') || '暂无'}）发送求助提醒，用时请点下方拨打120`"
              positive-text="确认求助" negative-text="取消"
-             @positive-click="confirmSos" @negative-click="sosConfirm = false">
+             @positive-click="confirmSos" @negative-click="sos.cancelConfirm">
       <template #default>
-        <div style="text-align:center;font-size:2.1rem;font-weight:800;color:var(--ink-danger);">{{ sosCountdown }} 秒后自动取消</div>
+        <div style="text-align:center;font-size:1.3rem;">
+          将通知社区负责人{{ sos.contactNames.value ? `，以及紧急联系人：${sos.contactNames.value}` : '' }}。
+        </div>
+        <div style="text-align:center;font-size:2.1rem;font-weight:800;color:var(--ink-danger);margin-top:8px;">{{ sosCountdown }} 秒后自动取消</div>
+        <div class="muted" style="text-align:center;margin-top:8px;font-size:1.1rem;">
+          手机不能自动连续拨号，需要时请点下面的「拨打 120」
+        </div>
       </template>
     </n-modal>
 

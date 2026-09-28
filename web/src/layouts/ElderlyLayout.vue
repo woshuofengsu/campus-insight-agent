@@ -1,12 +1,20 @@
 <script setup>
-// 老年端布局：顶部标题 + 大字导航 + 内容
-import { onMounted, onBeforeUnmount } from 'vue'
+// 老年端布局：顶部标题 + 大字导航（**6 个入口，已按 v3 复核 B4 收敛**）+ 内容
+//
+// 为什么收敛：原来顶层摆了 8 个按钮（首页/小助手/报修/我的报修/用药/联系人/通知/政策），
+// 首页又有一整套入口 —— 对老人来说"每个都在，等于每个都找不到"。
+// 现在顶层只留 5 个高频入口 + 1 个**独立紧急求助键**（在任何页面都能一键到达），
+// 其余（小助手/政策问答/用药/健康）收进「更多服务」页；**路由全部保留**，只是展示入口收敛。
+import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useMessage } from 'naive-ui'
 import { useUserStore } from '../stores/user'
+import { useSos } from '../composables/useSos'
 
 const router = useRouter()
 const route = useRoute()
 const store = useUserStore()
+const message = useMessage()
 
 // 在 body 上打角色类：Naive 的弹窗会 teleport 到 body，
 // 只写在 .elderly-page 下的适老样式命不中它们（紧急通知弹窗正是这种）。
@@ -14,23 +22,35 @@ const store = useUserStore()
 onMounted(() => document.body.classList.add('role-elderly'))
 onBeforeUnmount(() => document.body.classList.remove('role-elderly'))
 
+// 独立紧急求助（长按 3 秒 → 10 秒确认）：与首页大按钮**共用同一套逻辑**
+const sos = useSos({ onMessage: message })
+// 老人从别的页面按求助键时，先记下当前页，触发成功后就地提示"首页可拨打 120"
+const sosHint = computed(() => route.path === '/elderly/home')
+
 const navs = [
   { key: '/elderly/home', label: '🏠 首页' },
-  { key: '/elderly/agent', label: '🤖 小助手' },
-  { key: '/elderly/report', label: '🗣️ 报修' },
-  { key: '/elderly/orders', label: '🔧 我的报修' },
-  { key: '/elderly/medication', label: '💊 用药' },
-  { key: '/elderly/contacts', label: '👨‍👩‍👧 联系人' },
-  { key: '/elderly/notices', label: '🔊 通知' },
-  { key: '/elderly/qa', label: '📖 政策' },
+  { key: '/elderly/report', label: '🗣️ 我要报修' },
+  { key: '/elderly/orders', label: '📋 看进度' },
+  { key: '/elderly/contacts', label: '👨‍👩‍👧 联系家人' },
+  { key: '/elderly/notices', label: '🔔 今日提醒' },
+  { key: '/elderly/more', label: '🧰 更多服务' },
 ]
 </script>
 
 <template>
   <div style="min-height:100vh;background:var(--bg);">
-    <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;">
+    <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div style="font-size:1.3rem;font-weight:800;">🏘️ 社区服务</div>
-      <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:48px;" @click="store.logout(); router.replace('/login')">退出</n-button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <!-- 独立紧急求助：任何页面都能一键到达（长按 3 秒仍然防误触） -->
+        <n-button size="large" type="error" data-longpress
+                  style="color:#fff;font-size:1.3rem;min-height:56px;font-weight:800;background:linear-gradient(135deg,#DC2626,#B91C1C);"
+                  @pointerdown="sos.pressStart" @pointerup="sos.pressCancel" @pointerleave="sos.pressCancel"
+                  @touchstart.prevent="sos.pressStart" @touchend="sos.pressCancel">
+          🆘 紧急求助
+        </n-button>
+        <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:48px;" @click="store.logout(); router.replace('/login')">退出</n-button>
+      </div>
     </div>
     <div class="elderly-nav" style="display:flex;gap:10px;padding:12px 14px;background:var(--primary-light,#E8EDFF);flex-wrap:wrap;">
       <n-button v-for="n in navs" :key="n.key" size="large" round
@@ -40,6 +60,24 @@ const navs = [
       </n-button>
     </div>
     <router-view />
+
+    <!-- 紧急求助确认弹窗（与首页同一个状态机：10 秒未确认自动取消） -->
+    <n-modal v-model:show="sos.sosConfirm.value" preset="dialog" type="error" title="确认紧急求助？"
+             positive-text="确认求助" negative-text="取消"
+             @positive-click="sos.confirmSos" @negative-click="sos.cancelConfirm">
+      <template #default>
+        <div style="text-align:center;font-size:1.3rem;">
+          将通知社区负责人{{ sos.contactNames.value ? `，以及紧急联系人：${sos.contactNames.value}` : '' }}。
+        </div>
+        <div style="text-align:center;font-size:2.1rem;font-weight:800;color:var(--ink-danger);margin-top:8px;">
+          {{ sos.sosCountdown.value }} 秒后自动取消
+        </div>
+        <div v-if="!sosHint" class="muted" style="text-align:center;margin-top:8px;font-size:1.1rem;">
+          需要打 120 请回到首页（那里有红色「拨打 120」按钮）
+        </div>
+      </template>
+    </n-modal>
+
     <div class="elderly-rotate-mask">📱<br/>请竖屏使用<br/>转动手机回到竖屏</div>
   </div>
 </template>
