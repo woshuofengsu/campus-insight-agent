@@ -121,17 +121,21 @@ def test_session_persist_and_restore(client):
 
 
 def test_orchestrator_session_persistence(client):
-    """Agent 对话后会话落库，新 Orchestrator（模拟重启）可恢复追问状态。"""
+    """Agent 对话后会话落库，新 Orchestrator（模拟重启）可恢复追问状态。
+
+    卡10 后「我家水管漏水了」只追问**紧急程度**（位置/责任范围已说清），
+    所以这里断言的是"会话落库了、重启后能按落库的步骤继续"这件事本身 —— 步骤名随追问策略变化。
+    """
     from agent.orchestrator import Orchestrator
     o1 = Orchestrator()
-    o1.run("resident", 99010, "测试", "我家水管漏水了")  # 追问分类，state 落库
+    o1.run("resident", 99010, "测试", "我家水管漏水了")  # 追问（只剩紧急程度要问），state 落库
     from data import db_agent
     st = db_agent.load_session(o1.bb.session_id)
-    assert st and st.get("step") == "ask_type"
+    assert st and st.get("step") == "ask_urgency", st
     # 新实例（模拟重启）用同一 session_id 恢复
     o2 = Orchestrator(session_id=o1.bb.session_id)
-    r = o2.run("resident", 99010, "测试", "家里")
-    assert "紧急" in r["reply"]  # 恢复后继续追问紧急程度
+    r = o2.run("resident", 99010, "测试", "紧急")
+    assert r["status"] == "需确认" and "确认报修信息" in r["reply"]  # 恢复后继续走到确认
 
 
 # ---------- PIPL 端点 ----------

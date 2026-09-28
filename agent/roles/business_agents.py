@@ -45,6 +45,39 @@ def _llm_polish_health_suggestion(tags: str, base: str) -> str:
     return base
 
 
+def _extract_repair_fields(text: str, uid) -> dict:
+    """从这句话（＋服务端登记资料）抽取位置与责任范围（卡10：字段来源可解释）。
+
+    与**老人端共用**同一套契约 `utils/elderly_report`（一套规则、两种入口，别各写一份）：
+      · 拿到位置 → 不再问"哪个楼/哪一层"；
+      · 责任范围明确（室内/室外）→ 不再问"家里还是公共区域"；
+      · 拿不准就不给结论（`extract_report_fields` 会把它放进 `missing`），由状态机继续追问。
+    异常一律退化成"什么都没抽到"（宁可多问一句，也不猜）。
+    """
+    import logging
+    _log = logging.getLogger(__name__)
+    # 资料查询与文本抽取**分开兜底**：查不到资料只是少了"补齐楼栋"的能力，
+    # 绝不能因此把用户**已经说出来的位置**一起丢掉（旧写法一个 try 包住两件事，
+    # 数据库一抖就退化成"什么都没抽到"，用户被白问一遍）。
+    prof: dict = {}
+    if uid:
+        try:
+            from data.db_user import get_user_by_id
+            row = get_user_by_id(uid) or {}
+            prof = {"building": row.get("building") or "", "unit": row.get("unit") or "",
+                    "community": row.get("community") or ""}
+        except Exception as e:  # noqa: BLE001
+            _log.warning("读取登记资料失败（仅影响用资料补齐位置）：%s", e)
+    try:
+        from utils.elderly_report import extract_report_fields
+        r = extract_report_fields(text, prof)
+        return {"location": r["fields"]["location"], "type": r["fields"]["issue_type"],
+                "sources": r["sources"], "missing": r["missing"]}
+    except Exception as e:  # noqa: BLE001 — 抽取失败不阻断对话，但要留痕
+        _log.warning("报修字段抽取失败（按什么都没抽到处理）：%s", e)
+        return {"location": "", "type": "", "sources": {}, "missing": ["location", "scope"]}
+
+
 def _state_key(uid):
     return f"user:{uid}:state"
 
@@ -229,9 +262,21 @@ class RepairDispatchAgent(BaseAgent):
                     actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],
                     chain_note=f"安全隐患（{hazard}）：紧急直确认 + 主动协商通知管理员")
             draft = {"desc": text, "type": "室内", "urgency": "紧急" if st.get("urgent") else None}
+            # 卡10（字段来源与追问策略）：**只追问必要信息** —— 先用同一套抽取契约看一眼
+            # 这句话里已经有什么（位置/责任范围），说清了就不再问那一句；
+            # 同时把"每个字段从哪来"记进草稿，确认卡片上标出来（未确认的不算业务事实）。
+            ex = _extract_repair_fields(text, uid)
+            if ex.get("location"):
+                draft["location"] = ex["location"]
+            if ex.get("type"):
+                draft["type"] = ex["type"]
+            draft["sources"] = ex.get("sources") or {}
             if ctx.get("role") == "elderly":
                 draft["urgency"] = draft["urgency"] or "一般"
                 st["step"] = "confirm"
+            elif ex.get("type") and ex.get("location"):
+                # 位置与责任范围都清楚了 → 跳过"家里还是公共区域"，只问紧急程度
+                st["step"] = "ask_urgency" if draft["urgency"] is None else "confirm"
             else:
                 st["step"] = "ask_type"
         else:
@@ -255,8 +300,13 @@ class RepairDispatchAgent(BaseAgent):
             # 诚实告知：上一次那条没提交的报修**已被这条替换**（不是"顺手改一改"，是两件事）
             prefix = (f"（说明：刚才那条「{superseded}」还没确认，我按您现在说的这件事重新开了工单草稿，"
                       f"刚才那条没有提交。）\n")
+        # 字段来源可解释（卡10）：位置来自"您说的"还是"您的登记资料"，让用户一眼能核
+        src_label = {"text": "来自您说的话", "profile": "来自您的登记资料",
+                     "user": "您确认的"}.get((draft.get("sources") or {}).get("location", ""), "")
+        loc_line = f"\n· 位置：{draft['location']}" + (f"（{src_label}）" if src_label else "") \
+            if draft.get("location") else ""
         return self._reply(
-            f"{prefix}请您确认报修信息：\n· 问题：{draft.get('desc', '')[:60]}\n"
+            f"{prefix}请您确认报修信息：\n· 问题：{draft.get('desc', '')[:60]}{loc_line}\n"
             f"· 分类：{draft.get('type')}\n· 紧急程度：{urgent_txt}",
             "需确认", "报修",
             actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],

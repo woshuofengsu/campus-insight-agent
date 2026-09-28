@@ -109,13 +109,18 @@ def test_repair_stats_query_is_not_a_new_report(client):
 
 
 def test_repair_flow(client):
+    """报修全流程（卡10：**只追问必要信息**）。
+
+    这句话已经把"问题 + 是家里的事"说清了，所以位置/责任范围不该再问一遍
+    （旧行为会先问"是您家里还是公共区域？"）—— 这里断言的是**问得更少**，不是更松。
+    """
     _reset(client)
     out, _ = _chat(client, "我家水管漏水了")
     assert out["intent"] == "repair_dispatch" and out["status"] == "追问"
     assert any(c["agent"] == "receptionist" for c in out["execution_chain"])
     assert any(c["agent"] == "compliance_auditor" for c in out["execution_chain"])
-    out, _ = _chat(client, "家里")
-    assert "紧急" in out["reply"]
+    # 位置与责任范围已明确 → 只剩紧急程度要问
+    assert "紧急" in out["reply"] and "公共区域" not in out["reply"], out["reply"]
     out, _ = _chat(client, "紧急")
     assert out["status"] == "需确认" and "确认报修信息" in out["reply"]
     out, _ = _chat(client, "确认提交")
@@ -637,19 +642,21 @@ def test_draft_persist_and_restore(client):
 
 
 def test_orchestrator_draft_full_restore(client):
-    """端到端：报修追问草稿落库 → 新 Orchestrator（模拟重启）恢复完整字段继续。"""
+    """端到端：报修草稿落库 → 新 Orchestrator（模拟重启）恢复完整字段并办完。
+
+    卡10 后这句话只追问**紧急程度**（位置/责任范围已说清），所以流程少一步；
+    断言的是"草稿完整落库 + 换实例仍能续"这件事本身，与追问次数无关。
+    """
     from agent.orchestrator import Orchestrator
     from data.db_draft import load_draft
     o1 = Orchestrator()
-    o1.run("resident", 99021, "测试", "我家水管漏水了")   # ask_type
-    o1.run("resident", 99021, "测试", "家里")            # ask_urgency
+    o1.run("resident", 99021, "测试", "我家水管漏水了")   # 追问紧急程度（位置/责任范围已明确）
+    o1.run("resident", 99021, "测试", "紧急")            # 回答紧急程度 → 进入确认
     d = load_draft(99021, "work_order_draft")
     assert d and d["content"]["desc"] == "我家水管漏水了" and d["content"]["type"] == "室内"
     o2 = Orchestrator(session_id=o1.bb.session_id)      # 模拟重启
-    r3 = o2.run("resident", 99021, "测试", "紧急")
-    assert r3["status"] == "需确认" and "紧急" in r3["reply"]
     r4 = o2.run("resident", 99021, "测试", "确认提交")
-    assert r4["status"] == "成功"
+    assert r4["status"] == "成功", r4
     assert load_draft(99021, "work_order_draft") is None
 
 
