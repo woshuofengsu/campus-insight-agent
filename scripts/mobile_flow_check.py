@@ -11,6 +11,10 @@
   ② 触控目标够大（主要可点元素高度 ≥ 40px；老年端 ≥ 56px）；
   ③ 底部/顶部导航在位（移动端不能只有桌面侧边栏）。
 
+另外验一遍**语音替代与错误恢复**（v3 卡8 / §7.1+§7.2，2026-09-29 加）：
+常见说法（预置短语）→ 摘要 →「说错了，重新说」→「先不报修了」，
+以及"语音播报没回音时报修按钮不能永久转圈"（这条实测抓到过：按钮卡 loading，老人既看不到结果也点不了第二次）。
+
 用法（服务需先起，且**手机/仿真要连得上**）：
     python -m uvicorn api_web:app --host 0.0.0.0 --port 8000
     python scripts/mobile_flow_check.py            # 默认 http://127.0.0.1:8000
@@ -18,6 +22,7 @@
 """
 import argparse
 import sys
+import time
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -90,6 +95,39 @@ def modal_open(page) -> bool:
     return page.evaluate(
         """() => [...document.querySelectorAll('.n-modal, .n-dialog')]
                  .some(e => e.getBoundingClientRect().height > 0)""")
+
+
+def tap_at(page, loc, wait: int = 900) -> bool:
+    """滚到元素，再在**它自己算出来的坐标**上真触摸一下。
+
+    为什么要自己算坐标、不用 `locator.tap()`：
+      · `tap()` 自带的"滚动可见"对**嵌套滚动容器**不总是奏效；
+      · 更麻烦的是移动仿真下它会按"可见点"重算落点，实测把报修页的
+        「说错了，重新说」判成"被「补充好了，再看一遍」遮挡"并一直重试到超时——
+        而同一坐标上 `elementFromPoint` 明明就是那个按钮本身。
+    坐标法仍然是**真触摸事件**（touchscreen.tap），只是落点由我们算并经命中校验。
+    """
+    try:
+        loc.first.scroll_into_view_if_needed()
+        page.wait_for_timeout(300)
+        box = loc.first.bounding_box()
+        if not box:
+            print("    （点击告警：元素没有可见区域）")
+            return False
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        hit = page.evaluate(
+            "([x, y]) => { const t = document.elementFromPoint(x, y);"
+            " return t ? (t.tagName + '|' + (t.textContent || '').trim().slice(0, 16)) : ''; }",
+            [x, y])
+        if "|" not in hit:
+            print(f"    （点击告警：该坐标上取不到元素 {x:.0f},{y:.0f}）")
+            return False
+        page.touchscreen.tap(x, y)
+        page.wait_for_timeout(wait)
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"    （点击告警：{str(e)[:70]}）")
+        return False
 
 
 def clear_session(page, base: str) -> None:
@@ -199,7 +237,59 @@ def main() -> int:
                 if ms:
                     print(f"    ↳ 仍小于 48px 的按钮（需要处理）：{ms}")
 
-        # ---------- 4. 老年端 SOS：误触不发、长按才发、可取消 ----------
+        # ---------- 4-2. 语音替代与错误恢复（v3 卡8 / §7.1+§7.2） ----------
+        # 为什么单列这一段：方案要求「语音是可替代的输入方式」「纠错是一等功能」——
+        # 也就是"说不出来 / 说错了 / 不想说了"都必须有**明确入口**，而不是让老人自己猜。
+        # 这里在手机尺寸下真点一遍（不验识别准确率，验的是"路走得通、话说得清"）。
+        print("\n【3-2】老年端报修：常见说法（语音替代）→ 纠错 → 先不提交")
+        page.goto(f"{base}/elderly/report", wait_until="networkidle")
+        page.wait_for_timeout(1800)
+        # ① 常见说法面板：点开 → 有 4 条大按钮 → 点一条会填进输入框并走同一套摘要流程
+        toggle = page.locator("button", has_text="常见说法")
+        check("报修页有「说不出来？点一个常见说法」入口（语音不是唯一入口）", toggle.count() > 0)
+        if toggle.count():
+            if not page.locator("[data-phrases]").count():
+                tap_at(page, toggle, 700)
+            phrases = page.locator("[data-phrases] button")
+            check("常见说法是「大按钮」列表（≥3 条，可点）", phrases.count() >= 3,
+                  f"{phrases.count()} 条：{phrases.all_inner_texts()[:4]}")
+            if phrases.count():
+                tap_at(page, phrases, 2600)
+                body = page.inner_text("body")
+                check("点常见说法后进入同一套摘要流程（不是直接建单）",
+                      "请您核对这几项" in body or "还缺" in body or "确认上报" in body)
+                # ①-2 按钮不能"永久转圈"：某些机型语音播报既不回 onend 也不回 onerror，
+                #     若播报卡住按钮的 loading，老人既看不到结果也点不了第二次（实测踩到）
+                stuck = page.evaluate(
+                    """() => { const b = [...document.querySelectorAll('button')]
+                         .find(x => x.textContent.includes('看看还缺什么'));
+                       return b ? b.className.toString().includes('n-button--loading') : null; }""")
+                check("报修按钮没有卡在「正在识别」（播报无回音也能再点）", stuck is False,
+                      "按钮已恢复可点" if stuck is False else f"loading={stuck}")
+                # ② 纠错入口：说错了能一键重来（清空草稿回到第一步）
+                restart = page.locator("[data-restart]")
+                check("摘要页有「说错了，重新说」明确入口", restart.count() > 0)
+                if restart.count():
+                    ok_tap = tap_at(page, restart)
+                    after = page.inner_text("body")
+                    check("「重新说」真的把摘要收掉（回到可重新输入的干净状态）",
+                          ok_tap and "请您核对这几项" not in after and page.locator("textarea").count() > 0,
+                          "" if ok_tap else "没点中「重新说」按钮")
+                # ③ 先不报修：明确出口，且**不建单**
+                tap_at(page, page.locator("button", has_text="看看还缺什么"))
+                # 摘要要等服务端解析（LLM 姿态全开时更慢）——等到出现为止，别用固定 sleep 猜
+                deadline = time.time() + 15
+                while time.time() < deadline and not page.locator("[data-giveup]").count():
+                    page.wait_for_timeout(400)
+                giveup = page.locator("[data-giveup]")
+                check("摘要页有「先不报修了」明确出口", giveup.count() > 0)
+                if giveup.count():
+                    ok_tap = tap_at(page, giveup, 1800)
+                    check("「先不报修了」回到首页（没有提交、没有建单）",
+                          ok_tap and "/elderly/home" in page.url,
+                          page.url if ok_tap else "没点中「先不报修了」按钮")
+
+        # ---------- 5. 老年端 SOS：误触不发、长按才发、可取消 ----------
         print("\n【4】老年端紧急求助：误触不发 / 长按弹确认 / 可取消")
         page.goto(f"{base}/elderly/home", wait_until="networkidle")
         page.wait_for_timeout(1800)

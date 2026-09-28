@@ -15,13 +15,18 @@ router = APIRouter(prefix="/api/web/agent", tags=["agent"])
 
 
 class HandoffAction(BaseModel):
-    """人工处理包流转动作（卡11 / v3 卡7）。
+    """人工处理包流转动作（卡11 / v3 卡7 + 卡8 幂等）。
 
     `action`：claim（领取）/ ask（补问）/ reply（回复）/ close（关闭）；
     `text`：补问内容 / 回复内容 / 关闭说明 —— 三个动作都**必填**（写进留痕与居民通知里）。
+
+    `client_token`（卡8 幂等，2026-09-29）：**一次"意图"一个编号**，网络重试/连点沿用同一个。
+    为什么这里也需要：补问/回复会**给居民发通知**，重复执行不是"多一条记录"这么轻——
+    居民会收到两条一样的回复。没有编号的旧调用方式照旧可用（只是没有幂等保护）。
     """
     action: str = Field(..., pattern="^(claim|ask|reply|close)$")
     text: str = Field(default="", max_length=1000)
+    client_token: str = Field(default="", max_length=64)
 
 _MAX_AGENT_SESSIONS = 500
 
@@ -185,15 +190,44 @@ def agent_handoff_action(hid: int, req: HandoffAction, request: Request):
     为什么要有这一条：原来只有"关闭"一个动作，网格端看得到包却办不了事。
     现在四个动作走同一个**状态机**（`data/db_agent.handle_handoff`），
     每次流转都校验允许的来源状态、记录"谁在什么时候做了什么"，并给居民发通知（补问/回复）。
+
+    幂等（卡8）：带 `client_token` 时用与服务端同一套原子占位——
+    同一次意图重复/并发提交**只执行一次**（居民不会收到两条一样的回复），第二次直接复用结果。
     """
     from data.db_agent import handle_handoff
     u = _user(request)
-    ok_, msg = handle_handoff(hid, req.action, actor_id=u.get("uid") or 0,
+    uid = u.get("uid") or 0
+    scope = "handoff_action"
+    reserved = False
+    if req.client_token:
+        from data.db_idempotency import begin, release, remember, wait_result
+        state, prev = begin(scope, req.client_token, uid)
+        if state == "done":
+            _log.info("人工待办重复操作（幂等命中）：uid=%s token=%s action=%s",
+                      uid, req.client_token, req.action)
+            return _ok({**(prev or {}), "duplicate": True},
+                       f"这个操作已经做过了：{req.action}")
+        if state == "pending":
+            prev = wait_result(scope, req.client_token, uid, timeout=8)
+            if prev is not None:
+                return _ok({**(prev or {}), "duplicate": True},
+                           f"这个操作已经做过了：{req.action}")
+            return _fail(2003, "这个操作正在处理中，请稍等几秒后再看结果。")
+        reserved = True
+    ok_, msg = handle_handoff(hid, req.action, actor_id=uid,
                               actor_name=u.get("name") or "负责人",
                               text=req.text, tenant=_tenant(request))
     if not ok_:
+        # 没做成 → 放掉占位，让同一个编号可以重试（否则会被判成"正在处理中"）
+        if reserved:
+            from data.db_idempotency import release
+            release(scope, req.client_token, uid)
         return _fail(2001, msg)
-    return _ok({"handoff_id": hid, "action": req.action}, msg)
+    payload = {"handoff_id": hid, "action": req.action}
+    if reserved:
+        from data.db_idempotency import remember
+        remember(scope, req.client_token, uid, payload)
+    return _ok(payload, msg)
 
 
 @router.post("/handoffs/{hid}/resolve")

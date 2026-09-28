@@ -17,7 +17,18 @@ import { useSpeech, speechCapability, reasonText } from '../../composables/useSp
 
 const router = useRouter()
 const message = useMessage()
-const { recognize, speak } = useSpeech()
+const { recognize, speak, stopListening } = useSpeech()
+
+// 预置短语（v3 §7.1：**语音不是唯一入口**）——
+// 说不出来 / 听不清 / 麦克风不能用时，点一个最接近的说法就能走到同一套办理流程。
+// 为什么不做成"选完直接提交"：那等于替老人把位置/责任范围拍板了，所以只**填进输入框**，
+// 老人还要看一眼摘要才提交（与打字、语音完全同一条路径）。
+const PHRASES = [
+  '楼道的灯不亮了',
+  '家里水管漏水了',
+  '电梯坏了，不动了',
+  '楼下垃圾没人清',
+]
 
 const text = ref('')
 const listening = ref(false)
@@ -33,6 +44,8 @@ const answer = ref({ location: '', scope: '', urgency: '一般' })
 const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
+// 常见说法面板：语音不可用、或者老人"说不出来"时自动推到眼前（也可以自己点开）
+const showPhrases = ref(!cap.hasASR || !cap.secure)
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
 // 播报是否真的响过：iOS Safari 的 TTS 必须由**用户手势**触发，挂载即播会静默不响，
 // 所以本页**不自动播报**，只提供"🔊 听一遍"，并且播不出来时如实说明（不假装老人听到了）
@@ -69,15 +82,54 @@ async function startListen() {
     // 识别结果**显示**在页面上即可，播报交给"🔊 听一遍"（挂载/自动播在 iOS 不响）
     await say(`您说的是：${r.text}。请确认下面的信息`)
     await loadDraft()
-  } else {
-    // 按真实原因分派文案：不支持/没权限/网络 → 引导打字；空识别 → 请再说一次
-    const reason = r.reason || 'empty'
-    if (reason !== 'empty' && reason !== 'done') {
-      asrBlocked.value = true
-      blockReason.value = reason
-    }
-    message.warning(reasonText(reason))
+    return
   }
+  const reason = r.reason || 'empty'
+  // 老人自己按的「停下」：不是故障，**不标记语音不可用**、也不覆盖他已经打进去的字
+  if (reason === 'cancelled') {
+    message.info(reasonText('cancelled'))
+    return
+  }
+  // 按真实原因分派文案：不支持/没权限/网络 → 引导打字；空识别 → 请再说一次
+  if (reason !== 'empty' && reason !== 'done') {
+    asrBlocked.value = true
+    blockReason.value = reason
+  }
+  message.warning(reasonText(reason))
+  // 说不出来的老人别卡在这里：把「常见说法」推到他眼前（v3 §7.1 的替代途径）
+  showPhrases.value = true
+}
+
+/** 老人按了「停下」：立刻结束这次聆听（不让他被 60 秒倒计时拖着）。 */
+function haltListen() {
+  stopListening()
+}
+
+/** 点一个常见说法：填进输入框，再走与打字/语音完全相同的"看看还缺什么"。 */
+async function usePhrase(p) {
+  text.value = p
+  draft.value = null
+  submitted.value = null
+  await loadDraft()
+}
+
+/** 说错了/不是这个位置 → 明确入口：清空重来（v3 §7.2 纠错是一等功能）。 */
+function restart() {
+  draft.value = null
+  submitted.value = null
+  resultVia.value = ''
+  unknownToken.value = ''
+  answer.value = { location: '', scope: '', urgency: '一般' }
+  if (listening.value) stopListening()
+  listening.value = false
+}
+
+/** 先不提交了：不建单、也不假装存了草稿，直接回首页。 */
+function giveUp() {
+  restart()
+  text.value = ''
+  message.info('好，这次没有提交，也没有建工单')
+  router.push('/elderly/home')
 }
 
 /** 让服务端把原话解析成结构化摘要（缺什么会明说，且**此时不会建单**）。
@@ -105,6 +157,10 @@ async function loadDraft(withAnswer = false) {
       scope: d.fields.issue_type || '',
       urgency: d.fields.urgency || '一般',
     }
+    // ⚠️ 先松开"正在识别"再播报：播报是增强项，**不能拖住按钮**。
+    // （实测踩到：某些机型 speak() 既不回 onend 也不回 onerror，按钮会一直转圈，
+    //  老人既看不到结果也点不了第二次——现在 speak() 有兜底超时，这里再把顺序摆正。）
+    loadingDraft.value = false
     if (d.need_more) {
       // 补充值被判"不够用"时，先说明为什么（否则老人不知道要改成什么样）
       if (d.reject_hint) message.warning(d.reject_hint)
@@ -151,6 +207,7 @@ async function submit() {
     submitted.value = d
     resultVia.value = 'submit'
     unknownToken.value = ''
+    submitting.value = false      // 同上：结果已经拿到，播报不该让按钮继续转圈
     if (d.issue_id > 0) {
       message.success(`已上报，工单号 ${d.issue_id}（待审核）`)
       await say(`已经帮您报上去了，工单号 ${d.issue_id}，请等负责人联系您`)
@@ -242,12 +299,32 @@ async function checkSubmitted() {
                 style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
         🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '点一下开始说话' }}
       </n-button>
+      <!-- 「允许停止和取消」（v3 §7.1）：点了开始就必须能自己停下，别被倒计时拖着 -->
+      <n-button v-if="listening" block size="large" data-speech-stop
+                style="min-height:64px;font-size:1.3rem;margin-top:10px;" @click="haltListen">
+        ⏹ 停下（我说完了 / 不想说了）
+      </n-button>
       <div v-else style="font-size:1.3rem;font-weight:700;">
         ✍️ 请在下面的框里打字告诉我们（最少 5 个字）
       </div>
 
       <n-input v-model:value="text" type="textarea" :rows="3" placeholder="比如：五号楼二层楼道灯坏了"
                style="font-size:1.3rem;margin-top:12px;" />
+
+      <!-- 预置短语（v3 §7.1）：语音不是唯一入口，说不出来也能办成同一件事 -->
+      <div style="margin-top:12px;">
+        <n-button block size="large" quaternary style="min-height:52px;font-size:1.15rem;"
+                  @click="showPhrases = !showPhrases">
+          💬 {{ showPhrases ? '收起常见说法' : '说不出来？点一个常见说法' }}
+        </n-button>
+        <div v-if="showPhrases" data-phrases
+             style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px;">
+          <n-button v-for="p in PHRASES" :key="p" block size="large"
+                    style="min-height:60px;font-size:1.25rem;" @click="usePhrase(p)">
+            🗣️ {{ p }}
+          </n-button>
+        </div>
+      </div>
 
       <!-- 播报一律"点一下听"（v3 复核 B3）：挂载自动播在 iOS 静默不响，不能假装老人听到了 -->
       <n-button v-if="lastSpoken && ttsOk" block size="large"
@@ -330,6 +407,16 @@ async function checkSubmitted() {
           上报后工单进入待审核，负责人会在「我的报修」里回复您。
         </div>
       </template>
+
+      <!-- 纠错与退出（v3 §7.2「纠错是一等功能」）：说错了/不是这个位置要能一键重来。
+           放在**摘要卡内部紧挨着内容**，不在页面最底部——老人看到哪就得能在哪改，
+           翻到页面底下才找到"重新说"等于没有这个入口（实测：手机上一屏根本看不到）。 -->
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <n-button size="large" data-restart style="flex:1;min-height:60px;font-size:1.2rem;"
+                  @click="restart">🔄 说错了，重新说</n-button>
+        <n-button size="large" data-giveup style="flex:1;min-height:60px;font-size:1.2rem;"
+                  @click="giveUp">❌ 先不报修了</n-button>
+      </div>
     </div>
 
     <!-- 提交结果：原话 / 系统建议 / 您确认的 / 入库值 四段分开展示（不混成一句"已纠正"） -->

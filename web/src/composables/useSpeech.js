@@ -19,6 +19,8 @@ const REASON_MSG = {
   'mic-denied': '没有拿到麦克风权限，请在浏览器里允许，或者直接打字',
   network: '语音服务连不上，您可以直接打字，或者稍后再试',
   empty: '没听清，请再说一次',
+  // 老人自己按了「停下」：这不是故障（**不许**提示"不支持语音"或"说错了"）
+  cancelled: '好的，停下了。您可以打字，或者再点一次说话',
   error: '语音出了点小问题，您可以直接打字',
 }
 
@@ -48,6 +50,11 @@ export function reasonText(reason) {
 
 export function useSpeech() {
   // —— 语音识别（录音转文字）——
+  // 「允许停止和取消」（v3 §7.1）：老人点了开始之后必须能**自己停下**，
+  // 而不是被 60 秒倒计时拖着（听错了、不想说了、旁边有人说话都要能停）。
+  // 实现：把当前识别会话的 stop 句柄放在模块级变量里，`stopListening()` 从任意位置调用。
+  let _activeStop = null
+
   function recognize() {
     return new Promise((resolve) => {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -62,6 +69,22 @@ export function useSpeech() {
       let timer = null
       let remain = MAX_SECONDS
       let finished = false
+      let cancelled = false
+
+      // 结束会话（成功/失败/取消都走这里），保证 stop 句柄不会残留
+      const close = (payload) => {
+        finished = true
+        clearInterval(timer)
+        _activeStop = null
+        resolve(payload)
+      }
+      _activeStop = () => {
+        if (finished) return false
+        cancelled = true
+        clearInterval(timer)
+        try { rec.stop() } catch { /* 忽略 */ }
+        return true
+      }
 
       // 60 秒倒计时自动结束（方案：单次语音最长 60 秒）
       timer = setInterval(() => {
@@ -83,7 +106,6 @@ export function useSpeech() {
         }
       }
       rec.onerror = (e) => {
-        clearInterval(timer)
         const reasonMap = {
           'not-allowed': 'mic-denied',
           'service-not-allowed': 'https-required',
@@ -91,40 +113,71 @@ export function useSpeech() {
           aborted: 'error',
           'no-speech': 'empty',
         }
-        resolve({ ok: final.length > 0, reason: reasonMap[e.error] || 'error', text: final })
+        // 自己按的「停下」不算故障：浏览器会把它报成 aborted，这里要覆盖掉
+        if (cancelled) return close({ ok: false, reason: 'cancelled', text: final })
+        close({ ok: final.length > 0, reason: reasonMap[e.error] || 'error', text: final })
       }
       rec.onend = () => {
-        clearInterval(timer)
-        resolve({ ok: final.length > 0, reason: final ? 'done' : 'empty', text: final })
+        if (finished) return
+        if (cancelled) return close({ ok: false, reason: 'cancelled', text: final })
+        close({ ok: final.length > 0, reason: final ? 'done' : 'empty', text: final })
       }
-      try { rec.start() } catch { clearInterval(timer); resolve({ ok: false, reason: 'error', text: '' }) }
+      try {
+        rec.start()
+      } catch {
+        close({ ok: false, reason: 'error', text: '' })
+      }
     })
+  }
+
+  /** 停下手里的识别（老人按了「停下」/页面要离开时调用）。返回是否真的停了一个会话。 */
+  function stopListening() {
+    return _activeStop ? _activeStop() : false
   }
 
   // —— 语音合成（朗读，音量可调；老人档可调慢语速，失败重试 3 次）——
   // 返回 true/false；**调用方必须处理 false**（iOS 需用户手势、部分机型静音），
   // 不能假设"点了就一定会响"。
+  //
+  // ⚠️ 兜底超时（2026-09-29 实测踩到）：有些机型 `speak()` 既不触发 `onend` 也不触发 `onerror`
+  // （没有语音包、被系统静音掐断、后台标签页等）。没有这个兜底，调用方的 `await say(...)`
+  // **会永远挂住**——老年端报修页的后果是「确认上报」按钮永久转圈：老人既看不到结果，
+  // 也点不了第二次（首批八条浏览器旅程排查时用无语音的 headless 浏览器复现的）。
   function speak(text, volume = 1.0, rate = 1.0) {
     return new Promise((resolve) => {
       if (typeof window === 'undefined' || !window.speechSynthesis || !text) return resolve(false)
       let tries = 0
+      let settled = false
+      // 说话最长给多久：短句 3 秒起，按字数放宽（中文约 4 字/秒，留足余量）
+      const guardMs = Math.min(20000, 3000 + String(text).length * 250)
+      const guard = setTimeout(() => finish(false), guardMs)
+      function finish(ok) {
+        if (settled) return
+        settled = true
+        clearTimeout(guard)
+        resolve(ok)
+      }
       function attempt() {
         tries++
         const u = new SpeechSynthesisUtterance(text)
         u.lang = 'zh-CN'
         u.rate = rate
         u.volume = volume
-        u.onend = () => resolve(true)
+        u.onend = () => finish(true)
         u.onerror = () => {
           if (tries < 3) setTimeout(attempt, 300) // 失败重试 3 次
-          else resolve(false)
+          else finish(false)
         }
-        window.speechSynthesis.cancel()
-        window.speechSynthesis.speak(u)
+        try {
+          window.speechSynthesis.cancel()
+          window.speechSynthesis.speak(u)
+        } catch {
+          finish(false)
+        }
       }
       attempt()
     })
   }
 
-  return { recognize, speak }
+  return { recognize, speak, stopListening }
 }

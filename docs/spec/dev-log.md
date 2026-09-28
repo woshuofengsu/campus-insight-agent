@@ -2247,8 +2247,47 @@ B5 只覆盖了 9 处插入点。B6 用"INSERT 点 vs stamp 点"对照表逐表�
 ### 四、验证（本次实测）
 
 - `python scripts/journey_check.py` → **8 条旅程 / 58 项全过**
-- `pytest tests/ -q` → **966 passed + 1 skipped（可运行 967）**，`ruff` 0，`check_claims` 3/3
+- `pytest tests/ -q` → **971 passed + 1 skipped（可运行 972）**，`ruff` 0，`check_claims` 3/3
 - `demo_preflight --fast` 9/9 · `ui_audit` 0 HIGH（37 路由页 / 58 视口）· `mobile_audit` 全通过
-- `mobile_flow_check` 27/27 · `demo_flow_check --mutate --handoff --faults` 26/26
+- `mobile_flow_check` 35/35 · `demo_flow_check --mutate --handoff --faults` 26/26
 - 新增门禁：`tests/test_repro_guide.py::test_journey_checker_covers_the_eight_journeys`
   （编号必须连续 1–8、八个实现都在、标记按运行区分、必须自带备份）
+
+### 五、同日追加：v3 卡8（语音/文字/短语替代与错误恢复）+ 转人工写操作幂等
+
+**一、语音可替代、可停止（v3 §7.1）**
+- `useSpeech` 新增 `stopListening()`：聆听中出现「⏹ 停下」大按钮，老人不必被 60 秒倒计时拖着；
+  新增独立原因 `cancelled`——**自己按停不是故障**，不标记"语音不可用"、不覆盖已输入内容。
+- 报修页新增「💬 说不出来？点一个常见说法」+ 4 条大按钮预置短语（楼道灯/家里漏水/电梯坏/垃圾没人清）：
+  点一条只**填进输入框**，然后走与打字、语音**完全相同**的摘要 → 确认 → 提交路径。
+  为什么不"点完直接提交"：那等于替老人把位置与责任范围拍板了（本项目最忌讳的事）。
+
+**二、纠错是一等功能（v3 §7.2）**
+摘要卡内新增「🔄 说错了，重新说」与「❌ 先不报修了」。
+位置特意放在**摘要卡内部紧挨内容**——第一版放在页面最底部，手机上一屏根本看不到
+（脚本点击时还因此报"被别的按钮遮挡"，其实是滚不到位；见下面第三点的工具修正）。
+
+**三、顺手修掉一个真 bug：播报卡死按钮（无语音环境下必现）**
+`speak()` 原来只靠 `onend/onerror` 收尾。某些机型/无语音包环境下这两个回调**都不触发**，
+于是 `await say(...)` 永久挂起 → `finally` 里的 `loadingDraft = false` 永不执行 →
+**报修按钮永久转圈**：老人既看不到结果，也点不了第二次（用无语音的 headless 浏览器复现）。
+两处修：① `speak()` 加兜底超时（短句 3 秒起、按字数放宽，最多 20 秒）；
+② 「正在识别」状态在**拿到接口结果后立刻松开**，播报是增强项，不许拖住按钮。
+门禁：`mobile_flow_check.py` 新增「报修按钮没有卡在正在识别（播报无回音也能再点）」。
+
+**四、转人工写操作接幂等（v2 卡8 剩余项）**
+`POST /agent/handoffs/{hid}/action` 收 `client_token`，四个动作走同一套
+`begin/release/remember`；前端每次「意图」一个编号、失败沿用、成功清掉。
+为什么这里必须做：补问/回复会**给居民发通知**，重复执行不是"多一条记录"，
+而是老人手机上多一条一模一样的答复。回归 5 例（含真双线程并发同编号只发一条通知）。
+
+**五、工具修正（避免"假通过"）**
+- `mobile_flow_check.tap_at()`：改用「滚到元素 → 自己算中心坐标 → 命中校验 → `touchscreen.tap`」。
+  `locator.tap()` 在移动仿真下会按"可见点"重算落点，把报修页的「说错了，重新说」判成被相邻按钮遮挡，
+  一直重试到超时——而同一坐标 `elementFromPoint` 明明就是它自己。
+- 断言不许"跳过了也当通过"：点击失败时把原因写进检查详情（原来是 `if tap(...)` 直接跳过，
+  等于**用假绿掩盖没验证**）。
+
+**验证（本次实测）**：`pytest tests/ -q` → **971 passed + 1 skipped（可运行 972）**；`ruff` 0；`check_claims` 3/3；
+`journey_check` 58/58；`mobile_flow_check` **35/35**；`demo_flow_check --mutate --handoff --faults` 26/26；
+`ui_audit` 0 HIGH（37 路由页 / 58 视口）；`mobile_audit` 全通过；`demo_preflight --fast` 9/9。

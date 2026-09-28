@@ -197,6 +197,90 @@ def test_close_after_finish_is_refused(fresh_db):
     assert _denied(res) and "关闭" in _err(res)
 
 
+# ---------------------------------------------------------------- 幂等（卡8：连点/重试只执行一次）
+
+def _call_tok(hid, action, text="", token="", req=None):
+    from api_routes.agent import HandoffAction, agent_handoff_action
+    return agent_handoff_action(
+        hid, HandoffAction(action=action, text=text, client_token=token),
+        req or _req(GRID_A))
+
+
+def test_same_token_reply_executes_once(fresh_db):
+    """**同编号重复提交只执行一次**：居民不会收到两条一样的回复（卡8 幂等）。
+
+    为什么这条值得单独守：重复执行在这里不是"多一条记录"，而是**居民手机上多一条通知**——
+    网格员连点两下「✅ 回复」，老人收到两条一模一样的答复。
+    """
+    hid = _new_handoff()
+    _call(hid, "claim")
+    tok = "handoff-tok-aaaa1111"
+    first = _call_tok(hid, "reply", "带身份证来社区服务站办理即可", token=tok)
+    second = _call_tok(hid, "reply", "带身份证来社区服务站办理即可", token=tok)
+    assert not _denied(first) and not _denied(second), _err(second)
+    assert len([m for m in _notifs(RESIDENT_A) if "身份证" in (m.get("content") or "")]) == 1, \
+        f"同编号不该发两条通知：{_notifs(RESIDENT_A)}"
+
+
+def test_same_token_close_executes_once(fresh_db):
+    """关闭同理：同编号连点只写一次办结（留痕不会出现两次"办结"）。"""
+    hid = _new_handoff()
+    _call(hid, "claim")
+    tok = "handoff-tok-bbbb2222"
+    assert not _denied(_call_tok(hid, "close", "已电话告知居民", token=tok))
+    assert not _denied(_call_tok(hid, "close", "已电话告知居民", token=tok))
+    with db_core.get_db() as conn:
+        n = conn.execute(
+            "SELECT COUNT(*) FROM activity_log WHERE target_id=? AND target_type='agent_handoff' "
+            "AND action='办结人工处理包'",
+            (hid,)).fetchone()[0]
+    assert n == 1, f"办结留痕出现 {n} 条（同编号只该写一次）"
+
+
+def test_concurrent_same_token_executes_once(fresh_db):
+    """并发（真两个线程）同编号也只执行一次 —— 顺序通过不等于并发安全。"""
+    import threading
+    hid = _new_handoff()
+    _call(hid, "claim")
+    tok = "handoff-tok-cccc3333"
+    out = []
+    lock = threading.Lock()
+
+    def go():
+        r = _call_tok(hid, "reply", "已核实：带医保卡即可办理", token=tok)
+        with lock:
+            out.append(r)
+
+    ts = [threading.Thread(target=go) for _ in range(2)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join(timeout=30)
+    assert len(out) == 2
+    assert len([m for m in _notifs(RESIDENT_A) if "医保卡" in (m.get("content") or "")]) == 1, \
+        f"并发同编号只该发一条通知：{_notifs(RESIDENT_A)}"
+
+
+def test_failed_action_frees_the_token(fresh_db):
+    """没做成的操作**不占用编号**：同一个编号可以重试（否则首次失败后会永远"正在处理中"）。"""
+    hid = _new_handoff()
+    tok = "handoff-tok-dddd4444"
+    assert _denied(_call_tok(hid, "reply", "未领取就想回复", token=tok)), "前置：未领取应被拒"
+    _call(hid, "claim")
+    res = _call_tok(hid, "reply", "已领取，现在可以回复", token=tok)
+    assert not _denied(res), f"失败的操作不该锁死编号：{_err(res)}"
+    assert _row(hid)["status"] == "已回复"
+
+
+def test_different_tokens_allow_legit_repeat(fresh_db):
+    """**反向断言**：不同编号是不同意图 → 该放行就放行（别把幂等做成"只能操作一次"）。"""
+    hid = _new_handoff()
+    _call(hid, "claim")
+    assert not _denied(_call_tok(hid, "ask", "请补充卡号", token="handoff-tok-eeee5555"))
+    assert not _denied(_call_tok(hid, "reply", "已查到，办理方式是…", token="handoff-tok-ffff6666"))
+    assert _row(hid)["status"] == "已回复"
+
+
 def test_claim_finished_package_refused(fresh_db):
     hid = _new_handoff()
     _call(hid, "claim")
