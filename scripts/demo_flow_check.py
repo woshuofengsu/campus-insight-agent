@@ -22,6 +22,17 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 
 results: list[tuple[str, bool, str]] = []
 
+# 关掉语音的注入脚本（**立即执行的语句块**，不要写成箭头函数字面量——那只是个表达式，不会被执行）
+SPEECH_OFF_JS = """
+(() => {
+  const kill = ['SpeechRecognition', 'webkitSpeechRecognition', 'speechSynthesis'];
+  for (const k of kill) {
+    try { delete window[k] } catch (e) { /* 忽略 */ }
+    try { Object.defineProperty(window, k, { value: undefined, configurable: true }) } catch (e) { /* 忽略 */ }
+  }
+})();
+"""
+
 
 def check(name, ok, detail=""):
     results.append((name, bool(ok), detail))
@@ -69,10 +80,67 @@ def _expand_first_row(page, status: str = "待审核") -> bool:
     return False
 
 
+def _fault_drills(page, base: str) -> None:
+    """故障注入（卡12 的"故障集"）：**接口坏了的时候，页面有没有说实话**。
+
+    为什么必须有这一组：本项目最忌讳"失败却显示成功"。前面所有诚实化改造
+    （缺信息不建单、结果未知可查询、播报失败要说出来）都只在**正常路径**上被验过；
+    这里把接口打断/打 500，直接看页面的反应。
+    """
+    print("\n【故障注入】接口失败时的页面行为（不许出现「假成功」）")
+
+    # 故障注入针对**老人端**，所以先切到老年端会话（--faults 可能单独跑，此时仍是网格员登录态）
+    clear_session(page, base)
+    page.locator("text=老年").first.click()
+    page.wait_for_url("**/elderly/**")
+
+    # ① 报修提交接口超时 → 必须说"结果还不确定 + 可核对"，**不能**说"已上报"
+    page.route("**/api/web/elderly/report/submit", lambda route: route.abort("timedout"))
+    page.goto(f"{base}/elderly/report", wait_until="networkidle")
+    page.wait_for_timeout(1800)
+    page.fill("textarea", "五号楼二层楼道灯坏了")
+    _btn(page, "🔍 帮我看看还缺什么").first.click()
+    page.wait_for_timeout(2200)
+    if _btn(page, "✅ 确认上报").count():
+        _btn(page, "✅ 确认上报").first.click()
+    page.wait_for_timeout(2500)
+    body = page.inner_text("body")
+    check("故障① 提交超时**不谎报成功**", "已上报" not in body and "工单号" not in body,
+          "页面上没有「已上报/工单号」")
+    check("故障① 给出「结果未知/核对」的出口",
+          ("核对" in body) or ("查一下是否已经提交" in body) or ("网络" in body),
+          "显示正在核对/网络没回话，而不是静默失败")
+    page.unroute("**/api/web/elderly/report/submit")
+
+    # ② 工单列表接口 500 → 必须给出错误提示，不能显示"没有数据"假装正常
+    page.route("**/api/web/elderly/orders**",
+               lambda route: route.fulfill(status=500, content_type="application/json",
+                                           body='{"success":false,"error":"服务器开小差"}'))
+    page.goto(f"{base}/elderly/orders", wait_until="networkidle")
+    page.wait_for_timeout(2200)
+    body2 = page.inner_text("body")
+    check("故障② 列表接口 500 时有明确反馈",
+          ("服务器开小差" in body2) or ("失败" in body2) or ("错误" in body2) or ("重试" in body2),
+          "不能只显示空白/没有记录")
+    page.unroute("**/api/web/elderly/orders**")
+
+    # ③ 语音不可用（删掉 Web Speech）→ 必须明说"打字就行"（老年端降级路径）
+    # ⚠️ 注入脚本必须写成**立即执行的语句块**：写成 `() => {...}` 字面量的话它只是个表达式，
+    #    永远不会被调用，"删语音"根本没生效（`scripts/mobile_audit.py` 里已记录过这个坑）。
+    page.context.add_init_script(SPEECH_OFF_JS)
+    page.goto(f"{base}/elderly/report", wait_until="networkidle")
+    page.wait_for_timeout(2200)
+    body3 = page.inner_text("body")
+    check("故障③ 关掉语音后页面显式降级（打字路径可用）",
+          ("打字" in body3) or ("不支持语音" in body3) or ("念不出来" in body3), "降级提示条出现")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8000")
     ap.add_argument("--mutate", action="store_true", help="真的推进一张工单到已解决")
+    ap.add_argument("--faults", action="store_true",
+                    help="额外做故障注入（接口超时/500/关掉语音），验「失败时不谎报成功」")
     args = ap.parse_args()
     base = args.base.rstrip("/")
 
@@ -194,6 +262,9 @@ def main() -> int:
             page.wait_for_timeout(1500)
             check("⑪ 「更多服务」页可打开并能进用药提醒",
                   "/elderly/more" in page.url, page.url)
+
+        if args.faults:
+            _fault_drills(page, base)
 
         b.close()
 

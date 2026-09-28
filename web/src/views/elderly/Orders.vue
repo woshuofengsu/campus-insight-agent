@@ -18,12 +18,22 @@ const ttsOk = ref(cap.hasTTS)
 const lastSpoken = ref('')
 const list = ref([])
 const loading = ref(true)
+// 加载失败必须与"没有记录"**区分开**：查不到就说查不到（可重试），
+// 绝不能在接口 500 / 断网时显示"还没有报修记录"——那等于告诉老人"你没有报过修"。
+const loadError = ref('')
 const fbReason = ref({})
 
 async function load() {
   loading.value = true
-  try { list.value = (await elderly.orders({ limit: 10 })) || [] } catch (e) { message.error(e.message) }
-  finally { loading.value = false }
+  loadError.value = ''
+  try {
+    list.value = (await elderly.orders({ limit: 10 })) || []
+  } catch (e) {
+    loadError.value = (e && e.message) || '网络不太顺，没能查到您的报修记录'
+    list.value = []
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(load)
 
@@ -68,10 +78,10 @@ async function act(id, data, okMsg) {
         <b>#{{ i.id }} {{ i.title }}</b>
       </div>
 
-      <!-- 五步进度：已走过的高亮 -->
+      <!-- 五步进度：已走过的高亮（⚠️ 老年端字号一律 ≥20px，1.05rem=16.8px 会被 ui_audit 判不合格） -->
       <div style="display:flex;gap:4px;margin-top:10px;">
         <div v-for="(s, si) in (i.progress?.steps || [])" :key="s"
-             :style="`flex:1;text-align:center;font-size:1.05rem;padding:6px 2px;border-radius:8px;` +
+             :style="`flex:1;text-align:center;font-size:1.25rem;padding:6px 2px;border-radius:8px;` +
                      (si < (i.progress?.step_index || 0)
                        ? 'background:var(--success-light,#dcfce7);color:var(--ink-success);font-weight:700;'
                        : 'background:var(--bg);color:var(--muted);')">
@@ -84,13 +94,13 @@ async function act(id, data, okMsg) {
         {{ i.progress?.now_line || i.status }}
       </div>
       <div style="margin-top:6px;">➡️ {{ i.progress?.next_line }}</div>
-      <div class="muted" style="margin-top:4px;font-size:1.15rem;">👤 这一步由：{{ i.progress?.who }}</div>
-      <div :style="`margin-top:6px;font-size:1.15rem;` +
+      <div class="muted" style="margin-top:4px;font-size:1.25rem;">👤 这一步由：{{ i.progress?.who }}</div>
+      <div :style="`margin-top:6px;font-size:1.25rem;` +
                    (i.progress?.overdue ? 'color:var(--ink-danger);font-weight:700;' : '')">
         ⏱️ {{ i.progress?.eta_line }}
       </div>
 
-      <div class="muted" style="font-size:1.05rem;margin-top:6px;">
+      <div class="muted" style="font-size:1.25rem;margin-top:6px;">
         {{ i.issue_type }} · {{ i.category }} · 📍{{ i.location }}
         <span v-if="i.assignee_name"> · 👷{{ i.assignee_name }}</span>
       </div>
@@ -114,6 +124,14 @@ async function act(id, data, okMsg) {
         </div>
       </div>
     </div>
-    <n-empty v-if="!loading && list.length === 0" description="还没有报修记录" style="font-size:1.25rem;" />
+    <n-empty v-if="!loading && !loadError && list.length === 0" description="还没有报修记录" style="font-size:1.25rem;" />
+
+    <!-- 查不到 ≠ 没有记录：明确说清是"没查到"，并给一次重试 -->
+    <div v-if="loadError" class="panel-warm" data-load-error
+         style="border-radius:14px;padding:12px;font-size:1.25rem;">
+      ⚠️ 没能查到您的报修记录（{{ loadError }}）
+      <n-button block size="large" type="primary" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
+                @click="load">🔄 再试一次</n-button>
+    </div>
   </div>
 </template>
