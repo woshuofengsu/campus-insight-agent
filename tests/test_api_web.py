@@ -456,8 +456,15 @@ def test_issue_permission_guard(client):
     gh = {"Authorization": f"Bearer {g['token']}"}
 
     # 老人提交工单
-    r = client.post("/api/web/elderly/voice-report", json={"text": "楼道灯坏了"}, headers=eh)
+    # ⚠️ v3 卡1 契约：缺位置的报修**不建单**（`楼道灯坏了` 会被如实追问，这是预期行为），
+    # 所以这里用一条位置完整的报修；缺位置的行为由 `tests/test_elderly_report_api.py` 专门守着。
+    r = client.post("/api/web/elderly/voice-report",
+                    json={"text": "五号楼二层楼道灯坏了"}, headers=eh)
     iid = r.json()["data"]["issue_id"]
+    assert iid > 0
+    # 缺位置 → 明确拒绝建单（不是静默失败：有 2002 + 追问话术）
+    r_bad = client.post("/api/web/elderly/voice-report", json={"text": "楼道灯坏了"}, headers=eh)
+    assert r_bad.json()["code"] == 2002 and r_bad.json()["data"] is None
 
     # 居民尝试审核他人工单 → 403
     r = client.post(f"/api/web/issues/{iid}/action", json={"action": "audit", "approve": True}, headers=rh)

@@ -66,20 +66,68 @@ def _help_reply(role: str) -> str:
 # 路由执行（调用数据层，不复制业务逻辑）
 # ---------------------------------------------------------------------------
 
+def _resolve_reporter_phone(uid: int, given: str) -> str:
+    """报修人的联系电话：对话里给的 → 服务端资料里的（**解密**）→ 空串。
+
+    ⚠️ **绝不回落到 `13800000000` 这种占位号**（那是编造数据：工单里躺着一个打不通的号，
+    页面却显示"已受理"）。拿不到就让调用方**如实问用户**要一个号码。
+
+    查资料时用 `get_user_by_id`（而不是直接按 uid 查手机号），是为了和同一函数里
+    "位置/姓名来自哪份资料"保持一致——它保留了历史库缺行时的兼容回落，
+    若它回落了，手机号也必须来自**同一份**资料，否则会出现"位置是张三的、电话是别人的"。
+    """
+    phone = (given or "").strip()
+    if phone:
+        return phone
+    try:
+        from data.db_user import get_user_by_id, get_user_phone
+        prof = get_user_by_id(uid) or {}
+        real_uid = prof.get("id") or uid
+        return get_user_phone(real_uid) or ""
+    except Exception as e:  # noqa: BLE001
+        _log.warning("读取用户手机号失败 uid=%s：%s", uid, e)
+        return ""
+
+
 def _exec_report(uid: int, name: str, data: dict) -> tuple[str, str, int | None]:
-    """提交报修（草稿确认后）。data: title/type/urgency/location/desc/phone。"""
+    """提交报修（草稿确认后）。data: title/type/urgency/location/desc/phone。
+
+    **走与老人端同一套必填契约**（`utils.elderly_report`，v3 卡1）：
+    位置缺失或责任范围说不清时**不建单**，而是回一句能听懂的追问。
+    为什么必须统一：原来这里 `location` 默认成"社区" —— 那会生成网格员没法派的废单；
+    而"家里灯不亮了"这类**室内**报修，位置可以用**登记资料里的住址**补齐（不是猜）。
+    """
     from data.db_repair import submit_issue
+    from utils.elderly_report import build_report_confirm_payload
+    prof: dict = {}
+    try:
+        from data.db_user import get_user_by_id
+        prof = get_user_by_id(uid) or {}
+    except Exception as e:  # noqa: BLE001 — 资料读不到就按"没有资料"处理，位置会因此需要老人补
+        _log.warning("读取报修人资料失败 uid=%s：%s", uid, e)
+    desc = (data.get("desc") or data.get("title") or "").strip()
+    scope = data.get("type") if data.get("type") in ("室内", "室外") else ""
+    ok, r, ask = build_report_confirm_payload(
+        desc, prof,
+        confirmed_location=(data.get("location") or "").strip(),
+        confirmed_scope=scope,
+        confirmed_urgency=data.get("urgency") or "")
+    if not ok:
+        return ask, "需补充", None
+    phone = _resolve_reporter_phone(uid, data.get("phone"))
+    if not phone:
+        return "还需要一个能联系到您的手机号（网格员要打电话跟您约时间），请告诉我。", "需补充", None
     iid, hint = submit_issue(
-        title=data.get("title") or data.get("desc", "")[:50],
-        category="公共设施", issue_type=data.get("type", "室内"),
-        location=data.get("location", "社区"),
-        description=data.get("desc", ""),
-        urgency=data.get("urgency", "一般"),
-        reporter_name=name or "居民", reporter_phone=data.get("phone") or "13800000000",
+        title=data.get("title") or desc[:50],
+        category="公共设施", issue_type=r["fields"]["issue_type"],
+        location=r["fields"]["location"],
+        description=desc,
+        urgency=r["fields"]["urgency"],
+        reporter_name=name or "居民", reporter_phone=phone,
         reporter_id=uid,
     )
     if iid <= 0:
-        return "提交失败，请稍后重试。", "失败", None
+        return f"提交失败：{hint}", "失败", None
     return f"已为您提交报修，工单号：WO{iid:08d}，负责人会尽快联系您。", "成功", iid
 
 
@@ -88,10 +136,14 @@ def _exec_proposal(uid: int, name: str, data: dict) -> tuple[str, str, int | Non
     from data.db_proposal import submit_proposal
     desc = data.get("desc", "")
     title = (data.get("title") or desc[:30] or "社区建议").strip()
+    phone = _resolve_reporter_phone(uid, data.get("phone"))
+    if not phone:
+        # 同报修：不编假号，直接问用户要（提案也需要能联系到提议人）
+        return "提交提案需要一个能联系到您的手机号，请告诉我。", "需补充", None
     pid, msg = submit_proposal(
         title=title, description=desc,
         category=data.get("category", "其他"),
-        reporter_name=name or "居民", reporter_phone=data.get("phone") or "13800000000",
+        reporter_name=name or "居民", reporter_phone=phone,
         is_public=data.get("is_public", 0), reporter_id=uid,
     )
     if pid <= 0:

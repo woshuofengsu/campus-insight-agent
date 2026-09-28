@@ -1,7 +1,14 @@
 <script setup>
-// 老年端语音报修：语音识别（60秒）→ 转写确认（10秒超时）→ 提交
-// 降级硬化（B4）：语音只是增强项——不支持/没权限/连不上时，明确告诉老人"打字就行"，
-// 不再把"不支持"误报成"没听清"（那会让老人一直重按，越按越急）。
+// 老年端一句话报修（v3 卡1 契约）：说话/打字 → **结构化摘要**（缺什么问什么）→ 老人确认 → 提交。
+//
+// 为什么不是"说完直接提交"：
+//   · 原实现位置提取失败就把 location 回落成"社区"直接建单 —— 库里真的留下了 `location='社区'`
+//     的**无法派单工单**（老人以为报了，其实没人能去修）；
+//   · 也不能让老人确认"一串转写文本"就算确认了办理信息 —— 位置/责任范围（家里还是公共区域）
+//     必须老人看得见、答得上。
+// 所以：先出摘要 + 缺失项 + 一句能听懂的追问；齐了才出现「确认上报」。
+//
+// 降级硬化（B4）：语音只是增强项——不支持/没权限/连不上时明确告诉老人"打字就行"。
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -14,14 +21,27 @@ const { recognize, speak } = useSpeech()
 
 const text = ref('')
 const listening = ref(false)
-const confirming = ref(false)
 const submitting = ref(false)
-const lastResult = ref(null) // {issue_id, category, corrected, original}
+const loadingDraft = ref(false)
+const draft = ref(null)          // 结构化摘要（服务端返回）
+const submitted = ref(null)      // 提交成功后的四段值
+// 老人补充/确认的字段（预填系统的建议，老人可改）
+const answer = ref({ location: '', scope: '', urgency: '一般' })
 
 const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
+
+const SOURCE_LABEL = {
+  text: '来自您说的话',
+  user: '您确认的',
+  profile: '来自您的登记资料',
+  suggestion: '系统建议（还没确认）',
+  default: '默认值',
+  none: '暂缺',
+}
+const srcTip = (k) => SOURCE_LABEL[k] || ''
 
 onMounted(() => speak('请说出或写下您遇到的问题'))
 
@@ -32,15 +52,8 @@ async function startListen() {
   listening.value = false
   if (r.ok && r.text) {
     text.value = r.text
-    confirming.value = true
-    speak(`您说的是：${r.text}，对吗？`)
-    // 10 秒确认超时自动取消（方案：确认超时 10 秒）
-    setTimeout(() => {
-      if (confirming.value) {
-        confirming.value = false
-        message.info('确认超时已取消，内容已保留，可重新提交')
-      }
-    }, 10000)
+    speak(`您说的是：${r.text}。请确认下面的信息`)
+    await loadDraft()
   } else {
     // 按真实原因分派文案：不支持/没权限/网络 → 引导打字；空识别 → 请再说一次
     const reason = r.reason || 'empty'
@@ -52,17 +65,62 @@ async function startListen() {
   }
 }
 
-async function submit() {
+/** 让服务端把原话解析成结构化摘要（缺什么会明说，且**此时不会建单**）。 */
+async function loadDraft() {
   if (text.value.trim().length < 5) return message.warning('请描述问题，至少 5 个字')
+  draft.value = null
+  submitted.value = null
+  loadingDraft.value = true
+  try {
+    const d = await elderly.reportDraft(text.value)
+    draft.value = d
+    answer.value = {
+      location: d.fields.location || d.suggestion.location || '',
+      scope: d.fields.issue_type || '',
+      urgency: d.fields.urgency || '一般',
+    }
+    if (d.need_more) {
+      speak(d.ask)
+      message.info(d.ask)
+    } else {
+      speak('信息我记好了，请确认后上报')
+    }
+    if (d.phone_hint) message.warning(d.phone_hint)
+  } catch (e) {
+    message.error(e.message || '没能识别，请再试一次')
+  } finally {
+    loadingDraft.value = false
+  }
+}
+
+/** 老人补充完信息后重新解析（不建单），直到没有缺失项。 */
+async function recheck() {
+  await loadDraft()
+}
+
+async function submit() {
+  if (!draft.value) return
   submitting.value = true
   try {
-    const d = await elderly.voiceReport({ text: text.value, issue_type: '室内' })
-    lastResult.value = d
-    message.success(`已上报成功，工单 #${d.issue_id}（${d.category}，待审核）`)
+    const d = await elderly.reportSubmit({
+      text: text.value,
+      location: answer.value.location || '',
+      scope: answer.value.scope || '',
+      urgency: answer.value.urgency || '',
+    })
+    submitted.value = d
+    if (d.issue_id > 0) {
+      message.success(`已上报，工单号 ${d.issue_id}（待审核）`)
+      speak(`已经帮您报上去了，工单号 ${d.issue_id}，请等负责人联系您`)
+    } else {
+      // 例：安全隐患只记提醒不建单 —— 如实告诉老人，不假装建了工单
+      message.success('已记录为安全提醒，负责人会看到')
+      speak('已经记录下来，负责人会看到')
+    }
+    draft.value = null
     text.value = ''
-    confirming.value = false
   } catch (e) {
-    message.error(e.message)
+    message.error(e.message || '上报失败，请稍后再试')
   } finally {
     submitting.value = false
   }
@@ -72,7 +130,7 @@ async function submit() {
 <template>
   <div class="elderly-page">
     <div class="elderly-title">🗣️ 一句话报修</div>
-    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">点「🎤 按住说话」语音上报，或直接打字</p>
+    <p style="text-align:center;color:var(--muted);font-size:1.25rem;">说一句或打几个字，我帮您整理成工单</p>
 
     <!-- 降级提示条：语音不可用时明说"打字就行"（审计靠 data-speech-fallback 做机器验证） -->
     <div v-if="asrBlocked" data-speech-fallback
@@ -83,31 +141,91 @@ async function submit() {
     <div class="card" style="font-size:1.3rem;">
       <n-button v-if="!asrBlocked" type="error" block size="large"
                 style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
-        🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '按住说话' }}
+        🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '点一下开始说话' }}
       </n-button>
       <div v-else style="font-size:1.3rem;font-weight:700;">
         ✍️ 请在下面的框里打字告诉我们（最少 5 个字）
       </div>
 
-      <n-input v-model:value="text" type="textarea" :rows="4" placeholder="或直接输入问题：3号楼电梯坏了"
+      <n-input v-model:value="text" type="textarea" :rows="3" placeholder="比如：五号楼二层楼道灯坏了"
                style="font-size:1.3rem;margin-top:12px;" />
 
-      <!-- 转写确认（10 秒超时） -->
-      <div v-if="confirming" style="background:#eef2ff;border-radius:10px;padding:10px;margin-top:12px;font-size:1.25rem;">
-        ✅ 已识别：{{ text }}（10 秒内确认）
+      <n-button type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;"
+                :loading="loadingDraft" @click="loadDraft">
+        🔍 帮我看看还缺什么
+      </n-button>
+    </div>
+
+    <!-- 结构化摘要：老人核对的就是**办理信息**，不是一串转写文本 -->
+    <div v-if="draft" class="card" style="font-size:1.25rem;">
+      <b>📋 请您核对这几项</b>
+      <div style="margin-top:8px;">🗣️ 您说的：{{ draft.original_text }}</div>
+      <div style="margin-top:6px;">🔧 问题：{{ draft.fields.title }}</div>
+      <div style="margin-top:6px;">
+        📍 位置：
+        <b v-if="draft.fields.location">{{ draft.fields.location }}</b>
+        <span v-else style="color:var(--danger,#c00);">还缺，请在下面补充</span>
+        <span class="muted" style="font-size:1rem;">（{{ srcTip(draft.sources.location) }}）</span>
+      </div>
+      <div style="margin-top:6px;">
+        🏠 责任范围：
+        <b v-if="draft.fields.issue_type === '室内'">您家里（自己家的事）</b>
+        <b v-else-if="draft.fields.issue_type === '室外'">公共地方（楼道/电梯等）</b>
+        <span v-else style="color:var(--danger,#c00);">还没定，请选一下</span>
+      </div>
+      <div style="margin-top:6px;">⏱️ 紧急程度：{{ draft.fields.urgency }}</div>
+
+      <!-- 缺失项：就地追问（缺什么问什么，缺着就不给提交） -->
+      <div v-if="draft.need_more" class="panel-warm" style="margin-top:12px;border-radius:10px;padding:10px;">
+        <b>❓ {{ draft.ask }}</b>
+        <!-- 系统已经能猜出位置时，给一个"就是它"的大按钮：老人点一下就行，不用打字 -->
+        <n-button v-if="draft.suggestion.location" type="primary" block size="large"
+                  style="margin-top:8px;min-height:64px;font-size:1.25rem;"
+                  @click="answer.location = draft.suggestion.location; recheck()">
+          ✅ 就是这里：{{ draft.suggestion.location }}
+        </n-button>
+        <n-input v-model:value="answer.location" placeholder="或者告诉我别的：比如 5号楼二层楼道"
+                 size="large" style="font-size:1.2rem;margin-top:8px;" />
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <n-button size="large" style="flex:1;min-height:56px;font-size:1.2rem;"
+                    :type="answer.scope === '室内' ? 'primary' : 'default'"
+                    @click="answer.scope = '室内'">🏠 是我家里</n-button>
+          <n-button size="large" style="flex:1;min-height:56px;font-size:1.2rem;"
+                    :type="answer.scope === '室外' ? 'primary' : 'default'"
+                    @click="answer.scope = '室外'">🏢 是公共地方</n-button>
+        </div>
+        <n-button type="primary" block size="large" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
+                  :loading="loadingDraft" @click="recheck">✅ 补充好了，再看一遍</n-button>
       </div>
 
-      <n-button type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
-                :loading="submitting" @click="submit">
-        ✅ 确认上报
-      </n-button>
+      <template v-else>
+        <div style="margin-top:12px;">
+          <div class="muted" style="font-size:1.05rem;">紧急程度可以改（不急就选「一般」）：</div>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <n-button v-for="u in ['一般', '中等', '紧急']" :key="u" size="large"
+                      style="flex:1;min-height:56px;font-size:1.2rem;"
+                      :type="answer.urgency === u ? 'primary' : 'default'"
+                      @click="answer.urgency = u">{{ u }}</n-button>
+          </div>
+        </div>
+        <n-button type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
+                  :loading="submitting" @click="submit">✅ 确认上报</n-button>
+        <div class="muted" style="margin-top:6px;font-size:1rem;">
+          上报后工单进入待审核，负责人会在「我的报修」里回复您。
+        </div>
+      </template>
+    </div>
 
-      <!-- 纠错确认（原始描述与纠正后描述均保留） -->
-      <div v-if="lastResult && lastResult.corrected && lastResult.corrected !== lastResult.original"
-           style="background:#fefce8;border-radius:10px;padding:10px;margin-top:12px;font-size:1rem;">
-        <b>✏️ 已为您纠正描述（原始与纠正后均保留）：</b>
-        <div style="margin-top:6px;">🗣️ 您说的：{{ lastResult.original }}</div>
-        <div style="margin-top:4px;">✅ 已纠正：{{ lastResult.corrected }}</div>
+    <!-- 提交结果：原话 / 系统建议 / 您确认的 / 入库值 四段分开展示（不混成一句"已纠正"） -->
+    <div v-if="submitted" class="card" style="background:#ecfdf5;font-size:1.2rem;">
+      <b>✅ 已上报（工单号 {{ submitted.issue_id }}）</b>
+      <div style="margin-top:8px;">🗣️ 您说的：{{ submitted.original_text }}</div>
+      <div style="margin-top:4px;">📍 最终记录的位置：{{ submitted.confirmed.location }}</div>
+      <div style="margin-top:4px;">🏠 责任范围：
+        {{ submitted.confirmed.issue_type === '室内' ? '您家里' : '公共地方' }}</div>
+      <div style="margin-top:4px;">⏱️ 紧急程度：{{ submitted.confirmed.urgency }}</div>
+      <div class="muted" style="margin-top:6px;font-size:1rem;">
+        位置来源：{{ srcTip(submitted.sources.location) }}（系统不会把您没确认的内容写成事实）
       </div>
     </div>
 

@@ -118,7 +118,11 @@ def get_current_user() -> dict:
 
 
 def get_user_by_id(user_id: int) -> dict:
-    """按 ID 查用户资料，没有就返回空 dict。"""
+    """按 ID 查用户资料，没有就返回空 dict。
+
+    ⚠️ `phone` 列是**明文列且按约定写空**（手机号在 `phone_enc`），所以想拿手机号请用
+    `get_user_phone()`（会解密）；直接读 `row["phone"]` 拿到的是空串。
+    """
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM user_profile WHERE id = ?", (user_id,)
@@ -126,10 +130,39 @@ def get_user_by_id(user_id: int) -> dict:
         if not row:
             # 兼容老数据：没有就回退到 id=1
             if user_id != 1:
+                _log.warning("user_profile 里没有 id=%s，回退到 id=1（老数据兼容路径，调用方注意归属）",
+                             user_id)
                 row = conn.execute(
                     "SELECT * FROM user_profile WHERE id = 1"
                 ).fetchone()
         return dict(row) if row else {}
+
+
+def get_user_phone(user_id: int) -> str:
+    """取用户手机号（**解密后**）。拿不到返回空串 —— **绝不返回占位假号**。
+
+    为什么单独有这个函数：`user_profile` 的 `phone` 明文列按数据安全约定写空、密文在 `phone_enc`，
+    于是"直接读 profile['phone']"永远拿到空串。老人报修需要真实联系方式（网格员要打得通），
+    旧代码的兜底是写死 `"13800000000"` —— 那是**编造数据**：工单里躺着一个打不通的号码，
+    页面上却显示"已受理"。找不到号码时应**如实告诉用户补号**，而不是填一个假的。
+    """
+    if not user_id:
+        return ""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT phone, phone_enc FROM user_profile WHERE id = ?", (user_id,)
+            ).fetchone()
+        if not row:
+            return ""
+        enc = row["phone_enc"] if "phone_enc" in row.keys() else ""
+        if enc:
+            from data.db_repair import _dec_phone
+            return _dec_phone(enc, row["phone"] or "")
+        return row["phone"] or ""
+    except Exception as e:  # noqa: BLE001 — 解密/查询失败返回空串，由调用方提示补号
+        _log.warning("读取用户手机号失败 uid=%s：%s", user_id, e)
+        return ""
 
 
 def get_user_by_username(username: str) -> dict | None:

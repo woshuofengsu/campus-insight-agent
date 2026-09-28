@@ -91,6 +91,24 @@ class VoiceReport(BaseModel):
     issue_type: str = Field(default="室内")
 
 
+class ReportDraftIn(BaseModel):
+    """报修草稿输入（v3 卡1）：只收**原话**，字段由服务端解析（不接受前端直接给"已确认字段"）。"""
+    text: str = Field(..., min_length=2, max_length=500)
+
+
+class ReportSubmitIn(BaseModel):
+    """报修提交输入（v3 卡1）：原话 + **老人确认/补充**的值。
+
+    为什么原话要一起传：`location`/`scope` 是"老人说的"或"老人确认的"，
+    而 title/description 永远是**原话**——分开保存才能做到
+    「原始话语 / 系统建议 / 用户确认值 / 最终入库值」四者可区分（v3 复核 §6-I7）。
+    """
+    text: str = Field(..., min_length=2, max_length=500)
+    location: str = Field(default="", max_length=80)
+    scope: str = Field(default="", max_length=8)      # 室内 / 室外 / 空=按原话推断
+    urgency: str = Field(default="", max_length=8)    # 一般 / 中等 / 紧急 / 空=按原话推断
+
+
 class MedicationCreate(BaseModel):
     drug_name: str = Field(..., min_length=1, max_length=50)
     dosage: str = Field(default="")
@@ -201,35 +219,132 @@ def web_elderly_home(request: Request):
     })
 
 
-@router.post("/voice-report")
-def web_elderly_voice_report(req: VoiceReport, request: Request):
-    """老年端语音报修（转写文本已确认，走报修状态机）。"""
+def _elderly_profile(uid) -> dict:
+    """老人资料 + **解密后的手机号**。
+
+    `get_user_by_id` 返回的 `phone` 明文列按约定是空的（密文在 `phone_enc`），
+    所以这里额外用 `get_user_phone()` 补上真实号码；拿不到就是空串，
+    调用方必须据此**如实提示补号**，绝不写占位假号。
+    """
+    try:
+        from data.db_user import get_user_by_id, get_user_phone
+        prof = get_user_by_id(uid) or {}
+        prof["phone"] = get_user_phone(uid)
+        return prof
+    except Exception as e:  # noqa: BLE001
+        _log.warning("读取老人资料失败 uid=%s：%s", uid, e)
+        return {}
+
+
+def _report_draft_payload(text: str, profile: dict) -> dict:
+    """生成报修确认摘要（v3 卡1）：结构化字段 + 缺失项 + 追问话术 + **每个字段的来源**。"""
+    from utils.elderly_report import extract_report_fields
+    r = extract_report_fields(text, profile)
+    cleaned = _correct_report_text(text)
+    return {
+        "original_text": text,
+        "fields": r["fields"],
+        "sources": r["sources"],
+        "suggestion": {
+            **r["suggestion"],
+            # 系统对措辞的建议（如去掉重复标点）——**只作提示**，入库的仍是老人确认过的原话
+            "title_hint": cleaned if cleaned != text else "",
+        },
+        "missing": r["missing"],
+        "ask": r["ask"],
+        "need_more": bool(r["missing"]),
+        "can_submit": not r["missing"],
+        "note": r["note"],
+        # 联系方式不要求老人填：用资料里的；没有就如实说"缺手机号"，**绝不写假号**
+        "reporter_phone_ready": bool(str(profile.get("phone") or "").strip()),
+    }
+
+
+@router.post("/report/draft")
+def web_elderly_report_draft(req: ReportDraftIn, request: Request):
+    """老人报修 · 第一步：把原话变成**可确认的结构化摘要**（不写库、不建单）。
+
+    解决的是 v3 复核 §6-B1/§6-I6：原来老人说一句"楼道灯坏了"，后端就把位置回落成"社区"直接建单
+    ——库里真的留下了 `location='社区'` 的**无法派单工单**。现在缺位置/责任范围时返回
+    `need_more=true` + `ask`（一句能听懂的话），**绝不建单**。
+    """
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    profile = _elderly_profile(uid)
+    out = _report_draft_payload(req.text, profile)
+    if not out["reporter_phone_ready"]:
+        out["phone_hint"] = "您的资料里还没有手机号，网格员联系不上您；请让网格员帮您补一个。"
+    return _ok(out, "请确认信息" if not out["need_more"] else out["ask"])
+
+
+@router.post("/report/submit")
+def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
+    """老人报修 · 第二步：**校验必填 + 提交**（v3 卡1 的闸门）。
+
+    返回体明确分开四段值（v3 复核 §6-I7）：
+      `original_text`（老人原话）/ `suggestion`（系统建议）/ `confirmed`（最终入库值）/ `sources`（每个字段来源）。
+    缺必填 → 返回 2002 + 追问话术，**不建单**；资料里没手机号 → 明确拒绝，**不写 13800000000 这种假号**。
+    """
     from data.db_repair import submit_issue
-    from agent.helpers import extract_location
     from tools.action_report_issue import _llm_classify
+    from utils.elderly_report import build_report_confirm_payload
     u = _user(request)
     uid = _resolve_elder_uid(request) or u.get("uid")
     _touch(uid)
-    profile = {}
-    try:
-        from data.db_user import get_user_by_id
-        profile = get_user_by_id(uid) or {}
-    except Exception:
-        pass
-    category, urgency = _llm_classify(req.text, "")
-    loc = extract_location(req.text) or profile.get("community") or "社区"
-    corrected = _correct_report_text(req.text)
+    profile = _elderly_profile(uid)
+
+    ok_, r, ask = build_report_confirm_payload(
+        req.text, profile, confirmed_location=req.location,
+        confirmed_scope=req.scope, confirmed_urgency=req.urgency)
+    if not ok_:
+        return _fail(2002, ask or "信息还不完整，请补充后再提交")
+
+    phone = str(profile.get("phone") or "").strip()
+    if not phone:
+        # 诚实：没有手机号就不建单（假号会让网格员打不通，还可能被当成真实数据引用）
+        return _fail(2002, "您的资料里还没有手机号，网格员联系不上您；请让网格员帮您补一个手机号再报修。")
+
+    fields = r["fields"]
+    category, urgency_llm = _llm_classify(req.text, "")
+    urgency = fields["urgency"] or urgency_llm or "一般"
     iid, hint = submit_issue(
-        title=req.text[:80], category=category, issue_type=req.issue_type,
-        location=loc, description=req.text, urgency=req.urgency or urgency or "一般",
-        reporter_name=profile.get("name") or "老人",
-        reporter_phone=profile.get("phone") or "13800000000",
-        reporter_id=uid,
+        title=fields["title"], category=category, issue_type=fields["issue_type"],
+        location=fields["location"], description=fields["description"],
+        urgency=urgency, reporter_name=profile.get("name") or u.get("name") or "老人",
+        reporter_phone=phone, reporter_id=uid,
     )
     if iid <= 0:
+        if hint == "safety":
+            return _ok({"issue_id": 0, "safety": True, "confirmed": fields},
+                       "已记为安全提醒（这类情况不生成工单，负责人会看到）")
         return _fail(2001, hint or "上报失败")
-    return _ok({"issue_id": iid, "category": category, "corrected": corrected,
-                "original": req.text}, "上报成功")
+    return _ok({
+        "issue_id": iid,
+        "original_text": req.text,
+        "suggestion": r["suggestion"],
+        "confirmed": fields,
+        "sources": r["sources"],
+        "category": category,
+    }, f"上报成功，工单号 {iid}，请等待审核")
+
+
+@router.post("/voice-report")
+def web_elderly_voice_report(req: VoiceReport, request: Request):
+    """老年端语音报修（**严格版**：缺位置/责任范围就不建单）。
+
+    ⚠️ 这是给旧版前端留的兼容入口；新版走「草稿 → 确认 → 提交」两步
+    （`/report/draft`、`/report/submit`）。两者共用同一套必填契约，
+    所以**不会再出现** `location='社区'` 那种无法派单的工单。
+    """
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    profile = _elderly_profile(uid)
+    from utils.elderly_report import build_report_confirm_payload
+    ok_, r, ask = build_report_confirm_payload(
+        req.text, profile, confirmed_urgency=req.urgency or "")
+    if not ok_:
+        return _fail(2002, ask or "请补充位置或说明是家里还是公共地方")
+    body = ReportSubmitIn(text=req.text, location=r["fields"]["location"],
+                          scope=r["fields"]["issue_type"], urgency=r["fields"]["urgency"])
+    return web_elderly_report_submit(body, request)
 
 
 @router.post("/medications")

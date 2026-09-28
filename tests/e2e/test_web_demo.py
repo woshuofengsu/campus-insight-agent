@@ -89,9 +89,19 @@ def test_full_demo_flow(client):
     assert r.status_code == 200 and r.json()["success"]
     print(f"✓ 政策问答（matched={r.json()['data']['matched']}）")
 
-    # 5) 老年端：语音报修 + 用药 + 首页聚合
+    # 5) 老年端：语音报修（v3 卡1 契约：先出摘要 → 确认 → 提交）+ 用药 + 首页聚合
+    #    先验证"缺位置的报修不会被建单"（这是 B1 的验收点），再走完整的两步流程
     r = client.post("/api/web/elderly/voice-report", json={"text": "家门口的灯坏了"}, headers=eh)
+    assert r.json()["code"] == 2002 and r.json()["data"] is None, \
+        "缺位置的报修必须被追问而不是建单"
+    r = client.post("/api/web/elderly/report/draft", json={"text": "3号楼2单元楼道灯坏了"}, headers=eh)
+    assert r.json()["success"] and r.json()["data"]["can_submit"], r.text
+    r = client.post("/api/web/elderly/report/submit", json={
+        "text": "3号楼2单元楼道灯坏了", "location": "3号楼2单元楼道",
+        "scope": "室外", "urgency": "一般",
+    }, headers=eh)
     assert r.json()["success"], r.text
+    assert r.json()["data"]["issue_id"] > 0
     r = client.post("/api/web/elderly/medications", json={
         "drug_name": "降压药", "dosage": "1片", "times": "08:00", "repeat_rule": "每天",
         "start_date": "2026-08-21", "end_date": "2026-12-31",

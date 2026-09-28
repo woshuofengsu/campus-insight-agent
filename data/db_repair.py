@@ -145,10 +145,16 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
                  reporter_phone: str, reporter_id: int | None = None,
                  photo_before: str = "[]", is_agent_report: int = 0,
                  agent_name: str = "", agent_phone: str = "", agent_relation: str = "",
-                 draft_id: int | None = None) -> tuple[int, str]:
+                 draft_id: int | None = None,
+                 allow_missing_phone: bool = False) -> tuple[int, str]:
     """提交报修。返回 (工单 ID, 提示语)。
 
     校验必填项、手机号格式；识别特殊情况；信息齐全生成工单（状态待审核）。
+
+    `allow_missing_phone`：**系统来源**（如舆情转工单）本来就没有报修人电话，
+    传 True 表示"允许没有电话"（存空串、页面显示未留电话）——
+    **绝不允许调用方编一个号码**（历史上有写死 `13800000000` 的，那是编造数据：
+    工单里躺着一个打不通的号，页面却显示"已受理"）。
     """
     title = scrub_field(title, "issue.title")
     location = scrub_field(location, "issue.location")
@@ -162,7 +168,10 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
         return 0, "问题描述太短，请至少写 5 个字。"
     if len(description.strip()) > 200:
         return 0, "问题描述过长，请控制在 200 字以内。"
-    if not _validate_phone(reporter_phone):
+    if not reporter_phone:
+        if not allow_missing_phone:
+            return 0, "请输入正确的手机号。"
+    elif not _validate_phone(reporter_phone):
         return 0, "请输入正确的手机号。"
     if issue_type not in ("室内", "室外"):
         return 0, "请选择分类（室内/室外）。"

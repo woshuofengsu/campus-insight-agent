@@ -139,6 +139,9 @@ export const messages = {
 export const elderly = {
   home: () => api.get('/elderly/home'),
   voiceReport: (data) => api.post('/elderly/voice-report', data),
+  // 报修契约（v3 卡1）：先出结构化摘要（缺什么就说缺什么）→ 老人确认后再提交
+  reportDraft: (text) => api.post('/elderly/report/draft', { text }),
+  reportSubmit: (data) => api.post('/elderly/report/submit', data),
   medications: () => api.get('/elderly/medications'),
   createMedication: (data) => api.post('/elderly/medications', data),
   toggleMedication: (id, action) => api.post(`/elderly/medications/${id}/toggle`, { action }),

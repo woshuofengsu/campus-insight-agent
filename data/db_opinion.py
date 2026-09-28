@@ -69,9 +69,15 @@ def convert_to_issue(opinion_id: int, actor: str = "负责人") -> tuple[bool, s
         return False, "舆情不存在", None
     iid, _ = submit_issue(
         title=(row["content"] or "")[:40], category="其他", issue_type="室外",
-        location="社区", description=f"[舆情·{row['source']}] {row['content']}",
+        # ⚠️ 原来写 location="社区"、reporter_phone="13900000000"：
+        #    · "社区"不是可派单位置（网格员不知道去哪）→ 改成显式"待核实"标记；
+        #    · 舆情来源本来就没有报修人电话 → 传空 + allow_missing_phone=True，
+        #      **绝不编一个号码**（那会让工单看起来有人可联系，实际打不通）。
+        location="（位置待核实·舆情来源）",
+        description=f"[舆情·{row['source']}] {row['content']}",
         urgency="紧急" if row["level"] in ("红色", "橙色") else "一般",
-        reporter_name="舆情系统", reporter_phone="13900000000", reporter_id=0,
+        reporter_name="舆情系统（无联系电话）", reporter_phone="", reporter_id=0,
+        allow_missing_phone=True,
     )
     if iid <= 0:
         return False, "转工单失败", None

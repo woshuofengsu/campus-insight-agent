@@ -188,7 +188,14 @@ def discover_and_dispatch(limit: int = 20) -> list[dict]:
                 _log.warning("分派失败通知负责人失败（工单 #%d）", r["id"], exc_info=True)
             continue
         name = _worker_display_name(worker)
-        phone = worker.get("phone") or "13900139000"
+        # ⚠️ 原来这里是 `worker.get("phone") or "13900139000"` —— 网格员资料没电话时**编一个假号**
+        # 写进工单的 `assignee_phone`（老人照着打就是空号）。现在取**解密后的真实号码**，
+        # 取不到就留空并留痕（页面显示"未留电话"，由负责人补录）。
+        from data.db_user import get_user_phone
+        phone = get_user_phone(worker.get("id")) or worker.get("phone") or ""
+        if not phone:
+            _log.warning("网格员 %s（id=%s）资料里没有手机号：工单 #%s 的联系电话留空（不编假号）",
+                         name, worker.get("id"), r["id"])
         ok, _ = dispatch_issue(r["id"], name, phone)
         if ok:
             try:
