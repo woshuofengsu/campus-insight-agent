@@ -210,6 +210,8 @@ export const agent = {
   deleteHistory: (id) => api.delete(`/agent/history/${id}`),
   clearHistory: () => api.delete('/agent/history'),
   logs: (params) => api.get('/agent/logs', { params }),
+  // 我没提交完的草稿（只返回自己的）：用于「上次有一条没提交的，要继续吗？」
+  drafts: () => api.get('/agent/drafts'),
   handoffs: (params) => api.get('/agent/handoffs', { params }),
   // 卡11 / v3 卡7：人工处理包流转（claim 领取 / ask 补问 / reply 回复 / close 关闭）
   handoffAction: (id, data) => api.post(`/agent/handoffs/${id}/action`, data),

@@ -127,6 +127,14 @@ class Orchestrator:
             except Exception:
                 pass
 
+        # 「继续上次」：把**上一场对话**没提交完的草稿显式续上（卡8 / §6-I10 的另一半）
+        # 背景：草稿回填只认同一场对话（否则旧草稿会顶替新报修），但老人上次没提交完就走了，
+        # 回来时要能续 —— 所以给一个**显式出口**，由用户自己说"继续上次"，而不是系统替他猜。
+        if text in ("继续上次", "继续上次的报修", "接着上次", "继续刚才那个", "继续没提交的"):
+            resumed = self._resume_draft(ctx, uid)
+            if resumed:
+                return resumed
+
         # 取消指令：清理草稿与状态（彻底清空，避免残留 step 导致续接）
         if text in ("算了", "取消", "不要了", "先不弄了"):
             for k in _draft_keys(uid):
@@ -175,6 +183,49 @@ class Orchestrator:
         "确认", "确认提交", "提交", "对", "是", "确定", "对，提交", "不是", "算了", "取消",
         "家里", "公共区域", "室内", "室外", "紧急", "一般", "公开", "私有", "不报了", "不要了",
     }
+
+    def _resume_draft(self, ctx: dict, uid: int) -> dict | None:
+        """把上一场对话**没提交完**的草稿显式续上（用户说"继续上次"时）。
+
+        为什么要显式：为了避免"旧草稿顶替新报修"，回填只认同一场对话；
+        但草稿不能因此消失（§6-I10 的另一半）。所以给用户一个明确出口——
+        由**老人自己**说"继续上次"，而不是系统猜他想要哪一条。
+        续上后把草稿放回黑板并进入"确认"步骤，同时把草稿的会话归属改成当前会话
+        （否则下一轮又会被判为"别的对话的草稿"）。
+        """
+        try:
+            from data.db_draft import list_drafts
+            drafts = [d for d in list_drafts(uid) if d.get("draft_type") == "work_order_draft"]
+        except Exception as e:  # noqa: BLE001 — 读草稿失败不能把对话搞崩
+            _log.warning("读取未提交草稿失败：%s", e)
+            return None
+        if not drafts:
+            return self._finish(ctx, "没有找到上次没提交的报修草稿，您直接说问题就行。",
+                                "失败", "报修", [], None)
+        d = drafts[0]
+        desc = str((d.get("content") or {}).get("desc") or d.get("source_text") or "").strip()
+        if not desc:
+            return None
+        draft = {"desc": desc,
+                 "type": (d.get("content") or {}).get("type") or "室内",
+                 "urgency": (d.get("content") or {}).get("urgency") or "一般"}
+        key = f"user:{uid}:work_order_draft"
+        self.bb.write(key, draft, "orchestrator", lock=False)
+        self.bb.write(_state_key(uid), {"step": "confirm", "intent": "repair"}, "orchestrator")
+        # 归属改到当前会话：否则本轮 _finish 落库时又会被标成"别的对话的草稿"
+        try:
+            from data.db_draft import save_draft
+            save_draft(uid, "work_order_draft", draft, step="confirm",
+                       source_session=self.bb.session_id, source_text=desc)
+        except Exception as e:  # noqa: BLE001
+            _log.warning("续接草稿时更新归属失败（下一轮可能又不回填）：%s", e)
+        self._log("repair_dispatch", "续接未提交草稿", f"续上「{desc[:20]}」")
+        return self._finish(
+            ctx,
+            f"找到了上次没提交的报修：\n· 问题：{desc[:60]}\n· 分类：{draft['type']}\n"
+            f"· 紧急程度：{draft['urgency']}\n确认提交就说「确认提交」，不要了就说「取消」。",
+            "需确认", "报修",
+            [{"type": "buttons", "options": ["确认提交", "取消"]}], None)
 
     def _resume_target(self, st: dict, text: str, role: str = "resident") -> str | None:
         """根据黑板 state 判断是否续接某业务 Agent（追问/草稿确认/导出确认）。

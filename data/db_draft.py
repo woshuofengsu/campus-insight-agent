@@ -68,6 +68,33 @@ def delete_draft(user_id: int, draft_type: str) -> None:
         conn.commit()
 
 
+def list_drafts(user_id: int) -> list[dict]:
+    """这个用户所有**未提交**的草稿（含出处），用于「上次有一条没提交的，要继续吗？」。
+
+    为什么需要它：草稿回填现在只认同一场对话（避免旧草稿顶替新报修），
+    但**草稿本身不能因此消失** —— 老人上次没提交完就走了，回来时要能看到，并且能续接。
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT draft_type, content_json, current_step, updated_at, source_session, "
+            "source_text FROM draft_contents WHERE user_id=? ORDER BY updated_at DESC",
+            (user_id,)).fetchall()
+    out = []
+    for r in rows:
+        try:
+            content = json.loads(r["content_json"] or "{}")
+        except (ValueError, TypeError):
+            content = {}
+        if not content:
+            continue
+        keys = r.keys()
+        out.append({"draft_type": r["draft_type"], "content": content,
+                    "step": r["current_step"] or "", "updated_at": r["updated_at"] or "",
+                    "source_session": (r["source_session"] if "source_session" in keys else "") or "",
+                    "source_text": (r["source_text"] if "source_text" in keys else "") or ""})
+    return out
+
+
 def clean_drafts(days: int = 7) -> int:
     """清理超过 N 天的草稿（调度器调用）。"""
     with get_db() as conn:

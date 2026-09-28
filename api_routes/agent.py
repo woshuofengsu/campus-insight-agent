@@ -153,6 +153,29 @@ def agent_handoffs(request: Request, status: str = "", limit: int = 50):
     return _ok(list_handoffs(status=status, limit=limit, tenant=_tenant(request)))
 
 
+@router.get("/drafts")
+def agent_drafts(request: Request):
+    """我**没提交完**的草稿（卡8 / §6-I10 的另一半）。
+
+    ⚠️ 只返回**自己**的草稿（按服务端身份的 uid），不接受任何前端传参 ——
+    草稿里是居民的原话（可能含电话、住址），绝不能让别的人查到。
+    前端拿它显示「上次有一条没提交的，要继续吗？」，用户说「继续上次」即可续接。
+    """
+    from data.db_draft import list_drafts
+    uid = _user(request).get("uid")
+    if not uid:
+        return _fail(1001, "请先登录")
+    out = []
+    for d in list_drafts(uid):
+        content = d.get("content") or {}
+        desc = str(content.get("desc") or d.get("source_text") or "").strip()
+        if not desc:
+            continue
+        out.append({"draft_type": d.get("draft_type"), "summary": desc[:60],
+                    "step": d.get("step") or "", "updated_at": d.get("updated_at") or ""})
+    return _ok(out)
+
+
 @router.post("/handoffs/{hid}/action")
 @write_route(roles=("grid",), table="agent_handoffs", id_param="hid",
              note="人工处理包流转（领取/补问/回复/关闭）：本社区 + 网格员")

@@ -20,6 +20,8 @@ const busy = ref(false)
 const scrollBox = ref(null)
 const showHistory = ref(false)
 const history = ref([])
+// 「上次没提交的草稿」提示（卡8 / §6-I10）：由用户自己决定要不要续，系统不替他猜
+const draftHint = ref(null)
 
 // 快捷问题
 const QUICK = props.role === 'grid'
@@ -36,7 +38,22 @@ onMounted(() => {
     intents: QUICK,
   })
   loadHistory()
+  loadDraftHint()
 })
+
+/** 有没有上次没提交完的草稿（只查自己的；查不到就静默不显示）。 */
+async function loadDraftHint() {
+  try {
+    const rows = (await agent.drafts()) || []
+    draftHint.value = rows.find((d) => d.draft_type === 'work_order_draft') || null
+  } catch { /* 忽略：这只是个提示 */ }
+}
+
+/** 点「继续上次」= 替用户说一句"继续上次"（走的是同一条后端链路，不搞特殊通道）。 */
+function resumeDraft() {
+  draftHint.value = null
+  send('继续上次')
+}
 
 async function loadHistory() {
   try {
@@ -234,6 +251,12 @@ async function clearAll() {
         <n-button v-for="(q, qi) in QUICK" :key="qi" size="tiny" quaternary @click="sendOption(q)">{{ q }}</n-button>
       </div>
 
+      <!-- 上次没提交完的草稿：由用户自己决定续不续（不替他猜，也不把旧草稿当成新请求） -->
+      <div v-if="draftHint" class="agent-draft-hint" data-draft-hint>
+        <span>📝 上次有一条没提交的报修：{{ draftHint.summary }}</span>
+        <n-button size="tiny" type="primary" @click="resumeDraft">继续上次</n-button>
+      </div>
+
       <!-- 输入区 -->
       <div class="agent-input">
         <n-input v-model:value="input" placeholder="请输入您的问题（如：我家水管漏水了）" maxlength="200"
@@ -250,6 +273,8 @@ async function clearAll() {
 .agent-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px;
   border-bottom: 1px solid var(--border); }
 .agent-history { padding: 8px 12px; border-bottom: 1px solid var(--border); max-height: 140px; overflow-y: auto; }
+.agent-draft-hint { display: flex; align-items: center; gap: 8px; justify-content: space-between;
+  padding: 6px 12px; font-size: 0.85rem; background: var(--primary-light, #E8EDFF); color: var(--ink-info); }
 .agent-body { padding: 12px; overflow-y: auto; height: min(380px, 55vh);  /* 固定高度：对话增长不再撑高页面，避免"回复时页面往上跳" */
   display: flex; flex-direction: column;   /* 短对话贴底但不破坏滚动（勿用 justify-content:flex-end，会导致溢出内容滚不上去） */
   background: var(--bg, #f5f7f5); }
