@@ -24,6 +24,7 @@ import re
 from collections import Counter
 
 from data.db_core import get_db
+from utils.tenant import normalize_tenant, tenant_clause
 
 _log = logging.getLogger(__name__)
 
@@ -341,27 +342,43 @@ def _refs_of_group(conn, entity_ids: set, ref_type: str) -> set:
     return {int(r["ref_id"]) for r in rows}
 
 
-def query_entity(name: str, limit: int = 20) -> dict:
+def query_entity(name: str, limit: int = 20, tenant: str | None = None) -> dict:
     """按实体反查业务对象（**图谱的核心价值**）。
 
-    - 单实体：`query_entity("3号楼")` → 该楼栋历史工单 + 相关设施 + 相关政策 + 归属类别；
-    - 复合实体：`query_entity("3号楼 电梯")` → 分词后**取交集**（同时提到两者的工单），
+    - 单实体：`query_entity("3号楼", tenant="海淀小区")` → 该楼栋历史工单 + 相关设施 + 相关政策 + 归属类别；
+    - 复合实体：`query_entity("3号楼 电梯", tenant=...)` → 分词后**取交集**（同时提到两者的工单），
       交集为空时退回并集并在 `match_mode` 标注 `any`；
     - 查不到不编造：`found=False` 并给出提示（图谱未构建 / 实体未收录）。
 
-    返回 `{query, found, match_mode, entities, related_issues, related_knowledge,
+    **多租户（卡4）**：`kg_entity`/`kg_relation` 是**全局词表**、`knowledge_base` 是**全局内容**，
+    但 `community_issues` / `proposals` 是**社区数据** —— 原来这个查询会把**别的社区的工单标题与位置**
+    一起返回（网格端按实体反查即可读到，属跨社区泄漏）。现在：
+      · `tenant` = 合法社区名 → 只返回该社区的工单/提案；
+      · `tenant` = 空串（身份没解析出社区）→ 业务对象**一律不返回**（fail-closed），政策照常返回；
+      · `tenant` 未给（None）→ **抛 ValueError**，绝不悄悄查全库；
+        平台级聚合统计请用 `graph_stats()`（它只有计数、没有标题与位置）。
+    返回值里新增 `tenant` 字段，便于前端/答复标注"以下仅限本社区"。
+
+    返回 `{query, tenant, found, match_mode, entities, related_issues, related_knowledge,
     related_proposals, related_entities, summary, hint}`。
     """
     q = (name or "").strip()
     limit = max(1, min(int(limit or 20), 100))
     out: dict = {
-        "query": q, "found": False, "match_mode": "", "entities": [],
+        "query": q, "tenant": "", "found": False, "match_mode": "", "entities": [],
         "related_issues": [], "related_knowledge": [], "related_proposals": [],
         "related_entities": [], "summary": "", "hint": "", "graph_entities": 0,
     }
     if not q:
         out["hint"] = "请提供实体名，如 name=3号楼 / name=电梯 / name=加装电梯"
         return out
+    # ⚠️ "租户有没有声明"必须**在下面的宽 except 之外**判定：否则 ValueError 会被吞成
+    # "图谱查询暂不可用"——那就是"隔离没生效还看不出来"，比不隔离更糟。
+    if tenant is None:
+        raise ValueError(
+            "query_entity() 必须显式传 tenant（读取侧 fail-closed，禁止跨社区查业务对象）；"
+            "平台级聚合统计请用 graph_stats()")
+    out["tenant"] = normalize_tenant(tenant)
     # 查询词先过一遍抽取器：支持「3号楼电梯」这种不带分隔符的复合查询
     tokens = [n for ns in extract_entities(q).values() for n in ns] or [q]
     try:
@@ -404,15 +421,22 @@ def query_entity(name: str, limit: int = 20) -> dict:
                     chosen[rt] = inter if inter else set().union(*[g[rt] for g in per_group])
 
             if chosen["issue"]:
-                ph = _placeholders(len(chosen["issue"]))
-                for r in conn.execute(
-                    f"SELECT id, title, category, status, location, reported_at "
-                    f"FROM community_issues WHERE id IN ({ph}) "
-                    f"ORDER BY reported_at DESC, id DESC LIMIT ?",
-                    (*sorted(chosen["issue"]), limit)):
-                    out["related_issues"].append(dict(r))
+                # 卡4：只返回**本社区**的工单（空社区 → tenant_clause 返回 None → 一条都不返回）
+                iargs: list = sorted(chosen["issue"])
+                itc = tenant_clause(tenant, iargs)
+                if itc is not None:
+                    iargs.append(limit)
+                    ph = _placeholders(len(chosen["issue"]))
+                    for r in conn.execute(
+                        f"SELECT id, title, category, status, location, reported_at "
+                        f"FROM community_issues WHERE id IN ({ph}){itc} "
+                        f"ORDER BY reported_at DESC, id DESC LIMIT ?",
+                        tuple(iargs)):
+                        out["related_issues"].append(dict(r))
 
             if chosen["knowledge"]:
+                # 政策是**全局内容**（knowledge_base 无归属社区）：不按社区过滤，
+                # 但答复/页面必须知道"这是全局依据"（跨区兜底时正文需标注适用地区，见 utils/region）
                 ph = _placeholders(len(chosen["knowledge"]))
                 for r in conn.execute(
                     f"SELECT id, title, category, source, audit_status, effective_date "
@@ -421,13 +445,18 @@ def query_entity(name: str, limit: int = 20) -> dict:
                     out["related_knowledge"].append(dict(r))
 
             if chosen["proposal"]:
-                ph = _placeholders(len(chosen["proposal"]))
-                for r in conn.execute(
-                    f"SELECT id, title, category, status, supporter_count "
-                    f"FROM proposals WHERE id IN ({ph}) "
-                    f"ORDER BY supporter_count DESC, id DESC LIMIT ?",
-                    (*sorted(chosen["proposal"]), limit)):
-                    out["related_proposals"].append(dict(r))
+                # 卡4：提案同样是社区数据（含标题与诉求正文），按社区收口
+                pargs: list = sorted(chosen["proposal"])
+                ptc = tenant_clause(tenant, pargs)
+                if ptc is not None:
+                    pargs.append(limit)
+                    ph = _placeholders(len(chosen["proposal"]))
+                    for r in conn.execute(
+                        f"SELECT id, title, category, status, supporter_count "
+                        f"FROM proposals WHERE id IN ({ph}){ptc} "
+                        f"ORDER BY supporter_count DESC, id DESC LIMIT ?",
+                        tuple(pargs)):
+                        out["related_proposals"].append(dict(r))
 
             ph = _placeholders(len(all_ids))
             args = sorted(all_ids)

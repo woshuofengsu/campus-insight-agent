@@ -7,6 +7,7 @@ assignee_id（用户主键）供「我的待办」按 ID 过滤，同时下发�
 import logging
 
 from data.db_core import get_db
+from utils.tenant import normalize_tenant
 
 _log = logging.getLogger(__name__)
 
@@ -24,25 +25,44 @@ CATEGORY_DEPT_MAP = {
 }
 
 
-def _grid_worker_for(dept: str) -> dict | None:
+def _grid_worker_for(dept: str, tenant: str = "") -> dict | None:
     """按部门找一个网格员，返回整行 dict。
 
     优先挑「当前处理中工单最少」的网格员（R46：自动分派按空闲状态），
     避免任务全压在第一个网格员身上。
+
+    **多租户（卡4 的"查找类"收口）**：`tenant` = **工单所属社区**，只在社区内挑人。
+    这不只是隐私问题，而是**功能正确性**问题：读取侧是 fail-closed 的，把海淀工单
+    派给朝阳网格员，那个网格员在「工单管理」里**根本看不到这张单**（等于没派）。
+    取不到社区（历史数据未盖章）时回退为全员查找 + warning —— 宁可先派出去并留痕，
+    也不要让工单卡在「已审核待派单」无人知道。
     """
     try:
-        from data.db_user import list_users
-        candidates = [u for u in list_users(role="grid") if (u.get("building") or "").strip() == dept]
+        from data.db_user import list_users, managers_of
+        t = normalize_tenant(tenant or "")
+        pool = managers_of(t) if t else []
+        if not pool:
+            _log.warning("派单找人在社区 %r 内无网格员，回退为全员查找（dept=%s）", tenant, dept)
+            pool = list_users(role="grid")
+        candidates = [u for u in pool if (u.get("building") or "").strip() == dept]
         if not candidates:
             return None
         if len(candidates) == 1:
             return candidates[0]
-        # 统计每个网格员当前「处理中/已派单」工单数，取最少的
+        # 统计每个网格员当前「处理中/已派单」工单数，取最少的（**只统计本社区**：
+        # 原来跨社区统计会把别社区的负载算进来，"按空闲分派"就失真了）
         with get_db() as conn:
-            rows = conn.execute(
-                "SELECT assignee_name, COUNT(*) c FROM community_issues "
-                "WHERE status IN ('已派单','处理中') GROUP BY assignee_name"
-            ).fetchall()
+            if t:
+                rows = conn.execute(
+                    "SELECT assignee_name, COUNT(*) c FROM community_issues "
+                    "WHERE status IN ('已派单','处理中') AND tenant_id = ? "
+                    "GROUP BY assignee_name", (t,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT assignee_name, COUNT(*) c FROM community_issues "
+                    "WHERE status IN ('已派单','处理中') GROUP BY assignee_name"
+                ).fetchall()
         load = {r["assignee_name"]: r["c"] for r in rows}
         return min(candidates, key=lambda u: load.get(_worker_display_name(u), 0))
     except Exception:
@@ -50,11 +70,15 @@ def _grid_worker_for(dept: str) -> dict | None:
     return None
 
 
-def _any_grid_worker() -> dict | None:
-    """兜底：随便返回一个网格员。"""
+def _any_grid_worker(tenant: str = "") -> dict | None:
+    """兜底：在该社区内随便返回一个网格员（取不到社区时回退全员 + warning）。"""
     try:
-        from data.db_user import list_users
-        grids = list_users(role="grid")
+        from data.db_user import list_users, managers_of
+        t = normalize_tenant(tenant or "")
+        grids = managers_of(t) if t else []
+        if not grids:
+            _log.warning("兜底派单在社区 %r 内无网格员，回退为全员查找", tenant)
+            grids = list_users(role="grid")
         if grids:
             return grids[0]
     except Exception:
@@ -75,7 +99,7 @@ def auto_dispatch(issue_id: int) -> dict | None:
     """
     with get_db() as conn:
         issue = conn.execute(
-            "SELECT id, title, category, assignee, assignee_id "
+            "SELECT id, title, category, assignee, assignee_id, tenant_id "
             "FROM community_issues WHERE id = ?",
             (issue_id,),
         ).fetchone()
@@ -85,8 +109,11 @@ def auto_dispatch(issue_id: int) -> dict | None:
         return {"issue_id": issue_id, "assignee": issue["assignee"],
                 "assignee_id": issue["assignee_id"]}
 
+    # 卡4：**只在工单所属社区内挑人**（跨社区派单 = 被派单人在自己列表里看不见这张单）
+    _t = normalize_tenant(issue["tenant_id"] or "")
     dept = CATEGORY_DEPT_MAP.get(issue["category"], "网格办")
-    worker = _grid_worker_for(dept) or _grid_worker_for("网格办") or _any_grid_worker()
+    worker = (_grid_worker_for(dept, _t) or _grid_worker_for("网格办", _t)
+              or _any_grid_worker(_t))
     if not worker:
         return None
 
@@ -126,7 +153,7 @@ def discover_and_dispatch(limit: int = 20) -> list[dict]:
 
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT id, title, category, urgency, assignee, assignee_id "
+            "SELECT id, title, category, urgency, assignee, assignee_id, tenant_id "
             "FROM community_issues WHERE status='已审核待派单' "
             "AND (assignee_id IS NULL OR assignee = '') "
             "ORDER BY CASE urgency WHEN '紧急' THEN 0 WHEN '中等' THEN 1 ELSE 2 END, id "
@@ -136,14 +163,21 @@ def discover_and_dispatch(limit: int = 20) -> list[dict]:
 
     dispatched: list[dict] = []
     for r in rows:
+        # 卡4：逐工单按**它自己的社区**找处理人（系统级定时任务，没有"当前用户"）
+        _t = normalize_tenant(r["tenant_id"] or "")
         dept = CATEGORY_DEPT_MAP.get(r["category"], "网格办")
-        worker = _grid_worker_for(dept) or _grid_worker_for("网格办") or _any_grid_worker()
+        worker = (_grid_worker_for(dept, _t) or _grid_worker_for("网格办", _t)
+                  or _any_grid_worker(_t))
         if not worker:
             # 分派失败：保持「已审核待派单」，通知负责人手动分派（spec：分派失败通知负责人手动分派，计时不暂停）
             try:
-                from data.db_user import list_users
+                from data.db_user import list_users, managers_of
                 from data.db_notifications import create_notification
-                for u in list_users(role="grid"):
+                _recipients = managers_of(_t) if _t else []
+                if not _recipients:
+                    _log.warning("工单 #%s 无归属社区：分派失败提醒回退为全体网格员", r["id"])
+                    _recipients = list_users(role="grid")
+                for u in _recipients:
                     create_notification(
                         u["id"], "dispatch_fail",
                         f"工单 #{r['id']} 自动分派失败",

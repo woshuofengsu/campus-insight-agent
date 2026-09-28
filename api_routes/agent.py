@@ -248,13 +248,16 @@ def agent_kg_entity(request: Request, name: str = "", limit: int = 20):
 
     例：`?name=3号楼` → 该楼栋历史工单 + 相关设施 + 相关政策；
     `?name=3号楼电梯` → 复合查询取交集（同时提到两者的工单）。
+
+    **多租户（卡4）**：`tenant` 只能来自服务端身份（JWT 的 community）——
+    工单/提案按本社区收口，绝不接受前端传 community；政策是全局内容照常返回。
     """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     if not (name or "").strip():
         return _fail(1003, "请提供实体名 name（如 3号楼 / 电梯 / 加装电梯）")
     from data.db_kg import query_entity
-    return _ok(query_entity(name, limit=limit))
+    return _ok(query_entity(name, limit=limit, tenant=_tenant(request)))
 
 
 @router.get("/kg/stats")

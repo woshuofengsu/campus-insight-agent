@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、819 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、821 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 819 项：818 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 821 项：820 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 819 项测试**（818 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
+- **不要破坏这 821 项测试**（820 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 34 个路由页 / 54 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -111,6 +111,15 @@ elderly:  demo_elderly（免登录）
      ⚠️ 备线的 `ui/_tenant.current_tenant()` 拿不到会话会回落默认社区，工具**不要**用它，
      要用严格版 `session_tenant_or_empty()`（实测踩到过：用它等于工具没隔离）。
      上下文用 `contextvars` 不用模块级全局（全局变量并发会串味）。
+  ⑦ **收件人有统一入口，且"通知"与"读取"口径必须分开**——凡是"社区里发生的事要通知负责人"，
+     一律走 `data.db_user.managers_of(tenant)`（内部 fail-closed：非法/空社区返回空表），
+     不要**再**写 `list_users(role="grid")` 裸广播（项目里曾有 19 处，会把 A 社区老人的健康读数
+     投给 B 社区网格员）。但通知**取不到合法社区时要回退为"全体负责人 + `_log.warning`"**，
+     **不能** fail-closed——静默漏发比跨社区多发更难发现（SOS 尤其如此）。
+     读取类（列表/下拉/分派候选）反过来：走 `tenant_clause`，空社区给空集、不传租户抛 `ValueError`
+     （例：`data.db_kg.query_entity(name, tenant=...)`、`db_health_content.list_consult_handlers(tenant)`）。
+     受 `tests/test_recipient_scope_ratchet.py` 棘轮约束：新增裸收件人写法直接红；
+     有意保留的"无社区归属回退"必须登记在它的 `BASELINE` 并写明理由。
   `config.DEFAULT_COMMUNITY` 是历史/无归属数据的归档社区（`DEFAULT_TENANT` 是 v41 旧口径的行政区值，仅兼容保留）；
   Streamlit 备线在入口 `app.py` 调 `install_tenant_defaults()` 统一注入（见 `ui/_tenant.py`）。
 - LLM 默认**规则优先降本**：代码默认 `LLM_NEGOTIATION`/`LLM_ORCHESTRATION`/`POLICY_LLM_RAG`/`RECEPTION_LLM_FALLBACK` 全关；

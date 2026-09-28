@@ -25,7 +25,7 @@ import logging
 from data.db_core import get_db
 
 _log = logging.getLogger(__name__)
-from utils.tenant import stamp_tenant, tenant_clause
+from utils.tenant import normalize_tenant, stamp_tenant, tenant_clause, tenant_of_user
 from data.db_notifications import create_notification, log_activity
 from data.db_repair import _dec_phone, _enc_phone
 from utils.timeutil import utcnow
@@ -214,16 +214,37 @@ def _medication_owner(reminder_id: int) -> int:
         return 0
 
 
-def _notify_grids(title: str, content: str = "", related_id: int | None = None) -> int:
-    """通知所有负责人（grid 角色）。返回收件人数。
+def _notify_grids(title: str, content: str = "", related_id: int | None = None,
+                  tenant: str = "") -> int:
+    """通知负责人（grid 角色），**优先只通知该社区**。返回收件人数。
+
+    ⚠️ **紧急求助（SOS）不能 fail-closed**：SOS 是本系统最不能"悄悄不发"的通知。
+    因此口径是：能定位社区 → 只通知该社区；定位不到、或该社区**一个网格员账号都没有**时
+    → **回退通知全体 + warning**（宁可多提醒别的社区，也不能让老人的求助没人看见）。
+    这与读取类接口的 fail-closed 口径**故意相反**，理由见 `执行台账` §5.1。
 
     发送失败自动重试一次（spec：升级通知发送失败 → 记录失败日志再尝试一次，
     仍失败通知负责人手动处理）。
     """
     for attempt in range(2):
         try:
-            from data.db_user import list_users
-            grids = list_users(role="grid")
+            from data.db_user import list_users, managers_of
+            t = normalize_tenant(tenant or "")
+            grids = managers_of(t) if t else []
+            if not grids:
+                if t:
+                    _log.warning("社区「%s」无网格员账号，紧急求助通知回退为全体网格员", t)
+                else:
+                    _log.warning("紧急求助未解析出社区，通知回退为全体网格员：%s", title[:30])
+                grids = list_users(role="grid")
+            if not grids:
+                # 全库都没有可通知的网格员 = 配置故障，必须留下异常记录（不能静默 0 收件人）
+                try:
+                    from data.db_notifications import log_exception
+                    log_exception("老年端", f"紧急求助无任何可通知负责人（{title[:30]}）")
+                except Exception:
+                    _log.warning("紧急求助无收件人且异常留痕失败：%s", title[:30], exc_info=True)
+                return 0
             sent = 0
             for g in grids:
                 try:
@@ -1108,7 +1129,8 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
         pass
     content = (f"老人姓名：{actor}，电话：{phone}，住址：{address}；"
                f"紧急联系人：{names}；触发时间：{datetime.now().strftime('%H:%M')}；状态：紧急求助中。")
-    _notify_grids(f"⚠️ 紧急求助：{actor}", content, call_id)
+    _notify_grids(f"⚠️ 紧急求助：{actor}", content, call_id,
+                  tenant=tenant_of_user(user_id))  # 卡4：只提醒老人所在社区（无网格员则回退全体）
     return call_id, ""
 
 
@@ -1200,7 +1222,8 @@ def escalate_sos(call_id: int, actor: str = "系统", minutes: int | None = None
         )
         conn.commit()
     _notify_grids(f"🚨 紧急求助升级（{count}次）：尚未响应",
-                  f"紧急求助已 {minutes} 分钟无人确认响应，请立即处理。", call_id)
+                  f"紧急求助已 {minutes} 分钟无人确认响应，请立即处理。", call_id,
+                  tenant=tenant_of_user(row["user_id"]))  # 卡4：按求助老人的社区投递
     log_activity(actor, "紧急求助升级通知", "emergency_call", call_id, "紧急求助",
                  module=MODULE, detail=f"{minutes}分钟未响应，升级第{count}次")
     return True, ""

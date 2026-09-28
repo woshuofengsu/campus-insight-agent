@@ -10,7 +10,7 @@ import json
 import logging
 import re
 from data.db_core import get_db
-from utils.tenant import stamp_tenant, tenant_clause
+from utils.tenant import normalize_tenant, stamp_tenant, tenant_clause
 from utils.pii import scrub_field
 from data.db_notifications import log_activity
 
@@ -285,7 +285,6 @@ def _notify_worker(worker_name: str, worker_phone: str, action: str,
             # 应先在**该工单所属社区**内查找，否则跨社区同名会被误通知。
             # 取不到工单社区时保持原行为 + 告警（通知类不做 fail-closed，否则该收到的人收不到）。
             from data.db_core import get_db as _gdb
-            from utils.tenant import normalize_tenant
             with _gdb() as _conn:
                 _row = _conn.execute("SELECT tenant_id FROM community_issues WHERE id=?",
                                      (issue_id,)).fetchone()
@@ -530,7 +529,8 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
     new_count = 0
     with get_db() as conn:
         row = conn.execute(
-            "SELECT supplement_count, supplemented_at, status, title FROM community_issues WHERE id=?",
+            "SELECT supplement_count, supplemented_at, status, title, tenant_id "
+            "FROM community_issues WHERE id=?",
             (issue_id,),
         ).fetchone()
         if row is None:
@@ -545,7 +545,10 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
                         "UPDATE community_issues SET supplement_count=0 WHERE id=?", (issue_id,)
                     )
             except Exception:
-                pass
+                # 时间戳解析失败 → 按"仍在 24 小时窗口内"处理（不放宽限流），但必须留痕，
+                # 否则窗口逻辑静默失效、居民会被无故限流而无人知道。
+                _log.warning("工单 #%s 的补充时间解析失败，按窗口内处理：%r",
+                             issue_id, row["supplemented_at"], exc_info=True)
         fresh = conn.execute(
             "SELECT supplement_count FROM community_issues WHERE id=?", (issue_id,)
         ).fetchone()
@@ -564,10 +567,17 @@ def supplement_issue(issue_id: int, content: str, actor: str = "居民") -> tupl
     log_activity(actor, "补充信息", "issue", issue_id, module=MODULE, detail=content,
                  after_value=f"第 {new_count} 次补充（24小时窗口）")
     # 自动通知负责人重评估（spec 16：补充后自动通知负责人，标记"有补充信息"，负责人需确认）
+    # 多租户（卡4 收件人迁移）：只通知**该工单所属社区**的网格员
+    # （原来通知全体网格员 → 居民补充内容会投递给别的社区；未盖章时回退全体 + warning）
     try:
-        from data.db_user import list_users
-        for u in list_users(role="grid"):
-            from data.db_notifications import create_notification
+        from data.db_user import list_users, managers_of
+        from data.db_notifications import create_notification
+        _t = normalize_tenant(row["tenant_id"] or "")
+        _recipients = managers_of(_t) if _t else []
+        if not _recipients:
+            _log.warning("工单 #%s 无归属社区：补充通知回退为全体网格员（待补章）", issue_id)
+            _recipients = list_users(role="grid")
+        for u in _recipients:
             create_notification(
                 u["id"], "supplement",
                 f"工单 #{issue_id} 有补充信息",
@@ -802,19 +812,30 @@ def get_overdue_issues() -> list[dict]:
 
 
 def mark_issue_overdue_notice(actor: str = "系统") -> list[dict]:
-    """报修超时自动升级（scheduler 调用）：超时工单留痕 + 通知负责人。"""
+    """报修超时自动升级（scheduler 调用）：超时工单留痕 + 通知负责人。
+
+    **多租户口径（卡4 收件人迁移）**：这是**系统级定时任务**（没有"当前用户"），
+    所以要**逐工单按它自己的社区**投递，而不是一次广播给全体网格员
+    （否则海淀工单超时会提醒朝阳网格员）。未盖章的工单回退全体 + warning。
+    """
     overdue = get_overdue_issues()
     for i in overdue:
         log_activity(actor, "工单超时升级", "issue", i["id"], i.get("title", ""),
                      module=MODULE, detail=f"{i.get('urgency', '')}级工单超时，请尽快处理")
         try:
-            from data.db_user import list_users
-            for u in list_users(role="grid"):
-                from data.db_notifications import create_notification
+            from data.db_user import list_users, managers_of
+            from data.db_notifications import create_notification
+            t = normalize_tenant(i.get("tenant_id") or "")
+            recipients = managers_of(t) if t else []
+            if not recipients:
+                _log.warning("工单 #%s 无归属社区：超时提醒回退为全体网格员（待补章）", i["id"])
+                recipients = list_users(role="grid")
+            for u in recipients:
                 create_notification(u["id"], "sla", "工单超时提醒",
                                     f"工单 #{i['id']}（{i.get('title', '')[:20]}）已超时，请尽快处理。")
         except Exception:
-            pass  # 通知不是硬依赖
+            # 通知不是硬依赖，但发不出去必须可见（否则"超时升级"在页面上永远不会出现）
+            _log.warning("工单 #%s 超时提醒发送失败（工单已标记超时）：", i["id"], exc_info=True)
     return overdue
 
 

@@ -25,13 +25,18 @@ def fresh_db():
     db_core._DB_PATH = orig
 
 
-def _add_issue(title, location="", description="", category="设施维修"):
-    """直接写一条工单（只写 title/category/location/description，不涉及手机号列）。"""
+def _add_issue(title, location="", description="", category="设施维修", tenant="海淀小区"):
+    """直接写一条工单（只写 title/category/location/description，不涉及手机号列）。
+
+    `tenant`（卡4 起必需）：工单是**社区数据**，图谱反查按社区收口 —— 不盖章的工单
+    在按实体反查时查不到（这本身就是被测行为之一，见 `test_query_entity_is_tenant_scoped`）。
+    """
     from data.db_core import get_db
     with get_db() as conn:
         cur = conn.execute(
-            "INSERT INTO community_issues (title, category, location, description) VALUES (?,?,?,?)",
-            (title, category, location, description))
+            "INSERT INTO community_issues (title, category, location, description, tenant_id) "
+            "VALUES (?,?,?,?,?)",
+            (title, category, location, description, tenant))
         conn.commit()
         return cur.lastrowid
 
@@ -126,7 +131,7 @@ def test_query_entity_returns_issue_and_knowledge(fresh_db):
     _add_knowledge("电梯年度检修与维保口径", "电梯维保单位每月巡检一次，故障停运需 24 小时内响应。",
                    keywords="电梯,检修", category="公共设施")
     build_graph(limit=100)
-    r = query_entity("电梯")
+    r = query_entity("电梯", tenant="海淀小区")
     assert r["found"] and r["match_mode"] == "single"
     assert any("电梯" in i["title"] for i in r["related_issues"])
     assert any("电梯" in k["title"] for k in r["related_knowledge"])
@@ -135,8 +140,35 @@ def test_query_entity_returns_issue_and_knowledge(fresh_db):
     assert "3号楼" in names and "设施维修" in names
     assert "电梯" in r["summary"] and r["summary"].count("工单") >= 1
     # 查不到的实体：不编造，给提示
-    miss = query_entity("火星移民")
+    miss = query_entity("火星移民", tenant="海淀小区")
     assert miss["found"] is False and miss["hint"]
+
+
+def test_query_entity_requires_tenant(fresh_db):
+    """读取侧 fail-closed：不传 tenant **必须抛错**，绝不悄悄查全库（卡4）。"""
+    from data.db_kg import query_entity
+    with pytest.raises(ValueError):
+        query_entity("电梯")
+
+
+def test_query_entity_is_tenant_scoped(fresh_db):
+    """跨社区隔离：本社区网格员按实体反查，**看不到别的社区的工单标题/位置**（卡4）。"""
+    from data.db_kg import build_graph, query_entity
+    _add_issue("3号楼电梯故障停运（海淀）", location="海淀3号楼2单元", tenant="海淀小区")
+    _add_issue("3号楼电梯异响（朝阳）", location="朝阳3号楼1单元", tenant="朝阳试点社区")
+    build_graph(limit=100)
+    r = query_entity("电梯", tenant="海淀小区")
+    titles = [i["title"] for i in r["related_issues"]]
+    assert any("海淀" in t for t in titles), "本社区工单必须能查到（别误伤）"
+    assert not any("朝阳" in t for t in titles), "不能返回别的社区的工单标题"
+    assert r["tenant"] == "海淀小区"
+    # 空社区（身份没解析出社区）→ 业务对象一律不返回，但**政策（全局内容）照常返回**
+    _add_knowledge("电梯维保口径", "电梯故障需 24 小时内响应。", keywords="电梯")
+    build_graph(limit=100)
+    empty = query_entity("电梯", tenant="")
+    assert empty["related_issues"] == [], "空社区必须 fail-closed，不得返回任何工单"
+    assert any("电梯" in k["title"] for k in empty["related_knowledge"]), \
+        "政策是全局内容，不受租户过滤影响"
 
 
 def test_query_entity_compound_intersection(fresh_db):
@@ -146,7 +178,7 @@ def test_query_entity_compound_intersection(fresh_db):
     _add_issue("5号楼电梯异响", location="5号楼", description="电梯异响")
     _add_issue("3号楼水管漏水", location="3号楼", description="水管漏水")
     build_graph(limit=100)
-    r = query_entity("3号楼电梯")
+    r = query_entity("3号楼电梯", tenant="海淀小区")
     assert r["found"] and r["match_mode"] == "all"
     titles = [i["title"] for i in r["related_issues"]]
     assert any("3号楼电梯" in t for t in titles)
@@ -155,7 +187,7 @@ def test_query_entity_compound_intersection(fresh_db):
     # 子串扩展：查「老人」应能带出更具体的人群实体（独居老人）
     _add_issue("11号楼独居老人需要助餐", location="11号楼", description="独居老人行动不便", category="社区事务")
     build_graph(limit=100)
-    r2 = query_entity("老人")
+    r2 = query_entity("老人", tenant="海淀小区")
     assert r2["found"]
     assert {e["name"] for e in r2["entities"]} >= {"独居老人"}
     assert any("独居老人" in i["title"] for i in r2["related_issues"])
@@ -166,7 +198,7 @@ def test_query_entity_empty_graph_is_honest(fresh_db):
     from data.db_kg import graph_stats, query_entity
     st = graph_stats()
     assert st["entities"] == 0 and st["relations"] == 0
-    r = query_entity("电梯")
+    r = query_entity("电梯", tenant="海淀小区")
     assert r["found"] is False
     assert "尚未构建" in r["hint"]
     assert r["related_issues"] == [] and r["related_knowledge"] == []
@@ -211,11 +243,16 @@ def client():
 
 
 def test_kg_endpoints_permission(fresh_db, client):
-    """端点：居民一律 1003 无权限；grid 200（且全程只写临时库）。"""
+    """端点：居民一律 1003 无权限；grid 200（且全程只写临时库）。
+
+    ⚠️ 多租户（卡4）：grid 的 token **必须带 community** —— 图谱反查业务对象是按社区收口的，
+    不带社区的 token 会 fail-closed 返回空工单列表（这不是 bug，是本用例原先"恰好没暴露"的口径）。
+    """
     from api_routes.deps import make_token
     _add_issue("3号楼电梯故障停运", location="3号楼2单元", description="电梯停运", category="设施维修")
     rh = {"Authorization": f"Bearer {make_token(9001, 'resident', '测试居民')}"}
-    gh = {"Authorization": f"Bearer {make_token(9002, 'grid', '测试网格员')}"}
+    gh = {"Authorization": f"Bearer {make_token(9002, 'grid', '测试网格员', community='海淀小区')}"}
+    gh_no_com = {"Authorization": f"Bearer {make_token(9003, 'grid', '无社区网格员')}"}
 
     # 居民：三个端点全部拒绝
     assert client.get("/api/web/agent/kg/stats", headers=rh).json()["code"] == 1003
@@ -236,6 +273,12 @@ def test_kg_endpoints_permission(fresh_db, client):
     data = r.json()["data"]
     assert data["found"] and data["related_issues"]
     assert "3号楼电梯故障停运" in data["related_issues"][0]["title"]
+
+    # 隔离：token 里没有社区 → 工单一条都不返回（fail-closed），但接口本身仍成功
+    r_empty = client.get("/api/web/agent/kg/entity?name=电梯", headers=gh_no_com)
+    assert r_empty.status_code == 200 and r_empty.json()["success"]
+    assert r_empty.json()["data"]["related_issues"] == [], \
+        "没有社区身份的网格员不得看到任何工单（跨社区不可见）"
 
     # 缺参数：明确报错而不是查全表
     assert client.get("/api/web/agent/kg/entity", headers=gh).json()["code"] == 1003

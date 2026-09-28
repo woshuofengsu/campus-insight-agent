@@ -731,31 +731,50 @@ def take_down_knowledge(knowledge_id: int, reason: str,
 
 def _notify_related_policy_notices(kb_title: str, event: str) -> None:
     """跨模块联动 #9（最小方案）：知识库更新/下架时，若存在标题或正文含该政策名的
-    已发布「政策通知」，提示负责人处理（可选择下架或更新通知）。"""
+    已发布「政策通知」，提示负责人处理（可选择下架或更新通知）。
+
+    **多租户口径（卡4 收件人迁移）**：知识库是**全局内容**，但命中的「政策通知」有归属社区，
+    所以按通知的 `tenant_id` **分组投递**，只通知该通知所属社区的网格员。
+    历史数据未盖章（租户为空）时**保持原行为 + warning**：通知类不走 fail-closed——
+    静默漏发比多发更难发现（见 `docs/spec/升级方案/执行台账.md` §5.1）。
+    """
     if not kb_title:
         return
     try:
         from data.db_core import get_db as _gdb
+        from data.db_user import list_users
+        from data.db_notifications import create_notification
+        from utils.tenant import normalize_tenant
         kw = kb_title[:8]
         with _gdb() as conn:
             rows = conn.execute(
-                "SELECT id, title FROM notices WHERE notice_type='政策通知' AND status='已发布' "
-                "AND (title LIKE ? OR body LIKE ?) LIMIT 5",
+                "SELECT id, title, tenant_id FROM notices "
+                "WHERE notice_type='政策通知' AND status='已发布' "
+                "AND (title LIKE ? OR body LIKE ?) LIMIT 20",
                 (f"%{kw}%", f"%{kw}%"),
             ).fetchall()
         if not rows:
             return
-        names = "、".join(f"#{r['id']} {r['title']}" for r in rows)
-        from data.db_user import list_users
-        for u in list_users(role="grid"):
-            from data.db_notifications import create_notification
-            create_notification(
-                u["id"], "policy",
-                f"🔗 {event}，请处理关联政策通知",
-                f"知识库「{kb_title[:20]}」{event}，检测到关联政策通知（{names}），请选择下架或更新通知。",
-            )
+        grouped: dict[str, list[str]] = {}
+        for r in rows:
+            t = normalize_tenant(r["tenant_id"] or "")
+            grouped.setdefault(t, []).append(f"#{r['id']} {r['title']}")
+        for t, items in grouped.items():
+            names = "、".join(items)
+            recipients = list_users(role="grid", community=t) if t else []
+            if not recipients:
+                _log.warning(
+                    "知识库联动通知：关联政策通知（%s）无合法社区归属，回退为通知全体网格员", names)
+                recipients = list_users(role="grid")
+            for u in recipients:
+                create_notification(
+                    u["id"], "policy",
+                    f"🔗 {event}，请处理关联政策通知",
+                    f"知识库「{kb_title[:20]}」{event}，检测到关联政策通知（{names}），请选择下架或更新通知。",
+                )
     except Exception:
-        pass
+        _log.warning("知识库「%s」%s 的关联政策通知提醒发送失败（不影响下架/更新本身）",
+                     kb_title, event, exc_info=True)
 
 
 def auto_expire_knowledge(actor: str = "系统") -> list[dict]:
@@ -890,14 +909,21 @@ def remind_knowledge_updates() -> list[dict]:
 
 
 def _notify_managers_txt(title: str, body: str, related_id: int) -> None:
-    """通知全部负责人（提醒类）。失败静默（不阻断调度器）。"""
+    """通知负责人（知识库到期/退回修改提醒）。失败只记 warning（不阻断调度器）。
+
+    **为什么这里有意"通知全体网格员"（卡4 收件人迁移的例外）**：
+    `knowledge_base` 是**全局政策内容**（不在 `utils.tenant.TENANT_TABLES` 白名单里，
+    没有归属社区）——到期/退回提醒是"知识库运维待办"，不携带任何社区居民的个人信息，
+    所以面向全体负责人是**产品口径本身**，不是漏加 WHERE。
+    ⚠️ 若将来知识库改为按社区分库，这里必须同步改成按社区投递。
+    """
     try:
         from data.db_user import list_users
-        for u in list_users(role="grid"):
-            from data.db_notifications import create_notification
+        from data.db_notifications import create_notification
+        for u in list_users(role="grid"):  # 全局内容 → 全体负责人（见 docstring 说明）
             create_notification(u["id"], "policy", title, body, related_id=related_id)
     except Exception:
-        pass
+        _log.warning("知识库提醒通知发送失败（不阻断调度器）：%s", title, exc_info=True)
 
 
 def get_knowledge_activity(knowledge_id: int, limit: int = 10) -> list[dict]:
@@ -1077,18 +1103,37 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
 
 
 def _notify_managers(qid: int, summary: str) -> None:
-    """转人工后通知负责人（有新的待回复提问，spec 07）。"""
+    """转人工后通知负责人（有新的待回复提问，spec 07）。
+
+    **多租户口径（卡4 收件人迁移）**：提问归属**提问人所在社区**，因此只通知该社区的网格员
+    （原实现通知全体网格员：朝阳居民的提问摘要会投递给海淀网格员 = 跨社区投递）。
+    社区由 `policy_questions.user_id` 反查；查不到合法社区时**保持原行为 + warning**
+    （通知类不走 fail-closed，见 `执行台账` §5.1）。
+    """
     try:
-        from data.db_user import list_users
+        from data.db_user import list_users, managers_of
         from data.db_notifications import create_notification
-        for u in list_users(role="grid"):
+        tenant = ""
+        try:
+            with get_db() as conn:
+                qrow = conn.execute(
+                    "SELECT user_id FROM policy_questions WHERE id=?", (qid,)).fetchone()
+            if qrow and qrow["user_id"]:
+                tenant = tenant_of_user(qrow["user_id"])
+        except Exception:  # 尽力而为：查不到归属就按"未迁移"处理
+            _log.warning("政策提问 #%s 的社区归属查询失败，将回退为通知全体网格员", qid, exc_info=True)
+        recipients = managers_of(tenant) if tenant else []
+        if not recipients:
+            _log.warning("政策提问 #%s 未解析出合法社区，回退为通知全体网格员（待补章）", qid)
+            recipients = list_users(role="grid")
+        for u in recipients:
             create_notification(
                 u["id"], "policy_question", "有新的政策问答待回复",
                 f"提问「{summary[:20]}」已转人工，请在24小时内回复。",
                 related_id=qid,
             )
     except Exception:
-        pass
+        _log.warning("政策问答待回复通知发送失败（提问已入库）：#%s", qid, exc_info=True)
 
 
 def transfer_to_human(question_id: int | None = None, user_id: int | None = None,
@@ -1227,17 +1272,13 @@ def feedback_question(question_id: int, satisfied: bool, reason: str = "",
             log_activity(actor, "超过3次循环转线下沟通", "policy_question", question_id,
                          row["summary"], module=MODULE, before_value="已回复",
                          after_value="需线下沟通", detail=reason)
-            # R13：超过 3 次循环通知双方（居民 + 负责人）
+            # R13：超过 3 次循环通知负责人（居民侧由页面反馈提示）
+            # ⚠️ 原实现这里是两段通知：先 `list_users(role="grid")` 循环，再调
+            # `_notify_managers(title, body, related_id=...)` —— 后者签名是 `(qid, summary)`，
+            # 于是**每次必然 TypeError**，被 except 吞掉只留一行 warning（"做了但不生效"）。
+            # 现统一走 `_notify_managers`（已按提问人社区收口），去掉重复的死代码。
             try:
-                from data.db_user import list_users
-                for u in list_users(role="grid"):
-                    from data.db_notifications import create_notification
-                    create_notification(u["id"], "policy",
-                                        "🧭 政策提问需线下沟通",
-                                        f"提问「{row['summary'][:20]}」已超过 3 次循环未解决，标记需线下沟通，请与居民联系。")
-                _notify_managers("🧭 政策提问需线下沟通",
-                                 f"提问「{row['summary'][:20]}」超过 3 次循环未解决，已标记需线下沟通。",
-                                 related_id=question_id)
+                _notify_managers(question_id, row["summary"])
             except Exception as _e:  # noqa: BLE001
                 _log.warning("「需线下沟通」通知发送失败（状态已更新）：%s", _e)
             return True, "offline", question_id
@@ -1375,15 +1416,21 @@ def mark_overdue_questions(actor: str = "系统") -> list[dict]:
                      module=MODULE, before_value="已转人工", after_value="超时未回复",
                      detail=f"超时 {info['remaining_hours']:.1f} 小时")
         # 再次提醒负责人（R12：超时后再次提醒，不止标记）
+        # 卡4 收件人迁移：按提问人所在社区收口（原来通知全体网格员 = 跨社区投递提问摘要）
         try:
-            from data.db_user import list_users
-            for u in list_users(role="grid"):
-                from data.db_notifications import create_notification
+            from data.db_user import list_users, managers_of
+            from data.db_notifications import create_notification
+            tenant = tenant_of_user(q["user_id"]) if q.get("user_id") else ""
+            recipients = managers_of(tenant) if tenant else []
+            if not recipients:
+                _log.warning("政策提问 #%s 未解析出合法社区，超时提醒回退为全体网格员", q["id"])
+                recipients = list_users(role="grid")
+            for u in recipients:
                 create_notification(u["id"], "policy",
                                     "⏰ 政策提问超时未回复",
                                     f"提问「{q['summary'][:20]}」已超过 24 小时未回复，请尽快处理。")
         except Exception:
-            pass
+            _log.warning("政策提问 #%s 超时提醒发送失败（状态已标记）：", q["id"], exc_info=True)
     return marked
 
 

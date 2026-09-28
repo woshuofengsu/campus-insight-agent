@@ -20,15 +20,23 @@ import pytest  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 待迁移清单（文件名 -> 处数）。迁移一处删一处，不许新增。
+#
+# **19 处原始收件人写法已全部迁移完毕**（卡4 收件人半）：
+# 所有"给负责人发通知/挑处理人"的地方现在都按**事件所属社区**收口。
+# 本基线剩下的 13 处，全部是**有意保留的"无社区归属回退"**：
+#   - 触发条件：行没盖章（历史数据）或该社区一个网格员账号都没有；
+#   - 行为：回退为"全体网格员" + `_log.warning`；
+#   - 为什么不能删掉改成 fail-closed：**通知类不能 fail-closed**——
+#     静默漏发比跨社区多发更难发现（SOS 尤其如此，见 `执行台账` §5.1）；
+#   - 读取类（如 `list_consult_handlers`）**已经**改成 fail-closed，不在本基线里。
+# 若将来把历史数据的租户补章补干净，可把这些条目归零。
 BASELINE = {
-    "db_elderly_care.py": 1,    # SOS 升级通知（_notify_grids）——用药审核超时已迁移
-    "db_elderly.py": 1,         # SOS 指派（notify_sos_targeted）——久未活跃已迁移
-    "db_repair.py": 3,          # 工单流转通知（受理/派单/解决）
-    "db_policy.py": 5,          # 知识到期、提问转人工等
-    "db_health_content.py": 3,  # _notify_managers 待迁移（6 个调用方未逐个迁移）+ list_consult_handlers
-
-
-    "db_dispatch.py": 3,        # 派单候选（按楼栋匹配，仍需按社区收口）
+    "db_elderly_care.py": 1,    # _notify_grids（SOS）：社区无网格员账号时回退全体
+    "db_elderly.py": 1,         # notify_sos_targeted（旧 Streamlit 路径遗留）同上
+    "db_repair.py": 3,          # 改派查找 / 补充信息 / 超时升级 各 1 处回退
+    "db_health_content.py": 1,  # _notify_managers 的"未指定社区"回退（只剩全局内容到期提醒）
+    "db_policy.py": 4,          # 关联政策通知 / 转人工 / 超时提醒 各 1 处回退 + 全局知识库提醒
+    "db_dispatch.py": 3,        # 按部门找人 / 兜底找人 / 分派失败提醒 各 1 处回退
 }
 
 _SCAN_DIRS = ("agent", "data", "api_routes", "scripts")

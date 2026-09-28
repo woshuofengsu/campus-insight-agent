@@ -221,16 +221,31 @@ def cancel_sos(sos_id: int) -> None:
         conn.commit()
 
 
-def notify_sos_targeted(user_name: str, sos_id: int) -> int | None:
+def notify_sos_targeted(user_name: str, sos_id: int, tenant: str = "") -> int | None:
     """SOS 定向通知（不广播）：优先网格办/居委会网格员，fallback 任一网格员。
 
     避免多网格员场景下 SOS 广播轰炸所有网格员。返回被通知的网格员 id。
+
+    **多租户口径（卡4 收件人迁移）**：`tenant` = 求助老人所在社区，**只在社区内挑选**负责人；
+    取不到合法社区、或该社区没有网格员账号时**回退全体 + warning**
+    （SOS 不做 fail-closed：宁可多提醒，也不能让求助没人看见，见 `执行台账` §5.1）。
+    ⚠️ 当前仓库内**没有调用方**（三端架构下老年端 SOS 走 `data.db_elderly_care`
+    的 `trigger_sos`/`escalate_sos`）；本函数是旧 Streamlit 路径遗留，
+    保留是因为 CHANGELOG 曾把它作为"SOS 定向派发"的对外口径。
+    若将来复用，**必须把老人社区传进来**。
     """
     try:
-        from data.db_user import list_users
+        from data.db_user import list_users, managers_of
         from data.db_notifications import create_notification
-        grids = list_users(role="grid")
+        from utils.tenant import normalize_tenant
+        t = normalize_tenant(tenant or "")
+        grids = managers_of(t) if t else []
         if not grids:
+            _log.warning("SOS 定向通知未定位到社区（tenant=%r），回退为全体网格员：%s",
+                         tenant, user_name)
+            grids = list_users(role="grid")
+        if not grids:
+            _log.warning("SOS 定向通知无任何可通知网格员：%s", user_name)
             return None
         target = None
         for dept in ("网格办", "居委会", "网格一组"):

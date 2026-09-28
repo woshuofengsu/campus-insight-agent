@@ -15,9 +15,11 @@
     永久关闭后可重新开启。阈值可配置（仅疾病预防负责人，调整即留痕）。
 
 说明（本轮数据层近似处理，UI 需配合）：
-  - "在线负责人"无专门表：通知函数接受 online_user_ids，不传时通知全部 grid 角色。
+  - "在线负责人"无专门表：通知函数接受 online_user_ids，不传时按 `tenant` 取本社区网格员
+    （通知类取不到社区时回退全体 + warning，见 `_notify_managers` docstring）。
   - "疾病预防负责人 / 咨询处理人"无配置表：is_disease_prevention_manager 按角色
-    （grid/admin/health_mgr）判断，list_consult_handlers 默认返回全部 grid。
+    （grid/admin/health_mgr）判断；`list_consult_handlers(tenant)` **必须传社区**
+    （读取侧 fail-closed：社区为空 → 空表，不能"默认全部 grid"）。
   - 联动记录、超时标记、撤回次数等状态统一用 activity_log 留痕承载，
     不额外建表（遵循"不动其他 data/ 文件"约束）。
 """
@@ -28,7 +30,7 @@ from datetime import datetime, timedelta
 
 from data.db_core import get_db
 from data.db_settings import get_setting_json, set_setting_json
-from utils.tenant import stamp_tenant, tenant_clause
+from utils.tenant import stamp_tenant, tenant_clause, tenant_of_user
 from utils.pii import scrub_field
 from data.db_notifications import log_activity
 from data.db_repair import _dec_phone, _enc_phone
@@ -122,12 +124,14 @@ def _log_once(action: str, detail: str, target_type: str = "") -> None:
 def _notify_managers(title: str, content: str, related_id: int | None = None,
                      online_user_ids: list[int] | None = None,
                      tenant: str | None = None) -> int:
-    """通知负责人（在线名单由调用方传入；默认通知本社区 grid 角色）。
+    """通知负责人（在线名单由调用方传入；默认通知**该社区** grid 角色）。
 
-    多租户（任务卡 4）：`tenant` 给了就只通知该社区。
-    ⚠️ **本文件 6 个调用方尚未逐个迁移**（3 处是全局内容到期提醒、3 处是咨询类应取咨询自身社区）——
-    在迁移完成前，未传 tenant 时**保持原行为并打 warning**，绝不静默不投递
-    （fail-closed 用在这里会造成"通知悄悄消失"，比跨社区广播更难发现）。
+    多租户（任务卡 4）：`tenant` 给了就只通知该社区（走 `managers_of`，fail-closed 空表）。
+    调用方要么传 `online_user_ids`、要么传 `tenant`；**咨询类已全部迁移**（新咨询 / 反馈未解决 /
+    超时未回复 / 天气联动缺失各一处）。
+    仍在走"未传 tenant"这条回退的只有**知识/健康内容到期提醒**——那些内容是**全局库**
+    （`health_contents` 不在 `utils.tenant.TENANT_TABLES`，没有归属社区），面向全体负责人是产品口径。
+    ⚠️ 回退路径**绝不静默不投递**：fail-closed 用在这里会造成"通知悄悄消失"，比跨社区广播更难发现。
     """
     try:
         from data.db_notifications import create_notification
@@ -168,12 +172,20 @@ def is_disease_prevention_manager(user: dict) -> bool:
     return role in ("grid", "admin", "health_mgr")
 
 
-def list_consult_handlers() -> list[dict]:
-    """咨询处理人名单：疾病预防负责人自动成为处理人，本轮默认全部 grid 角色。"""
+def list_consult_handlers(tenant: str) -> list[dict]:
+    """咨询处理人名单（疾病预防负责人 ≈ grid/admin/health_mgr，本轮近似为 grid）。
+
+    **为什么必须传社区（多租户 · 读取侧 fail-closed）**：这是**读取**——
+    用于处理人下拉/分派候选。读取侧不能"取不到就返回全部"：那等于
+    "朝阳的咨询可以把海淀网格员选成处理人"（姓名与所属社区一并暴露）。
+    所以走结构化入口 `managers_of(tenant)`：**社区为空返回空表**，绝不退化成全体。
+    （对比：`_notify_managers` 是**通知**，它取不到社区时回退全体 + warning，两者口径不同。）
+    """
     try:
-        from data.db_user import list_users
-        return list_users(role="grid")
+        from data.db_user import managers_of
+        return managers_of(tenant)
     except Exception:
+        _log.warning("咨询处理人名单查询失败（按社区=%s）", tenant, exc_info=True)
         return []
 
 
@@ -688,6 +700,7 @@ def submit_consult(user_id: int, name: str, phone: str, consult_type: str,
         f"🩺 新健康咨询（{consult_type}）",
         f"咨询编号 {code}，请尽量在{REPLY_HOURS}小时内回复。",
         related_id=consult_id,
+        tenant=tenant_of_user(user_id),   # 卡4：只通知咨询人所在社区的网格员
     )
     return consult_id, "ok", code
 
@@ -851,7 +864,8 @@ def feedback_consult(consult_id: int, user_id: int, solved: bool,
     if not solved:
         _notify_managers(f"🔄 健康咨询待继续回复（{get_consult_code(consult_id)}）",
                          "居民反馈未解决，请继续回复（重新开始24小时回复时限）。",
-                         related_id=consult_id)
+                         related_id=consult_id,
+                         tenant=tenant_of_user(row["user_id"]))
     return True, "ok"
 
 
@@ -876,11 +890,15 @@ def close_consult(consult_id: int, user_id: int) -> tuple[bool, str]:
 
 
 def mark_overdue_consults() -> list[dict]:
-    """24 小时未回复 → 标记"超时未回复"，记录超时时长并再次提醒负责人。"""
+    """24 小时未回复 → 标记"超时未回复"，记录超时时长并再次提醒负责人。
+
+    **多租户口径（卡4）**：这是系统级定时任务，按**每条咨询自己的社区**投递
+    （原来一次广播给全体网格员 → 海淀居民的咨询内容会提醒朝阳网格员）。
+    """
     overdue: list[dict] = []
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT id, name, consult_type FROM health_consults "
+            "SELECT id, name, consult_type, user_id FROM health_consults "
             "WHERE status IN ('待回复','继续回复') "
             "AND julianday('now') - julianday(COALESCE(feedback_at, created_at)) > ?",
             (REPLY_HOURS / 24.0,),
@@ -898,7 +916,8 @@ def mark_overdue_consults() -> list[dict]:
                      detail=f"超过{REPLY_HOURS}小时未回复，超时时长{hours}小时，再次提醒负责人")
         _notify_managers(f"⏰ 健康咨询超时未回复：{code}",
                          f"咨询（{r['consult_type']}）已超{REPLY_HOURS}小时未回复（超时{hours}小时），请尽快处理。",
-                         related_id=r["id"])
+                         related_id=r["id"],
+                         tenant=tenant_of_user(r["user_id"]))
     return overdue
 
 
@@ -1210,6 +1229,7 @@ def trigger_weather_linkage(weather_event: dict, actor: str = "系统",
             _notify_managers(
                 f"⚠️ 天气联动内容缺失：{key}",
                 "触发联动前校验未通过：无已发布且未过期的匹配内容，请补充内容后重新触发。",
+                tenant=tenant,   # 卡4：只提醒该社区（调度器逐社区调用本函数）
             )
             continue
         content = matched[0]  # 按优先级取最高的一条
