@@ -292,7 +292,13 @@ def check_server() -> dict:
 
 
 def check_accounts() -> dict:
-    """三个演示账号可登录 + 鉴权中间件在跑（无 token → 401）。"""
+    """演示账号可登录 + 鉴权中间件在跑（无 token → 401）。
+
+    除三角色免密入口外，还验**第二社区（朝阳试点社区）的两个账号**——
+    「多租户隔离」是现场要演的一条：只验海淀三个账号的话，
+    朝阳网格员登录不上（实测踩到：账号缺密码，`password_hash` 为空，
+    而 seed 原来只补手机号、修不回来）也不会有任何提示，演示当场才发现。
+    """
     roles = [("resident", "居民端"), ("elderly", "老年端"), ("grid", "网格员端")]
     bad = []
     for role, label in roles:
@@ -304,13 +310,20 @@ def check_accounts() -> dict:
         st2, _me = _http("/api/web/auth/me")  # 无 token 应 401（顺带验证鉴权中间件在跑）
         if st2 != 401:
             bad.append(f"{label}(鉴权异常)")
+    for uname, pw, label in (("demo_resident_cy", "demo123", "朝阳居民"),
+                             ("demo_grid_cy", "demo123", "朝阳网格员")):
+        st, body = _post("/api/web/auth/login", {"username": uname, "password": pw})
+        ok = st == 200 and bool(((body or {}).get("data") or {}).get("token"))
+        if not ok:
+            bad.append(f"{label}({uname} 登录失败)")
     if bad:
         return {"name": "演示账号可登录", "passed": False, "detail": f"异常：{'、'.join(bad)}",
                 "fix": ("若「服务可达」已失败，先解决端口占用/服务未启动；"
                         "否则确认 DEMO_MODE=true 且演示账号存在："
                         "python -c \"from config import DB_PATH;from data.seed import seed_all;seed_all(DB_PATH)\"")}
     return {"name": "演示账号可登录", "passed": True,
-            "detail": "居民/老年/网格员三角色均可登录，鉴权中间件正常（无 token → 401）", "fix": ""}
+            "detail": "三端免密 + 第二社区（朝阳居民/朝阳网格员，密码 demo123）均可登录；鉴权中间件正常（无 token → 401）",
+            "fix": ""}
 
 
 def _force_utf8_stdout() -> None:

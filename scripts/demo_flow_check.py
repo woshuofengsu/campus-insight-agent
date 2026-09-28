@@ -12,6 +12,7 @@
 """
 import argparse
 import sys
+import time
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -238,8 +239,19 @@ def main() -> int:
             check("⑥ 报修页给出结构化摘要", ("请您核对这几项" in body_el) or ("入" in body_el and "位置" in body_el))
             if _btn(page, "✅ 确认上报").count():
                 _btn(page, "✅ 确认上报").first.click()
-                page.wait_for_timeout(2500)
-            after = page.inner_text("body")
+                # ⚠️ 别用固定 sleep 等结果：提交里有分类等耗时步骤（LLM 姿态全开时更慢），
+                #    固定 2.5s 会**偶发**读到"还没有结果"而误报失败（实测踩到一次 25/26）。
+                #    这里改成轮询等结果文案出现。
+                deadline = time.time() + 20
+                after = ""
+                while time.time() < deadline:
+                    page.wait_for_timeout(500)
+                    after = page.inner_text("body")
+                    if ("已上报" in after) or ("工单号" in after) or ("还差" in after) \
+                            or ("手机号" in after) or ("没有提交成功" in after):
+                        break
+            else:
+                after = page.inner_text("body")
             ok_result = ("已上报" in after) or ("工单号" in after) or ("还差" in after) or ("手机号" in after)
             check("⑦ 确认后如实反馈结果（成功带工单号 / 缺信息则追问）", ok_result,
                   "不出现伪造的成功提示" if ok_result else

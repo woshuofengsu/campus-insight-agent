@@ -93,8 +93,22 @@ class VoiceReport(BaseModel):
 
 
 class ReportDraftIn(BaseModel):
-    """报修草稿输入（v3 卡1）：只收**原话**，字段由服务端解析（不接受前端直接给"已确认字段"）。"""
+    """报修草稿输入（v3 卡1）：原话 + **老人对追问的回答**（可选）。
+
+    为什么收"回答"而不收"已确认字段"：字段的判定权永远在服务端——
+    `answer_location` 只是老人答的那句话（"8号楼3层楼道"），服务端照样按
+    "能不能派单"的标准判一遍（太笼统/答非所问仍算缺），来源标成 `user`。
+    前端**不能**靠这个参数把任意值写成事实。
+
+    ⚠️ 2026-09-29（首批八条浏览器旅程 · 第 2 条）修：原来这里只有 `text`，
+    而前端 `recheck()` 又把老人补充的位置丢掉（`answer` 被服务端返回值覆盖）——
+    结果**缺位置时老人怎么补都出不来「确认上报」**，两步契约成了死路。
+    现在补充值随重查一起上行，服务端重算缺失项，补齐后才出现提交按钮。
+    """
     text: str = Field(..., min_length=2, max_length=500)
+    answer_location: str = Field(default="", max_length=80)
+    answer_scope: str = Field(default="", max_length=8)      # 室内 / 室外 / 空=未答
+    answer_urgency: str = Field(default="", max_length=8)    # 一般 / 中等 / 紧急 / 空=未答
 
 
 class ReportSubmitIn(BaseModel):
@@ -241,11 +255,25 @@ def _elderly_profile(uid) -> dict:
         return {}
 
 
-def _report_draft_payload(text: str, profile: dict) -> dict:
-    """生成报修确认摘要（v3 卡1）：结构化字段 + 缺失项 + 追问话术 + **每个字段的来源**。"""
+def _report_draft_payload(text: str, profile: dict, answer_location: str = "",
+                          answer_scope: str = "", answer_urgency: str = "") -> dict:
+    """生成报修确认摘要（v3 卡1）：结构化字段 + 缺失项 + 追问话术 + **每个字段的来源**。
+
+    `answer_*` 是老人在追问里补充/更正的值（也可能来自"就是这里"一键确认）：
+    服务端**照样要判一遍**合不合用，不合用就退回缺失并说明为什么。
+    """
     from utils.elderly_report import extract_report_fields
-    r = extract_report_fields(text, profile)
+    r = extract_report_fields(text, profile, confirmed_location=answer_location,
+                              confirmed_scope=answer_scope,
+                              confirmed_urgency=answer_urgency)
     cleaned = _correct_report_text(text)
+    # 老人补充了位置、但服务端判它派不了单（比如答"社区""小区"这种太笼统的）
+    # → 必须**说清为什么不算**，否则老人会以为自己答了、系统却不理人（干瞪眼）。
+    loc_rejected = bool(answer_location.strip()) and not r["fields"]["location"]
+    reject_hint = ""
+    if loc_rejected:
+        reject_hint = (f"「{answer_location.strip()}」太笼统了，网格员找不到地方；"
+                       "请说到哪栋楼、哪一层（比如：8号楼3层楼道），或者是不是您家那栋。")
     return {
         "original_text": text,
         "fields": r["fields"],
@@ -260,6 +288,8 @@ def _report_draft_payload(text: str, profile: dict) -> dict:
         "need_more": bool(r["missing"]),
         "can_submit": not r["missing"],
         "note": r["note"],
+        "location_rejected": loc_rejected,
+        "reject_hint": reject_hint,
         # 联系方式不要求老人填：用资料里的；没有就如实说"缺手机号"，**绝不写假号**
         "reporter_phone_ready": bool(str(profile.get("phone") or "").strip()),
     }
@@ -301,7 +331,10 @@ def web_elderly_report_draft(req: ReportDraftIn, request: Request):
     """
     uid = _resolve_elder_uid(request) or _user(request).get("uid")
     profile = _elderly_profile(uid)
-    out = _report_draft_payload(req.text, profile)
+    out = _report_draft_payload(req.text, profile,
+                                answer_location=req.answer_location,
+                                answer_scope=req.answer_scope,
+                                answer_urgency=req.answer_urgency)
     if not out["reporter_phone_ready"]:
         out["phone_hint"] = "您的资料里还没有手机号，网格员联系不上您；请让网格员帮您补一个。"
     return _ok(out, "请确认信息" if not out["need_more"] else out["ask"])
@@ -315,7 +348,7 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
       `original_text`（老人原话）/ `suggestion`（系统建议）/ `confirmed`（最终入库值）/ `sources`（每个字段来源）。
     缺必填 → 返回 2002 + 追问话术，**不建单**；资料里没手机号 → 明确拒绝，**不写 13800000000 这种假号**。
     """
-    from data.db_idempotency import recall, remember
+    from data.db_idempotency import begin, release, remember, wait_result
     from data.db_repair import submit_issue
     from tools.action_report_issue import _llm_classify
     from utils.elderly_report import build_report_confirm_payload
@@ -326,13 +359,29 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
     # 幂等（卡8 / §6-I5）：同一个 token 重复提交 → 直接返回**上一次的结果**。
     # 这一步在"校验必填"之前：重试的请求本来就带着完整的已确认字段，
     # 但即便字段被前端改动了，也不该凭同一个 token 建第二张单（老人的意图只有一次）。
+    #
+    # ⚠️ 必须是**先原子占位、再干活**：只"先查后写"挡不住并发——
+    # 两个并发请求会同时查不到，各建一张单（首批八条浏览器旅程第 4 条实测：
+    # 老人在同一帧里连点两下「确认上报」→ 库里两张单、两个工单号）。
+    reserved = False
     if req.client_token:
-        prev = recall("elderly_report", req.client_token, uid)
-        if prev is not None:
+        state, prev = begin("elderly_report", req.client_token, uid)
+        if state == "done":
             _log.info("老人报修重复提交（幂等命中）：uid=%s token=%s → 工单 #%s",
                       uid, req.client_token, prev.get("issue_id"))
             return _ok({**prev, "duplicate": True},
                        f"这条报修已经提交过了，工单号 {prev.get('issue_id')}")
+        if state == "pending":
+            # 另一个请求正在为同一件事建单：**只能等它的结果**，绝不替它再建一张
+            prev = wait_result("elderly_report", req.client_token, uid, timeout=8)
+            if prev is not None:
+                _log.info("老人报修并发重复提交（等到前一次的结果）：uid=%s token=%s → 工单 #%s",
+                          uid, req.client_token, prev.get("issue_id"))
+                return _ok({**prev, "duplicate": True},
+                           f"这条报修已经提交过了，工单号 {prev.get('issue_id')}")
+            _log.warning("老人报修并发提交：前一次还没出结果 uid=%s token=%s", uid, req.client_token)
+            return _fail(2003, "这条报修正在提交中，请稍等几秒后点「查一下是否已经提交了」核对结果。")
+        reserved = True   # 这件事归我办：办成 remember，办不成 release（让老人还能用同一个编号重试）
 
     profile = _elderly_profile(uid)
 
@@ -340,11 +389,15 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         req.text, profile, confirmed_location=req.location,
         confirmed_scope=req.scope, confirmed_urgency=req.urgency)
     if not ok_:
+        if reserved:
+            release("elderly_report", req.client_token, uid)
         return _fail(2002, ask or "信息还不完整，请补充后再提交")
 
     phone = str(profile.get("phone") or "").strip()
     if not phone:
         # 诚实：没有手机号就不建单（假号会让网格员打不通，还可能被当成真实数据引用）
+        if reserved:
+            release("elderly_report", req.client_token, uid)
         return _fail(2002, "您的资料里还没有手机号，网格员联系不上您；请让网格员帮您补一个手机号再报修。")
 
     fields = r["fields"]
@@ -364,6 +417,9 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
             if req.client_token:
                 remember("elderly_report", req.client_token, uid, payload)
             return _ok(payload, "已记为安全提醒（这类情况不生成工单，负责人会看到）")
+        if reserved:
+            # 没建成 → 放掉占位，否则老人用同一个编号重试会被判成"正在提交中"
+            release("elderly_report", req.client_token, uid)
         return _fail(2001, hint or "上报失败")
     payload = {
         "issue_id": iid,
@@ -390,12 +446,17 @@ def web_elderly_report_status(request: Request, token: str = ""):
       · `submitted=False` → 明确"这次没有提交成功"，可以重试（token 仍可复用）。
 
     这不是"伪造一个成功状态"，而是**把不确定如实展示**并把真实结果查出来。
+    三种回答都要能分开：已提交（带工单号）/ **正在提交中**（还没结果）/ 确实没提交过。
     """
-    from data.db_idempotency import recall, valid_key
+    from data.db_idempotency import state, valid_key
     uid = _resolve_elder_uid(request) or _user(request).get("uid")
     if not valid_key(token):
         return _fail(1003, "缺少有效的提交编号")
-    prev = recall("elderly_report", token, uid)
+    st, prev = state("elderly_report", token, uid)
+    if st == "pending":
+        # ⚠️ 不能说"没提交过"：另一个请求正在建单，这句话会诱导老人再点一次提交（就重复了）
+        return _ok({"submitted": False, "issue_id": 0, "known": False, "in_flight": True},
+                   "这次提交还在处理中，请稍等几秒再点一次核对")
     if prev is None:
         return _ok({"submitted": False, "issue_id": 0, "known": False},
                    "这次没有查到已提交的记录，可以重新提交")

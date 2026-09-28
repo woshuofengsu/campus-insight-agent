@@ -32,8 +32,29 @@ def test_guide_documents_the_key_commands():
     for cmd in ("python -m pytest tests/ -q", "python -m ruff check .",
                 "python scripts/check_claims.py", "python scripts/demo_preflight.py --fast",
                 "python scripts/ui_audit.py", "python scripts/mobile_flow_check.py",
+                "python scripts/journey_check.py",
                 "python scripts/eval_all.py", "python scripts/freeze_eval_corpus.py --check"):
         assert cmd in g, f"复现指南缺少命令：{cmd}"
+
+
+def test_journey_checker_covers_the_eight_journeys():
+    """首批八条浏览器旅程（v2 §14 的发布门槛）必须是**可跑的脚本**，不是文档里的一段话。
+
+    同时钉住"编号连续、一条不少"——少一条就等于门槛漏了一层，
+    而漏掉的那条恰恰可能是有问题的那条（本项目实测：第 2、4 条都抓到过真 bug）。
+    """
+    path = os.path.join(ROOT, "scripts", "journey_check.py")
+    assert os.path.isfile(path), "缺少 scripts/journey_check.py（首批八条浏览器旅程）"
+    src = io.open(path, encoding="utf-8").read()
+    nums = [int(m) for m in re.findall(r"^\s*\((\d+),\s*\"", src, re.M)]
+    assert nums == list(range(1, 9)), f"旅程编号不是完整的 1–8：{nums}"
+    for fn in ("journey_1", "journey_2", "journey_3", "journey_4",
+               "journey_5", "journey_6", "journey_7", "journey_8"):
+        assert f"def {fn}(" in src, f"缺少旅程实现：{fn}"
+    # 标记要**每次运行独立**，否则上一轮的数据会让"这次没建单"这类断言假失败
+    assert "RUN = time.strftime" in src, "旅程标记必须按运行时间区分"
+    # 会写演示库的脚本必须自带备份（别人的演示库不能被悄悄改坏）
+    assert "backup_db" in src and "--no-backup" in src
 
 
 def test_guide_warns_about_the_two_traps():

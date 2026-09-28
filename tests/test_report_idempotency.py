@@ -101,6 +101,53 @@ def test_different_tokens_create_two_issues(fresh_db):
     assert len(_issues()) == 2
 
 
+def test_concurrent_same_token_creates_one_issue(fresh_db):
+    """**并发**（不只是顺序第二次）同一个编号 → 仍然只建一张单。
+
+    为什么必须单独有一条：顺序调用通过**完全不等于**并发安全。
+    原来只有"先查 recall、后写 remember"，两个并发请求会同时查不到 → 各建一张单
+    （首批八条浏览器旅程第 4 条实测：老人连点两下「确认上报」→ 库里两张单、两个工单号）。
+    现在靠 `begin()` 的原子占位挡住，这条用例守住它。
+    """
+    import threading
+    from api_routes.elderly import ReportSubmitIn, web_elderly_report_submit
+    body = dict(text="5号楼二层楼道灯坏了", location="5号楼2层楼道", scope="室外",
+                client_token="tok-hhhh8888")
+    out: list[dict] = []
+    lock = threading.Lock()
+
+    def go():
+        res = _ok_payload(web_elderly_report_submit(ReportSubmitIn(**body), _req(ELDER)))
+        with lock:
+            out.append(res)
+
+    threads = [threading.Thread(target=go) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+
+    issues = _issues()
+    assert len(issues) == 1, f"并发同编号不得建第二张单：{issues}"
+    assert len(out) == 2, out
+    # 两次都必须知道"同一张单"：一个建单成功、另一个复用（duplicate）或如实说"正在提交中"
+    ids = {r["data"].get("issue_id") for r in out if r.get("success")}
+    assert ids == {issues[0]["id"]}, f"两次提交必须指向同一张单：{out}"
+
+
+def test_status_distinguishes_in_flight(fresh_db):
+    """「正在提交中」不能答成「没提交过」—— 那句话会诱导老人再点一次（就重复了）。"""
+    from api_routes.elderly import web_elderly_report_status
+    from data.db_idempotency import begin
+    tok = "tok-iiii9999"
+    st, _ = begin("elderly_report", tok, ELDER)
+    assert st == "new"
+    res = _ok_payload(web_elderly_report_status(_req(ELDER), token=tok))
+    assert res["data"]["in_flight"] is True
+    assert res["data"]["submitted"] is False
+    assert "处理中" in (res.get("message") or ""), res
+
+
 def test_no_token_still_works(fresh_db):
     """不带编号的老调用方式仍然可用（兼容旧前端），只是没有幂等保护。"""
     from api_routes.elderly import ReportSubmitIn, web_elderly_report_submit

@@ -56,6 +56,20 @@ def _seed_users():
                     "AND length(COALESCE(phone_enc,''))>0",
                     (username,),
                 )
+                # 补回**缺失**的密码（卡12 首批八条浏览器旅程实测踩到）：
+                # demo_grid_cy 曾被隔离探测脚本建出来、`password_hash` 是空的，
+                # 于是"多租户演示"里的第二社区网格员**根本登录不上**，而 seed 只补手机号、修不回来
+                # （文档写着"跑 seed_all 即可"，实际修不好）。
+                # 只补空密码：用户自己改过密码的账号**不动**（那是用户的设置，不是缺数据）。
+                if pw:
+                    from data.db_core import _hash_password
+                    cur = conn.execute(
+                        "UPDATE user_profile SET password_hash=? WHERE username=? "
+                        "AND COALESCE(password_hash,'')=''",
+                        (_hash_password(pw), username),
+                    )
+                    if cur.rowcount:
+                        _log.warning("seed：演示账号 %s 缺密码，已按文档口令补回", username)
                 continue
             pw_hash = ""
             if pw:

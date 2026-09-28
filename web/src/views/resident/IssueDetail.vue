@@ -10,6 +10,7 @@ const router = useRouter()
 const message = useMessage()
 const detail = ref(null)
 const loading = ref(true)
+const loadError = ref('')
 const fbReason = ref('')
 const supContent = ref('')
 const editForm = ref(null)
@@ -17,7 +18,16 @@ const editForm = ref(null)
 onMounted(load)
 async function load() {
   loading.value = true
-  try { detail.value = await issues.detail(route.params.id) } catch (e) { message.error(e.message) }
+  loadError.value = ''
+  try { detail.value = await issues.detail(route.params.id) }
+  catch (e) {
+    // ⚠️ 只弹一个 3 秒就消失的 toast 不算"界面可理解"：老人/居民回头看屏幕时只剩空白页，
+    // 分不清"没这条单"还是"页面坏了"。所以把原因**留在页面上**，并说明下一步能做什么
+    // （首批八条浏览器旅程第 7 条：跨社区/他人工单被拒时必须看得懂）。
+    detail.value = null
+    loadError.value = e.message || '这条工单打不开'
+    message.error(loadError.value)
+  }
   finally { loading.value = false }
 }
 
@@ -55,6 +65,18 @@ async function submitEdit() {
   <div class="page">
     <n-button quaternary size="small" style="margin-bottom:8px;" @click="router.back()">← 返回</n-button>
     <n-spin :show="loading">
+      <!-- 打不开时给**留在页面上的**原因与出口（不是一闪而过的提示） -->
+      <div v-if="loadError && !detail" class="card" data-load-error
+           style="text-align:center;padding:22px;">
+        <div style="font-size:1.05rem;font-weight:700;color:var(--ink-danger);">🚫 {{ loadError }}</div>
+        <div class="muted" style="margin-top:8px;font-size:0.9rem;">
+          只能查看您自己报的工单；如果这不是您报的，返回列表看您自己的工单即可。
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+          <n-button type="primary" @click="load">🔄 再试一次</n-button>
+          <n-button @click="router.push('/resident/work-orders')">← 回到我的报修</n-button>
+        </div>
+      </div>
       <template v-if="detail">
         <h2 class="page-title">🔧 工单 #{{ detail.id }} {{ detail.title }}</h2>
         <p class="page-sub">状态：<b>{{ detail.status }}</b> · {{ detail.issue_type }} · {{ detail.category }}</p>

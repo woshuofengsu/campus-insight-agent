@@ -25,6 +25,7 @@ const submitting = ref(false)
 const loadingDraft = ref(false)
 const draft = ref(null)          // 结构化摘要（服务端返回）
 const submitted = ref(null)      // 提交成功后的四段值
+const resultVia = ref('')        // 'submit'=提交时直接拿到结果 / 'verify'=网络没回话后**核对**到的
 const unknownToken = ref('')     // 提交结果未知时的幂等编号（§6-I5：不诱导老人重复点提交）
 // 老人补充/确认的字段（预填系统的建议，老人可改）
 const answer = ref({ location: '', scope: '', urgency: '一般' })
@@ -79,14 +80,25 @@ async function startListen() {
   }
 }
 
-/** 让服务端把原话解析成结构化摘要（缺什么会明说，且**此时不会建单**）。 */
-async function loadDraft() {
+/** 让服务端把原话解析成结构化摘要（缺什么会明说，且**此时不会建单**）。
+ *
+ * `withAnswer=true`（"补充好了，再看一遍"）：把老人在追问里填的补充值一起送上去重算。
+ * ⚠️ 这里踩过一次真坑：补充值原来只存在页面上、重查时不送上行，而后端只按原话解析，
+ * 于是"缺位置 → 补 → 再看"永远是同一个缺失结论，**「确认上报」根本不出现**（两步契约成死路）。
+ * 首批八条浏览器旅程第 2 条（缺位置→追问→更正→确认提交）就是为抓这类问题立的。
+ */
+async function loadDraft(withAnswer = false) {
   if (text.value.trim().length < 5) return message.warning('请描述问题，至少 5 个字')
   draft.value = null
   submitted.value = null
+  resultVia.value = ''
   loadingDraft.value = true
   try {
-    const d = await elderly.reportDraft(text.value)
+    const d = await elderly.reportDraft(text.value, withAnswer ? {
+      answer_location: answer.value.location,
+      answer_scope: answer.value.scope,
+      answer_urgency: answer.value.urgency,
+    } : {})
     draft.value = d
     answer.value = {
       location: d.fields.location || d.suggestion.location || '',
@@ -94,6 +106,8 @@ async function loadDraft() {
       urgency: d.fields.urgency || '一般',
     }
     if (d.need_more) {
+      // 补充值被判"不够用"时，先说明为什么（否则老人不知道要改成什么样）
+      if (d.reject_hint) message.warning(d.reject_hint)
       await say(d.ask)
       message.info(d.ask)
     } else {
@@ -107,9 +121,9 @@ async function loadDraft() {
   }
 }
 
-/** 老人补充完信息后重新解析（不建单），直到没有缺失项。 */
+/** 老人补充完信息后重新解析（不建单）：**带上补充值**，直到没有缺失项。 */
 async function recheck() {
-  await loadDraft()
+  await loadDraft(true)
 }
 
 /** 每次"准备提交"生成一个幂等编号：网络重试沿用同一个（卡8 / §6-I5）。 */
@@ -135,6 +149,7 @@ async function submit() {
       client_token: token,
     })
     submitted.value = d
+    resultVia.value = 'submit'
     unknownToken.value = ''
     if (d.issue_id > 0) {
       message.success(`已上报，工单号 ${d.issue_id}（待审核）`)
@@ -149,13 +164,23 @@ async function submit() {
   } catch (e) {
     // ⚠️ 断网/超时时**不能**说"提交失败"就完事 —— 可能其实已经提交成功了。
     // 如实告诉老人"结果还不确定"，并给一个"查一下"的出口，**不诱导他再点一次**（§6-I5）。
-    const maybe = /超时|timeout|Network|Failed to fetch|网络/i.test(String(e && e.message) || '')
+    const msg = String((e && e.message) || '')
+    if (/提交中/.test(msg)) {
+      // 并发提交（老人连点/网络重试）：服务端说"正有人在做这件事"，等它做完再核对，
+      // **绝不在这里再发一次提交**（那才会真的建出第二张单）
+      message.info(msg)
+      await say('这条报修正在提交中，我帮您等一下再核对')
+      await new Promise((r) => setTimeout(r, 2000))
+      await checkSubmitted()
+      return
+    }
+    const maybe = /超时|timeout|Network|Failed to fetch|网络/i.test(msg)
     if (maybe) {
       message.warning('网络没回话，我先帮您核对一下是否已经报上去了')
       await say('网络没有回话，我帮您核对一下是不是已经报上去了')
       await checkSubmitted()
     } else {
-      message.error(e.message || '上报失败，请稍后再试')
+      message.error(msg || '上报失败，请稍后再试')
     }
   } finally {
     submitting.value = false
@@ -169,11 +194,18 @@ async function checkSubmitted() {
     const s = await elderly.reportStatus(unknownToken.value)
     if (s && s.submitted && s.issue_id > 0) {
       submitted.value = s
+      // 诚实标注结果的**来路**：这一条不是提交时拿到的，而是网络断了以后按提交编号核对出来的。
+      // 不标的话，老人（和评审）无法区分"服务端回了成功"与"我们去问过服务端"。
+      resultVia.value = 'verify'
       unknownToken.value = ''
       draft.value = null
       text.value = ''
       message.success(`核对到了：已经提交成功，工单号 ${s.issue_id}`)
       await say(`核对到了，已经提交成功，工单号 ${s.issue_id}`)
+    } else if (s && s.in_flight) {
+      // 另一个请求正在建单：**不能说"没成功、可以再点一次"**（那一下就会建出第二张单）
+      message.info('这次提交还在处理中，请等几秒再点一次核对')
+      await say('这条报修还在处理中，请等几秒再点一次查一下')
     } else {
       message.info('核对结果：这次没有提交成功，可以再点一次「确认上报」')
       await say('核对过了，这次没有提交成功，可以再点一次确认上报')
@@ -254,6 +286,11 @@ async function checkSubmitted() {
       <!-- 缺失项：就地追问（缺什么问什么，缺着就不给提交） -->
       <div v-if="draft.need_more" class="panel-warm" style="margin-top:12px;border-radius:10px;padding:10px;">
         <b>❓ {{ draft.ask }}</b>
+        <!-- 补充值不够用时说明原因（不能默默不理会老人答的话） -->
+        <div v-if="draft.reject_hint" data-reject-hint
+             style="color:var(--danger,#c00);font-weight:700;margin-top:6px;font-size:1.15rem;">
+          ⚠️ {{ draft.reject_hint }}
+        </div>
         <!-- 系统已经能猜出位置时，给一个"就是它"的大按钮：老人点一下就行，不用打字 -->
         <n-button v-if="draft.suggestion.location" type="primary" block size="large"
                   style="margin-top:8px;min-height:64px;font-size:1.25rem;"
@@ -296,8 +333,13 @@ async function checkSubmitted() {
     </div>
 
     <!-- 提交结果：原话 / 系统建议 / 您确认的 / 入库值 四段分开展示（不混成一句"已纠正"） -->
-    <div v-if="submitted" class="card" style="background:#ecfdf5;font-size:1.2rem;">
+    <div v-if="submitted" class="card" :data-result-via="resultVia || 'submit'"
+         style="background:#ecfdf5;font-size:1.2rem;">
       <b>✅ 已上报（工单号 {{ submitted.issue_id }}）</b>
+      <!-- 结果是从"核对"来的就说清楚：老人/家属才知道这条不是当时服务端回的 -->
+      <div v-if="resultVia === 'verify'" style="margin-top:6px;font-weight:700;color:var(--ink-info);">
+        📶 刚才网络没回话，工单号是按提交编号**核对**到的真实结果（没有重复上报）
+      </div>
       <div style="margin-top:8px;">🗣️ 您说的：{{ submitted.original_text }}</div>
       <div style="margin-top:4px;">📍 最终记录的位置：{{ submitted.confirmed.location }}</div>
       <div style="margin-top:4px;">🏠 责任范围：

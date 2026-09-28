@@ -147,8 +147,10 @@ export const messages = {
 export const elderly = {
   home: () => api.get('/elderly/home'),
   voiceReport: (data) => api.post('/elderly/voice-report', data),
-  // 报修契约（v3 卡1）：先出结构化摘要（缺什么就说缺什么）→ 老人确认后再提交
-  reportDraft: (text) => api.post('/elderly/report/draft', { text }),
+  // 报修契约（v3 卡1）：先出结构化摘要（缺什么就说缺什么）→ 老人确认后再提交。
+  // answers 是老人对追问的**补充值**（重查时上行，服务端照样要判合不合用）——
+  // 不带它的话"缺位置→补充→再看"永远还是缺，提交按钮出不来。
+  reportDraft: (text, answers = {}) => api.post('/elderly/report/draft', { text, ...answers }),
   reportSubmit: (data) => api.post('/elderly/report/submit', data),
   // 「我刚才到底提交成功了吗」：断网/超时后按幂等 token 查真实结果（§6-I5）
   reportStatus: (token) => api.get('/elderly/report/status', { params: { token } }),
