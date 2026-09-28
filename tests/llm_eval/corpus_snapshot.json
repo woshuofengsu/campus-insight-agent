@@ -1,0 +1,565 @@
+{
+ "digest": "f613b0a9ddda7811",
+ "frozen_at": "2026-09-29 00:57:45",
+ "count": 62,
+ "rows": [
+  {
+   "id": 1,
+   "title": "3号楼电梯停运检修通知",
+   "category": "event",
+   "applicable_area": "",
+   "keywords": "电梯,检修,停运,3号楼",
+   "audit_status": "已发布",
+   "content_sha1": "4f1337689c37"
+  },
+  {
+   "id": 2,
+   "title": "小区夏季灭蚊蝇消杀通知",
+   "category": "event",
+   "applicable_area": "",
+   "keywords": "消杀,蚊虫,卫生,夏季",
+   "audit_status": "已发布",
+   "content_sha1": "7120b5d0062b"
+  },
+  {
+   "id": 3,
+   "title": "海淀小区垃圾分类驿站正式启用",
+   "category": "notice",
+   "applicable_area": "",
+   "keywords": "垃圾分类,驿站,环保,投放",
+   "audit_status": "已发布",
+   "content_sha1": "5a2f752c7487"
+  },
+  {
+   "id": 4,
+   "title": "老旧小区加装电梯政策宣讲会",
+   "category": "notice",
+   "applicable_area": "",
+   "keywords": "加装电梯,政策,宣讲,老旧小区",
+   "audit_status": "已发布",
+   "content_sha1": "bca973d1f833"
+  },
+  {
+   "id": 5,
+   "title": "海淀小区 2026 年社区活动安排",
+   "category": "calendar",
+   "applicable_area": "",
+   "keywords": "活动,社区,日程,安排",
+   "audit_status": "已发布",
+   "content_sha1": "116d82abe5d1"
+  },
+  {
+   "id": 6,
+   "title": "小区问题上报指南",
+   "category": "governance",
+   "applicable_area": "",
+   "keywords": "上报,接诉即办,诉求,治理,工单",
+   "audit_status": "已发布",
+   "content_sha1": "229817ff38ef"
+  },
+  {
+   "id": 7,
+   "title": "社区治理反馈渠道",
+   "category": "governance",
+   "applicable_area": "",
+   "keywords": "反馈,12345,网格员,渠道,物业,居委会",
+   "audit_status": "已发布",
+   "content_sha1": "31ba303d4a19"
+  },
+  {
+   "id": 8,
+   "title": "基层治理 OODA 工作法",
+   "category": "governance",
+   "applicable_area": "",
+   "keywords": "OODA,治理,流程,闭环,接诉即办",
+   "audit_status": "已发布",
+   "content_sha1": "1c058abc6312"
+  },
+  {
+   "id": 9,
+   "title": "社区常用电话与网格员信息",
+   "category": "faq",
+   "applicable_area": "",
+   "keywords": "电话,网格员,物业,家庭医生,助餐,居委会",
+   "audit_status": "已发布",
+   "content_sha1": "1b978b7b2b8e"
+  },
+  {
+   "id": 10,
+   "title": "秋冬季流感预防指南",
+   "category": "health",
+   "applicable_area": "",
+   "keywords": "流感,预防,疫苗,冬季,健康",
+   "audit_status": "已发布",
+   "content_sha1": "a081700b10c3"
+  },
+  {
+   "id": 11,
+   "title": "春季花粉过敏防护",
+   "category": "health",
+   "applicable_area": "",
+   "keywords": "过敏,花粉,春季,鼻炎,健康",
+   "audit_status": "已发布",
+   "content_sha1": "f57300704ff8"
+  },
+  {
+   "id": 12,
+   "title": "夏季防暑与肠道疾病预防",
+   "category": "health",
+   "applicable_area": "",
+   "keywords": "中暑,肠道,夏季,防暑,健康",
+   "audit_status": "已发布",
+   "content_sha1": "66b279e45773"
+  },
+  {
+   "id": 13,
+   "title": "独居老人居家安全与关爱",
+   "category": "health",
+   "applicable_area": "",
+   "keywords": "独居,老人,安全,关爱,呼叫",
+   "audit_status": "已发布",
+   "content_sha1": "864f7dd69131"
+  },
+  {
+   "id": 14,
+   "title": "社区养老助餐与家庭医生",
+   "category": "health",
+   "applicable_area": "",
+   "keywords": "养老,助餐,家庭医生,慢病,签约",
+   "audit_status": "已发布",
+   "content_sha1": "d7766a89e726"
+  },
+  {
+   "id": 15,
+   "title": "1",
+   "category": "通知",
+   "applicable_area": "",
+   "keywords": "",
+   "audit_status": "已发布",
+   "content_sha1": "356a192b7913"
+  },
+  {
+   "id": 16,
+   "title": "居住证办理",
+   "category": "办事指引",
+   "applicable_area": "",
+   "keywords": "居住证 办理 流程",
+   "audit_status": "待审核",
+   "content_sha1": "3e07fbaf886f"
+  },
+  {
+   "id": 17,
+   "title": "居住证办理",
+   "category": "办事指引",
+   "applicable_area": "",
+   "keywords": "居住证 办理 流程",
+   "audit_status": "已发布",
+   "content_sha1": "3e07fbaf886f"
+  },
+  {
+   "id": 18,
+   "title": "居住证办理",
+   "category": "办事指引",
+   "applicable_area": "",
+   "keywords": "居住证 办理 流程",
+   "audit_status": "已发布",
+   "content_sha1": "3e07fbaf886f"
+  },
+  {
+   "id": 19,
+   "title": "居住证办理",
+   "category": "办事指引",
+   "applicable_area": "",
+   "keywords": "居住证 办理 流程",
+   "audit_status": "已发布",
+   "content_sha1": "3e07fbaf886f"
+  },
+  {
+   "id": 20,
+   "title": "北京市既有多层住宅加装电梯操作指引（试行）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "电梯,老楼装电梯,加装电梯,老楼安电梯,增设电梯",
+   "audit_status": "已发布",
+   "content_sha1": "49cf2f7f1c03"
+  },
+  {
+   "id": 21,
+   "title": "海淀区既有多层住宅加装电梯指导意见",
+   "category": "住房保障",
+   "applicable_area": "北京市海淀区",
+   "keywords": "电梯,加装电梯,海淀加装电梯,老楼装电梯,加装电梯流程",
+   "audit_status": "已发布",
+   "content_sha1": "dece16ce55cf"
+  },
+  {
+   "id": 22,
+   "title": "老旧小区加装电梯业主表决比例（双三分之二）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "电梯,加装电梯,接诉即办,老旧小区,加装电梯表决",
+   "audit_status": "已发布",
+   "content_sha1": "f24a2d878cd5"
+  },
+  {
+   "id": 23,
+   "title": "老旧小区综合整治工作方案（2018—2020年）（摘要）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "老旧小区,老旧小区改造,综合整治,京政办发2018年6号,老破小改造",
+   "audit_status": "已发布",
+   "content_sha1": "b03222d13cbd"
+  },
+  {
+   "id": 24,
+   "title": "北京市城市更新条例",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "电梯,加装电梯,老旧小区,城市更新,老旧小区改造",
+   "audit_status": "已发布",
+   "content_sha1": "703b0bd38eed"
+  },
+  {
+   "id": 25,
+   "title": "北京市公共租赁住房申请、审核及配租管理办法（摘要）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "公租房,公共租赁住房,公租房申请条件,保障房备案资格,公租房怎么申请",
+   "audit_status": "已发布",
+   "content_sha1": "18e0b8dc7acd"
+  },
+  {
+   "id": 26,
+   "title": "关于调整本市市场租房补贴申请条件及补贴标准的通知（摘要）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "补贴,市场租房补贴,租房补贴,租金补贴,住房保障",
+   "audit_status": "已发布",
+   "content_sha1": "588a8f4f5442"
+  },
+  {
+   "id": 27,
+   "title": "北京市关于加快发展保障性租赁住房的实施方案（摘要）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "公租房,保障性租赁住房,保租房,新市民租房,40万套",
+   "audit_status": "已发布",
+   "content_sha1": "d14e2eff8db7"
+  },
+  {
+   "id": 28,
+   "title": "租房提取住房公积金办理指南（含无发票提取）",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "公租房,公积金,公积金租房提取,提取公积金交房租,无发票提取",
+   "audit_status": "已发布",
+   "content_sha1": "e3ed46a1e0c2"
+  },
+  {
+   "id": 29,
+   "title": "购买北京行政区域内住房申请提取住房公积金",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "公积金,公积金购房提取,买房提取公积金,提取住房公积金,自住住房",
+   "audit_status": "已发布",
+   "content_sha1": "8b2964745e4b"
+  },
+  {
+   "id": 30,
+   "title": "北京市住宅专项维修资金使用审核标准（摘要）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "电梯,漏水,报修,消防,老旧小区",
+   "audit_status": "已发布",
+   "content_sha1": "2f3ee4043b9c"
+  },
+  {
+   "id": 31,
+   "title": "北京市接诉即办工作条例",
+   "category": "办事指引",
+   "applicable_area": "北京市",
+   "keywords": "接诉即办,12345,打12345,市民热线,投诉举报",
+   "audit_status": "已发布",
+   "content_sha1": "b2c33123f368"
+  },
+  {
+   "id": 32,
+   "title": "北京市街道办事处条例",
+   "category": "办事指引",
+   "applicable_area": "北京市",
+   "keywords": "物业,街道办事处,居委会,社区治理,接诉即办",
+   "audit_status": "已发布",
+   "content_sha1": "d80e07a001ba"
+  },
+  {
+   "id": 33,
+   "title": "北京市物业管理条例（业主大会与业委会成立）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "物业,业主委员会,业主大会,业委会怎么成立,小区自治",
+   "audit_status": "已发布",
+   "content_sha1": "ab1b0bc83439"
+  },
+  {
+   "id": 34,
+   "title": "北京市物业管理条例（物业服务人与物业费）",
+   "category": "住房保障",
+   "applicable_area": "北京市",
+   "keywords": "物业,报修,消防,物业费,物业服务人",
+   "audit_status": "已发布",
+   "content_sha1": "fe8263e0e4eb"
+  },
+  {
+   "id": 35,
+   "title": "北京市文明行为促进条例",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "物业,垃圾,消防,文明行为,楼道堆物",
+   "audit_status": "已发布",
+   "content_sha1": "77db7c4dcee0"
+  },
+  {
+   "id": 36,
+   "title": "北京市生活垃圾管理条例（垃圾分类怎么分）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "物业,垃圾,垃圾分类,扔垃圾,厨余垃圾",
+   "audit_status": "已发布",
+   "content_sha1": "3b92c2eae3d1"
+  },
+  {
+   "id": 37,
+   "title": "北京市建筑垃圾处置管理规定（装修垃圾怎么扔）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "物业,垃圾,装修垃圾,建筑垃圾,渣土",
+   "audit_status": "已发布",
+   "content_sha1": "0a11c2ca19d5"
+  },
+  {
+   "id": 38,
+   "title": "北京市环境噪声污染防治办法（装修时间与噪音扰民）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "物业,装修,装修噪音,装修时间,几点能装修",
+   "audit_status": "已发布",
+   "content_sha1": "2c5fd3754f41"
+  },
+  {
+   "id": 39,
+   "title": "北京市消防条例（电动自行车停放与充电）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "电梯,物业,消防,电动车,电动车充电",
+   "audit_status": "已发布",
+   "content_sha1": "572ea5d92be0"
+  },
+  {
+   "id": 40,
+   "title": "北京市消防条例（消防通道与楼道堆物）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "物业,停车,消防,楼道堆物,消防通道",
+   "audit_status": "已发布",
+   "content_sha1": "5d35fbb63f7e"
+  },
+  {
+   "id": 41,
+   "title": "北京市最低生活保障和低收入家庭救助审核确认办法（摘要）",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "救助,低保,吃低保,低收入家庭,低保怎么申请",
+   "audit_status": "已发布",
+   "content_sha1": "eef7d2ee3abf"
+  },
+  {
+   "id": 42,
+   "title": "北京市燃气管理条例（居民用气安全）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "漏水,报修,老旧小区,燃气安全,燃气自闭阀",
+   "audit_status": "已发布",
+   "content_sha1": "e7f49d0bd2dc"
+  },
+  {
+   "id": 43,
+   "title": "北京市供热采暖管理办法（法定采暖期）",
+   "category": "社区规定",
+   "applicable_area": "北京市",
+   "keywords": "暖气,漏水,报修,供暖,供暖时间",
+   "audit_status": "已发布",
+   "content_sha1": "115bb03abf5d"
+  },
+  {
+   "id": 44,
+   "title": "北京市老年人养老服务补贴津贴管理实施办法",
+   "category": "养老服务",
+   "applicable_area": "北京市",
+   "keywords": "补贴,老年,高龄,残疾,养老",
+   "audit_status": "已发布",
+   "content_sha1": "3538cb4b1b36"
+  },
+  {
+   "id": 45,
+   "title": "北京市社区养老服务驿站管理办法（试行）",
+   "category": "养老服务",
+   "applicable_area": "北京市",
+   "keywords": "补贴,老年,高龄,消防,养老",
+   "audit_status": "已发布",
+   "content_sha1": "88821cc62af0"
+  },
+  {
+   "id": 46,
+   "title": "北京市社区养老服务驿站运营扶持办法",
+   "category": "养老服务",
+   "applicable_area": "北京市",
+   "keywords": "补贴,老年,高龄,养老,养老驿站补贴",
+   "audit_status": "已发布",
+   "content_sha1": "df92e228e74f"
+  },
+  {
+   "id": 47,
+   "title": "北京市加快养老助餐服务发展的工作方案",
+   "category": "养老服务",
+   "applicable_area": "北京市",
+   "keywords": "报销,补贴,老年,高龄,养老",
+   "audit_status": "已发布",
+   "content_sha1": "08b36a35a78a"
+  },
+  {
+   "id": 48,
+   "title": "北京市养老家庭照护床位建设管理办法（试行）",
+   "category": "养老服务",
+   "applicable_area": "北京市",
+   "keywords": "补贴,老年,高龄,残疾,养老",
+   "audit_status": "已发布",
+   "content_sha1": "d6944a94062f"
+  },
+  {
+   "id": 49,
+   "title": "北京市育儿补贴制度实施方案（摘要）",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "补贴,生育,育儿补贴,生娃补贴,生育补贴",
+   "audit_status": "已发布",
+   "content_sha1": "99e527e7c982"
+  },
+  {
+   "id": 50,
+   "title": "北京市医疗保障局关于优化本市生育津贴发放工作的通知",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "医保,社保,报销,补贴,生育",
+   "audit_status": "已发布",
+   "content_sha1": "b0f6bc4feefc"
+  },
+  {
+   "id": 51,
+   "title": "北京市人口与计划生育条例修改决定（生育假与育儿假）",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "生育,生育假,育儿假,产假,陪产假",
+   "audit_status": "已发布",
+   "content_sha1": "8f7078ebfa40"
+  },
+  {
+   "id": 52,
+   "title": "北京市卫生健康委员会关于落实生育登记制度的通知",
+   "category": "办事指引",
+   "applicable_area": "北京市",
+   "keywords": "生育,生育登记,生育服务登记,准生证,生育登记怎么办理",
+   "audit_status": "已发布",
+   "content_sha1": "927fe4f49dfd"
+  },
+  {
+   "id": 53,
+   "title": "北京市灵活就业社会保险补贴人员认定审核办法（试行）",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "社保,补贴,灵活就业社保补贴,灵活就业补贴,社保补贴",
+   "audit_status": "已发布",
+   "content_sha1": "920c5a2754d2"
+  },
+  {
+   "id": 54,
+   "title": "北京市失业保险金申领发放实施办法（试行）",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "社保,失业金,失业,领失业金,失业保险金",
+   "audit_status": "已发布",
+   "content_sha1": "19f93f97cb83"
+  },
+  {
+   "id": 55,
+   "title": "关于做好2026年度北京市城乡居民基本医疗保险参保缴费工作有关问题的通知",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "医保,社保,报销,补贴,老年",
+   "audit_status": "已发布",
+   "content_sha1": "a8a65d98520c"
+  },
+  {
+   "id": 56,
+   "title": "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "医保,社保,报销,异地就医,异地看病报销",
+   "audit_status": "已发布",
+   "content_sha1": "d6412222ea7e"
+  },
+  {
+   "id": 57,
+   "title": "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "医保,社保,报销,家庭共济,医保卡给家人用",
+   "audit_status": "已发布",
+   "content_sha1": "284b642c2fa4"
+  },
+  {
+   "id": 58,
+   "title": "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "医保,报销,救助,医疗救助,大病救助",
+   "audit_status": "已发布",
+   "content_sha1": "c1406b6a03f1"
+  },
+  {
+   "id": 59,
+   "title": "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "补贴,低保,残疾,残疾人补贴,两项补贴",
+   "audit_status": "已发布",
+   "content_sha1": "539685ecfba8"
+  },
+  {
+   "id": 60,
+   "title": "北京市海淀区高龄老人津贴申领实施细则",
+   "category": "社保医保",
+   "applicable_area": "北京市海淀区",
+   "keywords": "高龄,津贴,补贴,老人,80岁,海淀,申领,办理,材料,养老,季度,高龄补贴,养老补贴,高龄津贴,怎么领,多少钱",
+   "audit_status": "已发布",
+   "content_sha1": "e8ec04d8c5e5"
+  },
+  {
+   "id": 61,
+   "title": "海淀小区社区助餐补贴与代办服务指引",
+   "category": "社区服务",
+   "applicable_area": "海淀小区",
+   "keywords": "助餐,补贴,送餐,代办,登记,老年卡,社区,老人,就餐,驿站",
+   "audit_status": "已发布",
+   "content_sha1": "e5c2f4e9e757"
+  },
+  {
+   "id": 62,
+   "title": "北京市老旧小区加装电梯财政补贴办法",
+   "category": "社保医保",
+   "applicable_area": "北京市",
+   "keywords": "加装电梯,电梯,补贴,增设电梯,分摊,申请,老旧小区,费用",
+   "audit_status": "已发布",
+   "content_sha1": "9600961a0a41"
+  }
+ ]
+}

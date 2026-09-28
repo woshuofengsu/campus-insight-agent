@@ -1,0 +1,1377 @@
+{
+ "generated_at": "2026-09-29 01:02:05",
+ "corpus": {
+  "count": 62,
+  "digest": "f613b0a9ddda7811",
+  "snapshot": {
+   "count": 62,
+   "digest": "f613b0a9ddda7811",
+   "frozen_at": "2026-09-29 00:57:45"
+  },
+  "drift": {
+   "added": [],
+   "removed": [],
+   "changed": [],
+   "same": true
+  }
+ },
+ "cases": 48,
+ "rag": {
+  "cases": 48,
+  "hits": 48,
+  "hit1": 48,
+  "hit_rate": 100.0,
+  "hit1_rate": 100.0,
+  "region_cases": 4,
+  "region_top1_ok": 4,
+  "topk": 3,
+  "embedding": {
+   "provider": "bailian",
+   "model": "text-embedding-v3",
+   "enabled": true,
+   "has_key": true
+  },
+  "details": [
+   {
+    "query": "老楼装电梯怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见",
+     "北京市老旧小区加装电梯财政补贴办法"
+    ]
+   },
+   {
+    "query": "加装电梯费用怎么分摊",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "医保怎么报销",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知",
+     "关于做好2026年度北京市城乡居民基本医疗保险参保缴费工作有关问题的通知"
+    ]
+   },
+   {
+    "query": "退休了每月能领多少钱",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "老人有什么补贴可以领",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "老年人高龄津贴怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "家里困难能申请什么救助",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "北京市最低生活保障和低收入家庭救助审核确认办法（摘要）",
+     "北京市老旧小区加装电梯财政补贴办法"
+    ]
+   },
+   {
+    "query": "公租房怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市公共租赁住房申请、审核及配租管理办法（摘要）",
+     "北京市关于加快发展保障性租赁住房的实施方案（摘要）",
+     "租房提取住房公积金办理指南（含无发票提取）"
+    ]
+   },
+   {
+    "query": "物业费太贵了找谁说",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市物业管理条例（物业服务人与物业费）",
+     "北京市物业管理条例（业主大会与业委会成立）",
+     "社区治理反馈渠道"
+    ]
+   },
+   {
+    "query": "垃圾桶满了没人清运",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市生活垃圾管理条例（垃圾分类怎么分）",
+     "海淀小区垃圾分类驿站正式启用",
+     "北京市建筑垃圾处置管理规定（装修垃圾怎么扔）"
+    ]
+   },
+   {
+    "query": "小区停车位不够怎么办",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（消防通道与楼道堆物）",
+     "小区问题上报指南",
+     "北京市消防条例（电动自行车停放与充电）"
+    ]
+   },
+   {
+    "query": "暖气不热怎么投诉",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市供热采暖管理办法（法定采暖期）",
+     "社区治理反馈渠道",
+     "小区问题上报指南"
+    ]
+   },
+   {
+    "query": "楼道消防通道被堵了",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（电动自行车停放与充电）",
+     "北京市消防条例（消防通道与楼道堆物）",
+     "独居老人居家安全与关爱"
+    ]
+   },
+   {
+    "query": "电动车在楼道充电危险吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（电动自行车停放与充电）",
+     "北京市文明行为促进条例",
+     "北京市消防条例（消防通道与楼道堆物）"
+    ]
+   },
+   {
+    "query": "生孩子有什么待遇",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市医疗保障局关于优化本市生育津贴发放工作的通知",
+     "北京市人口与计划生育条例修改决定（生育假与育儿假）",
+     "北京市育儿补贴制度实施方案（摘要）"
+    ]
+   },
+   {
+    "query": "公积金怎么取出来",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "购买北京行政区域内住房申请提取住房公积金",
+     "租房提取住房公积金办理指南（含无发票提取）",
+     "北京市公共租赁住房申请、审核及配租管理办法（摘要）"
+    ]
+   },
+   {
+    "query": "残疾人能领什么补助",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "老旧小区什么时候改造",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "老旧小区综合整治工作方案（2018—2020年）（摘要）",
+     "北京市城市更新条例",
+     "老旧小区加装电梯业主表决比例（双三分之二）"
+    ]
+   },
+   {
+    "query": "有事找政府打什么电话",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "社区常用电话与网格员信息",
+     "社区治理反馈渠道",
+     "小区问题上报指南"
+    ]
+   },
+   {
+    "query": "社区有没有养老驿站",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市社区养老服务驿站管理办法（试行）",
+     "北京市社区养老服务驿站运营扶持办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "家里老人一个人住不放心",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "独居老人居家安全与关爱",
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "海淀小区社区助餐补贴与代办服务指引"
+    ]
+   },
+   {
+    "query": "看病花光了积蓄怎么办",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知",
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知"
+    ]
+   },
+   {
+    "query": "外地住院的钱怎么报",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知",
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知"
+    ]
+   },
+   {
+    "query": "老楼上下楼不方便",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "北京市老旧小区加装电梯财政补贴办法",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "小区里车位抢不到",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "小区问题上报指南",
+     "海淀小区垃圾分类驿站正式启用",
+     "老旧小区加装电梯业主表决比例（双三分之二）"
+    ]
+   },
+   {
+    "query": "穷人租不起房",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "关于调整本市市场租房补贴申请条件及补贴标准的通知（摘要）",
+     "租房提取住房公积金办理指南（含无发票提取）",
+     "北京市公共租赁住房申请、审核及配租管理办法（摘要）"
+    ]
+   },
+   {
+    "query": "残疾人有没有照顾",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "养老金啥时候发",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市社区养老服务驿站运营扶持办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站管理办法（试行）"
+    ]
+   },
+   {
+    "query": "腿脚不好，下楼费劲",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "北京市老旧小区加装电梯财政补贴办法",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "我一个人在家没人说话",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "独居老人居家安全与关爱",
+     "社区治理反馈渠道",
+     "小区问题上报指南"
+    ]
+   },
+   {
+    "query": "社区管饭吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市加快养老助餐服务发展的工作方案",
+     "社区养老助餐与家庭医生"
+    ]
+   },
+   {
+    "query": "孩子不在身边，办事找谁",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "社区养老助餐与家庭医生",
+     "北京市卫生健康委员会关于落实生育登记制度的通知",
+     "北京市接诉即办工作条例"
+    ]
+   },
+   {
+    "query": "残疾证能领啥钱",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "冬天屋里冷，暖气不热",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市供热采暖管理办法（法定采暖期）",
+     "秋冬季流感预防指南",
+     "独居老人居家安全与关爱"
+    ]
+   },
+   {
+    "query": "楼道堆东西绊人",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（消防通道与楼道堆物）",
+     "北京市文明行为促进条例",
+     "独居老人居家安全与关爱"
+    ]
+   },
+   {
+    "query": "医保卡里的钱能给老伴用吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "关于做好2026年度北京市城乡居民基本医疗保险参保缴费工作有关问题的通知",
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知"
+    ]
+   },
+   {
+    "query": "去外地看病咋报",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知",
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "北京市卫生健康委员会关于落实生育登记制度的通知"
+    ]
+   },
+   {
+    "query": "家里困难能申请啥补助",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "关于调整本市市场租房补贴申请条件及补贴标准的通知（摘要）",
+     "北京市最低生活保障和低收入家庭救助审核确认办法（摘要）"
+    ]
+   },
+   {
+    "query": "楼里能装电梯不，我出钱",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "北京市老旧小区加装电梯财政补贴办法",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "垃圾咋分类，我记不住",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市生活垃圾管理条例（垃圾分类怎么分）",
+     "海淀小区垃圾分类驿站正式启用",
+     "北京市建筑垃圾处置管理规定（装修垃圾怎么扔）"
+    ]
+   },
+   {
+    "query": "电动车能不能在楼道里充电",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（电动自行车停放与充电）",
+     "北京市消防条例（消防通道与楼道堆物）",
+     "北京市文明行为促进条例"
+    ]
+   },
+   {
+    "query": "退休金每年涨不涨",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "小区助餐点老人吃饭有补贴吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "海淀小区",
+    "region_level": "local_street",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市加快养老助餐服务发展的工作方案",
+     "北京市海淀区高龄老人津贴申领实施细则"
+    ]
+   },
+   {
+    "query": "高龄津贴多少钱一个月",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "海淀小区",
+    "region_level": "local_district",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "高龄津贴多少钱一个月",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "老旧小区加装电梯补贴怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "朝阳试点社区",
+    "region_level": "local_city",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "北京市城市更新条例"
+    ]
+   },
+   {
+    "query": "助餐补贴怎么登记",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "海淀小区",
+    "region_level": "local_street",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市加快养老助餐服务发展的工作方案"
+    ]
+   },
+   {
+    "query": "外地的高龄补贴政策在这里适用吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "hybrid",
+    "region": "海淀小区",
+    "region_level": "local_district",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   }
+  ],
+  "splits": {
+   "all": {
+    "n": 48,
+    "hit_rate": 100.0,
+    "hit1_rate": 100.0
+   },
+   "dev": {
+    "n": 35,
+    "hit_rate": 100.0,
+    "hit1_rate": 100.0
+   },
+   "holdout": {
+    "n": 13,
+    "hit_rate": 100.0,
+    "hit1_rate": 100.0
+   }
+  }
+ },
+ "rag_lexical_only": {
+  "cases": 48,
+  "hits": 44,
+  "hit1": 43,
+  "hit_rate": 91.7,
+  "hit1_rate": 89.6,
+  "region_cases": 4,
+  "region_top1_ok": 4,
+  "topk": 3,
+  "embedding": {
+   "provider": "bailian",
+   "model": "text-embedding-v3",
+   "enabled": false,
+   "has_key": true
+  },
+  "details": [
+   {
+    "query": "老楼装电梯怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "加装电梯费用怎么分摊",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "医保怎么报销",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "关于做好2026年度北京市城乡居民基本医疗保险参保缴费工作有关问题的通知",
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知"
+    ]
+   },
+   {
+    "query": "退休了每月能领多少钱",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "老人有什么补贴可以领",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市老年人养老服务补贴津贴管理实施办法"
+    ]
+   },
+   {
+    "query": "老年人高龄津贴怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "家里困难能申请什么救助",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市最低生活保障和低收入家庭救助审核确认办法（摘要）",
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "北京市老旧小区加装电梯财政补贴办法"
+    ]
+   },
+   {
+    "query": "公租房怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市公共租赁住房申请、审核及配租管理办法（摘要）",
+     "北京市关于加快发展保障性租赁住房的实施方案（摘要）",
+     "租房提取住房公积金办理指南（含无发票提取）"
+    ]
+   },
+   {
+    "query": "物业费太贵了找谁说",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市物业管理条例（物业服务人与物业费）",
+     "北京市物业管理条例（业主大会与业委会成立）",
+     "北京市街道办事处条例"
+    ]
+   },
+   {
+    "query": "垃圾桶满了没人清运",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市生活垃圾管理条例（垃圾分类怎么分）",
+     "海淀小区垃圾分类驿站正式启用",
+     "北京市建筑垃圾处置管理规定（装修垃圾怎么扔）"
+    ]
+   },
+   {
+    "query": "小区停车位不够怎么办",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（消防通道与楼道堆物）",
+     "北京市消防条例（电动自行车停放与充电）",
+     "小区问题上报指南"
+    ]
+   },
+   {
+    "query": "暖气不热怎么投诉",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市供热采暖管理办法（法定采暖期）",
+     "海淀小区 2026 年社区活动安排",
+     "北京市社区养老服务驿站管理办法（试行）"
+    ]
+   },
+   {
+    "query": "楼道消防通道被堵了",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（电动自行车停放与充电）",
+     "北京市消防条例（消防通道与楼道堆物）",
+     "独居老人居家安全与关爱"
+    ]
+   },
+   {
+    "query": "电动车在楼道充电危险吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（电动自行车停放与充电）",
+     "北京市文明行为促进条例",
+     "独居老人居家安全与关爱"
+    ]
+   },
+   {
+    "query": "生孩子有什么待遇",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市人口与计划生育条例修改决定（生育假与育儿假）",
+     "北京市卫生健康委员会关于落实生育登记制度的通知",
+     "北京市医疗保障局关于优化本市生育津贴发放工作的通知"
+    ]
+   },
+   {
+    "query": "公积金怎么取出来",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "购买北京行政区域内住房申请提取住房公积金",
+     "租房提取住房公积金办理指南（含无发票提取）",
+     "北京市公共租赁住房申请、审核及配租管理办法（摘要）"
+    ]
+   },
+   {
+    "query": "残疾人能领什么补助",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "老旧小区什么时候改造",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "老旧小区综合整治工作方案（2018—2020年）（摘要）",
+     "北京市城市更新条例",
+     "北京市老旧小区加装电梯财政补贴办法"
+    ]
+   },
+   {
+    "query": "有事找政府打什么电话",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "社区常用电话与网格员信息",
+     "北京市供热采暖管理办法（法定采暖期）",
+     "老旧小区综合整治工作方案（2018—2020年）（摘要）"
+    ]
+   },
+   {
+    "query": "社区有没有养老驿站",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市社区养老服务驿站管理办法（试行）",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "家里老人一个人住不放心",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "独居老人居家安全与关爱",
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "海淀小区社区助餐补贴与代办服务指引"
+    ]
+   },
+   {
+    "query": "看病花光了积蓄怎么办",
+    "hit": false,
+    "hit_at_1": false,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "海淀区既有多层住宅加装电梯指导意见",
+     "北京市社区养老服务驿站管理办法（试行）",
+     "北京市既有多层住宅加装电梯操作指引（试行）"
+    ]
+   },
+   {
+    "query": "外地住院的钱怎么报",
+    "hit": true,
+    "hit_at_1": false,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市社区养老服务驿站管理办法（试行）",
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知",
+     "北京市城市更新条例"
+    ]
+   },
+   {
+    "query": "老楼上下楼不方便",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "小区里车位抢不到",
+    "hit": false,
+    "hit_at_1": false,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "小区夏季灭蚊蝇消杀通知",
+     "海淀小区垃圾分类驿站正式启用",
+     "老旧小区综合整治工作方案（2018—2020年）（摘要）"
+    ]
+   },
+   {
+    "query": "穷人租不起房",
+    "hit": false,
+    "hit_at_1": false,
+    "route": "none",
+    "region": "",
+    "region_level": "",
+    "top": []
+   },
+   {
+    "query": "残疾人有没有照顾",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "养老金啥时候发",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市社区养老服务驿站运营扶持办法",
+     "北京市社区养老服务驿站管理办法（试行）",
+     "北京市老年人养老服务补贴津贴管理实施办法"
+    ]
+   },
+   {
+    "query": "腿脚不好，下楼费劲",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "我一个人在家没人说话",
+    "hit": false,
+    "hit_at_1": false,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知",
+     "北京市医疗保障局关于优化本市生育津贴发放工作的通知",
+     "北京市生活垃圾管理条例（垃圾分类怎么分）"
+    ]
+   },
+   {
+    "query": "社区管饭吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市加快养老助餐服务发展的工作方案",
+     "社区养老助餐与家庭医生"
+    ]
+   },
+   {
+    "query": "孩子不在身边，办事找谁",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市街道办事处条例",
+     "北京市卫生健康委员会关于落实生育登记制度的通知",
+     "北京市人口与计划生育条例修改决定（生育假与育儿假）"
+    ]
+   },
+   {
+    "query": "残疾证能领啥钱",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市困难残疾人生活补贴和重度残疾人护理补贴制度实施办法",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）"
+    ]
+   },
+   {
+    "query": "冬天屋里冷，暖气不热",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市供热采暖管理办法（法定采暖期）",
+     "海淀小区 2026 年社区活动安排"
+    ]
+   },
+   {
+    "query": "楼道堆东西绊人",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（消防通道与楼道堆物）",
+     "北京市文明行为促进条例",
+     "独居老人居家安全与关爱"
+    ]
+   },
+   {
+    "query": "医保卡里的钱能给老伴用吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知",
+     "关于做好2026年度北京市城乡居民基本医疗保险参保缴费工作有关问题的通知",
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知"
+    ]
+   },
+   {
+    "query": "去外地看病咋报",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市医疗保障局关于进一步做好基本医疗保险跨省异地就医直接结算工作的通知",
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知"
+    ]
+   },
+   {
+    "query": "家里困难能申请啥补助",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市公共租赁住房申请、审核及配租管理办法（摘要）",
+     "关于调整本市市场租房补贴申请条件及补贴标准的通知（摘要）"
+    ]
+   },
+   {
+    "query": "楼里能装电梯不，我出钱",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市既有多层住宅加装电梯操作指引（试行）",
+     "海淀区既有多层住宅加装电梯指导意见"
+    ]
+   },
+   {
+    "query": "垃圾咋分类，我记不住",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市生活垃圾管理条例（垃圾分类怎么分）",
+     "海淀小区垃圾分类驿站正式启用",
+     "北京市建筑垃圾处置管理规定（装修垃圾怎么扔）"
+    ]
+   },
+   {
+    "query": "电动车能不能在楼道里充电",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市消防条例（电动自行车停放与充电）",
+     "北京市文明行为促进条例",
+     "北京市建筑垃圾处置管理规定（装修垃圾怎么扔）"
+    ]
+   },
+   {
+    "query": "退休金每年涨不涨",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市养老家庭照护床位建设管理办法（试行）",
+     "北京市社区养老服务驿站管理办法（试行）"
+    ]
+   },
+   {
+    "query": "小区助餐点老人吃饭有补贴吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "海淀小区",
+    "region_level": "local_street",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市加快养老助餐服务发展的工作方案"
+    ]
+   },
+   {
+    "query": "高龄津贴多少钱一个月",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "海淀小区",
+    "region_level": "local_district",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "高龄津贴多少钱一个月",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "",
+    "region_level": "national",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "老旧小区加装电梯补贴怎么申请",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "朝阳试点社区",
+    "region_level": "local_city",
+    "top": [
+     "北京市老旧小区加装电梯财政补贴办法",
+     "北京市城市更新条例",
+     "北京市既有多层住宅加装电梯操作指引（试行）"
+    ]
+   },
+   {
+    "query": "助餐补贴怎么登记",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "海淀小区",
+    "region_level": "local_street",
+    "top": [
+     "海淀小区社区助餐补贴与代办服务指引",
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   },
+   {
+    "query": "外地的高龄补贴政策在这里适用吗",
+    "hit": true,
+    "hit_at_1": true,
+    "route": "lexical",
+    "region": "海淀小区",
+    "region_level": "local_district",
+    "top": [
+     "北京市海淀区高龄老人津贴申领实施细则",
+     "北京市老年人养老服务补贴津贴管理实施办法",
+     "北京市社区养老服务驿站运营扶持办法"
+    ]
+   }
+  ],
+  "splits": {
+   "all": {
+    "n": 48,
+    "hit_rate": 91.7,
+    "hit1_rate": 89.6
+   },
+   "dev": {
+    "n": 35,
+    "hit_rate": 88.6,
+    "hit1_rate": 88.6
+   },
+   "holdout": {
+    "n": 13,
+    "hit_rate": 100.0,
+    "hit1_rate": 92.3
+   }
+  }
+ },
+ "compare": {
+  "shared_n": 47,
+  "baseline_hit_rate": 91.5,
+  "variant_hit_rate": 100.0,
+  "delta": 8.5,
+  "better": [
+   {
+    "query": "看病花光了积蓄怎么办",
+    "variant_top": [
+     "北京市医疗保障局关于扩大职工医保个人账户共济范围的通知",
+     "关于进一步做好因病致贫重病患者家庭医疗救助工作的通知"
+    ]
+   },
+   {
+    "query": "小区里车位抢不到",
+    "variant_top": [
+     "小区问题上报指南",
+     "海淀小区垃圾分类驿站正式启用"
+    ]
+   },
+   {
+    "query": "穷人租不起房",
+    "variant_top": [
+     "关于调整本市市场租房补贴申请条件及补贴标准的通知（摘要）",
+     "租房提取住房公积金办理指南（含无发票提取）"
+    ]
+   },
+   {
+    "query": "我一个人在家没人说话",
+    "variant_top": [
+     "独居老人居家安全与关爱",
+     "社区治理反馈渠道"
+    ]
+   }
+  ],
+  "worse": [],
+  "better_n": 4,
+  "worse_n": 0,
+  "verdict": "变好",
+  "has_regressions": false,
+  "note": "整体持平"
+ },
+ "intent": {
+  "skipped": true,
+  "reason": "评测脚本不可用：cannot import name 'run' from 'scripts.llm_eval' (C:\\Users\\wo'shuo'feng'su\\Deskt"
+ }
+}
