@@ -111,6 +111,14 @@ class ReportDraftIn(BaseModel):
     answer_urgency: str = Field(default="", max_length=8)    # 一般 / 中等 / 紧急 / 空=未答
 
 
+class ReportDraftSaveIn(BaseModel):
+    """老年报修草稿保存：正文只进服务端，前端只保留会话恢复标记。"""
+    text: str = Field(..., min_length=2, max_length=500)
+    answer_location: str = Field(default="", max_length=80)
+    answer_scope: str = Field(default="", max_length=8)
+    answer_urgency: str = Field(default="一般", max_length=8)
+
+
 class ReportSubmitIn(BaseModel):
     """报修提交输入（v3 卡1 + 卡8）：原话 + **老人确认/补充**的值 + 幂等键。
 
@@ -338,6 +346,47 @@ def web_elderly_report_draft(req: ReportDraftIn, request: Request):
     if not out["reporter_phone_ready"]:
         out["phone_hint"] = "您的资料里还没有手机号，网格员联系不上您；请让网格员帮您补一个。"
     return _ok(out, "请确认信息" if not out["need_more"] else out["ask"])
+
+
+@router.get("/report/draft/current")
+def web_elderly_report_draft_current(request: Request):
+    """只返回当前登录老人自己的未提交草稿；正文不再放在浏览器存储中。"""
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    if not uid:
+        return _fail(1001, "请先登录")
+    from data.db_draft import load_draft
+    d = load_draft(uid, "elderly_report_draft")
+    if not d or not d.get("content"):
+        return _ok(None)
+    content = d["content"]
+    return _ok({"text": content.get("text", ""), "answer": content.get("answer") or {},
+                "summary": content.get("summary", ""), "updated_at": d.get("updated_at", "")})
+
+
+@router.post("/report/draft/save")
+def web_elderly_report_draft_save(req: ReportDraftSaveIn, request: Request):
+    """保存当前老人草稿；按用户归属写入，避免共享设备泄露正文。"""
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    if not uid:
+        return _fail(1001, "请先登录")
+    from data.db_draft import save_draft
+    save_draft(uid, "elderly_report_draft",
+               {"text": req.text, "answer": {"location": req.answer_location,
+                                               "scope": req.answer_scope,
+                                               "urgency": req.answer_urgency},
+                "summary": req.text[:30]},
+               step="report", source_session="server", source_text=req.text)
+    return _ok({"saved": True}, "草稿已保存")
+
+
+@router.delete("/report/draft/current")
+def web_elderly_report_draft_clear(request: Request):
+    uid = _resolve_elder_uid(request) or _user(request).get("uid")
+    if not uid:
+        return _fail(1001, "请先登录")
+    from data.db_draft import delete_draft
+    delete_draft(uid, "elderly_report_draft")
+    return _ok({"cleared": True}, "草稿已清除")
 
 
 @router.post("/report/submit")

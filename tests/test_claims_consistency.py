@@ -91,10 +91,10 @@ def test_doc_test_numbers_match_single_source():
         "docs/competition/最终版交付说明.md", "docs/competition/创意说明书-提交版.md",
     ]
     RULES = [
-        (re.compile(r"\b(\d{3})\s*passed"), runnable - 1, "passed 应=可运行数−1"),
-        (re.compile(r"\b(\d{3})\s*通过"), runnable - 1, "「N 通过」应=可运行数−1"),
-        (re.compile(r"可运行\s*(\d{3})"), runnable, "「可运行 N」应=可运行数"),
-        (re.compile(r"\b(\d{3})\s*(?:项\s*)?(?:自动化\s*)?测试"), runnable, "「N 项测试」应=可运行数"),
+        (re.compile(r"\b(\d{3,})\s*passed"), runnable - 1, "passed 应=可运行数−1"),
+        (re.compile(r"\b(\d{3,})\s*通过"), runnable - 1, "「N 通过」应=可运行数−1"),
+        (re.compile(r"可运行\s*(\d{3,})"), runnable, "「可运行 N」应=可运行数"),
+        (re.compile(r"\b(\d{3,})\s*(?:项\s*)?(?:自动化\s*)?测试"), runnable, "「N 项测试」应=可运行数"),
     ]
     bad = []
     for doc in primary:

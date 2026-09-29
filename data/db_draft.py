@@ -11,7 +11,7 @@ from data.database import get_db
 
 _log = logging.getLogger(__name__)
 
-DRAFT_TYPES = ("work_order_draft", "proposal_draft")
+DRAFT_TYPES = ("work_order_draft", "proposal_draft", "elderly_report_draft")
 
 
 def save_draft(user_id: int, draft_type: str, content: dict, step: str = "",

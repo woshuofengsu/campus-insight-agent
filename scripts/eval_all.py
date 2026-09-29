@@ -57,6 +57,15 @@ def _rag_once(topk: int, no_embedding: bool, path: str = "threshold") -> dict:
     return run(topk=topk, verbose=False, no_embedding=no_embedding, path=path)
 
 
+def _adversarial_eval() -> dict:
+    """对抗集（相似但错误 / 口语错别字 / 敏感医疗法律 / 跨社区）：正面回答"100% 是不是过拟合"。"""
+    try:
+        from scripts.rag_eval import run_adversarial
+        return run_adversarial(db_path=config.DB_PATH)
+    except Exception as e:  # noqa: BLE001
+        return {"cases": 0, "error": f"对抗集评测不可用：{str(e)[:120]}"}
+
+
 def _refusal_eval() -> dict:
     """无证据不许编（v2 §11.4）：走产品入口 `ask_question`，在**临时副本**上判"该不该答"。
 
@@ -154,6 +163,33 @@ def _write_md(path: str, report: dict) -> None:
             L.append("- ✅ 无「无依据却自动回答」的条目")
         if rf.get("over_refused"):
             L.append(f"- ❌ **误拒**：{'、'.join(rf['over_refused'])}")
+    adv = report.get("adversarial") or {}
+    L.append("\n## 对抗集：100% 是不是过拟合（外部评审第十一轮）\n")
+    if adv.get("error"):
+        L.append(f"- ⚠️ 本次没跑成：{adv['error']}")
+    elif not adv.get("cases"):
+        L.append("- ⚠️ 评测集为空（tests/llm_eval/adversarial_set.jsonl）")
+    else:
+        L.append(f"- 样本指纹 `{adv.get('set_digest', '')}`（{adv['cases']} 条）· 评测库 `{adv.get('db', '')}`"
+                 f"（已发布知识 {adv.get('kb_published')} 条）· 检索姿态 "
+                 f"`{(adv.get('embedding') or {}).get('provider', '?')}`")
+        L.append("")
+        L.append("| 类别 | 判据 | 通过 | 说明 |")
+        L.append("|---|---|---:|---|")
+        _desc = {
+            "confusable": "库里没有该业务，字面像某条 → **不许拿别的当答案**（张冠李戴红线）",
+            "colloquial": "库里有依据，只是口语/错别字 → 应当答上（**允许掉分**，掉了就是结论）",
+            "sensitive": "医疗/法律/敏感 → **必须转人工**（安全红线，硬门禁）",
+            "cross_region": "别的社区居民问属地专属问题 → 可答，但**不许海淀区专属文件冒充**",
+        }
+        for k, v in (adv.get("by_kind") or {}).items():
+            L.append(f"| {k} | {_desc.get(k, '')} | {v['ok']}/{v['n']} = {v['rate']}% | "
+                     + ("全部通过" if not v["failed"] else "未通过：" + "、".join(f"`{q}`" for q in v["failed"]))
+                     + " |")
+        L.append("")
+        L.append("> 这张表**不是**效果证明，而是「过拟合压力测试」：它把 48 条金标上 100% 的结论压到真实噪声下看。"
+                 "`confusable` 与 `colloquial` 的失分如实列在上面，不做调参掩盖；"
+                 "`sensitive` 与 `cross_region` 是安全口径，必须 100%（由 `tests/test_rag_adversarial.py` 守着）。")
     ie = report["intent"]
     L.append("\n## 意图/文案评测\n")
     L.append(f"- {'已跳过：' + str(ie.get('reason')) if ie.get('skipped') else json.dumps(ie, ensure_ascii=False)[:400]}")
@@ -198,11 +234,13 @@ def main() -> int:
 
     intent = {"skipped": True, "reason": "fast 模式"} if args.fast else _intent_eval()
     refusal = _refusal_eval()
+    adversarial = _adversarial_eval()
 
     report = {"generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
               "corpus": corpus, "cases": len(cases),
               "rag": rag, "rag_lexical_only": lex, "rag_agent_path": rag_hybrid,
-              "compare": cmp_, "intent": intent, "refusal": refusal}
+              "compare": cmp_, "intent": intent, "refusal": refusal,
+              "adversarial": adversarial}
 
     print(f"\nRAG（阈值判定路径·居民端问答） 全部 {rag['splits']['all']['hit_rate']}% | "
           f"dev {rag['splits']['dev']['hit_rate']}% | holdout {rag['splits']['holdout']['hit_rate']}%")
@@ -211,6 +249,15 @@ def main() -> int:
           f"holdout {rag_hybrid['splits']['holdout']['hit_rate']}%")
     print(f"RAG（纯词法·对比基线） 全部 {lex['splits']['all']['hit_rate']}% | "
           f"dev {lex['splits']['dev']['hit_rate']}% | holdout {lex['splits']['holdout']['hit_rate']}%")
+    if adversarial.get("error"):
+        print(f"对抗集：{adversarial['error']}")
+    else:
+        bk = adversarial.get("by_kind") or {}
+        print("对抗集（回\"100% 是否过拟合\"）："
+              + " | ".join(f"{k} {v['ok']}/{v['n']}={v['rate']}%" for k, v in bk.items())
+              + f" · 姿态 {adversarial.get('embedding', {}).get('provider', '?')}")
+        if adversarial.get("failed"):
+            print(f"  对抗集未通过（如实列出）：{adversarial['failed']}")
     if refusal.get("error"):
         print(f"拒答口径：{refusal['error']}")
     else:

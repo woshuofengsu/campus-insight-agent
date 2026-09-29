@@ -106,11 +106,23 @@ async function delQuestion(q) {
               <n-tag size="small" type="info" round>📍 适用地区：{{ result.applicable_area }}</n-tag>
               <span v-if="result.region_label" class="muted" style="font-size:0.78rem;">按您的社区「{{ result.region_label }}」优先</span>
             </div>
+            <div v-if="result.knowledge" class="evidence-card" data-evidence-card>
+              <div class="evidence-title">🔎 这条回答依据</div>
+              <div class="evidence-main">{{ result.knowledge.title }}</div>
+              <div class="evidence-meta">
+                <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }}</span>
+                <span v-if="result.knowledge.publisher">发布：{{ result.knowledge.publisher }}</span>
+                <span v-if="result.knowledge.effective_date">生效：{{ result.knowledge.effective_date }}</span>
+                <span v-if="result.knowledge.version">版本：V{{ result.knowledge.version }}</span>
+              </div>
+              <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener">查看政策原文 ↗</a>
+            </div>
             <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
           </template>
           <template v-else>
             <div style="font-weight:700;color:#d97706;">暂未找到答案</div>
             <div class="muted" style="margin-top:6px;">{{ result.manual_text }}</div>
+            <div v-if="result.reason" class="muted evidence-reason">系统状态：{{ result.reason === 'weak_evidence' ? '依据不够直接，已转人工核对' : result.reason === 'manual' ? '涉及需要人工判断的内容' : '暂未找到匹配依据' }}</div>
             <div v-if="result.expired_hint" class="muted">{{ result.expired_hint }}</div>
             <n-button size="small" type="primary" ghost style="margin-top:10px;" @click="transfer">🙋 转人工咨询</n-button>
           </template>
@@ -186,3 +198,12 @@ async function delQuestion(q) {
     </n-tabs>
   </div>
 </template>
+
+<style scoped>
+.evidence-card { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-left:4px solid var(--primary); border-radius:10px; background:var(--card-bg); }
+.evidence-title { font-weight:700; color:var(--primary); font-size:0.9rem; }
+.evidence-main { margin-top:4px; font-weight:600; }
+.evidence-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:5px; color:var(--muted); font-size:0.78rem; }
+.evidence-card a { display:inline-block; margin-top:6px; color:var(--primary); font-size:0.82rem; }
+.evidence-reason { margin-top:8px; font-size:0.82rem; }
+</style>

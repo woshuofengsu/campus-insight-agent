@@ -151,6 +151,9 @@ export const elderly = {
   // answers 是老人对追问的**补充值**（重查时上行，服务端照样要判合不合用）——
   // 不带它的话"缺位置→补充→再看"永远还是缺，提交按钮出不来。
   reportDraft: (text, answers = {}) => api.post('/elderly/report/draft', { text, ...answers }),
+  reportDraftCurrent: () => api.get('/elderly/report/draft/current'),
+  saveReportDraft: (data) => api.post('/elderly/report/draft/save', data),
+  clearReportDraft: () => api.delete('/elderly/report/draft/current'),
   reportSubmit: (data) => api.post('/elderly/report/submit', data),
   // 「我刚才到底提交成功了吗」：断网/超时后按幂等 token 查真实结果（§6-I5）
   reportStatus: (token) => api.get('/elderly/report/status', { params: { token } }),

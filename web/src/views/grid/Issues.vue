@@ -22,6 +22,8 @@ const urgFilter = ref('全部')
 const keyword = ref('')
 // 操作输入（按工单 id 存）
 const op = ref({}) // { [id]: { opinion, assignee, phone, note, reason, cat, noPhoto, negReason } }
+const detailOpen = ref(false)
+const detailIssue = ref(null)
 
 const STATUS_OPTIONS = ['全部', '待审核', '退回补充信息', '已审核待派单', '已派单', '处理中', '待居民反馈', '处理结束', '已关闭', '已撤回', '待协商', '已转出']
 const CAT_OPTIONS = ['全部', '公共设施', '水电燃气', '环境卫生', '房屋维修', '绿化养护', '治安消防', '其他']
@@ -52,6 +54,11 @@ onMounted(() => { load(); loadSafety() })
 function opOf(i) {
   if (!op.value[i.id]) op.value[i.id] = {}
   return op.value[i.id]
+}
+
+function openDetail(i) {
+  detailIssue.value = i
+  detailOpen.value = true
 }
 
 function deadlineText(i) {
@@ -168,6 +175,7 @@ async function batchClose() {
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
                 <span v-if="deadlineText(i)" class="status-pill" :style="i.overdue ? 'background:#fef2f2;color:var(--ink-danger);' : 'background:#f0fdf4;color:var(--ink-success);'">{{ deadlineText(i) }}</span>
+                <n-button size="tiny" secondary @click.stop="openDetail(i)">详情</n-button>
                 <span class="muted" style="font-size:0.85rem;">{{ expanded[i.id] ? '收起 ▲' : '展开 ▼' }}</span>
               </div>
             </div>
@@ -255,5 +263,34 @@ async function batchClose() {
         </div>
       </n-tab-pane>
     </n-tabs>
+
+    <n-drawer v-model:show="detailOpen" placement="right" :width="420">
+      <n-drawer-content v-if="detailIssue" :title="'工单 #' + detailIssue.id + ' 详情'" :native-scrollbar="false">
+        <div class="detail-status">
+          <span class="status-pill">{{ detailIssue.status }}</span>
+          <span v-if="detailIssue.urgency === '紧急'" class="status-pill detail-danger">🔴 紧急</span>
+          <span v-if="deadlineText(detailIssue)" class="muted">{{ deadlineText(detailIssue) }}</span>
+        </div>
+        <h3 style="margin:12px 0 6px;">{{ detailIssue.title }}</h3>
+        <div class="detail-grid">
+          <span>问题类型</span><b>{{ detailIssue.issue_type || '—' }}</b>
+          <span>分类</span><b>{{ detailIssue.category || '—' }}</b>
+          <span>位置</span><b>{{ detailIssue.location || '—' }}</b>
+          <span>报修人</span><b>{{ detailIssue.reporter_name || '—' }}</b>
+          <span>责任人</span><b>{{ detailIssue.assignee_name || '待派单' }}</b>
+        </div>
+        <div class="detail-block"><div class="muted">居民原话 / 问题描述</div><div>{{ detailIssue.description || '—' }}</div></div>
+        <div v-if="detailIssue.resolve_note" class="detail-block"><div class="muted">处理结果</div><div>{{ detailIssue.resolve_note }}</div></div>
+        <n-button type="primary" block @click="expanded[detailIssue.id] = true; detailOpen = false">回到列表处理</n-button>
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
+
+<style scoped>
+.detail-status { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.detail-danger { background:#fef2f2; color:var(--ink-danger); }
+.detail-grid { display:grid; grid-template-columns:90px 1fr; gap:9px 12px; padding:12px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.detail-grid span, .detail-block .muted { color:var(--muted); font-size:0.85rem; }
+.detail-block { padding:12px 0; line-height:1.65; }
+</style>

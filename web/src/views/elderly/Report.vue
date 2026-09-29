@@ -19,53 +19,30 @@ const router = useRouter()
 const message = useMessage()
 const { recognize, speak, stopListening, stopSpeaking } = useSpeech()
 
-// 未提交草稿的**本会话**留存（v3 §7.4「中断可恢复」）：
-// 刷新/返回回来要能找到没填完的内容，恢复时**先说摘要再让老人选**（继续 / 重新开始）。
-// 为什么用 sessionStorage 而不是 localStorage：这是共享设备（社区活动室的平板、子女的手机），
-// 用 localStorage 会把上一个人的报修留在下一个人眼前。sessionStorage 随标签页关闭即失效，
-// 并且这里再按「用户+社区」标记校验一次——**绝不把上一个人的草稿带进来**。
-const DRAFT_KEY = 'ci_elderly_report_draft'
+// 未提交草稿由服务端按用户保存；浏览器不再保存原话、位置等正文。
+// 共享设备换人时，接口按当前会话 uid 查询，避免 localStorage/sessionStorage 被篡改后越权展示。
 const resumeOffer = ref(null)     // 待恢复的草稿摘要（有值才显示恢复卡）
 const speaking = ref(false)       // 正在播报（用于显示「⏹ 别念了」）
 
-function whoAmI() {
+async function saveDraft() {
+  const t = (text.value || '').trim()
+  if (!t) return
   try {
-    const u = JSON.parse(localStorage.getItem('ci_user') || 'null') || {}
-    return `${u.user_id || ''}|${u.community || ''}`
-  } catch { return '' }
+    await elderly.saveReportDraft({ text: t, answer_location: answer.value.location || '',
+      answer_scope: answer.value.scope || '', answer_urgency: answer.value.urgency || '一般' })
+  } catch { /* 草稿保存失败不阻断当前办理 */ }
 }
 
-/** 把"没提交完的这一步"留在本会话里（刷新可恢复）。存不下也不影响办理，故只忽略错误。 */
-function saveLocalDraft() {
-  try {
-    const t = (text.value || '').trim()
-    if (!t) return
-    const summary = (draft.value && draft.value.fields && draft.value.fields.title) || t.slice(0, 30)
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-      who: whoAmI(), text: t, answer: { ...answer.value }, summary, at: Date.now(),
-    }))
-  } catch { /* 忽略：存不下不影响办理 */ }
+async function clearDraft() {
+  try { await elderly.clearReportDraft() } catch { /* 草稿已提交时清除失败不阻断 */ }
 }
 
-function clearLocalDraft() {
-  try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* 忽略 */ }
-}
-
-/** 页面打开时看看有没有**同一个人**没填完的草稿（换人就当没有）。 */
-function loadLocalDraft() {
+/** 页面打开时由服务端按当前登录身份取自己的草稿。 */
+async function loadSavedDraft() {
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY)
-    if (!raw) return
-    const d = JSON.parse(raw)
-    if (!d || !d.text) return
-    if (d.who !== whoAmI()) {     // 换用户/换社区 → 直接丢掉，不提示、不展示
-      clearLocalDraft()
-      return
-    }
-    resumeOffer.value = d
-  } catch {
-    clearLocalDraft()
-  }
+    const d = await elderly.reportDraftCurrent()
+    if (d && d.text) resumeOffer.value = d
+  } catch { /* 未登录或服务暂不可用时不显示旧草稿 */ }
 }
 
 /** 老人选「接着填」：把原话与已确认字段放回去，再**从服务端重算一遍摘要**（不拿旧结论当事实）。 */
@@ -81,12 +58,12 @@ async function resumeDraft() {
 /** 老人选「重新开始」：把本会话的草稿丢掉（明确的选择，不是悄悄清掉）。 */
 function dropLocalDraft() {
   resumeOffer.value = null
-  clearLocalDraft()
+  void clearDraft()
   message.info('好，那就重新说')
 }
 
 onMounted(() => {
-  loadLocalDraft()
+  loadSavedDraft()
 })
 
 // 预置短语（v3 §7.1：**语音不是唯一入口**）——
@@ -199,7 +176,7 @@ async function usePhrase(p) {
 function giveUp() {
   restart()
   text.value = ''
-  clearLocalDraft()
+  void clearDraft()
   message.info('好，这次没有提交，也没有建工单')
   router.push('/elderly/home')
 }
@@ -211,7 +188,7 @@ function restart() {
   resultVia.value = ''
   unknownToken.value = ''
   answer.value = { location: '', scope: '', urgency: '一般' }
-  clearLocalDraft()
+  void clearDraft()
   if (listening.value) stopListening()
   listening.value = false
 }
@@ -245,7 +222,7 @@ async function loadDraft(withAnswer = false) {
     // （实测踩到：某些机型 speak() 既不回 onend 也不回 onerror，按钮会一直转圈，
     //  老人既看不到结果也点不了第二次——现在 speak() 有兜底超时，这里再把顺序摆正。）
     loadingDraft.value = false
-    saveLocalDraft()          // 刷新/返回回来还能接着填（v3 §7.4）
+    await saveDraft()         // 正文保存到服务端，按当前用户恢复
     if (d.need_more) {
       // 补充值被判"不够用"时，先说明为什么（否则老人不知道要改成什么样）
       if (d.reject_hint) message.warning(d.reject_hint)
@@ -303,7 +280,7 @@ async function submit() {
     }
     draft.value = null
     text.value = ''
-    clearLocalDraft()             // 已经建单了：本会话的临时草稿失效（v3 §7.4 不许旧确认再提交）
+    await clearDraft()             // 已经建单了：服务端草稿失效
   } catch (e) {
     // ⚠️ 断网/超时时**不能**说"提交失败"就完事 —— 可能其实已经提交成功了。
     // 如实告诉老人"结果还不确定"，并给一个"查一下"的出口，**不诱导他再点一次**（§6-I5）。
@@ -343,7 +320,7 @@ async function checkSubmitted() {
       unknownToken.value = ''
       draft.value = null
       text.value = ''
-      clearLocalDraft()
+      await clearDraft()
       message.success(`核对到了：已经提交成功，工单号 ${s.issue_id}`)
       await say(`核对到了，已经提交成功，工单号 ${s.issue_id}`)
     } else if (s && s.in_flight) {

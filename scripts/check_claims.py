@@ -214,11 +214,11 @@ def _cross_check(collected: int) -> int:
         for i, ln in enumerate(txt.splitlines(), 1):
             if "scripts/sync_test_count" in ln or "check_claims" in ln:
                 continue          # 命令示例/提示行不参与核对
-            for m in re.finditer(r"可运行(?:用例)?[\s|*]*(\d{3})", ln):
+            for m in re.finditer(r"可运行(?:用例)?[\s|*]*(\d{3,})", ln):
                 if int(m.group(1)) != collected:
                     bad.append(f"{doc}:{i} 写「可运行 {m.group(1)}」，实测可运行 {collected}"
                                f"（跑 `python scripts/sync_test_count.py {collected}` 同步）")
-            for m in re.finditer(r"(\d{3})\s*(?:通过|passed)", ln):
+            for m in re.finditer(r"(\d{3,})\s*(?:通过|passed)", ln):
                 if int(m.group(1)) != passed:
                     bad.append(f"{doc}:{i} 写「{m.group(1)} 通过」，实测应为 {passed}"
                                f"（跑 `python scripts/sync_test_count.py {collected}` 同步）")

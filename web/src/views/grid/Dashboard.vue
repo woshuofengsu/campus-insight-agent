@@ -10,6 +10,7 @@ const router = useRouter()
 const message = useMessage()
 
 const stats = ref({ total: 0, pending: 0, processing: 0, resolved: 0 })
+const todo = ref([])
 const urgent = ref([])
 const pendingProps = ref([])
 const selfRes = ref({ ai_self_resolution_rate: 0, issue_self_resolution_rate: 0, total_dialogs: 0, total_issues: 0 })
@@ -37,6 +38,13 @@ onMounted(async () => {
       resolved: all.filter((i) => i.status === '处理结束').length,
     }
     urgent.value = all.filter((i) => i.urgency === '紧急' && !['处理结束', '已关闭', '已撤回'].includes(i.status)).slice(0, 5)
+    const active = all.filter((i) => !['处理结束', '已关闭', '已撤回'].includes(i.status))
+    todo.value = active.sort((a, b) => {
+      const overdue = Number(Boolean(b.overdue)) - Number(Boolean(a.overdue))
+      if (overdue) return overdue
+      const rank = { 紧急: 0, 中等: 1, 一般: 2, 普通: 3 }
+      return (rank[a.urgency] ?? 9) - (rank[b.urgency] ?? 9)
+    }).slice(0, 8)
   } catch (e) { message.error(e.message) }
   try {
     const ps = (await proposals.list()) || []
@@ -77,6 +85,20 @@ const cards = computed(() => [
           <CountUp :value="c.value" :duration="900" />
         </div>
         <div class="muted" style="font-size:0.85rem;">{{ c.label }}</div>
+      </div>
+    </div>
+
+    <div class="card todo-panel" v-if="todo.length">
+      <div class="todo-head">
+        <div><div class="todo-title">📥 今日待办</div><div class="muted todo-sub">先处理超时和紧急事项，再处理普通工单</div></div>
+        <n-button size="small" type="primary" ghost @click="router.push('/grid/work-orders')">进入工单台</n-button>
+      </div>
+      <div class="todo-list">
+        <button v-for="i in todo" :key="i.id" class="todo-row" @click="router.push('/grid/work-orders')">
+          <span class="todo-priority" :class="{ danger: i.overdue || i.urgency === '紧急' }">{{ i.overdue ? '超时' : i.urgency || '一般' }}</span>
+          <span class="todo-content"><b>#{{ i.id }} {{ i.title }}</b><span class="muted">{{ i.location || '未标位置' }} · {{ i.status }}</span></span>
+          <span class="muted">查看 ›</span>
+        </button>
       </div>
     </div>
 
@@ -200,3 +222,19 @@ const cards = computed(() => [
     </n-drawer>
   </div>
 </template>
+
+<style scoped>
+.todo-panel { margin-bottom:16px; }
+.todo-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.todo-title { font-size:1.1rem; font-weight:750; }
+.todo-sub { font-size:0.8rem; margin-top:2px; }
+.todo-list { border-top:1px solid var(--border); }
+.todo-row { width:100%; display:flex; align-items:center; gap:10px; padding:10px 0; border:0; border-bottom:1px solid var(--border); background:transparent; color:inherit; text-align:left; cursor:pointer; }
+.todo-row:hover { background:var(--hover-bg); }
+.todo-priority { min-width:42px; padding:3px 5px; border-radius:6px; background:var(--panel-blue); color:var(--ink-info); font-size:0.75rem; text-align:center; }
+.todo-priority.danger { background:#fef2f2; color:var(--ink-danger); }
+.todo-content { display:flex; flex:1; flex-direction:column; gap:3px; min-width:0; }
+.todo-content b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.todo-content .muted { font-size:0.8rem; }
+@media (max-width: 720px) { .todo-head { align-items:flex-start; flex-direction:column; } .todo-row { gap:6px; } }
+</style>

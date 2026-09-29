@@ -174,12 +174,23 @@ async function doTransfer() {
         <div v-if="result.applicable_area" style="margin-top:6px;font-size:1.15rem;">
           📍 适用地区：<b>{{ result.applicable_area }}</b>
         </div>
+        <div v-if="result.knowledge" class="elderly-evidence" data-evidence-card>
+          <div style="font-weight:700;color:var(--primary);">🔎 这条回答依据</div>
+          <div style="margin-top:5px;">{{ result.knowledge.title }}</div>
+          <div style="margin-top:5px;color:var(--muted);font-size:1rem;line-height:1.6;">
+            <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }} </span>
+            <span v-if="result.knowledge.effective_date">生效：{{ result.knowledge.effective_date }} </span>
+            <span v-if="result.knowledge.version">版本：V{{ result.knowledge.version }}</span>
+          </div>
+          <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener" style="display:inline-block;margin-top:4px;color:var(--primary);">查看政策原文 ↗</a>
+        </div>
         <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
         <n-button type="primary" ghost block size="large" style="margin-top:12px;min-height:56px;" @click="playAnswer">🔊 播放回答</n-button>
       </template>
       <template v-else>
         <div style="font-weight:700;color:#d97706;">暂未找到答案</div>
         <div class="muted" style="margin-top:6px;">{{ result.manual_text }}</div>
+        <div v-if="result.reason" class="elderly-evidence elderly-evidence-muted">{{ result.reason === 'weak_evidence' ? '系统提示：依据不够直接，已转人工核对。' : result.reason === 'manual' ? '系统提示：这类问题需要负责人判断。' : '系统提示：暂未找到匹配依据。' }}</div>
         <n-button size="large" type="primary" ghost block style="margin-top:12px;min-height:56px;" @click="transferConfirm = true">🙋 转人工咨询</n-button>
       </template>
     </div>
@@ -205,3 +216,8 @@ async function doTransfer() {
              @positive-click="doTransfer" @negative-click="transferConfirm = false" />
   </div>
 </template>
+
+<style scoped>
+.elderly-evidence { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-left:4px solid var(--primary); border-radius:10px; background:var(--card-bg); }
+.elderly-evidence-muted { color:var(--muted); font-size:1rem; }
+</style>

@@ -27,6 +27,10 @@ GOLDEN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 # 「无证据不许编」评测集（v2 §11.4）：refuse=库里确实没依据（不许编），answer=控制组（必须能答）
 REFUSAL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "tests", "llm_eval", "refusal_set.jsonl")
+# 对抗集（外部评审第十一轮："100% 是不是过拟合"）：
+# confusable 相似但错误 / colloquial 口语错别字 / sensitive 敏感医疗法律 / cross_region 跨社区
+ADVERSARIAL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "tests", "llm_eval", "adversarial_set.jsonl")
 
 
 def load_golden(path: str = GOLDEN) -> list[dict]:
@@ -45,6 +49,122 @@ def load_golden(path: str = GOLDEN) -> list[dict]:
 def load_refusal(path: str = REFUSAL) -> list[dict]:
     """读「无证据不许编」评测集（与 golden 同格式，`expect` 取值 refuse / answer）。"""
     return load_golden(path)
+
+
+def load_adversarial(path: str = ADVERSARIAL) -> list[dict]:
+    """读对抗集（`kind` 决定判据，见文件头说明）。"""
+    return load_golden(path)
+
+
+def run_adversarial(verbose: bool = False, db_path: str | None = None,
+                    tenant_community: str = "海淀小区",
+                    cross_tenant_community: str = "朝阳试点社区") -> dict:
+    """**对抗集**：正面回答"100% 是不是过拟合"（外部评审第十一轮）。
+
+    · `confusable` 相似但错误 —— 库里没有的东西，字面像某条 → **不许拿别的当答案**（张冠李戴红线）；
+    · `colloquial` 口语/错别字   —— 库里有依据 → 应当答上（检验检索对噪声的鲁棒性，**允许掉分**）；
+    · `sensitive`  敏感/医疗/法律 —— 必须转人工（安全红线，硬门禁）；
+    · `cross_region` 别的社区问属地专属问题 —— 可以答，但**不许拿海淀区专属文件冒充**。
+
+    与前两集一致：走**产品入口** `ask_question`，在数据库**临时副本**上跑（不污染真实提问记录），
+    并校验评测库的已发布知识条数（数字可比性的前提）。
+    """
+    import shutil
+    import sqlite3
+    import tempfile
+
+    from config import DB_PATH
+    from data import db_core
+
+    rows = load_adversarial()
+    if not rows:
+        return {"cases": 0, "error": "对抗集为空（tests/llm_eval/adversarial_set.jsonl）"}
+
+    src = db_path or DB_PATH
+    tmpdir = tempfile.mkdtemp(prefix="adversarial_")
+    tmp_db = os.path.join(tmpdir, "adv.db")
+    orig_path = db_core._DB_PATH
+    try:
+        shutil.copy(src, tmp_db)
+    except Exception as e:  # noqa: BLE001
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return {"cases": 0, "db": src, "error": f"评测库不可读：{src}（{str(e)[:60]}）"}
+
+    details = []
+    kb_published = 0
+    db_core._DB_PATH = tmp_db
+    try:
+        conn = sqlite3.connect(tmp_db)
+        try:
+            kb_published = conn.execute(
+                "SELECT COUNT(*) FROM knowledge_base WHERE audit_status='已发布'").fetchone()[0]
+            # 跨社区用例要用"另一个社区"的居民身份（租户只从服务端身份来）
+            row = conn.execute("SELECT id FROM user_profile WHERE community=? ORDER BY id LIMIT 1",
+                               (cross_tenant_community,)).fetchone()
+            cross_uid = row[0] if row else 1
+        finally:
+            conn.close()
+        if kb_published == 0:
+            return {"cases": 0, "db": src, "kb_published": 0,
+                    "error": f"评测库没有已发布知识（{src}）—— 对抗集无从谈起"}
+
+        from data.db_policy import ask_question
+        from utils.region import resolve_region
+        regions = {t: resolve_region(t) for t in (tenant_community, cross_tenant_community)}
+        for c in rows:
+            kind = (c.get("kind") or "").strip()
+            expect = (c.get("expect") or "").strip()
+            uid = cross_uid if kind == "cross_region" else 1
+            tenant = cross_tenant_community if kind == "cross_region" else tenant_community
+            r = ask_question(uid, c["query"], region=regions[tenant])
+            answered = bool(r.get("matched"))
+            reason = r.get("reason") or ("matched" if answered else "")
+            cit_area = ((r.get("knowledge") or {}).get("applicable_area") or "")
+            blob = " ".join([
+                str((r.get("knowledge") or {}).get("title") or ""),
+                str((r.get("knowledge") or {}).get("keywords") or ""),
+                str(r.get("auto_answer") or ""),
+            ])
+            wants = c.get("expect_any") or []
+            if expect == "refuse":
+                ok = (not answered)
+                if kind == "sensitive":
+                    ok = ok and reason == "manual"     # 敏感类必须是"转人工"，不是"没找到"
+            else:
+                ok = answered and (not wants or any(w in blob for w in wants))
+                if kind == "cross_region":
+                    # 不许拿"海淀区专属"文件冒充（跨区只扣 0.5 分，压不过主题分差距，历史上真出过）
+                    ok = ok and cit_area != "北京市海淀区"
+            details.append({"id": c.get("id"), "kind": kind, "query": c["query"],
+                            "expect": expect, "answered": answered, "reason": reason,
+                            "cited_area": cit_area, "ok": ok, "why": c.get("why", "")})
+            if verbose:
+                print(f"[{'✓' if ok else '✗'}] ({kind}) {c['query']} → "
+                      f"{'自动回答' if answered else '不自动回答'}（{reason}）引用地区={cit_area or '—'}")
+    finally:
+        db_core._DB_PATH = orig_path
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def _rate(pick) -> dict:
+        sub = [d for d in details if pick(d)]
+        good = sum(1 for d in sub if d["ok"])
+        return {"n": len(sub), "ok": good,
+                "rate": round(good * 100 / len(sub), 1) if sub else 0.0,
+                "failed": [d["query"] for d in sub if not d["ok"]]}
+
+    from utils.embedding import describe
+    out = {
+        "cases": len(details), "db": src, "kb_published": kb_published,
+        "set_digest": refusal_digest(ADVERSARIAL),
+        # 检索姿态必须记录：跑的时候向量服务连不上（网络抖动）会自动退化成纯词法，
+        # 口语/错别字类的成绩会明显不同 —— 不写姿态的百分比没法比较（实测踩到）
+        "embedding": describe(),
+        "by_kind": {k: _rate(lambda d, k=k: d["kind"] == k)
+                    for k in ("confusable", "colloquial", "sensitive", "cross_region")},
+        "details": details,
+    }
+    out["failed"] = [d["query"] for d in details if not d["ok"]]
+    return out
 
 
 def refusal_digest(path: str = REFUSAL) -> str:

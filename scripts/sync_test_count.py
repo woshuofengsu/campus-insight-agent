@@ -110,6 +110,33 @@ def current_meta() -> int:
     return int(m.group(1)) if m else -1
 
 
+
+def rewrite_counts(text: str, new: int) -> str:
+    """把文档正文里的测试数改写成 `new`（**唯一入口**，便于单测与防回归）。
+
+    按**语义**替换每种表述：
+      · 「可运行 N」/「N 项可运行」/「可运行用例 N」→ 可运行数 `new`；
+      · 「N passed」/「N 通过」→ 通过数 `new - 1`（踩过的坑：先前把它也当成可运行数，
+        文档因此出现「577 passed（可运行 576）」这种自相矛盾）；
+      · 「N 项测试」/「N 测试」→ 总数 `new`。
+
+    ⚠️ 数字一律用「三位及以上」的数量词正则而不是固定三位：
+    2026-09-29 套件跨过 999 → 1000 条时，固定三位正则会去匹配 1000 里的前三位 100 并替换成 1000，
+    于是文档被写成 **10000**（8 份材料同时错），而 check_claims 的读取正则也是固定三位，
+    压根读不出四位数字 → 两边一起"看起来正常"。`tests/test_count_tooling.py` 守着这条。
+    """
+    s = re.sub(r"\b\d{3,}(\s*项\s*自动化\s*测试|\s*项\s*测试|\s*测试|\s*项(?=\s*[（(]))",
+               lambda m: f"{new}{m.group(1)}", text)
+    s = re.sub(r"(可运行\s*)\d{3,}", lambda m: f"{m.group(1)}{new}", s)
+    # 只覆盖上面两条会漏掉「NNN 项可运行」「可运行用例 NNN」「NNN = MMM 通过」三种写法，
+    # 导致文档出现「622 项可运行（624 通过）」这种自相矛盾 → 补齐。
+    s = re.sub(r"\b\d{3,}(\s*项\s*可运行)", lambda m: f"{new}{m.group(1)}", s)
+    s = re.sub(r"(可运行用例[\s|*]*)\d{3,}", lambda m: f"{m.group(1)}{new}", s)
+    s = re.sub(r"\b\d{3,}(\s*=\s*\d{3,}\s*通过)", lambda m: f"{new}{m.group(1)}", s)
+    s = re.sub(r"\b\d{3,}(\s*passed)", lambda m: f"{new - 1}{m.group(1)}", s)
+    s = re.sub(r"\b\d{3,}(\s*通过)", lambda m: f"{new - 1}{m.group(1)}", s)
+    return s
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     check_only = "--check" in sys.argv
@@ -149,18 +176,7 @@ def main() -> int:
         if not os.path.exists(p):
             continue
         s = orig = io.open(p, encoding="utf-8").read()
-        # 按**语义**替换每种表述。踩过的坑：先前把「N passed」也替换成可运行数，导致文档出现
-        # 「577 passed（可运行 576）」这种互换——`passed` 必须是「可运行数 − 1」。
-        s = re.sub(r"\b\d{3}(\s*项\s*自动化\s*测试|\s*项\s*测试|\s*测试|\s*项(?=\s*[（(]))",
-                   lambda m: f"{new}{m.group(1)}", s)
-        s = re.sub(r"(可运行\s*)\d{3}", lambda m: f"{m.group(1)}{new}", s)
-        # 踩过的坑（本轮实测）：只覆盖上面两条会漏掉「NNN 项可运行」「可运行用例 NNN」「NNN = MMM 通过」
-        # 三种写法，导致文档出现「622 项可运行（624 通过）」这种自相矛盾 → 补齐。
-        s = re.sub(r"\b\d{3}(\s*项\s*可运行)", lambda m: f"{new}{m.group(1)}", s)
-        s = re.sub(r"(可运行用例[\s|*]*)\d{3}", lambda m: f"{m.group(1)}{new}", s)
-        s = re.sub(r"\b\d{3}(\s*=\s*\d{3}\s*通过)", lambda m: f"{new}{m.group(1)}", s)
-        s = re.sub(r"\b\d{3}(\s*passed)", lambda m: f"{new - 1}{m.group(1)}", s)
-        s = re.sub(r"\b\d{3}(\s*通过)", lambda m: f"{new - 1}{m.group(1)}", s)
+        s = rewrite_counts(s, new)
         if s != orig:
             io.open(p, "w", encoding="utf-8", newline="").write(s)
             print(f"  {doc} 已同步")
