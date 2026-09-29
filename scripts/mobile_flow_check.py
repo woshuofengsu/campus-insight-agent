@@ -313,21 +313,29 @@ def main() -> int:
                   "六号楼一层楼道灯闪" in body and "请您核对这几项" in body)
             # 恢复面板消失（选过了就不再反复问）
             check("选过之后恢复卡片不再出现", page.locator("[data-resume-draft]").count() == 0)
-            # 隐私：草稿带着「谁」的标记，换用户/换社区**绝不带入**（共享设备上这是硬要求）
-            page.evaluate("""() => {
-              const raw = sessionStorage.getItem('ci_elderly_report_draft');
-              if (!raw) return;
-              const d = JSON.parse(raw);
-              d.who = '999|别的小区';          // 假装这份草稿是上一个人留下的
-              sessionStorage.setItem('ci_elderly_report_draft', JSON.stringify(d));
+            # 隐私（外部评审第十一轮后改成服务端草稿）：**浏览器里不再存草稿正文**。
+            # 以前正文在 sessionStorage、身份靠 localStorage 的 ci_user —— 改 localStorage 就能骗过前端；
+            # 现在草稿由服务端按会话身份存取，前端伪造浏览器存储**不该**带出任何草稿。
+            fake = page.evaluate("""() => {
+              const payload = JSON.stringify({who: '1|海淀小区', text: '伪造的别人的报修',
+                                              answer: {}, summary: '伪造的别人的报修'});
+              try { sessionStorage.setItem('ci_elderly_report_draft', payload); } catch (e) {}
+              try { localStorage.setItem('ci_elderly_report_draft', payload); } catch (e) {}
+              return [sessionStorage.getItem('ci_elderly_report_draft'),
+                      localStorage.getItem('ci_elderly_report_draft')].map(Boolean);
             }""")
             page.reload(wait_until="networkidle")
-            page.wait_for_timeout(1600)
-            left = page.evaluate(
-                "() => sessionStorage.getItem('ci_elderly_report_draft')")
-            check("草稿属于别人时不带入（换用户/换社区直接丢掉，不展示、不提示）",
-                  page.locator("[data-resume-draft]").count() == 0 and not left,
-                  "已丢弃且输入框为空" if not left else f"残留：{str(left)[:40]}")
+            page.wait_for_timeout(1800)
+            shown_txt = page.inner_text("body")
+            # 判定口径：**页面不许出现伪造的内容**。服务端自己那条真草稿仍会出现（这是对的），
+            # 所以不能简单断言"没有恢复卡"——那会把正确行为判成失败（第一版就是这么写错的）。
+            ok_no_forge = "伪造的别人的报修" not in shown_txt
+            check("伪造浏览器存储也带不出草稿（草稿正文已移到服务端，前端只剩接口）", ok_no_forge,
+                  ("浏览器里塞了草稿（写入成功=%s），页面只显示服务端自己的那条" % fake)
+                  if ok_no_forge else "伪造内容被展示出来了")
+            # 清掉伪造痕迹，别影响后续检查
+            page.evaluate("""() => { try { sessionStorage.clear(); } catch (e) {}
+                                     try { localStorage.removeItem('ci_elderly_report_draft'); } catch (e) {} }""")
 
         # ---------- 4. 老年端 SOS：误触不发、长按才发、可取消 ----------
         print("\n【4】老年端紧急求助：误触不发 / 长按弹确认 / 可取消")

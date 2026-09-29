@@ -232,7 +232,7 @@ const cards = computed(() => [
 .todo-row { width:100%; display:flex; align-items:center; gap:10px; padding:10px 0; border:0; border-bottom:1px solid var(--border); background:transparent; color:inherit; text-align:left; cursor:pointer; }
 .todo-row:hover { background:var(--hover-bg); }
 .todo-priority { min-width:42px; padding:3px 5px; border-radius:6px; background:var(--panel-blue); color:var(--ink-info); font-size:0.75rem; text-align:center; }
-.todo-priority.danger { background:#fef2f2; color:var(--ink-danger); }
+.todo-priority.danger { background:color-mix(in srgb, var(--st-danger) 14%, transparent); color:var(--ink-danger); }
 .todo-content { display:flex; flex:1; flex-direction:column; gap:3px; min-width:0; }
 .todo-content b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .todo-content .muted { font-size:0.8rem; }
