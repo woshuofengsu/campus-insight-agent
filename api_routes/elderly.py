@@ -381,6 +381,13 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
                            f"这条报修已经提交过了，工单号 {prev.get('issue_id')}")
             _log.warning("老人报修并发提交：前一次还没出结果 uid=%s token=%s", uid, req.client_token)
             return _fail(2003, "这条报修正在提交中，请稍等几秒后点「查一下是否已经提交了」核对结果。")
+        if state == "unknown":
+            # 占位没做成（库忙/锁/异常）：**无法确认这件事是否已被别人领走 → 不办**（fail-closed）。
+            # 幂等表恰好写不进去时，最需要保护的正是"别建第二张单"；此时放行等于把保护关掉
+            # （外部评审第十一轮指出的硬伤，已实测复现：让占位抛异常 → 同编号建出两张单）。
+            # 客户端手里还有同一个编号，「查一下是否已经提交了」能查到真实结果，不诱导重复提交。
+            return _fail(2003, "提交状态暂时无法确认（系统繁忙）。请点「查一下是否已经提交了」核对，"
+                               "不要重复点上报。")
         reserved = True   # 这件事归我办：办成 remember，办不成 release（让老人还能用同一个编号重试）
 
     profile = _elderly_profile(uid)

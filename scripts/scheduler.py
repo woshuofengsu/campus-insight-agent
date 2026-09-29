@@ -112,54 +112,100 @@ def _health_linkage_tasks(db_weather, db_health) -> list[dict]:
     return out
 
 
-def run_all() -> dict:
-    """跑一遍全部自动任务，返回每类结果摘要。任务本身幂等，失败记录到异常日志。"""
+def _sos_escalations() -> int:
+    """SOS 未响应升级：**按社区逐个跑**（安全链路上的一环，不能静默失效）。
+
+    ⚠️ 2026-09-29 修（外部评审第十一轮提示 + 本机在库副本上逐个任务探测确认）：
+    原来直接 `get_sos_calls(status="求助中")` **不传社区** → 撞上多租户 fail-closed
+    （`ValueError: 跨用户列表/聚合查询必须显式提供 tenant=`）→ `_safe` 只记一条 warning，
+    于是**这个任务从来没跑成过**，而界面上完全看不出来（老人 SOS 无人响应升级 = 静默丢失）。
+
+    做法照 B7（天气联动）的规矩：用 `utils.tenant.all_tenants()` 枚举社区逐个判定；
+    另外单独数一遍"没有租户归属"的历史行并**明确告警**——宁可日志里吵，也不能把人漏掉。
+    """
+    from data import db_elderly_care as _ec
+    from utils.tenant import all_tenants
+    total = 0
+    tenants = all_tenants()
+    for t in tenants:
+        for s in _ec.get_sos_calls(status="求助中", limit=50, tenant=t):
+            if _ec.escalate_sos(s["id"], actor="系统")[0]:
+                total += 1
+    # 无归属的历史行：说明清楚（当前演示库为 0 条；一旦出现就要有人处理，而不是静默跳过）
+    try:
+        from data.db_core import get_db
+        with get_db() as conn:
+            orphan = conn.execute(
+                "SELECT COUNT(*) c FROM emergency_calls "
+                "WHERE call_type='sos' AND status='求助中' AND COALESCE(tenant_id,'')=''"
+            ).fetchone()["c"]
+        if orphan:
+            _log.warning("SOS升级：有 %s 条求助记录没有社区归属（历史数据），按社区跑不到它们，"
+                         "需要补盖租户章：utils.tenant.stamp_tenant(...)", orphan)
+    except Exception as e:  # noqa: BLE001 — 统计失败不影响已经做完的升级，但必须留痕
+        _log.warning("SOS升级：无归属行统计失败：%s", e)
+    return total
+
+
+def scheduled_tasks() -> dict:
+    """**任务清单的唯一来源**：`{结果键: (中文名, 无参可调用)}`。
+
+    `run_all()` 按它执行；`tests/test_scheduler_health.py` 也按它逐个跑一遍——
+    任务清单只留一份，就不会出现"测试里抄的那份先过期"（这正是本轮要防的那类问题）。
+    """
     from data import db_notice, db_proposal, db_health_content, db_weather
     from data import db_policy as _pol, db_elderly_care as _ec, db_repair as _rep
     from data import db_dispatch as _dispatch
+    return {
+        "notice": ("通知", db_notice.run_auto_tasks),
+        "auto_dispatch": ("自动分派", lambda: len(_dispatch.discover_and_dispatch(limit=20))),
+        "weather": ("天气自动任务", lambda: _weather_tasks(db_weather)),
+        "weather_overdue": ("天气超时", db_weather.mark_overdue_tasks),
+        # 天气升级：**不传**名单 → 由 escalate_overdue_tasks 按每个任务所属社区取
+        # （settings `senior_manager_ids@社区`，未配置则走"无法升级"分支）。
+        # 传一个全局名单会让"社区级配置"永远不生效——B7 的教训。
+        "weather_escalated": ("天气升级", db_weather.escalate_overdue_tasks),
+        "weather_expired": ("天气预警解除", db_weather.expire_alerts),
+        "proposal_confirm": ("提案确认", db_proposal.auto_confirm_overdue),
+        "proposal_end": ("提案反馈", db_proposal.auto_end_unfeedback),
+        "consult_overdue": ("咨询超时", db_health_content.mark_overdue_consults),
+        "consult_close": ("咨询关闭", db_health_content.auto_close_stale_consults),
+        "content_expire": ("内容到期", db_health_content.expire_contents),
+        "unpin": ("置顶取消", db_health_content.auto_unpin_expired),
+        "monthly": ("月度提醒", db_health_content.monthly_update_reminder),
+        "resubmit_remind": ("退回修改提醒", db_health_content.resubmit_reminder),
+        "health_linkage": ("健康天气联动",
+                           lambda: _health_linkage_tasks(db_weather, db_health_content)),
+        "policy_expire": ("政策到期", _pol.auto_expire_knowledge),
+        "policy_remind": ("政策更新提醒", lambda: len(_pol.remind_knowledge_updates())),
+        "policy_overdue": ("政策超时", _pol.mark_overdue_questions),
+        "policy_close": ("政策关闭", _pol.auto_close_stale_questions),
+        "sos_escalated": ("SOS升级", _sos_escalations),
+        "med_remind": ("用药审核提醒", lambda: len(_ec.remind_unreviewed_medications())),
+        "issue_overdue": ("报修超时", lambda: len(_rep.mark_issue_overdue_notice())),
+        "draft_cleaned": ("草稿清理", lambda: _rep.clean_issue_drafts(days=7)),
+        "agent_draft_cleaned": ("Agent草稿清理", lambda: _draft_clean()),
+        "kb_query_cleaned": ("知识库查询日志清理", lambda: _kb_query_clean()),
+        "care_event_cleaned": ("关怀事件日志清理", lambda: _care_event_clean()),
+        "exception_cleaned": ("异常清理", _clean_exceptions),
+        "proactive_followup": ("主动关怀-办结回访", lambda: _proactive_care()),
+        "elderly_safety": ("老人安全巡检", lambda: _elderly_safety()),
+        # 诚实呼叫（§6-B2）：没回填结果的拨打记录 → 如实标「结果未知」，不让它悬成"待确认"
+        "contact_call_resolved": ("联系拨打结果未知标注",
+                                  lambda: _ec.resolve_stale_contact_calls(minutes=5)),
+        # 卡9：补发"当时没发出去"的通知（业务事实早已提交，这里只负责把该收的人补齐）
+        "outbox_sent": ("通知补发", _flush_outbox),
+        "outbox_cleaned": ("通知队列清理", _clean_outbox),
+    }
 
+
+def run_all() -> dict:
+    """跑一遍全部自动任务，返回每类结果摘要。任务本身幂等，失败记录到异常日志。"""
     results: dict = {}
-    results["notice"] = _safe("通知", db_notice.run_auto_tasks)
-    results["auto_dispatch"] = _safe("自动分派", lambda: len(_dispatch.discover_and_dispatch(limit=20)))
-    results["weather"] = _safe("天气自动任务", lambda: _weather_tasks(db_weather))
-    results["weather_overdue"] = _safe("天气超时", db_weather.mark_overdue_tasks)
-    # 天气升级：**不传**名单 → 由 escalate_overdue_tasks 按每个任务所属社区取
-    # （settings `senior_manager_ids@社区`，未配置则走"无法升级"分支）。
-    # 传一个全局名单会让"社区级配置"永远不生效——B7 的教训。
-    _safe("天气升级", db_weather.escalate_overdue_tasks)
-    _safe("天气预警解除", db_weather.expire_alerts)
-    results["proposal_confirm"] = _safe("提案确认", db_proposal.auto_confirm_overdue)
-    results["proposal_end"] = _safe("提案反馈", db_proposal.auto_end_unfeedback)
-    results["consult_overdue"] = _safe("咨询超时", db_health_content.mark_overdue_consults)
-    results["consult_close"] = _safe("咨询关闭", db_health_content.auto_close_stale_consults)
-    results["content_expire"] = _safe("内容到期", db_health_content.expire_contents)
-    results["unpin"] = _safe("置顶取消", db_health_content.auto_unpin_expired)
-    results["monthly"] = _safe("月度提醒", db_health_content.monthly_update_reminder)
-    results["resubmit_remind"] = _safe("退回修改提醒", db_health_content.resubmit_reminder)
-    results["health_linkage"] = _safe("健康天气联动", lambda: _health_linkage_tasks(db_weather, db_health_content))
-    results["policy_expire"] = _safe("政策到期", _pol.auto_expire_knowledge)
-    results["policy_remind"] = _safe("政策更新提醒", lambda: len(_pol.remind_knowledge_updates()))
-    results["policy_overdue"] = _safe("政策超时", _pol.mark_overdue_questions)
-    results["policy_close"] = _safe("政策关闭", _pol.auto_close_stale_questions)
-    results["sos_escalated"] = _safe("SOS升级", lambda: sum(
-        1 for s in _ec.get_sos_calls(status="求助中", limit=50)
-        if _ec.escalate_sos(s["id"], actor="系统")[0]))
-    results["med_remind"] = _safe("用药审核提醒", lambda: len(_ec.remind_unreviewed_medications()))
-    results["issue_overdue"] = _safe("报修超时", lambda: len(_rep.mark_issue_overdue_notice()))
-    results["draft_cleaned"] = _safe("草稿清理", lambda: _rep.clean_issue_drafts(days=7))
-    results["agent_draft_cleaned"] = _safe("Agent草稿清理", lambda: _draft_clean())
-    results["kb_query_cleaned"] = _safe("知识库查询日志清理", lambda: _kb_query_clean())
-    results["care_event_cleaned"] = _safe("关怀事件日志清理", lambda: _care_event_clean())
-    results["exception_cleaned"] = _safe("异常清理", _clean_exceptions)
-    results["proactive_followup"] = _safe("主动关怀-办结回访", lambda: _proactive_care())
-    results["elderly_safety"] = _safe("老人安全巡检", lambda: _elderly_safety())
-    # 诚实呼叫（§6-B2）：没回填结果的拨打记录 → 如实标「结果未知」，不让它悬成"待确认"
-    results["contact_call_resolved"] = _safe(
-        "联系拨打结果未知标注", lambda: _ec.resolve_stale_contact_calls(minutes=5))
-    # 卡9：补发"当时没发出去"的通知（业务事实早已提交，这里只负责把该收的人补齐）
-    results["outbox_sent"] = _safe("通知补发", _flush_outbox)
-    results["outbox_cleaned"] = _safe("通知队列清理", _clean_outbox)
+    for key, (label, fn) in scheduled_tasks().items():
+        results[key] = _safe(label, fn)
     return results
+
 
 
 def _flush_outbox() -> int:

@@ -213,6 +213,10 @@ def agent_handoff_action(hid: int, req: HandoffAction, request: Request):
                 return _ok({**(prev or {}), "duplicate": True},
                            f"这个操作已经做过了：{req.action}")
             return _fail(2003, "这个操作正在处理中，请稍等几秒后再看结果。")
+        if state == "unknown":
+            # 占位没做成 → **不办**（fail-closed）：补问/回复会给居民发通知，
+            # 无法确认是否已被别人领走时执行，就可能给居民发两条一样的答复。
+            return _fail(2003, "操作状态暂时无法确认（系统繁忙），请稍等几秒重试。")
         reserved = True
     ok_, msg = handle_handoff(hid, req.action, actor_id=uid,
                               actor_name=u.get("name") or "负责人",

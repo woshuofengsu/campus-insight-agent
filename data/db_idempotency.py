@@ -103,7 +103,15 @@ def begin(scope: str, key: str, user_id: int | None = None,
     返回：
       · `("done", 结果)`    —— 之前已经做成过，直接复用结果（**不要再执行一次业务**）；
       · `("pending", None)` —— 另一个请求正在做同一件事，等它的结果，**不要再执行一次业务**；
-      · `("new", None)`     —— 这件事归你办，办完调 `remember`，办不成调 `release`。
+      · `("new", None)`     —— 这件事归你办，办完调 `remember`，办不成调 `release`；
+      · `("unknown", None)` —— **占位没能做成（数据库忙/锁/异常）**，无法确认这件事是否已被别人领走。
+        调用方**必须停止业务写入**，如实告诉用户"提交状态未知，可以按编号核对"，并且**不许**再建对象。
+
+    ⚠️ 2026-09-29（外部评审第十一轮指出，确认属实并已修）：原来占位抛异常时返回 `("new", None)`
+    —— 注释写着"宁可重复也不能阻断报修"。这个取舍是**错的**：
+    占位失败恰恰最容易发生在"库忙/锁冲突"这种**并发场景**，而那正是幂等要保护的时刻；
+    此时放行 = 在最需要保护的时候把它关掉（实测可复现：让占位语句抛异常，同编号能建出两张单）。
+    现在改成 fail-closed：拿不到"这件事归我办"的结论，就不办。
     """
     if not scope or not valid_key(key):
         return "new", None
@@ -130,9 +138,10 @@ def begin(scope: str, key: str, user_id: int | None = None,
             conn.commit()
         if (cur.rowcount or 0) == 1:
             return "new", None
-    except Exception as e:  # noqa: BLE001 — 占位失败时按老行为走（宁可重复也不能阻断报修），但要留痕
-        _log.warning("幂等键占位失败（并发时可能重复提交）scope=%s key=%s：%s", scope, plain, e)
-        return "new", None
+    except Exception as e:  # noqa: BLE001 — **fail-closed**：占位没做成就不许往下办（见 docstring）
+        _log.warning("幂等键占位失败（已按 fail-closed 拒绝继续办理）scope=%s key=%s：%s",
+                     scope, plain, e)
+        return "unknown", None
     # 被别的线程/进程抢先占位了：读它的结果，读不到就是"正在做"
     return state(scope, plain, user_id)
 

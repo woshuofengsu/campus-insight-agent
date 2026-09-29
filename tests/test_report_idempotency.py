@@ -5,7 +5,10 @@
   ① 同一个幂等编号重复提交 → **只建一张工单**，第二次直接返回上一次的结果；
   ② 断网/超时时能用该编号**查出真实结果**（不是猜的，是服务端记的）；
   ③ 别人的编号不能用来探测/复用别人的结果。
+另有一组**故障注入**（外部评审第十一轮指出）：占位失败（库忙/锁/异常）时必须 **fail-closed** ——
+不建单、不执行动作，如实回"状态未知 + 去核对"；这一条正是"最需要幂等的时刻别把幂等关掉"。
 """
+import json
 import os
 import sys
 import tempfile
@@ -19,6 +22,8 @@ from data import db_core  # noqa: E402
 A = "海淀小区"
 ELDER = 99301
 OTHER = 99302
+RESIDENT_UID = 99303
+GRID_UID = 99304
 PHONE = "13800009301"
 
 
@@ -169,6 +174,130 @@ def test_other_user_cannot_reuse_token(fresh_db):
     assert other["success"], _err(other)
     assert other["data"].get("duplicate") is not True, "同编号属于别人，不该当成自己的重复提交"
     assert other["data"]["issue_id"] != first["data"]["issue_id"]
+
+
+# ---------------------------------------------------------------- 故障注入：占位失败必须 fail-closed
+
+def test_reservation_failure_blocks_the_write(fresh_db):
+    """**占位失败时不许继续建单**（外部评审第十一轮指出的硬伤，2026-09-29 修）。
+
+    原来的取舍是"宁可重复也不能阻断报修"：占位抛异常就返回 `("new", None)` 继续办。
+    这个取舍是错的 —— 占位失败恰恰最容易发生在**库忙/锁冲突**这种并发场景，
+    而那正是幂等要保护的时刻；此时放行等于在最需要保护的时候把保护关掉。
+    本用例注入"占位语句抛异常"，断言：**一张单都不许建**、答复是"状态未知 + 去核对"，
+    并且同一个编号在故障解除后仍能正常提交（只建一张）。
+    """
+    from api_routes.elderly import (ReportSubmitIn, web_elderly_report_status,
+                                    web_elderly_report_submit)
+    from data import db_idempotency as ID
+    tok = "tok-jjjj1111"
+    body = dict(text="5号楼二层楼道灯坏了", location="5号楼2层楼道", scope="室外",
+                client_token=tok)
+
+    real_get_db = ID.get_db
+    boom = {"on": True}
+
+    class _Boom:
+        def __enter__(self):
+            raise RuntimeError("database is locked（注入）")
+
+        def __exit__(self, *a):
+            return False
+
+    def _flaky():
+        if boom["on"]:
+            return _Boom()
+        return real_get_db()
+
+    ID.get_db = _flaky
+    try:
+        res = web_elderly_report_submit(ReportSubmitIn(**body), _req(ELDER))
+    finally:
+        ID.get_db = real_get_db
+    payload = _ok_payload(res)
+    assert payload["success"] is False, f"占位失败竟然放行并建单：{payload}"
+    assert "无法确认" in _err(payload), f"答复没说清「状态未知」：{payload}"
+    assert _issues() == [], f"占位失败时**不许建单**，但库里出现了：{_issues()}"
+
+    # 故障解除后，同一个编号能正常提交（且只建一张）
+    ok = _ok_payload(web_elderly_report_submit(ReportSubmitIn(**body), _req(ELDER)))
+    assert ok["success"], _err(ok)
+    assert len(_issues()) == 1, f"恢复后应恰好建一张：{_issues()}"
+    # 客户端手里还是同一个编号 → 「查一下」能查到真实结果（不诱导重复提交）
+    st = _ok_payload(web_elderly_report_status(_req(ELDER), token=tok))
+    assert st["data"]["submitted"] is True and st["data"]["issue_id"] == ok["data"]["issue_id"]
+
+
+def test_begin_returns_unknown_when_placeholder_fails(fresh_db):
+    """`begin()` 的契约：占位失败 → `("unknown", None)`（而不是 `("new", None)` 放行）。"""
+    from data import db_idempotency as ID
+    real_get_db = ID.get_db
+
+    class _Boom:
+        def __enter__(self):
+            raise RuntimeError("disk I/O error（注入）")
+
+        def __exit__(self, *a):
+            return False
+
+    ID.get_db = lambda: _Boom()
+    try:
+        st, res = ID.begin("elderly_report", "tok-kkkk2222", ELDER)
+    finally:
+        ID.get_db = real_get_db
+    assert st == "unknown" and res is None, f"占位失败必须报 unknown（fail-closed），实际：{st}"
+
+
+def test_handoff_action_blocks_on_placeholder_failure(fresh_db):
+    """人工待办的补问/回复会给居民发通知：占位失败时同样**不许执行**（否则居民收两条）。"""
+    from api_routes.agent import HandoffAction, agent_handoff_action
+    from data import db_idempotency as ID
+    from data.db_agent import create_handoff
+    from utils.tenant import clear_cache
+    clear_cache()
+    # 先建好两个账号：处理包归属社区靠**写入侧盖章**（按 user_id 查其 community），
+    # 账号不存在就会盖成空租户 → 连领取都会被租户闸门挡住（顺序不能反）
+    with db_core.get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO user_profile (id, username, role, name, is_active, "
+            "community, phone_enc) VALUES (?, ?, 'resident', ?, 1, ?, '')",
+            (RESIDENT_UID, f"r{RESIDENT_UID}", "居民", A))
+        conn.execute(
+            "INSERT OR REPLACE INTO user_profile (id, username, role, name, is_active, "
+            "community, phone_enc) VALUES (?, ?, 'grid', ?, 1, ?, '')",
+            (GRID_UID, f"g{GRID_UID}", "网格员", A))
+        conn.commit()
+    clear_cache()
+    hid = create_handoff(session_id="sess-boom", user_id=RESIDENT_UID, role="resident",
+                         reason="注入测试", intent="handoff", package={"original_input": "测试"})
+    req = SimpleNamespace(
+        state=SimpleNamespace(user={"uid": GRID_UID, "role": "grid", "name": "网格员", "community": A}),
+        query_params={}, client=SimpleNamespace(host="127.0.0.1"))
+    # 先正常领取（让状态允许"回复"）
+    agent_handoff_action(hid, HandoffAction(action="claim"), req)
+
+    real_get_db = ID.get_db
+
+    class _Boom:
+        def __enter__(self):
+            raise RuntimeError("database is locked（注入）")
+
+        def __exit__(self, *a):
+            return False
+
+    ID.get_db = lambda: _Boom()
+    try:
+        res = agent_handoff_action(
+            hid, HandoffAction(action="reply", text="这条不该发出去", client_token="tok-llll3333"), req)
+    finally:
+        ID.get_db = real_get_db
+    body = res if isinstance(res, dict) else json.loads(bytes(res.body).decode("utf-8"))
+    assert body["success"] is False, f"占位失败竟然执行了回复：{body}"
+    with db_core.get_db() as conn:
+        n = conn.execute("SELECT COUNT(*) FROM notifications WHERE user_id=?", (RESIDENT_UID,)).fetchone()[0]
+        row = conn.execute("SELECT status, reply FROM agent_handoffs WHERE id=?", (hid,)).fetchone()
+    assert n == 0, f"注入故障时不该给居民发通知（发了 {n} 条）"
+    assert row["status"] == "已领取" and not (row["reply"] or ""), f"处理包不该被改动：{dict(row)}"
 
 
 # ---------------------------------------------------------------- 结果未知 → 查真实结果
