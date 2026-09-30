@@ -27,8 +27,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web", "src")
 ICONS = os.path.join(WEB, "config", "icons.js")
 
-# 真 emoji（不含排版箭头 → ↩ ⬇；它们在文本里是标点不是图标）
-EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B50\u2B55\u20E3]")
+# 真 emoji（不含排版箭头 → ↩ ⬇；它们在文本里是标点不是图标）。
+# ⚠️ 2026-09-29 补：只看码位区间会**漏掉一类**——U+23F1(⏱)/U+21A9(↩)/U+25B6(▶)/U+23F8(⏸)
+# 这些基字符在"符号/几何"区，**只有后面跟 U+FE0F（变体选择符）时才是彩色 emoji**。
+# 第一遍就漏了 `⏱️/↩️/▶️` 共 18 处（页面上真看得见），所以判据加一条：**出现 U+FE0F 就算 emoji**。
+EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B50\u2B55\u20E3]"
+                   "|[\u2190-\u21FF\u23E9-\u23FA\u25A0-\u25FF\u2B00-\u2BFF]\uFE0F"
+                   "|\uFE0F")
 # 唯一豁免：这份文件里的 emoji 是**用来匹配后端数据里可能出现的 emoji**的
 # （天气接口历史上会给 `emoji` 字段；没有 condition 文本时靠它兜底选图标），
 # 不是界面图标 —— 豁免必须写明理由，且只豁免这一个文件。
@@ -119,7 +124,12 @@ def test_icon_component_is_monochrome_and_sized():
 def test_scanner_self_check():
     assert EMOJI.search("🔧 工单管理"), "自检失效：认不出 emoji"
     assert EMOJI.search("标⚠️注"), "自检失效：认不出带变体选择符的符号"
+    # 第一遍漏掉的那一类必须被抓到（基字符在符号区，靠 U+FE0F 才是彩色 emoji）
+    assert EMOJI.search("⏱️ 还剩多久"), "自检失效：认不出 ⏱️（U+23F1+VS16）"
+    assert EMOJI.search("↩️ 撤回"), "自检失效：认不出 ↩️（U+21A9+VS16）"
+    assert EMOJI.search("▶️ 接着填"), "自检失效：认不出 ▶️（U+25B6+VS16）"
     assert not EMOJI.search("首页 → 报修 · 一步到人"), "自检失效：把排版箭头当成 emoji"
+    assert not EMOJI.search("● 未读　○ 待办　▲ 收起　▼ 展开"), "自检失效：把无 VS16 的排版符号当成 emoji"
     assert not EMOJI.search('<EIcon name="wrench" :size="18" />'), "自检失效：把图标组件当成 emoji"
     names = _icon_names()
     assert "wrench" in names and "bell" in names, "自检失效：图标表解析不出已知图标"

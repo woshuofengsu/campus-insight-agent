@@ -95,9 +95,9 @@ async function saveEdit() {
                原来是 size=small（≈15px 字号、32px 高），不符合长辈版"字号≥20px、触控≥48px"的口径。
                统一放大到 1.2rem / 最小 52px 高。 -->
           <n-button v-if="m.status === '审核通过'" size="large" type="success" class="elder-act" style="margin-left:8px;" @click="take(m, 'taken')"><EIcon name="checkCircle" :size="18" /> 我吃了</n-button>
-          <n-button v-if="m.status === '审核通过'" size="large" class="elder-act" style="margin-left:8px;" @click="take(m, 'snooze')">⏰ 10 分钟后再说</n-button>
-          <n-button v-if="m.status === '审核通过'" size="large" class="elder-act" style="margin-left:8px;" @click="toggle(m, 'pause')">⏸️ 暂停</n-button>
-          <n-button v-if="m.status === '已暂停'" size="large" type="primary" class="elder-act" style="margin-left:8px;" @click="toggle(m, 'resume')">▶️ 恢复</n-button>
+          <n-button v-if="m.status === '审核通过'" size="large" class="elder-act" style="margin-left:8px;" @click="take(m, 'snooze')"><EIcon name="clock" :size="18" /> 10 分钟后再说</n-button>
+          <n-button v-if="m.status === '审核通过'" size="large" class="elder-act" style="margin-left:8px;" @click="toggle(m, 'pause')"><EIcon name="pause" :size="18" /> 暂停</n-button>
+          <n-button v-if="m.status === '已暂停'" size="large" type="primary" class="elder-act" style="margin-left:8px;" @click="toggle(m, 'resume')"><EIcon name="play" :size="18" /> 恢复</n-button>
           <n-button v-if="['审核通过', '已暂停', '审核不通过'].includes(m.status)" size="large" class="elder-act" style="margin-left:8px;" @click="startEdit(m)"><EIcon name="edit" :size="18" /> 修改</n-button>
         </div>
       </div>

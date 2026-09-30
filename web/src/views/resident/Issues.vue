@@ -63,7 +63,7 @@ async function act(id, data) {
             <n-button size="small" type="warning" @click="act(i.id, { action: 'feedback', satisfied: false, reason: opOf(i).reason || '还需处理' })"><EIcon name="face-sad" :size="18" /> 不满意</n-button>
           </template>
           <!-- 待审核 → 撤回 -->
-          <n-button v-if="i.status === '待审核'" size="small" quaternary @click="act(i.id, { action: 'withdraw' })">↩️ 撤回</n-button>
+          <n-button v-if="i.status === '待审核'" size="small" quaternary @click="act(i.id, { action: 'withdraw' })"><EIcon name="arrowLeft" :size="18" />  撤回</n-button>
           <!-- 已撤回 → 重新打开（回待审核，可修改一次） -->
           <n-button v-if="i.status === '已撤回'" size="small" type="info" @click="act(i.id, { action: 'reopen' })"><EIcon name="unlock" :size="18" /> 重新打开</n-button>
           <!-- 退回补充信息 → 重新提交 -->

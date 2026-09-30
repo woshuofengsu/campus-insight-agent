@@ -225,7 +225,7 @@ function atts(c) {
             <n-button size="small" type="warning" @click="fb(c, false)"><EIcon name="face-sad" :size="18" /> 未解决</n-button>
           </div>
           <div v-if="['待回复','已回复','超时未回复','已撤回'].includes(c.status)" style="margin-top:8px;display:flex;gap:8px;">
-            <n-button v-if="c.status === '待回复'" size="small" quaternary @click="toggle(c, 'withdraw')">↩️ 撤回</n-button>
+            <n-button v-if="c.status === '待回复'" size="small" quaternary @click="toggle(c, 'withdraw')"><EIcon name="arrowLeft" :size="18" />  撤回</n-button>
             <n-button v-if="c.status === '已撤回'" size="small" @click="toggle(c, 'reopen')"><EIcon name="refresh" :size="18" /> 重新打开</n-button>
             <n-button v-if="['已回复','超时未回复'].includes(c.status)" size="small" @click="toggle(c, 'close')"><EIcon name="x" :size="18" /> 关闭</n-button>
           </div>

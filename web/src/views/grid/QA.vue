@@ -228,7 +228,7 @@ async function kgSearch() {
             <template v-if="k.status === '待审核'">
               <n-input v-model:value="kOpOf(k).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:220px;" />
               <n-button size="small" type="success" @click="kAct(k, { action: 'audit', approve: true, opinion: kOpOf(k).opinion || '同意' }, '已通过发布')"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
-              <n-button size="small" type="warning" @click="kAct(k, { action: 'audit', approve: false, opinion: kOpOf(k).opinion || '请补充' }, '已退回')">↩️ 退回</n-button>
+              <n-button size="small" type="warning" @click="kAct(k, { action: 'audit', approve: false, opinion: kOpOf(k).opinion || '请补充' }, '已退回')"><EIcon name="arrowLeft" :size="18" />  退回</n-button>
               <n-button size="small" quaternary @click="kAct(k, { action: 'withdraw' }, '已撤回审核，转草稿')">⏪ 撤回审核</n-button>
               <n-popconfirm @positive-click="kAct(k, { action: 'delete' }, '已删除草稿')">
                 <template #trigger><n-button size="small" quaternary type="error"><EIcon name="trash" :size="18" /> 删除</n-button></template>

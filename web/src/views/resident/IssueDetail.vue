@@ -92,7 +92,7 @@ async function submitEdit() {
             <EIcon name="clock" :size="18" /> 提交时间：{{ (detail.created_at || '').slice(0, 16) }}<br>
             <span v-if="detail.is_violation"><EIcon name="ban" :size="18" /> 违规标记<br></span>
             <span v-if="detail.non_community_responsibility"><EIcon name="construction" :size="18" /> 第三方施工（非社区责任）<br></span>
-            <span v-if="detail.remaining_hours != null">⏱️ {{ detail.overdue ? `已超时 ${Math.abs(detail.remaining_hours).toFixed(1)}h` : `剩余 ${detail.remaining_hours.toFixed(1)}h` }}（{{ detail.urgency }}级时限 {{ detail.deadline_hours }}h）<br></span>
+            <span v-if="detail.remaining_hours != null"><EIcon name="clock" :size="18" />  {{ detail.overdue ? `已超时 ${Math.abs(detail.remaining_hours).toFixed(1)}h` : `剩余 ${detail.remaining_hours.toFixed(1)}h` }}（{{ detail.urgency }}级时限 {{ detail.deadline_hours }}h）<br></span>
           </div>
           <div style="margin-top:8px;"><EIcon name="edit" :size="18" /> {{ detail.description }}</div>
           <div v-if="detail.resolve_note" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:10px;">
@@ -125,7 +125,7 @@ async function submitEdit() {
           </div>
         </div>
         <div v-if="detail.status === '待审核'" class="card">
-          <n-button quaternary @click="act({ action: 'withdraw' }, '已撤回')">↩️ 撤回工单</n-button>
+          <n-button quaternary @click="act({ action: 'withdraw' }, '已撤回')"><EIcon name="arrowLeft" :size="18" />  撤回工单</n-button>
         </div>
         <div v-if="detail.status === '已撤回'" class="card">
           <n-button type="info" @click="act({ action: 'reopen' }, '已重新打开，待审核')"><EIcon name="unlock" :size="18" /> 重新打开（可修改一次）</n-button>

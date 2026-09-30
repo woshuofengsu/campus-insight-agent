@@ -196,7 +196,7 @@ async function batchClose() {
                   <n-input v-model:value="opOf(i).opinion" placeholder="审核意见（退回必填）" size="small" style="margin-bottom:8px;" />
                   <div style="display:flex;gap:8px;">
                     <n-button size="small" type="success" @click="act(i, { action: 'audit', approve: true, opinion: opOf(i).opinion || '同意' }, '已审核通过')"><EIcon name="checkCircle" :size="18" /> 审核通过</n-button>
-                    <n-button size="small" type="warning" @click="requireValue(i, 'opinion', '退回必须填写审核意见') && act(i, { action: 'audit', approve: false, opinion: opOf(i).opinion }, '已退回')">↩️ 退回补充</n-button>
+                    <n-button size="small" type="warning" @click="requireValue(i, 'opinion', '退回必须填写审核意见') && act(i, { action: 'audit', approve: false, opinion: opOf(i).opinion }, '已退回')"><EIcon name="arrowLeft" :size="18" />  退回补充</n-button>
                   </div>
                 </template>
                 <!-- 派单 -->
@@ -220,7 +220,7 @@ async function batchClose() {
                   <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                     <span style="font-size:0.85rem;">居民补充了信息：</span>
                     <n-button size="small" type="primary" @click="act(i, { action: 'confirm_supplement', affects_timing: false }, '已确认补充')"><EIcon name="checkCircle" :size="18" /> 确认（不影响时限）</n-button>
-                    <n-button size="small" type="warning" @click="act(i, { action: 'confirm_supplement', affects_timing: true }, '已确认（时限重算）')">⏱️ 确认且重算时限</n-button>
+                    <n-button size="small" type="warning" @click="act(i, { action: 'confirm_supplement', affects_timing: true }, '已确认（时限重算）')"><EIcon name="clock" :size="18" />  确认且重算时限</n-button>
                   </div>
                 </template>
                 <!-- 改分类 -->

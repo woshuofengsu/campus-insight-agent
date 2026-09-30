@@ -367,7 +367,7 @@ async function checkSubmitted() {
       <div style="margin-top:6px;">{{ resumeOffer.summary }}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <n-button type="primary" size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
-                  @click="resumeDraft">▶️ 接着填</n-button>
+                  @click="resumeDraft"><EIcon name="arrowRight" :size="18" />  接着填</n-button>
         <n-button size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
                   @click="dropLocalDraft"><EIcon name="trash" :size="18" /> 重新开始</n-button>
       </div>
@@ -442,7 +442,7 @@ async function checkSubmitted() {
         <b v-else-if="draft.fields.issue_type === '室外'">公共地方（楼道/电梯等）</b>
         <span v-else style="color:var(--danger,#c00);">还没定，请选一下</span>
       </div>
-      <div style="margin-top:6px;">⏱️ 紧急程度：{{ draft.fields.urgency }}</div>
+      <div style="margin-top:6px;"><EIcon name="clock" :size="18" />  紧急程度：{{ draft.fields.urgency }}</div>
 
       <!-- 缺失项：就地追问（缺什么问什么，缺着就不给提交） -->
       <div v-if="draft.need_more" class="panel-warm" style="margin-top:12px;border-radius:10px;padding:10px;">
@@ -515,7 +515,7 @@ async function checkSubmitted() {
       <div style="margin-top:4px;"><EIcon name="pin" :size="18" /> 最终记录的位置：{{ submitted.confirmed.location }}</div>
       <div style="margin-top:4px;"><EIcon name="home" :size="18" /> 责任范围：
         {{ submitted.confirmed.issue_type === '室内' ? '您家里' : '公共地方' }}</div>
-      <div style="margin-top:4px;">⏱️ 紧急程度：{{ submitted.confirmed.urgency }}</div>
+      <div style="margin-top:4px;"><EIcon name="clock" :size="18" />  紧急程度：{{ submitted.confirmed.urgency }}</div>
       <div class="muted" style="margin-top:6px;font-size:1rem;">
         位置来源：{{ srcTip(submitted.sources.location) }}（系统不会把您没确认的内容写成事实）
       </div>

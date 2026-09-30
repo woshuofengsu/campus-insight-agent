@@ -98,7 +98,7 @@ async function act(id, data, okMsg) {
       <div class="muted" style="margin-top:4px;font-size:1.25rem;"><EIcon name="user" :size="18" /> 这一步由：{{ i.progress?.who }}</div>
       <div :style="`margin-top:6px;font-size:1.25rem;` +
                    (i.progress?.overdue ? 'color:var(--ink-danger);font-weight:700;' : '')">
-        ⏱️ {{ i.progress?.eta_line }}
+        <EIcon name="clock" :size="18" />  {{ i.progress?.eta_line }}
       </div>
 
       <div class="muted" style="font-size:1.25rem;margin-top:6px;">

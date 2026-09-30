@@ -22,6 +22,8 @@ export const ICON_PATHS = {
   plus: 'M12 5v14M5 12h14',
   plusCircle: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 8.5v7M8.5 12h7',
   minus: 'M5 12h14',
+  pause: 'M9.5 5.5v13M14.5 5.5v13',
+  play: 'M8 5.5 18.5 12 8 18.5v-13Z',
   arrowRight: 'M4 12h15M13 6l6 6-6 6',
   arrowLeft: 'M20 12H5M11 6l-6 6 6 6',
   arrowDown: 'M12 4v15M6 13l6 6 6-6',

@@ -101,7 +101,7 @@ function atts(p) {
             <n-input v-model:value="opOf(p).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:240px;" />
             <n-checkbox v-if="p.attachment_public" v-model:checked="opOf(p).attachOk" :checked-value="1" :unchecked-value="0" size="small">附件含隐私→不公开</n-checkbox>
             <n-button size="small" type="success" @click="act(p, { action: 'audit', approve: true, opinion: opOf(p).opinion || '同意', attachment_public_ok: opOf(p).attachOk ? false : true }, '审核通过')"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
-            <n-button size="small" type="warning" @click="act(p, { action: 'audit', approve: false, opinion: opOf(p).opinion || '请补充' }, '已退回')">↩️ 退回</n-button>
+            <n-button size="small" type="warning" @click="act(p, { action: 'audit', approve: false, opinion: opOf(p).opinion || '请补充' }, '已退回')"><EIcon name="arrowLeft" :size="18" />  退回</n-button>
           </template>
           <!-- 待确认公示/私有：提醒提案人确认（负责人不能代替确认） -->
           <template v-if="p.status === '待确认公示/私有'">
@@ -148,7 +148,7 @@ function atts(p) {
             <span class="muted" style="font-size:0.85rem;">评分（负责人也可投，一票制）：</span>
             <n-button v-for="s in 5" :key="'v' + s" size="small" :type="s === 5 ? 'primary' : 'default'" @click="vote(p, s)">{{ s }}<EIcon name="star" :size="18" /> </n-button>
             <n-popconfirm @positive-click="act(p, { action: 'extend_voting', minutes: 1440 }, '已顺延 1 天公示期')">
-              <template #trigger><n-button size="small" quaternary>⏱️ 延票 1 天</n-button></template>
+              <template #trigger><n-button size="small" quaternary><EIcon name="clock" :size="18" />  延票 1 天</n-button></template>
               投票异常时顺延公示期 1 天？
             </n-popconfirm>
           </template>

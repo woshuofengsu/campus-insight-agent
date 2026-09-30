@@ -132,7 +132,7 @@ async function sosAction(s, action) {
           <div v-if="m.status === '待审核'" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
             <n-input v-model:value="auditOp[m.id]" placeholder="审核意见" size="small" style="max-width:200px;" />
             <n-button size="small" type="success" @click="auditMed(m, true)"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
-            <n-button size="small" type="warning" @click="auditMed(m, false)">↩️ 退回</n-button>
+            <n-button size="small" type="warning" @click="auditMed(m, false)"><EIcon name="arrowLeft" :size="18" />  退回</n-button>
           </div>
         </div>
         <n-empty v-if="meds.length === 0" description="暂无用药提醒" />
@@ -148,7 +148,7 @@ async function sosAction(s, action) {
           <div class="muted" style="font-size:0.85rem;margin-top:4px;"><EIcon name="phone" :size="18" /> {{ c.phone }}</div>
           <div v-if="c.status === '待审核'" style="margin-top:10px;display:flex;gap:8px;">
             <n-button size="small" type="success" @click="auditContact(c, true)"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
-            <n-button size="small" type="warning" @click="auditContact(c, false)">↩️ 退回</n-button>
+            <n-button size="small" type="warning" @click="auditContact(c, false)"><EIcon name="arrowLeft" :size="18" />  退回</n-button>
           </div>
         </div>
         <n-empty v-if="contacts.length === 0" description="暂无紧急联系人" />

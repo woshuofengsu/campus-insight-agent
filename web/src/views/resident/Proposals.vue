@@ -125,7 +125,7 @@ async function addComment(p) {
 
         <!-- 我的提案：待审核撤回 / 已撤回重开 / 退回修改重提 / 待确认公示私有 -->
         <div v-if="p.mine" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <n-button v-if="p.status === '待审核'" size="small" quaternary @click="act(p, { action: 'withdraw' }, '已撤回')">↩️ 撤回</n-button>
+          <n-button v-if="p.status === '待审核'" size="small" quaternary @click="act(p, { action: 'withdraw' }, '已撤回')"><EIcon name="arrowLeft" :size="18" />  撤回</n-button>
           <n-button v-if="p.status === '已撤回'" size="small" type="info" @click="act(p, { action: 'reopen_mine' }, '已重新打开，待审核')"><EIcon name="unlock" :size="18" /> 重新打开</n-button>
           <n-button v-if="p.status === '退回修改'" size="small" type="warning" @click="openEdit(p)"><EIcon name="edit" :size="18" /> 修改后重新提交</n-button>
           <template v-if="p.status === '待确认公示/私有'">
