@@ -130,7 +130,7 @@ _OUTDOOR_WORDS = ("公共", "楼道", "走廊", "楼梯", "楼下", "广场", "�
 _CANCEL_WORDS = ("算了", "取消", "不要了", "先不弄了", "不报了", "撤了", "不修了", "别报了")
 
 
-def _apply_confirm_stage_supplement(text: str, draft: dict, uid) -> list[str]:
+def _apply_repair_supplement(text: str, draft: dict, uid) -> list[str]:
     """确认卡阶段收到的"补充信息" → 回填草稿；返回被更新的字段说明（没识别出则为空）。
 
     为什么需要（2026-09-30 实测）：老人在确认卡上往往不是回"确认"，而是补充/修正——
@@ -163,6 +163,13 @@ def _apply_confirm_stage_supplement(text: str, draft: dict, uid) -> list[str]:
             _log.warning("确认阶段读取登记资料失败（仅影响用资料补齐位置）：%s", e)
         r = extract_report_fields(t, prof)
         loc = (r["fields"].get("location") or "").strip()
+        if not loc:
+            # 老人只说了楼栋/楼层（"我住在五号楼""是二层"）时，extract_report_fields 因为
+            # 责任范围未定而给不出可派单位置；但**这句是老人明确说的**，应当优先于登记资料
+            # （实测：说"我住在五号楼"却用了资料里的"3号楼2单元501"，等于没听老人说话）。
+            frag = _structural_fragment(t)
+            if frag:
+                loc = frag
         # extract_report_fields 只会给出"能派单"的位置（太笼统的判为空）→ 这里可以直接用
         if loc and loc != (draft.get("location") or ""):
             draft["location"] = loc
@@ -174,6 +181,32 @@ def _apply_confirm_stage_supplement(text: str, draft: dict, uid) -> list[str]:
         _log.warning("确认阶段解析补充信息失败：%s", e)
     return filled
 
+
+
+def _structural_fragment(text: str) -> str:
+    """从一句话里取出"楼栋/单元/楼层"片段（老人补充位置时最常说的那部分）。
+
+    只认**明确的结构片段**（5号楼 / 3单元 / 二层），不做推断；取不到就返回空串。
+    """
+    try:
+        from utils.elderly_report import _BUILDING_RE, _FLOOR_RE, _UNIT_RE
+    except Exception:  # noqa: BLE001 — 拿不到正则就退化成"不补位置"
+        return ""
+    t = text or ""
+    parts: list[str] = []
+    for rx, suffix in ((_BUILDING_RE, "号楼"), (_UNIT_RE, "单元"), (_FLOOR_RE, "层")):
+        m = rx.search(t)
+        if m:
+            num = m.group(1)
+            from utils.elderly_report import _cn_to_int
+            try:
+                num = _cn_to_int(num)
+            except Exception:  # noqa: BLE001
+                pass
+            frag = f"{num}{suffix}"
+            if frag not in parts:
+                parts.append(frag)
+    return "".join(parts)
 
 def _classify_repair_location(text: str) -> str:
     """根据用户描述判断报修地点是室内还是室外。"""
@@ -265,6 +298,12 @@ class RepairDispatchAgent(BaseAgent):
             draft = None
             st.clear()
             step = None
+        # 老人可能在任何一步才补充位置/责任范围（实测：「我住在五号楼」是在问"急不急"时说的，
+        # 只认确认阶段的话就漏了，最后用登记资料的门牌建单——等于没听老人说话）。
+        # 所以只要草稿还在、这句话不是确认/取消词，就先尝试把补充吸收进草稿（拿不准就不动）。
+        if draft is not None and step and text not in _CANCEL_WORDS:
+            _apply_repair_supplement(text, draft, uid)
+
         if step == "ask_type":
             draft["type"] = _classify_repair_location(text)
             st["step"] = "ask_urgency" if draft.get("urgency") is None else "confirm"
@@ -298,7 +337,7 @@ class RepairDispatchAgent(BaseAgent):
                     _log.warning("取消报修时清理草稿失败：%s", e)
                 return self._reply("已取消，没有生成工单。", "已取消", "报修", chain_note="用户取消")
             # ② 是补充信息（位置/责任范围/紧急程度）→ 回填后重新确认（不丢草稿）
-            filled = _apply_confirm_stage_supplement(text, draft, uid)
+            filled = _apply_repair_supplement(text, draft, uid)
             if filled:
                 self._write(_draft_key(uid, "work_order_draft"), draft, lock=False)
                 self._write(_state_key(uid), st)

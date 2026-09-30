@@ -92,11 +92,36 @@ def test_confirm_stage_supplement_is_not_a_cancel():
     assert "确认" in reply and out.get("status") == "需确认", out
 
 
+def test_confirm_stage_takes_the_elderly_own_location_words():
+    """老人明确说出的楼栋/楼层要**优先于登记资料**（实测：说"我住在五号楼"却用了资料里的门牌）。"""
+    bb = _BB()
+    _run("楼道灯坏了", bb=bb)
+    out = _run("我住在五号楼", bb=bb)
+    draft = bb.read("user:99601:work_order_draft") or {}
+    reply = str(out.get("reply") or "")
+    loc = str(draft.get("location") or "")
+    # 库内位置统一成阿拉伯数字（五号楼 → 5号楼，与老人端同一套规范化），两种写法都算通过
+    assert "5号楼" in loc or "五号楼" in loc, f"没用老人说的话：{draft}"
+    assert (draft.get("sources") or {}).get("location") == "user", draft
+    assert "已取消" not in reply and out.get("status") == "需确认", out
+
+
+def test_supplement_at_urgency_stage_also_counts():
+    """**追问紧急程度时**才说楼栋，也要用上（不能只认确认阶段）。"""
+    bb = _BB()
+    _run("3号楼2单元电梯坏了", bb=bb)        # 位置清楚 → 只问紧急程度
+    out = _run("对了，是五号楼", bb=bb)
+    draft = bb.read("user:99601:work_order_draft") or {}
+    loc = str(draft.get("location") or "")
+    assert "5号楼" in loc or "五号楼" in loc, f"追问阶段的补充没被用上：{draft}"
+    assert out.get("status") in ("需确认", "追问"), out
+
+
 def test_confirm_stage_unrelated_talk_reasks_and_keeps_draft():
     """既不是确认、也不是补充、也没说取消 → **重新问一遍**，草稿保留。"""
     bb = _BB()
     _run("楼道灯坏了", bb=bb)
-    out = _run("我住在五号楼", bb=bb)
+    out = _run("我孙子在家呢", bb=bb)
     reply = str(out.get("reply") or "")
     assert "已取消" not in reply, f"非确认词被当成取消：{reply}"
     assert "还没" in reply or "没有提交" in reply, reply
@@ -157,9 +182,9 @@ def test_gate_would_catch_the_old_silent_cancel(monkeypatch):
         calls["n"] += 1
         return []
 
-    monkeypatch.setattr(B, "_apply_confirm_stage_supplement", _never_filled)
+    monkeypatch.setattr(B, "_apply_repair_supplement", _never_filled)
     bb = _BB()
     _run("楼道灯坏了", bb=bb)
-    out = _run("其实是我家里", bb=bb)      # 补充分支被禁 → 会落到"重新问一遍"（仍是安全行为）
-    assert calls["n"] == 1
+    out = _run("我住在五号楼", bb=bb)      # 补充分支被禁 → 会落到"重新问一遍"（仍是安全行为）
+    assert calls["n"] >= 1, "补充吸收函数根本没被调用（自检无效）"
     assert "已取消" not in str(out.get("reply") or "")
