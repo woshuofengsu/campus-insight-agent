@@ -97,3 +97,52 @@ def test_gate_actually_detects_drift():
     # 复现核对逻辑（不落盘改文件）
     key, (cssvar, value) = "primary", ("--primary", "#123456")
     assert (css.get(cssvar) or "").upper() != value.upper(), "自检失效：漂移竟然没被比出来"
+
+
+# ---------------------------------------------------------------- 语义文字色
+# 这些令牌是给**图形/淡底**用的亮色，直接当文字色用在白底上只有 2.0–2.31:1
+# （ui_audit 在 /resident/proposals/:id 的「匿名居民#xxxx」上实测抓到 2.31:1）。
+# 文字必须换成成对的 `-ink` 令牌（亮色深、暗色亮）。
+FIG = re.compile(
+    r"color:\s*var\(--(accent|primary|success|danger|warning|info"
+    r"|st-pending|st-doing|st-feedback|st-done|st-danger|st-info|st-success)\)")
+INK = re.compile(r"--[a-z-]*ink[a-z-]*$|^--muted$")
+
+
+def _scan_figure_text_colors() -> list[str]:
+    """扫 web/src 下的 `.vue` 与 `style.css`，找出「拿图形色当文字色」的地方。"""
+    out = []
+    targets = [CSS]
+    for dirpath, _dirs, files in os.walk(os.path.dirname(CSS)):
+        targets += [os.path.join(dirpath, f) for f in files if f.endswith(".vue")]
+    for p in targets:
+        text = io.open(p, encoding="utf-8").read()
+        for m in FIG.finditer(text):
+            var = m.group(1)
+            if INK.search("--" + var):
+                continue
+            line = text[:m.start()].count("\n") + 1
+            rel = os.path.relpath(p, os.path.dirname(os.path.dirname(CSS))).replace("\\", "/")
+            out.append(f"{rel}:{line} → {m.group(0).strip()}")
+    return out
+
+
+def test_semantic_text_colors_use_ink_tokens():
+    bad = _scan_figure_text_colors()
+    assert not bad, (
+        "语义文字色用了「图形色」令牌（暗色/亮色下对比度不达标），请换成 -ink 成对令牌"
+        "（--primary-ink / --ink-danger / --st-feedback-ink / --success-ink / --muted）：\n  "
+        + "\n  ".join(bad))
+
+
+def test_ink_gate_would_catch_the_old_style():
+    """**门禁自检**：拿修之前真出现过的那种写法，核对逻辑必须报出来（证明它不是摆设）。"""
+    sample = '<span style="color:var(--accent);font-weight:600;">匿名居民#8c6433</span>'
+    hits = [m.group(1) for m in FIG.finditer(sample)]
+    assert hits == ["accent"], f"自检失效：扫描器认不出历史写法（hits={hits}）"
+    assert not INK.search("--accent"), "自检失效：--accent 被误判成 ink 令牌"
+    # 反向：换成 ink 令牌后不该再报
+    fixed = sample.replace("var(--accent)", "var(--st-feedback-ink)")
+    assert not FIG.search(fixed), "自检失效：改成 ink 令牌后仍被判违规"
+    assert _scan_figure_text_colors() == [], "扫描器在仓库里仍有命中（上面的用例应已失败）"
+

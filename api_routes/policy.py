@@ -41,21 +41,40 @@ def web_qa_ask(req: AskQuestion, request: Request):
     except Exception:
         pass
     if r.get("matched"):
+        k = r.get("knowledge") or {}
         return _ok({
             "matched": True, "question_id": r.get("question_id"),
             "answer": r.get("auto_answer"), "score": r.get("score"),
-            "title": (r.get("knowledge") or {}).get("title"),
+            "title": k.get("title"),
             "rag": r.get("rag", False),
             # 属地可解释性：前端可显示"已按海淀区属地优先"
             "region_level": r.get("region_level", "national"),
             "region_label": reg.label(),
-            "applicable_area": r.get("applicable_area", ""),
+            "applicable_area": r.get("applicable_area", "") or k.get("applicable_area", ""),
+            # 证据面板（外部评审第十一轮建议）：前端早就有 `data-evidence-card` 的渲染与样式，
+            # 但**接口一直没返回 `knowledge`** → 那块 UI 永远不显示（典型的"前后端字段没对齐"）。
+            # 这里把"这条回答依据"按**数据库真行**透出（不给模型复述留位置）：
+            # 标题/来源/发布者/版本/生效与失效日期/适用地区/原文附件/检索姿态。
+            "knowledge": {
+                "id": k.get("id"), "title": k.get("title", ""),
+                "category": k.get("category", ""), "version": k.get("version") or 1,
+                "source": k.get("source", ""), "publisher": k.get("publisher", ""),
+                "policy_number": k.get("policy_number", ""),
+                "effective_date": k.get("effective_date", ""),
+                "expire_date": k.get("expire_date", ""),
+                "applicable_area": k.get("applicable_area", ""),
+                "attachment": k.get("attachment", ""),
+                "retrieval": k.get("retrieval", ""),
+                "is_community": k.get("is_community", False),
+            } if k else None,
         }, "已自动回答")
-    # 未匹配/敏感/医疗 → 转人工提示
+    # 未匹配/敏感/医疗/弱证据 → 转人工提示（把"为什么没自动回答"也如实带上）
     return _ok({
         "matched": False, "reason": r.get("reason"),
         "manual_text": r.get("manual_text", "暂未找到答案，可转人工。"),
         "expired_hint": r.get("expired_hint", ""),
+        "best_score": r.get("best_score"),
+        "q_type": r.get("q_type", ""),
     }, "未自动回答")
 
 

@@ -172,16 +172,19 @@ body {
   content: ""; width: 6px; height: 6px; border-radius: 50%;
   background: currentColor; flex-shrink: 0;
 }
-.st-pending  { background: rgba(245, 158, 11, 0.10);  color: var(--st-pending); }
-.st-doing    { background: rgba(45, 91, 255, 0.10);   color: var(--st-doing); }
-.st-feedback { background: rgba(255, 140, 66, 0.10);  color: var(--st-feedback); }
-.st-done     { background: rgba(156, 163, 175, 0.12); color: var(--st-done); }
-.st-danger   { background: rgba(239, 68, 68, 0.10);   color: var(--st-danger); }
-.st-info     { background: rgba(45, 91, 255, 0.10);   color: var(--st-info); }
-.st-success  { background: rgba(16, 185, 129, 0.10);  color: var(--st-success); }
+/* 文字色一律用 `-ink` 成对令牌：亮色 `--st-*` 是给 10% 淡底画的**图形**色，
+   直接当文字色在白底上只有 2.0–2.3:1（ui_audit 在提案详情页抓到过 2.31:1）。
+   由 tests/test_design_tokens.py::test_semantic_text_colors_use_ink_tokens 静态守着。 */
+.st-pending  { background: rgba(245, 158, 11, 0.10);  color: var(--st-pending-ink); }
+.st-doing    { background: rgba(45, 91, 255, 0.10);   color: var(--primary-ink); }
+.st-feedback { background: rgba(255, 140, 66, 0.10);  color: var(--st-feedback-ink); }
+.st-done     { background: rgba(156, 163, 175, 0.12); color: var(--muted); }
+.st-danger   { background: rgba(239, 68, 68, 0.10);   color: var(--ink-danger); }
+.st-info     { background: rgba(45, 91, 255, 0.10);   color: var(--ink-info); }
+.st-success  { background: rgba(16, 185, 129, 0.10);  color: var(--success-ink); }
 
 /* ---------------- 紧急橙提醒 ---------------- */
-.urgent { color: var(--accent); font-weight: 700; }
+.urgent { color: var(--st-feedback-ink); font-weight: 700; }
 .urgent-bg { background: var(--accent-light); border: 1px solid rgba(255, 140, 66, 0.5); border-radius: 10px; }
 
 /* ---------------- 数字统计卡 ---------------- */

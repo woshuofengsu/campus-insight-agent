@@ -71,7 +71,9 @@ def test_adversarial_set_shape_and_reasons():
     assert kinds == KINDS, f"四类都要有：{kinds}"
     for k in KINDS:
         n = sum(1 for r in rows if r["kind"] == k)
-        assert n >= 3, f"{k} 样本太少（{n} 条），测不出东西"
+        # 2026-09-29 扩样（21 → 60，四类各 15）：分母从"个位数"提到 15，
+        # 下限跟着提到 12 —— 谁删样本都会被拦住，别让报告里的百分比又退回"3/6"那种可信度。
+        assert n >= 12, f"{k} 样本太少（{n} 条），测不出东西"
     for r in rows:
         assert r.get("id") and r.get("query") and r.get("expect") in ("refuse", "answer"), r
         assert len(r.get("why") or "") >= 8, f"{r.get('id')} 没写 why（凭什么这样期望）"
@@ -95,7 +97,26 @@ def test_cross_region_never_cites_haidian_specific_policy():
     """朝阳居民的问题不许被"海淀区专属"文件回答（跨区只扣 0.5 分，压不过主题分差距——历史真出过）。"""
     r = _run()
     bk = r["by_kind"]["cross_region"]
-    assert bk["rate"] == 100.0, f"跨社区用例失败：{bk['failed']}"
+    assert bk["rate"] == 100.0, f"跨社区用例失败：{bk['failed']}。引用地区：{[(d['query'], d['cited_area']) for d in r['details'] if d['kind'] == 'cross_region']}"
+
+
+def test_cross_region_rule_covers_community_level_haidian():
+    """判定规则必须**连"海淀小区"级条目一起拦**，不能只比"不等于北京市海淀区"。
+
+    为什么单独守这一条：库里有两级海淀依据——`北京市海淀区`（区级细则）与
+    `海淀小区`（社区自编指引）。原来只比前者，社区自编那条会从判据里漏过去
+    （朝阳居民读到海淀小区的助餐指引，用例却是绿的）。
+    """
+    import re
+    src = io.open(os.path.join(ROOT, "scripts", "rag_eval.py"), encoding="utf-8").read()
+    assert '"海淀" not in cit_area' in src, (
+        "跨社区判据又退回「只比区级」了：应写 \"海淀\" not in cit_area")
+    # 规则语义自检：两级海淀依据都要被判失败，市级/全国要判通过
+    rule = lambda area: ("海淀" not in area)  # noqa: E731
+    assert not rule("北京市海淀区"), "区级海淀依据竟然判通过"
+    assert not rule("海淀小区"), "社区级海淀依据竟然判通过"
+    assert rule("北京市") and rule("全国") and rule("朝阳试点社区")
+    assert re.search(r'kind == "cross_region"', src), "找不到跨社区分支（判据挪走了？）"
 
 
 # ---------------------------------------------------------------- 噪声类（只报不打分）

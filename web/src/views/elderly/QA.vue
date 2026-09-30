@@ -175,14 +175,14 @@ async function doTransfer() {
           📍 适用地区：<b>{{ result.applicable_area }}</b>
         </div>
         <div v-if="result.knowledge" class="elderly-evidence" data-evidence-card>
-          <div style="font-weight:700;color:var(--primary);">🔎 这条回答依据</div>
+          <div style="font-weight:700;color:var(--primary-ink);">🔎 这条回答依据</div>
           <div style="margin-top:5px;">{{ result.knowledge.title }}</div>
           <div style="margin-top:5px;color:var(--muted);font-size:1rem;line-height:1.6;">
             <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }} </span>
             <span v-if="result.knowledge.effective_date">生效：{{ result.knowledge.effective_date }} </span>
             <span v-if="result.knowledge.version">版本：V{{ result.knowledge.version }}</span>
           </div>
-          <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener" style="display:inline-block;margin-top:4px;color:var(--primary);">查看政策原文 ↗</a>
+          <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener" style="display:inline-block;margin-top:4px;color:var(--primary-ink);">查看政策原文 ↗</a>
         </div>
         <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
         <n-button type="primary" ghost block size="large" style="margin-top:12px;min-height:56px;" @click="playAnswer">🔊 播放回答</n-button>

@@ -93,12 +93,35 @@ QUERY_SYNONYMS: dict[str, tuple[str, ...]] = {
 }
 
 
+# ---- 居民常见错别字归一（对抗集实测抓到的召回漏洞）----
+# 为什么要有这一张**极小**的表：对抗集 c18「装修完的拉圾往哪儿扔」实测被
+# 《环境噪声污染防治办法（装修时间）》答上了——因为「拉圾」这个错写既没命中
+# 《建筑垃圾处置管理规定》的关键词，又让「装修」二字成了唯一线索。
+# 这类错写不是"另一个话题"，而是**同一个词写错了**，所以做**换字**（不新增语义）。
+# 纪律：只登记**评测里实测抓到**的错写，不臆造"常见的还有哪些"——
+# 表越长越像在给评测集打补丁，那条线不能越。
+COMMON_TYPOS: dict[str, str] = {
+    "拉圾": "垃圾",   # c18 实测（装修垃圾 → 噪声办法）
+}
+
+
+def normalize_typos(text: str) -> str:
+    """把居民常见错别字换成正确写法（不动其它任何字）。"""
+    out = text or ""
+    for wrong, right in COMMON_TYPOS.items():
+        if wrong in out:
+            out = out.replace(wrong, right)
+    return out
+
+
 def expand_query(query: str) -> str:
     """把查询里的口语词扩展为同义的政策书面语（用于提升检索召回）。
 
     只做「加词」不做「换词」，不改变原查询语义；无命中则原样返回。
+    错别字先归一（`normalize_typos`）——「拉圾」这种写错了的**同一个词**，
+    不归一会让整句只剩"装修"两个字可用（实测会把装修垃圾问题答成装修噪音）。
     """
-    q = query or ""
+    q = normalize_typos(query or "")
     extra: list[str] = []
     for key, syns in QUERY_SYNONYMS.items():
         if key in q:

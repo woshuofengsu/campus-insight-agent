@@ -152,7 +152,7 @@ async function addComment(p) {
           <template v-if="commentList[p.id]">
             <div v-for="c in commentList[p.id]" :key="c.id"
                  style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
-              <span style="color:var(--accent);font-weight:600;">{{ c.author }}</span>
+              <span style="color:var(--st-feedback-ink);font-weight:600;">{{ c.author }}</span>
               <span class="muted" style="margin-left:8px;font-size:0.75rem;">{{ c.created_at }}</span>
               <div style="margin-top:4px;">{{ c.content }}</div>
             </div>

@@ -133,8 +133,10 @@ def run_adversarial(verbose: bool = False, db_path: str | None = None,
             else:
                 ok = answered and (not wants or any(w in blob for w in wants))
                 if kind == "cross_region":
-                    # 不许拿"海淀区专属"文件冒充（跨区只扣 0.5 分，压不过主题分差距，历史上真出过）
-                    ok = ok and cit_area != "北京市海淀区"
+                    # 不许拿"海淀专属"文件冒充（跨区只扣 0.5 分，压不过主题分差距，历史上真出过）。
+                    # 只比"不等于北京市海淀区"是不够的：库里还有**海淀小区自编条目**
+                    # （`applicable_area='海淀小区'`），对朝阳居民同样是错依据 → 只要含「海淀」即判失败。
+                    ok = ok and ("海淀" not in cit_area)
             details.append({"id": c.get("id"), "kind": kind, "query": c["query"],
                             "expect": expect, "answered": answered, "reason": reason,
                             "cited_area": cit_area, "ok": ok, "why": c.get("why", "")})

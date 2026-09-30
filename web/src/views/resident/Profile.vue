@@ -107,7 +107,7 @@ async function deleteAccount() {
         <div class="lbl">未读通知</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/messages')">
-        <div class="num" style="color:var(--st-danger);">✉️ {{ unreadMsgs }}</div>
+        <div class="num" style="color:var(--ink-danger);">✉️ {{ unreadMsgs }}</div>
         <div class="lbl">未读消息</div>
       </div>
     </div>

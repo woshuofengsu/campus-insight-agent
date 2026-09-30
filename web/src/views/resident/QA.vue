@@ -118,6 +118,12 @@ async function delQuestion(q) {
               <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener">查看政策原文 ↗</a>
             </div>
             <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
+            <!-- 判定过程也摆出来：分数/检索姿态/属地级别 —— 让"凭什么答这一条"看得见 -->
+            <div class="evidence-meta" style="margin-top:8px;">
+              <span v-if="result.score != null">匹配度：{{ Number(result.score).toFixed(2) }}</span>
+              <span v-if="result.knowledge && result.knowledge.retrieval">检索方式：{{ result.knowledge.retrieval === 'hybrid' ? '词法+语义混合' : '词法' }}</span>
+              <span v-if="result.region_level === 'other'">⚠️ 该依据适用地区与您所在社区不同</span>
+            </div>
           </template>
           <template v-else>
             <div style="font-weight:700;color:#d97706;">暂未找到答案</div>
@@ -201,9 +207,9 @@ async function delQuestion(q) {
 
 <style scoped>
 .evidence-card { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-left:4px solid var(--primary); border-radius:10px; background:var(--card-bg); }
-.evidence-title { font-weight:700; color:var(--primary); font-size:0.9rem; }
+.evidence-title { font-weight:700; color:var(--primary-ink); font-size:0.9rem; }
 .evidence-main { margin-top:4px; font-weight:600; }
 .evidence-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:5px; color:var(--muted); font-size:0.78rem; }
-.evidence-card a { display:inline-block; margin-top:6px; color:var(--primary); font-size:0.82rem; }
+.evidence-card a { display:inline-block; margin-top:6px; color:var(--primary-ink); font-size:0.82rem; }
 .evidence-reason { margin-top:8px; font-size:0.82rem; }
 </style>
