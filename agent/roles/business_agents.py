@@ -94,7 +94,11 @@ def _draft_key(uid, name):
 #   · 短句且不含问题描述特征 → 当成回答（"家里"、"公共区域"、"紧急"）；
 #   · 长句或含问题特征（坏/漏/堵/不亮/停…）→ 当成**新报修**，另起草稿并说清旧草稿的去向。
 _PROBLEM_WORDS = ("坏", "漏", "堵", "不亮", "不亮", "停", "坏掉", "破", "冒", "响", "塌",
-                  "脱落", "松动", "积水", "堵住", "异响", "不转", "不制冷", "不热", "没水", "没电")
+                  "脱落", "松动", "积水", "堵住", "异响", "不转", "不制冷", "不热", "没水", "没电",
+                  # 2026-09-30 补：这些是**问题形态**（"窗户也关不上""门打不开""灯不响"），
+                  # 老人常用来描述**第二件事**；不补的话会被当成"对上一个问题的回答"（实测踩到：
+                  # 「窗户也关不上」被当成位置补充填进了上一件的草稿）。
+                  "关不上", "打不开", "不响", "不下水", "不通", "没反应", "滴水", "闪")
 
 
 def _is_new_repair_utterance(text: str, step: str) -> bool:
@@ -120,6 +124,55 @@ def _is_new_repair_utterance(text: str, step: str) -> bool:
 # 注意：室外词优先，避免"我家楼下"这类含"家"又含室外词的场景判错。
 _INDOOR_WORDS = ("内", "家", "屋", "卧室", "客厅", "厨房", "卫生间", "厕所", "浴室", "阳台")
 _OUTDOOR_WORDS = ("公共", "楼道", "走廊", "楼梯", "楼下", "广场", "过道", "门口", "外面", "室外", "花园", "车库", "电梯")
+
+
+# 明确"取消"的用词：**只有这些词**才会取消报修草稿（其余一律不取消，见确认分支）
+_CANCEL_WORDS = ("算了", "取消", "不要了", "先不弄了", "不报了", "撤了", "不修了", "别报了")
+
+
+def _apply_confirm_stage_supplement(text: str, draft: dict, uid) -> list[str]:
+    """确认卡阶段收到的"补充信息" → 回填草稿；返回被更新的字段说明（没识别出则为空）。
+
+    为什么需要（2026-09-30 实测）：老人在确认卡上往往不是回"确认"，而是补充/修正——
+    「是5号楼二层楼道」「我住在五号楼」「其实是我家里」「挺急的」。
+    旧行为把这些当"非确认词"→ 清空草稿并回"已取消"（等于把报修弄丢，比"没听懂"更有害）；
+    现在能用就用上：责任范围/紧急程度按短句判，位置走**与老人端同一套抽取契约**。
+    """
+    filled: list[str] = []
+    t = (text or "").strip()
+    if t in ("家里", "室内", "我家", "屋里"):
+        draft["type"] = "室内"
+        filled.append("责任范围=您家里")
+    elif t in ("公共", "公共区域", "室外", "楼道", "外面"):
+        draft["type"] = "室外"
+        filled.append("责任范围=公共地方")
+    if any(k in t for k in ("不着急", "不急", "一般", "有空再说")):
+        draft["urgency"] = "一般"
+        filled.append("紧急程度=一般")
+    elif any(k in t for k in ("紧急", "很急", "马上", "尽快", "快点")):
+        draft["urgency"] = "紧急"
+        filled.append("紧急程度=紧急")
+    try:
+        from utils.elderly_report import extract_report_fields
+        prof = {}
+        try:
+            from data.db_user import get_user_by_id
+            row = get_user_by_id(uid) or {}
+            prof = {"building": row.get("building") or "", "unit": row.get("unit") or ""}
+        except Exception as e:  # noqa: BLE001 — 读不到资料只是少了"补齐楼栋"，不影响回填
+            _log.warning("确认阶段读取登记资料失败（仅影响用资料补齐位置）：%s", e)
+        r = extract_report_fields(t, prof)
+        loc = (r["fields"].get("location") or "").strip()
+        # extract_report_fields 只会给出"能派单"的位置（太笼统的判为空）→ 这里可以直接用
+        if loc and loc != (draft.get("location") or ""):
+            draft["location"] = loc
+            draft.setdefault("sources", {})["location"] = "user"
+            if r["fields"].get("issue_type"):
+                draft["type"] = r["fields"]["issue_type"]
+            filled.append(f"位置=「{loc}」")
+    except Exception as e:  # noqa: BLE001 — 解析失败就不回填（走"重新问一遍"分支）
+        _log.warning("确认阶段解析补充信息失败：%s", e)
+    return filled
 
 
 def _classify_repair_location(text: str) -> str:
@@ -219,7 +272,7 @@ class RepairDispatchAgent(BaseAgent):
             draft["urgency"] = _classify_repair_urgency(text, st.get("urgent"))
             st["step"] = "confirm"
         elif step == "confirm":
-            if text in ("确认", "确认提交", "提交", "对", "是"):
+            if text in ("确认", "确认提交", "提交", "对", "是", "对，提交", "好的", "好"):
                 draft["urgency"] = draft.get("urgency") or "一般"  # 确认前兜底
                 r_text, status, iid = _exec_report(uid, name, draft)
                 self.bb.unlock(_draft_key(uid, "work_order_draft"))
@@ -228,16 +281,46 @@ class RepairDispatchAgent(BaseAgent):
                 self._write(_state_key(uid), st)
                 return self._reply(r_text, status, "报修", related_id=iid,
                                    chain_note="用户确认，工单已创建")
-            st.clear()
+            # ⚠️ 2026-09-30 修（用户实测反馈引出，三处真问题之一）：这里原来是
+            # "不是确认词 → 清空草稿 + 回『已取消，没有生成工单』"。
+            # 于是老人拿到确认卡后说「窗户也关不上」「我住在五号楼」，草稿被**静默丢掉**，
+            # 还被告知"已取消"——他根本没说要取消，等于把一次报修弄丢了（比"没听懂"更有害）。
+            # 现在分三种情况处理，唯一会取消的是**明确取消词**：
+            if text in _CANCEL_WORDS:
+                st.clear()
+                self._write(_state_key(uid), st)
+                self.bb.unlock(_draft_key(uid, "work_order_draft"))
+                self._write(_draft_key(uid, "work_order_draft"), None, lock=False)
+                try:
+                    from data.db_draft import delete_draft
+                    delete_draft(uid, "work_order_draft")
+                except Exception as e:  # noqa: BLE001
+                    _log.warning("取消报修时清理草稿失败：%s", e)
+                return self._reply("已取消，没有生成工单。", "已取消", "报修", chain_note="用户取消")
+            # ② 是补充信息（位置/责任范围/紧急程度）→ 回填后重新确认（不丢草稿）
+            filled = _apply_confirm_stage_supplement(text, draft, uid)
+            if filled:
+                self._write(_draft_key(uid, "work_order_draft"), draft, lock=False)
+                self._write(_state_key(uid), st)
+                return self._reply(
+                    f"好的，已按您说的更新：{'、'.join(filled)}。\n"
+                    f"请您确认报修信息：\n· 问题：{draft.get('desc', '')[:60]}\n"
+                    f"· 位置：{draft.get('location') or draft.get('type') or '（待补充）'}\n"
+                    f"· 分类：{draft.get('type')}\n· 紧急程度：{draft.get('urgency') or '一般'}",
+                    "需确认", "报修",
+                    actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],
+                    chain_note="确认阶段收到补充信息：已回填并重新确认")
+            # ③ 既不是确认、也不是可用补充、也没说取消 → **重新问一遍，草稿保留**
+            self._write(_draft_key(uid, "work_order_draft"), draft, lock=False)
             self._write(_state_key(uid), st)
-            self.bb.unlock(_draft_key(uid, "work_order_draft"))
-            self._write(_draft_key(uid, "work_order_draft"), None, lock=False)
-            try:
-                from data.db_draft import delete_draft
-                delete_draft(uid, "work_order_draft")
-            except Exception as e:  # noqa: BLE001
-                _log.warning("取消报修时清理草稿失败：%s", e)
-            return self._reply("已取消，没有生成工单。", "已取消", "报修", chain_note="用户取消")
+            return self._reply(
+                "这条报修我**还没有提交**（您刚说的我先记下了）。\n"
+                "· 要提交：说「确认提交」，或点下面的按钮\n"
+                "· 要改位置/责任范围：直接说，比如「是5号楼二层楼道」\n"
+                "· 不要了：说「取消」",
+                "需确认", "报修",
+                actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],
+                chain_note="确认阶段未收到确认词：重新询问（草稿保留）")
 
         # 新报修
         if draft is None:
@@ -348,9 +431,20 @@ class ProposalCollabAgent(BaseAgent):
                 self._write(_state_key(uid), st)
                 return self._reply(r_text, status, "提案", related_id=pid,
                                    chain_note="用户确认，提案已提交")
-            st.clear()
+            # ⚠️ 同类问题（2026-09-30）：非确认词不等于取消 —— 只有明确取消词才取消，
+            # 其余重新问一遍，草稿保留（老人在确认卡上常说的是补充，不是"取消"）。
+            if text in _CANCEL_WORDS:
+                st.clear()
+                self._write(_state_key(uid), st)
+                self._write(_draft_key(uid, "proposal_draft"), None, lock=False)
+                return self._reply("已取消，没有生成提案。", "已取消", "提案", chain_note="用户取消")
+            self._write(_draft_key(uid, "proposal_draft"), draft, lock=False)
             self._write(_state_key(uid), st)
-            return self._reply("已取消，没有生成提案。", "已取消", "提案", chain_note="用户取消")
+            return self._reply(
+                "这条提案我**还没有提交**。\n· 要提交：说「确认提交」\n· 不要了：说「取消」",
+                "需确认", "提案",
+                actions=[{"type": "buttons", "options": ["确认提交", "取消"]}],
+                chain_note="确认阶段未收到确认词：重新询问（草稿保留）")
 
         if draft is None:
             draft = {"desc": text}
