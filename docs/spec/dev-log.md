@@ -2451,7 +2451,20 @@ ChatGPT 独立评审（`docs/review/ChatGPT-独立评审-第十一轮.md`，7.2/
 - 结果：confusable **12/14** · colloquial **15/16** · sensitive **15/15** · cross_region **15/15**
   （样本指纹 `8331be2b9afbca38`），三条未达标项**逐条登记**在 `执行台账.md` §7.1。
 
-### 四、这一批**刻意没做**的两件事（写下来，免得下次有人以为没想到）
+### 五、老年端顶部图标去 emoji（布局层清零 + 正文记棘轮）
+
+- 新增 `web/src/components/EIcon.vue`：24×24 视框、线宽 2 的**单色线性图标**，`stroke="currentColor"`
+  ——也就是说图标**跟着文字色走**，暗色/高对比模式下自动跟着变（这正是写死色的图标做不到的事）。
+- 替换老年端**布局层 8 处**：顶部导航 6 个入口（首页/我要报修/看进度/联系家人/今日提醒/更多服务）、
+  标题栏「社区服务」、紧急求助按钮、横屏旋转提示。**文字一个字没改**（`mobile_flow_check` 按文字找按钮）。
+- 为什么值得做：emoji 在每家手机上是**不同厂商字形**（大小、配色、甚至有没有都不一样），
+  而这排按钮是老人**每个页面**都会看到的图形；`ui_audit` 能测对比度，但测不出"字形不确定"。
+- 门禁 `tests/test_elderly_icons.py`（5 例）：① 布局层不许有 emoji；② 导航图标必须来自 `EIcon`
+  且图标名在组件里真的存在；③ 图标必须 `currentColor`、不许写死填充色；④ `views/elderly` 下 emoji
+  **棘轮只减不增**（基线 176 处、跨 10 页）——**不假装全站已换**；⑤ 扫描器自检。
+- `mobile_flow_check` 新增一条真机检查（导航里 ≥6 个 SVG、emoji 残留 0、stroke 非 none），**40/40**。
+
+### 六、这一批**刻意没做**的两件事（写下来，免得下次有人以为没想到）
 
 1. 不为"公积金贷款额度/医保卡补办"被相邻依据答上加**业务词黑名单**——那是拿个例打补丁。
    要修就修成机制：查询里的具体业务词若在**全部已发布条目的标题+关键词**里都不存在 → 判"库里没有这件事"，
@@ -2460,13 +2473,15 @@ ChatGPT 独立评审（`docs/review/ChatGPT-独立评审-第十一轮.md`，7.2/
    评测集文件头写着"掉分是要如实写进报告的结论，**不是要调参调回去的东西**"——这条纪律不能自己先破。
    错别字归一之所以做，是因为它属于"同一个词写错"的**正确性**修复，不是把分数调好看。
 
-### 五、本批验收（全部现场可复算）
+### 七、本批验收（全部现场可复算）
 
 | 项 | 结果 |
 |---|---|
-| `python -m pytest tests/ -q` | **1031 可运行：1030 通过 + 1 需外部服务跳过**（另有 3 项真实模型用例 deselected） |
+| `python -m pytest tests/ -q` | 全绿（本轮新增 `test_qa_evidence_panel.py` 5 例、`test_elderly_icons.py` 5 例、设计令牌 2 例、对抗集 1 例） |
 | `python -m ruff check .` | 0 |
 | `python scripts/check_claims.py` | 全绿（数字口径与材料一致） |
 | `python scripts/ui_audit.py` | **0 HIGH**（修复前 1 处：提案详情 2.31:1） |
 | `python scripts/mobile_audit.py` | 全部通过 |
+| `python scripts/mobile_flow_check.py` | **40/40**（含新增的图标检查） |
+| `python scripts/journey_check.py` / `demo_flow_check.py --mutate --handoff --faults` | 58/58 · 26/26 |
 | `python scripts/eval_all.py --out docs/eval/eval-report` | 检索两路径 48/48 = 100% · 纯词法 91.7% · 拒答 8+8 · 对抗集见上 |

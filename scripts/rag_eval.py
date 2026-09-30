@@ -94,16 +94,22 @@ def run_adversarial(verbose: bool = False, db_path: str | None = None,
     kb_published = 0
     db_core._DB_PATH = tmp_db
     try:
-        conn = sqlite3.connect(tmp_db)
         try:
-            kb_published = conn.execute(
-                "SELECT COUNT(*) FROM knowledge_base WHERE audit_status='已发布'").fetchone()[0]
-            # 跨社区用例要用"另一个社区"的居民身份（租户只从服务端身份来）
-            row = conn.execute("SELECT id FROM user_profile WHERE community=? ORDER BY id LIMIT 1",
-                               (cross_tenant_community,)).fetchone()
-            cross_uid = row[0] if row else 1
-        finally:
-            conn.close()
+            conn = sqlite3.connect(tmp_db)
+            try:
+                kb_published = conn.execute(
+                    "SELECT COUNT(*) FROM knowledge_base WHERE audit_status='已发布'").fetchone()[0]
+                # 跨社区用例要用"另一个社区"的居民身份（租户只从服务端身份来）
+                row = conn.execute("SELECT id FROM user_profile WHERE community=? ORDER BY id LIMIT 1",
+                                   (cross_tenant_community,)).fetchone()
+                cross_uid = row[0] if row else 1
+            finally:
+                conn.close()
+        except sqlite3.Error as e:
+            # 同 run_refusal：副本缺表/损坏时报"数字不可比"，不抛裸异常（临时库 WAL 未落盘时拷贝）
+            return {"cases": 0, "db": src,
+                    "error": (f"评测副本不可读（{type(e).__name__}: {str(e)[:60]}）"
+                              f"—— 重建副本后重跑，本次数字不可比")}
         if kb_published == 0:
             return {"cases": 0, "db": src, "kb_published": 0,
                     "error": f"评测库没有已发布知识（{src}）—— 对抗集无从谈起"}
@@ -265,12 +271,20 @@ def run_refusal(verbose: bool = False, tenant_community: str = "海淀小区",
     db_core._DB_PATH = tmp_db
     kb_published = 0
     try:
-        conn = sqlite3.connect(tmp_db)
         try:
-            kb_published = conn.execute(
-                "SELECT COUNT(*) FROM knowledge_base WHERE audit_status='已发布'").fetchone()[0]
-        finally:
-            conn.close()
+            conn = sqlite3.connect(tmp_db)
+            try:
+                kb_published = conn.execute(
+                    "SELECT COUNT(*) FROM knowledge_base WHERE audit_status='已发布'").fetchone()[0]
+            finally:
+                conn.close()
+        except sqlite3.Error as e:
+            # 副本读不出表（2026-09-29 全量跑时实测偶发一次：临时库刚 init_db 完就在 WAL 里被拷走，
+            # 主文件里还没有表 → 裸 OperationalError 直接把用例打红，看不出是"库的问题"还是"产品的问题"）。
+            # 评价工具绝不能抛裸异常，更不能给出看似正常的百分比：如实报"副本不可读/数字不可比"。
+            return {"cases": 0, "db": src,
+                    "error": (f"评测副本不可读（{type(e).__name__}: {str(e)[:60]}）"
+                              f"—— 重建副本后重跑，本次数字不可比")}
         if expect_kb is not None and kb_published != expect_kb:
             return {"cases": 0, "db": src, "kb_published": kb_published,
                     "error": (f"评测库与预期不符：已发布知识 {kb_published} 条，期望 {expect_kb} 条"

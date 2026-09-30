@@ -14,6 +14,7 @@
 import io
 import json
 import os
+import sqlite3
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -177,11 +178,46 @@ def test_refusal_eval_refuses_to_report_on_the_wrong_corpus():
     tmp = tempfile.mkdtemp(prefix="wrongkb_")
     p = os.path.join(tmp, "empty.db")
     db_core.init_db(p)
+    # 前置条件先自己核一遍：临时库真的建出表了（2026-09-29 全量跑时这条用例偶发过一次
+    # "no such table"，当时只能看到一个裸 OperationalError，分不清是库的问题还是产品的问题）。
+    conn = sqlite3.connect(p)
+    try:
+        conn.execute("SELECT COUNT(*) FROM knowledge_base").fetchone()
+    finally:
+        conn.close()
     before = db_core._DB_PATH
     try:
         r = run_refusal(db_path=p)
         assert r.get("error"), f"空库竟然给出了数字：{r}"
         assert r["cases"] == 0 and r.get("kb_published") == 0
+        assert db_core._DB_PATH == before, "报错路径也必须把库路径恢复回去"
+    finally:
+        db_core._DB_PATH = before
+
+
+def test_refusal_eval_reports_unreadable_copy_instead_of_raising():
+    """副本不是数据库（缺表/损坏）时，必须**如实报"数字不可比"**，不许抛裸异常。
+
+    为什么单列：全量跑时实测偶发过一次副本缺表（临时库刚 `init_db` 完、schema 还在 WAL 里
+    就被拷走）——裸 `OperationalError` 把用例打红，看的人分不清"评测环境坏了"还是"产品答错了"。
+    评测工具的头等纪律是"数字不可比就说不可比"，所以这里连"非数据库文件"这种输入也要给出明确错误。
+    """
+    import tempfile
+
+    from data import db_core
+    from scripts.rag_eval import run_adversarial, run_refusal
+
+    tmp = tempfile.mkdtemp(prefix="notadb_")
+    p = os.path.join(tmp, "notadb.db")
+    with open(p, "wb") as f:
+        f.write(b"this is not a sqlite database at all" * 10)
+    before = db_core._DB_PATH
+    try:
+        for name, fn in (("refusal", run_refusal), ("adversarial", run_adversarial)):
+            r = fn(db_path=p)
+            assert r.get("error"), f"{name}：非数据库文件竟然给出了数字：{r}"
+            assert r["cases"] == 0, f"{name}：报错路径还有用例数 {r['cases']}"
+            assert "不可读" in r["error"] or "不可比" in r["error"], r["error"]
         assert db_core._DB_PATH == before, "报错路径也必须把库路径恢复回去"
     finally:
         db_core._DB_PATH = before

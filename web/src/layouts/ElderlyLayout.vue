@@ -10,6 +10,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../stores/user'
 import { useSos } from '../composables/useSos'
+import EIcon from '../components/EIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -27,27 +28,32 @@ const sos = useSos({ onMessage: message })
 // 老人从别的页面按求助键时，先记下当前页，触发成功后就地提示"首页可拨打 120"
 const sosHint = computed(() => route.path === '/elderly/home')
 
+// 图标改**单色线性 SVG**（`components/EIcon.vue`），不再用 emoji：
+// emoji 在各家手机上是不同厂商字形（大小/配色/有无都不一样），而这排按钮是老人看见次数最多的图形。
+// 文字一个字没改（`mobile_flow_check` 按文字找按钮：'更多服务' 等仍在），只是把图形换成跟着文字色走的线性图标。
 const navs = [
-  { key: '/elderly/home', label: '🏠 首页' },
-  { key: '/elderly/report', label: '🗣️ 我要报修' },
-  { key: '/elderly/orders', label: '📋 看进度' },
-  { key: '/elderly/contacts', label: '👨‍👩‍👧 联系家人' },
-  { key: '/elderly/notices', label: '🔔 今日提醒' },
-  { key: '/elderly/more', label: '🧰 更多服务' },
+  { key: '/elderly/home', label: '首页', icon: 'home' },
+  { key: '/elderly/report', label: '我要报修', icon: 'speak' },
+  { key: '/elderly/orders', label: '看进度', icon: 'list' },
+  { key: '/elderly/contacts', label: '联系家人', icon: 'family' },
+  { key: '/elderly/notices', label: '今日提醒', icon: 'bell' },
+  { key: '/elderly/more', label: '更多服务', icon: 'more' },
 ]
 </script>
 
 <template>
   <div style="min-height:100vh;background:var(--bg);">
     <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <div style="font-size:1.3rem;font-weight:800;">🏘️ 社区服务</div>
+      <div style="font-size:1.3rem;font-weight:800;display:flex;align-items:center;gap:8px;">
+        <EIcon name="community" :size="30" />社区服务
+      </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <!-- 独立紧急求助：任何页面都能一键到达（长按 3 秒仍然防误触） -->
         <n-button size="large" type="error" data-longpress
                   style="color:#fff;font-size:1.3rem;min-height:56px;font-weight:800;background:linear-gradient(135deg,#DC2626,#B91C1C);"
                   @pointerdown="sos.pressStart" @pointerup="sos.pressCancel" @pointerleave="sos.pressCancel"
                   @touchstart.prevent="sos.pressStart" @touchend="sos.pressCancel">
-          🆘 紧急求助
+          <EIcon name="alert" :size="28" />紧急求助
         </n-button>
         <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:48px;" @click="store.logout(); router.replace('/login')">退出</n-button>
       </div>
@@ -56,7 +62,9 @@ const navs = [
       <n-button v-for="n in navs" :key="n.key" size="large" round
                 :type="route.path.startsWith(n.key) ? 'primary' : 'default'"
                 @click="router.push(n.key)" style="min-height:64px;font-size:1.25rem;font-weight:700;padding:0 22px;">
-        {{ n.label }}
+        <span style="display:inline-flex;align-items:center;gap:10px;">
+          <EIcon :name="n.icon" :size="28" /><span>{{ n.label }}</span>
+        </span>
       </n-button>
     </div>
     <router-view />
@@ -78,6 +86,6 @@ const navs = [
       </template>
     </n-modal>
 
-    <div class="elderly-rotate-mask">📱<br/>请竖屏使用<br/>转动手机回到竖屏</div>
+    <div class="elderly-rotate-mask"><EIcon name="phone" :size="40" /><br/>请竖屏使用<br/>转动手机回到竖屏</div>
   </div>
 </template>

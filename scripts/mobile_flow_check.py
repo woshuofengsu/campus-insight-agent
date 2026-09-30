@@ -212,6 +212,21 @@ def main() -> int:
               f"实际 {nav_btns.count()} 个：{nav_btns.all_inner_texts()}")
         sos_top = page.locator(".elderly-nav, div", has_text="紧急求助")
         check("顶部导航带独立紧急求助入口", sos_top.count() > 0)
+        # v4 §3：老年端顶部导航改**单色线性图标**（不再用 emoji）——真机几何下核一遍：
+        # SVG 图标要在、无 emoji 残留、且图标用的是 currentColor（跟随文字色，暗色/高对比模式才跟着变）。
+        icon_state = page.evaluate(
+            """() => {
+                 const nav = document.querySelector('.elderly-nav');
+                 if (!nav) return { svg: 0, emoji: -1, mono: false };
+                 const svgs = [...nav.querySelectorAll('svg')];
+                 const emo = /[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/u;
+                 return { svg: svgs.length,
+                          emoji: (nav.innerText.match(emo) || []).length,
+                          mono: svgs.length > 0 && svgs.every(s => getComputedStyle(s).stroke !== 'none') };
+               }""")
+        check("老年端导航用单色线性图标（≥6 个 SVG、无 emoji 残留）",
+              icon_state["svg"] >= 6 and icon_state["emoji"] == 0 and icon_state["mono"],
+              f"SVG {icon_state['svg']} 个 · emoji 残留 {icon_state['emoji']} 处 · 单色 {icon_state['mono']}")
         btn = page.locator(".elderly-nav button", has_text="更多服务")
         check("老年端导航「更多服务」大按钮在位", btn.count() > 0)
         if btn.count():
