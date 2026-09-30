@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { proposals, upload } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -77,12 +78,12 @@ const submit = async () => {
 
 <template>
   <div class="page">
-    <h2 class="page-title">📝 提交提案</h2>
+    <h2 class="page-title"><EIcon name="edit" :size="18" /> 提交提案</h2>
     <p class="page-sub">你的建议会进入社区议事流程：审核 → 公示 → 投票 → 执行</p>
 
     <!-- 草稿恢复 -->
     <div v-if="drafts.length" class="card urgent-bg" style="margin-bottom:12px;">
-      <b>📝 您有未完成的提案草稿</b>
+      <b><EIcon name="edit" :size="18" /> 您有未完成的提案草稿</b>
       <div v-for="d in drafts" :key="d.id" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
         <span>{{ d.title || '（未填标题）' }} <span class="muted">（{{ (d.updated_at || '').slice(0, 10) }}）</span></span>
         <div style="display:flex;gap:6px;">
@@ -140,8 +141,8 @@ const submit = async () => {
           附件是否公开（勾选后公示期其他居民可查看附件；负责人审核时可能因隐私改为不公开）
         </n-checkbox>
         <div style="display:flex;gap:8px;margin-top:16px;">
-          <n-button type="primary" block size="large" :loading="loading" @click="submit">📨 提交提案</n-button>
-          <n-button size="large" @click="saveDraft">💾 存草稿</n-button>
+          <n-button type="primary" block size="large" :loading="loading" @click="submit"><EIcon name="mail" :size="18" /> 提交提案</n-button>
+          <n-button size="large" @click="saveDraft"><EIcon name="save" :size="18" /> 存草稿</n-button>
         </div>
       </n-form>
     </div>

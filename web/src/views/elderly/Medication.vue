@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -82,7 +83,7 @@ async function saveEdit() {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">💊 用药提醒</div>
+    <div class="elderly-title"><EIcon name="pill" :size="18" /> 用药提醒</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">到点会语音提醒您吃药</p>
 
     <div v-for="m in list" :key="m.id" class="card" style="font-size:1.25rem;">
@@ -93,11 +94,11 @@ async function saveEdit() {
           <!-- 老年端可达性：这几个是老人**每天要点的主操作**（我吃了/稍后），
                原来是 size=small（≈15px 字号、32px 高），不符合长辈版"字号≥20px、触控≥48px"的口径。
                统一放大到 1.2rem / 最小 52px 高。 -->
-          <n-button v-if="m.status === '审核通过'" size="large" type="success" class="elder-act" style="margin-left:8px;" @click="take(m, 'taken')">✅ 我吃了</n-button>
+          <n-button v-if="m.status === '审核通过'" size="large" type="success" class="elder-act" style="margin-left:8px;" @click="take(m, 'taken')"><EIcon name="checkCircle" :size="18" /> 我吃了</n-button>
           <n-button v-if="m.status === '审核通过'" size="large" class="elder-act" style="margin-left:8px;" @click="take(m, 'snooze')">⏰ 10 分钟后再说</n-button>
           <n-button v-if="m.status === '审核通过'" size="large" class="elder-act" style="margin-left:8px;" @click="toggle(m, 'pause')">⏸️ 暂停</n-button>
           <n-button v-if="m.status === '已暂停'" size="large" type="primary" class="elder-act" style="margin-left:8px;" @click="toggle(m, 'resume')">▶️ 恢复</n-button>
-          <n-button v-if="['审核通过', '已暂停', '审核不通过'].includes(m.status)" size="large" class="elder-act" style="margin-left:8px;" @click="startEdit(m)">✏️ 修改</n-button>
+          <n-button v-if="['审核通过', '已暂停', '审核不通过'].includes(m.status)" size="large" class="elder-act" style="margin-left:8px;" @click="startEdit(m)"><EIcon name="edit" :size="18" /> 修改</n-button>
         </div>
       </div>
       <div class="muted" style="margin-top:6px;">⏰ {{ fmtTimes(m.times) }} · {{ m.repeat_rule }}</div>
@@ -106,17 +107,17 @@ async function saveEdit() {
     <n-empty v-if="list.length === 0" description="还没有用药提醒" style="font-size:1.25rem;" />
 
     <n-button v-if="!showForm" type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
-              @click="showForm = true">➕ 添加用药提醒</n-button>
+              @click="showForm = true"><EIcon name="plus" :size="18" /> 添加用药提醒</n-button>
 
     <div v-if="showForm" class="card" style="margin-top:12px;">
-      <div v-if="editTarget" style="font-weight:700;font-size:1.25rem;margin-bottom:8px;">✏️ 修改：{{ editTarget.drug_name }}（提交后重新审核，审核期间原规则继续播报）</div>
+      <div v-if="editTarget" style="font-weight:700;font-size:1.25rem;margin-bottom:8px;"><EIcon name="edit" :size="18" /> 修改：{{ editTarget.drug_name }}（提交后重新审核，审核期间原规则继续播报）</div>
       <n-input v-model:value="form.drug_name" placeholder="药品名称（如：降压药）" size="large" style="font-size:1.25rem;" />
       <n-input v-model:value="form.dosage" placeholder="剂量（如：1片）" size="large" style="margin-top:10px;font-size:1.25rem;" />
       <n-input v-model:value="form.times" placeholder="时间，逗号分隔（如：08:00,20:00）" size="large" style="margin-top:10px;font-size:1.25rem;" />
       <n-input v-model:value="form.start_date" placeholder="开始日期（如：2026-08-21）" size="large" style="margin-top:10px;font-size:1.25rem;" />
       <n-input v-model:value="form.end_date" placeholder="结束日期（如：2026-12-31）" size="large" style="margin-top:10px;font-size:1.25rem;" />
-      <n-button v-if="editTarget" type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;" @click="saveEdit">📨 提交修改（待重新审核）</n-button>
-      <n-button v-else type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;" @click="add">📨 提交（待审核）</n-button>
+      <n-button v-if="editTarget" type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;" @click="saveEdit"><EIcon name="mail" :size="18" /> 提交修改（待重新审核）</n-button>
+      <n-button v-else type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;" @click="add"><EIcon name="mail" :size="18" /> 提交（待审核）</n-button>
     </div>
     <div v-if="showForm" style="margin-top:10px;">
       <n-button block size="large" style="min-height:56px;font-size:1.2rem;" @click="showForm = false; editTarget = null">取消</n-button>

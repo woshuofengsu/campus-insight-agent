@@ -30,7 +30,7 @@ api.interceptors.response.use(
       localStorage.removeItem('ci_user')
       if (!location.pathname.startsWith('/login')) location.href = '/login'
     }
-    // ⚠️ 必须 reject 一个 **Error**（而不是字符串）：页面里普遍写的是
+    // <EIcon name="alert" :size="18" /> 必须 reject 一个 **Error**（而不是字符串）：页面里普遍写的是
     // `catch (e) { message.error(e.message) }`，如果这里 reject 字符串，
     // `e.message` 就是 undefined —— 结果"接口 500 / 断网"时**什么都不提示**，
     // 页面还常常显示"暂无数据"，等于把失败说成了"没有数据"（实测踩到：

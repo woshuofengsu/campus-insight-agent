@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { proposals } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,18 +70,18 @@ async function changeVis(isPublic) {
   <div class="page">
     <n-button quaternary size="small" style="margin-bottom:8px;" @click="router.back()">← 返回</n-button>
     <template v-if="p">
-      <h2 class="page-title">💡 {{ p.title }}</h2>
+      <h2 class="page-title"><EIcon name="bulb" :size="18" /> {{ p.title }}</h2>
       <p class="page-sub">{{ p.category }} · {{ p.is_public ? '公开' : '私有' }} · 状态 <b>{{ p.status }}</b></p>
 
       <div class="card">
         <div class="muted" style="line-height:2;">{{ p.description }}</div>
-        <div v-if="p.community_building" class="muted" style="margin-top:6px;font-size:0.9rem;">🏠 所属楼栋：{{ p.community_building }}</div>
+        <div v-if="p.community_building" class="muted" style="margin-top:6px;font-size:0.9rem;"><EIcon name="home" :size="18" /> 所属楼栋：{{ p.community_building }}</div>
         <div v-if="p.vote_stats" class="muted" style="margin-top:6px;font-size:0.9rem;">
-          🗳️ 投票：{{ p.vote_stats.vote_count || 0 }} 人 · 平均 {{ p.vote_stats.avg_score || '—' }} 分
+          <EIcon name="vote" :size="18" /> 投票：{{ p.vote_stats.vote_count || 0 }} 人 · 平均 {{ p.vote_stats.avg_score || '—' }} 分
         </div>
         <!-- 附件（本人或公开） -->
         <div v-if="attachments().length" style="margin-top:8px;">
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📎 附件（{{ p.attachment_public ? '公开' : '仅本人可见' }}）</div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;"><EIcon name="paperclip" :size="18" /> 附件（{{ p.attachment_public ? '公开' : '仅本人可见' }}）</div>
           <div v-for="(a, i) in attachments()" :key="i" style="display:inline-block;margin-right:8px;">
             <img :src="a" style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid var(--border);" :alt="'附件' + (i + 1)" />
           </div>
@@ -89,42 +90,42 @@ async function changeVis(isPublic) {
 
       <!-- 我的提案：确认前/私有待执行时修改公开方式（7 天内一次机会） -->
       <div v-if="p.mine && ['待确认公示/私有', '待执行'].includes(p.status)" class="card">
-        <div style="font-weight:700;margin-bottom:8px;">🔀 修改公开/私有（审核通过后 7 天内仅一次机会）</div>
+        <div style="font-weight:700;margin-bottom:8px;"><EIcon name="shuffle" :size="18" /> 修改公开/私有（审核通过后 7 天内仅一次机会）</div>
         <div style="display:flex;gap:8px;">
-          <n-button size="small" type="success" @click="changeVis(1)">🌐 改为公开</n-button>
-          <n-button size="small" type="default" @click="changeVis(0)">🔒 改为私有</n-button>
+          <n-button size="small" type="success" @click="changeVis(1)"><EIcon name="globe" :size="18" /> 改为公开</n-button>
+          <n-button size="small" type="default" @click="changeVis(0)"><EIcon name="lock" :size="18" /> 改为私有</n-button>
         </div>
       </div>
 
       <!-- 投票 -->
       <div v-if="p.status === '公示中'" class="card">
-        <div style="font-weight:700;margin-bottom:8px;">🗳️ 匿名评分（1-5 星，一票制）</div>
+        <div style="font-weight:700;margin-bottom:8px;"><EIcon name="vote" :size="18" /> 匿名评分（1-5 星，一票制）</div>
         <template v-if="p.mine">
           <div class="muted">这是您自己的提案，不能给自己投票</div>
         </template>
         <template v-else-if="p.has_voted">
-          <div class="muted">✅ 您已评分，不可修改</div>
+          <div class="muted"><EIcon name="checkCircle" :size="18" /> 您已评分，不可修改</div>
         </template>
         <template v-else>
           <div style="display:flex;gap:6px;">
-            <n-button v-for="s in 5" :key="s" size="small" :type="s === 5 ? 'primary' : 'default'" @click="vote(s)">{{ s }}★</n-button>
+            <n-button v-for="s in 5" :key="s" size="small" :type="s === 5 ? 'primary' : 'default'" @click="vote(s)">{{ s }}<EIcon name="star" :size="18" /> </n-button>
           </div>
         </template>
       </div>
 
       <!-- 提案人反馈 -->
       <div v-if="p.status === '待提案人反馈'" class="card">
-        <div style="font-weight:700;margin-bottom:8px;">📨 执行完成，请反馈满意度</div>
+        <div style="font-weight:700;margin-bottom:8px;"><EIcon name="mail" :size="18" /> 执行完成，请反馈满意度</div>
         <n-input v-model:value="fbReason" placeholder="不满意原因（可选）" size="small" style="margin-bottom:8px;" />
         <div style="display:flex;gap:8px;">
-          <n-button type="success" @click="feedback(true)">✅ 满意</n-button>
-          <n-button type="warning" @click="feedback(false)">😕 不满意</n-button>
+          <n-button type="success" @click="feedback(true)"><EIcon name="checkCircle" :size="18" /> 满意</n-button>
+          <n-button type="warning" @click="feedback(false)"><EIcon name="face-sad" :size="18" /> 不满意</n-button>
         </div>
       </div>
 
       <!-- 匿名议论（门控条件与后端白名单一致：is_public + 5 个可议论阶段，见 canDiscuss()） -->
       <div v-if="canDiscuss()" class="card">
-        <div style="font-weight:700;margin-bottom:8px;">💬 议论（匿名）</div>
+        <div style="font-weight:700;margin-bottom:8px;"><EIcon name="chat-dots" :size="18" /> 议论（匿名）</div>
         <div v-for="c in comments" :key="c.id" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
           <span style="color:var(--st-feedback-ink);font-weight:600;">{{ c.author }}</span>
           <span class="muted" style="margin-left:8px;font-size:0.75rem;">{{ c.created_at }}</span>
@@ -139,7 +140,7 @@ async function changeVis(isPublic) {
 
       <!-- 时间线 -->
       <div class="card">
-        <div style="font-weight:700;margin-bottom:8px;">📜 处理留痕</div>
+        <div style="font-weight:700;margin-bottom:8px;"><EIcon name="scroll" :size="18" /> 处理留痕</div>
         <div v-for="t in p.timeline || []" :key="t.id" style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
           {{ (t.created_at || '').slice(0, 16) }} · {{ t.actor || '' }} · {{ t.action || '' }}
         </div>

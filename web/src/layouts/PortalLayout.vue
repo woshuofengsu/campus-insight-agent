@@ -8,6 +8,7 @@ import { useUserStore } from '../stores/user'
 import { useThemeStore } from '../stores/theme'
 import WeatherBanner from '../components/WeatherBanner.vue'
 import AgentChat from '../components/AgentChat.vue'
+import EIcon from '../components/EIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,25 +18,25 @@ const agentOpen = ref(false) // AI 工作助手默认收起
 const drawerOpen = ref(false) // 网格员端移动端抽屉导航
 
 const gridMenus = [
-  { key: '/grid/dashboard', label: '工作台', icon: '📊' },
-  { key: '/grid/work-orders', label: '工单管理', icon: '🔧' },
+  { key: '/grid/dashboard', label: '工作台', icon: 'chart' },
+  { key: '/grid/work-orders', label: '工单管理', icon: 'wrench' },
   // 卡11 / v3 卡7：转人工处理包工作台（领取/补问/回复/关闭）——原来只能"看"，办不了事
-  { key: '/grid/handoffs', label: '人工待办', icon: '🧑‍💻' },
-  { key: '/grid/proposals', label: '提案管理', icon: '💡' },
-  { key: '/grid/notices', label: '通知管理', icon: '📢' },
-  { key: '/grid/qa', label: '政策问答', icon: '📖' },
-  { key: '/grid/weather', label: '天气管理', icon: '🌤️' },
-  { key: '/grid/health', label: '健康管理', icon: '🏥' },
-  { key: '/grid/elderly-care', label: '老年关怀', icon: '👴' },
+  { key: '/grid/handoffs', label: '人工待办', icon: 'laptop' },
+  { key: '/grid/proposals', label: '提案管理', icon: 'bulb' },
+  { key: '/grid/notices', label: '通知管理', icon: 'megaphone' },
+  { key: '/grid/qa', label: '政策问答', icon: 'book' },
+  { key: '/grid/weather', label: '天气管理', icon: 'cloud-sun' },
+  { key: '/grid/health', label: '健康管理', icon: 'hospital' },
+  { key: '/grid/elderly-care', label: '老年关怀', icon: 'users' },
 ]
 
 // 居民端底部标签栏（规范 4.1：首页|报修|提案|通知|我的）
 const residentTabs = [
-  { key: '/resident/home', label: '首页', icon: '🏠' },
-  { key: '/resident/work-orders', label: '报修', icon: '🔧' },
-  { key: '/resident/proposals', label: '提案', icon: '💡' },
-  { key: '/resident/notices', label: '通知', icon: '📢' },
-  { key: '/resident/profile', label: '我的', icon: '👤' },
+  { key: '/resident/home', label: '首页', icon: 'home' },
+  { key: '/resident/work-orders', label: '报修', icon: 'wrench' },
+  { key: '/resident/proposals', label: '提案', icon: 'bulb' },
+  { key: '/resident/notices', label: '通知', icon: 'megaphone' },
+  { key: '/resident/profile', label: '我的', icon: 'user' },
 ]
 
 const active = computed(() => {
@@ -66,18 +67,18 @@ function logout() {
   <n-layout v-if="store.isGrid" style="min-height:100vh" has-sider>
     <n-layout-sider class="grid-desktop-sider" bordered width="230">
       <div class="sider-brand">
-        <div class="brand-dot">🏘️</div>
+        <div class="brand-dot"><EIcon name="community" :size="18" /></div>
         <div>
           <div class="grad-text" style="font-weight:800;font-size:1.06rem;line-height:1.25;">社区先知</div>
           <div style="color:var(--muted);font-size:0.76rem;">网格员工作台</div>
         </div>
       </div>
-      <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
+      <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h(EIcon, { name: m.icon, size: 18 }) }))"
               :value="active" @update:value="(k) => router.push(k)" />
       <!-- AI 工作助手（默认收起，不遮挡主内容） -->
       <div style="margin:8px 8px 0;border-top:1px solid var(--border);padding-top:8px;">
         <n-button block :type="agentOpen ? 'primary' : 'default'" size="small" @click="agentOpen = !agentOpen">
-          🤖 AI 工作助手 {{ agentOpen ? '▲' : '▼' }}
+          <EIcon name="robot" :size="18" /> AI 工作助手 {{ agentOpen ? '▲' : '▼' }}
         </n-button>
         <div v-if="agentOpen" style="margin-top:8px;">
           <AgentChat role="grid" />
@@ -88,14 +89,14 @@ function logout() {
       <WeatherBanner />
       <!-- 移动端顶栏（<768px 显示） -->
       <n-layout-header bordered class="grid-mobile-header" style="display:flex;align-items:center;gap:12px;padding:0 16px;min-height:56px;background:var(--card-bg);position:sticky;top:0;z-index:10;">
-        <n-button quaternary @click="drawerOpen = true">☰</n-button>
+        <n-button quaternary @click="drawerOpen = true"><EIcon name="menu" :size="18" /></n-button>
         <span style="font-weight:700;">{{ route.meta.title || '工作台' }}</span>
       </n-layout-header>
       <n-layout-header bordered class="glass topbar" style="height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
         <div style="font-weight:800;font-size:1.05rem;">{{ route.meta.title || '' }}</div>
         <div style="display:flex;align-items:center;gap:12px;">
-          <n-button size="small" quaternary @click="router.push('/screen')">🖥️ 治理大屏</n-button>
-          <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
+          <n-button size="small" quaternary @click="router.push('/screen')"><EIcon name="monitor" :size="18" /> 治理大屏</n-button>
+          <n-button size="small" quaternary @click="theme.toggle()"><EIcon :name="theme.isDark ? 'sun' : 'moon'" :size="16" /> {{ theme.isDark ? '日间' : '夜间' }}</n-button>
           <n-tag :bordered="false" type="success" size="small">● AI 治理</n-tag>
           <span style="color:var(--muted);">{{ store.user?.name }}</span>
           <n-button size="small" quaternary @click="logout">退出</n-button>
@@ -107,8 +108,8 @@ function logout() {
     </n-layout>
     <!-- 移动端抽屉导航 -->
     <n-drawer v-model:show="drawerOpen" placement="left" :width="240" :auto-close="true">
-      <n-drawer-content title="🏘️ 社区先知" :native-scrollbar="false">
-        <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h('span', m.icon) }))"
+      <n-drawer-content title="社区先知" :native-scrollbar="false">
+        <n-menu :options="gridMenus.map(m => ({ key: m.key, label: m.label, icon: () => h(EIcon, { name: m.icon, size: 18 }) }))"
                 :value="active" @update:value="(k) => { router.push(k); drawerOpen = false }" />
       </n-drawer-content>
     </n-drawer>
@@ -119,11 +120,11 @@ function logout() {
     <WeatherBanner />
     <n-layout-header bordered class="glass topbar" style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top)) 20px 0;min-height:58px;position:sticky;top:0;z-index:10;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="brand-dot" style="width:30px;height:30px;font-size:1rem;border-radius:9px;">🏘️</span>
+        <span class="brand-dot" style="width:30px;height:30px;border-radius:9px;"><EIcon name="community" :size="18" /></span>
         <span class="grad-text" style="font-weight:800;font-size:1.06rem;">社区先知</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
-        <n-button size="small" quaternary @click="theme.toggle()">{{ theme.isDark ? '☀️ 日间' : '🌙 夜间' }}</n-button>
+        <n-button size="small" quaternary @click="theme.toggle()"><EIcon :name="theme.isDark ? 'sun' : 'moon'" :size="16" /> {{ theme.isDark ? '日间' : '夜间' }}</n-button>
         <span style="color:var(--muted);">{{ store.user?.name }}</span>
         <n-button size="small" quaternary @click="logout">退出</n-button>
       </div>
@@ -143,7 +144,7 @@ function logout() {
              fontWeight: activeTab === t.key ? 700 : 400,
            }"
            @click="router.push(t.key)">
-        <span class="tab-icon" :style="{ fontSize: '1.3rem', display: 'inline-block' }">{{ t.icon }}</span>{{ t.label }}
+        <span class="tab-icon" :style="{ display: 'inline-block' }"><EIcon :name="t.icon" :size="22" /></span>{{ t.label }}
       </div>
     </div>
   </n-layout>

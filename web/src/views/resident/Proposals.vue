@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { proposals } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -101,7 +102,7 @@ async function addComment(p) {
   <div class="page">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <h2 class="page-title">💡 邻里议事</h2>
+        <h2 class="page-title"><EIcon name="bulb" :size="18" /> 邻里议事</h2>
         <p class="page-sub">提建议、看公示、投出你的一票（匿名），公示期可匿名议论</p>
       </div>
       <n-button type="primary" @click="$router.push('/resident/proposals/new')">+ 提交提案</n-button>
@@ -118,19 +119,19 @@ async function addComment(p) {
           <n-tag v-if="p.mine" size="tiny" type="info" style="margin-left:6px;">我的提案</n-tag>
           <span v-if="p.status === '公示中'" style="margin-left:8px;">
             <n-tag size="tiny" type="warning" v-if="p.remaining_days != null">剩 {{ p.remaining_days }} 天</n-tag>
-            <n-tag size="tiny" v-if="p.vote_count">🗳️ {{ p.vote_count }} 人 · {{ p.avg_score }} 分</n-tag>
+            <n-tag size="tiny" v-if="p.vote_count"><EIcon name="vote" :size="18" /> {{ p.vote_count }} 人 · {{ p.avg_score }} 分</n-tag>
           </span>
         </div>
 
         <!-- 我的提案：待审核撤回 / 已撤回重开 / 退回修改重提 / 待确认公示私有 -->
         <div v-if="p.mine" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <n-button v-if="p.status === '待审核'" size="small" quaternary @click="act(p, { action: 'withdraw' }, '已撤回')">↩️ 撤回</n-button>
-          <n-button v-if="p.status === '已撤回'" size="small" type="info" @click="act(p, { action: 'reopen_mine' }, '已重新打开，待审核')">🔓 重新打开</n-button>
-          <n-button v-if="p.status === '退回修改'" size="small" type="warning" @click="openEdit(p)">📝 修改后重新提交</n-button>
+          <n-button v-if="p.status === '已撤回'" size="small" type="info" @click="act(p, { action: 'reopen_mine' }, '已重新打开，待审核')"><EIcon name="unlock" :size="18" /> 重新打开</n-button>
+          <n-button v-if="p.status === '退回修改'" size="small" type="warning" @click="openEdit(p)"><EIcon name="edit" :size="18" /> 修改后重新提交</n-button>
           <template v-if="p.status === '待确认公示/私有'">
             <span class="muted" style="font-size:0.85rem;">请确认公开方式：</span>
-            <n-button size="small" type="success" @click="act(p, { action: 'confirm', is_public: 1 }, '已确认公开，进入公示')">🌐 确认公开</n-button>
-            <n-button size="small" type="default" @click="act(p, { action: 'confirm', is_public: 0 }, '已确认私有')">🔒 确认私有</n-button>
+            <n-button size="small" type="success" @click="act(p, { action: 'confirm', is_public: 1 }, '已确认公开，进入公示')"><EIcon name="globe" :size="18" /> 确认公开</n-button>
+            <n-button size="small" type="default" @click="act(p, { action: 'confirm', is_public: 0 }, '已确认私有')"><EIcon name="lock" :size="18" /> 确认私有</n-button>
           </template>
         </div>
 
@@ -141,14 +142,14 @@ async function addComment(p) {
           <template v-else>
             <span class="muted" style="font-size:0.85rem;">评分（1-5，匿名一票制）：</span>
             <n-button v-for="s in 5" :key="'v' + s" size="small" :type="s === 5 ? 'primary' : 'default'"
-                      :disabled="votedIds.includes(p.id)" @click="vote(p, s)">{{ s }}★</n-button>
+                      :disabled="votedIds.includes(p.id)" @click="vote(p, s)">{{ s }}<EIcon name="star" :size="18" /> </n-button>
             <span v-if="votedIds.includes(p.id)" class="muted" style="font-size:0.85rem;">您已评分，不可修改</span>
           </template>
         </div>
 
         <!-- 公示期匿名议论 -->
         <div v-if="p.status === '公示中'" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
-          <n-button size="small" quaternary @click="toggleComments(p)">💬 议论（{{ commentList[p.id] ? commentList[p.id].length : '展开' }}）</n-button>
+          <n-button size="small" quaternary @click="toggleComments(p)"><EIcon name="chat-dots" :size="18" /> 议论（{{ commentList[p.id] ? commentList[p.id].length : '展开' }}）</n-button>
           <template v-if="commentList[p.id]">
             <div v-for="c in commentList[p.id]" :key="c.id"
                  style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
@@ -168,7 +169,7 @@ async function addComment(p) {
     </n-spin>
 
     <!-- 编辑重提弹窗 -->
-    <n-modal :show="!!editModal" @update:show="(v) => { if (!v) editModal = null }" preset="card" style="width:560px;" title="✏️ 修改后重新提交（可修改一次）">
+    <n-modal :show="!!editModal" @update:show="(v) => { if (!v) editModal = null }" preset="card" style="width:560px;" title="修改后重新提交（可修改一次）">
       <template v-if="editModal">
         <n-form label-placement="top">
           <n-form-item label="标题">
@@ -181,7 +182,7 @@ async function addComment(p) {
             <n-select v-model:value="editModal.category" :options="CATS_EDIT.map(v=>({label:v,value:v}))" />
           </n-form-item>
           <div style="text-align:right;">
-            <n-button type="primary" @click="submitEdit">📤 重新提交（待审核）</n-button>
+            <n-button type="primary" @click="submitEdit"><EIcon name="send" :size="18" /> 重新提交（待审核）</n-button>
           </div>
         </n-form>
       </template>

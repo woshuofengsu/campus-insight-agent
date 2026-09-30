@@ -100,10 +100,10 @@ def _fault_drills(page, base: str) -> None:
     page.goto(f"{base}/elderly/report", wait_until="networkidle")
     page.wait_for_timeout(1800)
     page.fill("textarea", "五号楼二层楼道灯坏了")
-    _btn(page, "🔍 帮我看看还缺什么").first.click()
+    _btn(page, "帮我看看还缺什么").first.click()
     page.wait_for_timeout(2200)
-    if _btn(page, "✅ 确认上报").count():
-        _btn(page, "✅ 确认上报").first.click()
+    if _btn(page, "确认上报").count():
+        _btn(page, "确认上报").first.click()
     page.wait_for_timeout(2500)
     body = page.inner_text("body")
     check("故障① 提交超时**不谎报成功**", "已上报" not in body and "工单号" not in body,
@@ -197,27 +197,27 @@ def main() -> int:
             print("     ⚠️ 现场关键：操作按钮**藏在折叠行里**，必须先点这一行展开（脚本原稿漏了这步）")
             opened = _expand_first_row(page, "待审核")
             check("⓪ 点行展开工单（操作按钮才出现）", opened)
-            if _has_btn(page, "✅ 审核通过"):
-                _btn(page, "✅ 审核通过").first.click()
+            if _has_btn(page, "审核通过"):
+                _btn(page, "审核通过").first.click()
                 page.wait_for_timeout(1800)
-            check("① 审核通过", _has_btn(page, "🔧 派单") > 0,
+            check("① 审核通过", _has_btn(page, "派单") > 0,
                   "出现「🔧 派单」按钮 = 已进入已审核待派单")
             if page.locator("input[placeholder='维修人员姓名（必填）']").count():
                 page.fill("input[placeholder='维修人员姓名（必填）']", "王师傅")
                 page.fill("input[placeholder='电话（必填）']", "13800001234")
-                _btn(page, "🔧 派单").first.click()
+                _btn(page, "派单").first.click()
                 page.wait_for_timeout(1500)
-            check("② 派单（填维修人员与电话）", _has_btn(page, "🔨 开始处理") > 0,
+            check("② 派单（填维修人员与电话）", _has_btn(page, "开始处理") > 0,
                   "出现「🔨 开始处理」")
-            if _has_btn(page, "🔨 开始处理"):
-                _btn(page, "🔨 开始处理").first.click()
+            if _has_btn(page, "开始处理"):
+                _btn(page, "开始处理").first.click()
                 page.wait_for_timeout(1500)
-            check("③ 开始处理", _has_btn(page, "✅ 提交处理结果") > 0,
+            check("③ 开始处理", _has_btn(page, "提交处理结果") > 0,
                   "出现「✅ 提交处理结果」")
             if page.locator("input[placeholder='处理结果（必填）']").count():
                 page.fill("input[placeholder='处理结果（必填）']",
                           "已联系电梯维保单位，故障已排除，运行正常。")
-                _btn(page, "✅ 提交处理结果").first.click()
+                _btn(page, "提交处理结果").first.click()
                 page.wait_for_timeout(2000)
             text = page.inner_text("body")
             check("④ 提交处理结果 → 状态变为「处理结束」", "处理结束" in text)
@@ -233,12 +233,12 @@ def main() -> int:
             page.goto(f"{base}/elderly/report", wait_until="networkidle")
             page.wait_for_timeout(2000)
             page.fill("textarea", "五号楼二层楼道灯坏了")
-            _btn(page, "🔍 帮我看看还缺什么").first.click()
+            _btn(page, "帮我看看还缺什么").first.click()
             page.wait_for_timeout(2200)
             body_el = page.inner_text("body")
             check("⑥ 报修页给出结构化摘要", ("请您核对这几项" in body_el) or ("入" in body_el and "位置" in body_el))
-            if _btn(page, "✅ 确认上报").count():
-                _btn(page, "✅ 确认上报").first.click()
+            if _btn(page, "确认上报").count():
+                _btn(page, "确认上报").first.click()
                 # ⚠️ 别用固定 sleep 等结果：提交里有分类等耗时步骤（LLM 姿态全开时更慢），
                 #    固定 2.5s 会**偶发**读到"还没有结果"而误报失败（实测踩到一次 25/26）。
                 #    这里改成轮询等结果文案出现。
@@ -271,8 +271,8 @@ def main() -> int:
             check("⑨ 顶部导航 ≤ 6 个入口（B4 收敛）", nav.count() <= 6,
                   f"实际 {nav.count()} 个：{nav.all_inner_texts()}")
             check("⑩ 任意页面都有独立紧急求助入口",
-                  page.locator("button:has-text('🆘 紧急求助')").count() > 0)
-            _btn(page, "🧰 更多服务").first.click()
+                  page.locator("button:has-text('紧急求助')").count() > 0)
+            _btn(page, "更多服务").first.click()
             page.wait_for_timeout(1500)
             check("⑪ 「更多服务」页可打开并能进用药提醒",
                   "/elderly/more" in page.url, page.url)
@@ -307,8 +307,8 @@ def main() -> int:
             page.wait_for_timeout(2500)
             check("① 打开「人工待办」工作台", "人工待办" in page.inner_text("body"), page.url)
 
-            if _has_btn(page, "🙋 领取"):
-                _btn(page, "🙋 领取").first.click()
+            if _has_btn(page, "领取"):
+                _btn(page, "领取").first.click()
                 page.wait_for_timeout(2000)
                 body_h = page.inner_text("body")
                 # 判据要**看状态**，不能看"待处理还在不在"（列表里还有别人的待处理包）
@@ -317,14 +317,14 @@ def main() -> int:
                 if page.locator("input[placeholder='回复内容（会通知居民）']").count():
                     page.fill("input[placeholder='回复内容（会通知居民）']",
                               "已帮您核实：带身份证与医保卡到社区服务站即可办理。")
-                    _btn(page, "✅ 回复").first.click()
+                    _btn(page, "回复").first.click()
                     page.wait_for_timeout(2000)
                 check("③ 回复居民成功", "已回复" in page.inner_text("body"),
                       "回复内容已记录并通知居民")
                 if page.locator("input[placeholder='关闭说明（居民看得到的处理结果）']").count():
                     page.fill("input[placeholder='关闭说明（居民看得到的处理结果）']",
                               "已电话告知居民办理流程，居民确认理解。")
-                    _btn(page, "🏁 关闭").first.click()
+                    _btn(page, "关闭").first.click()
                     page.wait_for_timeout(2200)
                 check("④ 关闭办结（带说明）", "已办结" in page.inner_text("body"),
                       "关闭说明会成为居民看到的处理结果")

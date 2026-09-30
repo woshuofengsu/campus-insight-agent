@@ -2477,7 +2477,7 @@ ChatGPT 独立评审（`docs/review/ChatGPT-独立评审-第十一轮.md`，7.2/
 
 | 项 | 结果 |
 |---|---|
-| `python -m pytest tests/ -q` | 全绿（本轮新增 `test_qa_evidence_panel.py` 5 例、`test_elderly_icons.py` 5 例、设计令牌 2 例、对抗集 1 例） |
+| `python -m pytest tests/ -q` | 全绿（本轮新增 `test_qa_evidence_panel.py` 5 例、设计令牌 2 例、对抗集 1 例；`test_elderly_icons.py` 后被 `test_no_emoji_ui.py` 取代） |
 | `python -m ruff check .` | 0 |
 | `python scripts/check_claims.py` | 全绿（数字口径与材料一致） |
 | `python scripts/ui_audit.py` | **0 HIGH**（修复前 1 处：提案详情 2.31:1） |
@@ -2485,3 +2485,58 @@ ChatGPT 独立评审（`docs/review/ChatGPT-独立评审-第十一轮.md`，7.2/
 | `python scripts/mobile_flow_check.py` | **40/40**（含新增的图标检查） |
 | `python scripts/journey_check.py` / `demo_flow_check.py --mutate --handoff --faults` | 58/58 · 26/26 |
 | `python scripts/eval_all.py --out docs/eval/eval-report` | 检索两路径 48/48 = 100% · 纯词法 91.7% · 拒答 8+8 · 对抗集见上 |
+
+---
+
+## 六十、全站去 emoji：539 处 → 0（单色线性图标体系，2026-09-29 深夜）
+
+**为什么值得单独做一批**：这不是"好看一点"，而是**同一个界面在不同手机上长得不一样**的问题——
+emoji 是各厂商字形（大小、配色、有的干脆没有），而三端首页/状态卡/按钮上全是它；
+`ui_audit` 测得出对比度，`mobile_audit` 测得出热区，但**都测不出"字形不确定"**。
+
+### 一、做法（一套东西，三端复用）
+
+- 新增 `web/src/config/icons.js`：**约 70 个单色线性图标**（24×24 视框、线宽 2、只有 `stroke`），
+  名字按**语义**取（`wrench`/`bell`/`siren`/`hospital`…），不按形状取；同一语义三端共用一个图形。
+- 新增 `web/src/utils/weatherIcon.js`：天气图标原来是**后端给的 emoji**（`emoji` 字段），现在改成
+  **前端按天气文字选图标**（`晴/少云/多云/阴/雨/雪/沙雾霾/风` → `sun/cloud-sun/cloud/cloud-rain/cloud-snow/cloud-fog/wind`），
+  后端数据一个字段没动；认不出来兜底 `cloud-sun`，**绝不出现空白**。
+- `components/EIcon.vue` 从"老年端专用"扩成**全站通用**（`name`/`size`/`weight`）。
+- 迁移按**字符扫描**做（不是按行）：`<script>/<style>` 整块删 emoji；模板里**标签之外**（文本节点）
+  换成 `<EIcon/>`，**标签之内**（属性值、`{{ }}` 插值）只能删——插值里塞组件会被当成字符串原样渲染出来。
+  第一版按行判断，把跨行属性里的 `v-for="(f,i) in [ ['🤝','…'] ]"` 当成文本节点，
+  组件直接塞进了 JS 字符串，构建 38 个文件全挂（教训已写在脚本头部）。
+- 配置字段（`icon: '🔧'` → `icon: 'wrench'`）由**消费方模板**渲染组件：网格端侧边栏/抽屉菜单
+  （`h(EIcon, {name})`）、居民端底部标签栏、登录页角色卡、两个首页快捷入口、「更多服务」宫格、
+  治理大屏 8 张指标卡、工作台 4 张统计卡、消息类型图标、错误兜底页。
+
+### 二、过程中踩到并修掉的三个真问题
+
+1. **本机用户目录带单引号**（`C:/Users/wo'shuo'feng'su/…`）：`unplugin-vue-components` 自动导入会把
+   绝对路径写进 `import X from '…'`，单引号截断字符串 → `Unterminated string constant`。
+   修法：**40 个文件补显式相对导入**（顺带好处：页面依赖哪个组件一眼可见）。
+2. **选择器跟着文案走**：`journey_check`/`demo_flow_check` 用 `exact=True` 按「🔧 派单」这种**可访问名**
+   找按钮，图形改 SVG 后名字变成「派单」→ 旅程 4 条"执行中断"。已改 33 行按钮名里的 emoji，
+   **没有放宽 `exact=True`**（`派单` 子串会误命中「批量派单」）。
+3. **插值里的三元被掏空**：`{{ h.is_bot ? '🤖' : '👤' }}` 会被删成 `{{ h.is_bot ? '' : '' }}`，
+   已逐个改成 `<EIcon :name="…"/>`（AgentChat 历史记录、老年端进度五步、grid/Messages 的"居民/AI"前缀）。
+   **这类"删完不报错、但语义没了"的位置必须回头看**——静态检查抓不到。
+
+### 三、门禁（`tests/test_no_emoji_ui.py`，6 例）
+
+- `web/src/**/*.{vue,js,ts}` 里 **0 emoji**；唯一豁免 `utils/weatherIcon.js`
+  （那里的 emoji 是**匹配后端数据**用的正则，不是界面图标；豁免名单只准有这一个文件、且必须写理由）；
+- 页面里写死的 `<EIcon name="…"/>` 与配置里的 `icon: '…'` **都必须是图标表里真实存在的名字**
+  （写错不会报错、只会静默显示成「更多」图标——这种"静默降级"必须有静态闸门）；
+- `EIcon` 必须 `currentColor` + 有 `aria-hidden`；
+- 自检：认得出 emoji、认不出排版箭头（`→` 是标点不是图标）。
+  本文件**取代**了 `tests/test_elderly_icons.py`（那版只覆盖老年端布局层 + 正文棘轮；现在全站 0，棘轮不再需要）。
+
+### 四、验收
+
+| 项 | 结果 |
+|---|---|
+| 去 emoji 规模 | **539 处 / 45 个文件**；复扫 `web/src` **0 处** |
+| `ui_audit` / `mobile_audit` | **0 HIGH**（37 路由页 / 58 视口） / 全部通过 |
+| `mobile_flow_check` · `journey_check` · `demo_flow_check` | **40/40** · **58/58** · **26/26** |
+| 全量 `pytest` | 见 §五汇总（全绿） |

@@ -2,6 +2,7 @@
 // 全局极端天气滚动提醒（居民端/网格员端所有页面顶部，可临时关闭 6 小时，登录或 6 小时后重现）
 import { ref, onMounted, onUnmounted } from 'vue'
 import { weather } from '../api'
+import EIcon from './EIcon.vue'
 
 const alerts = ref([])
 const hidden = ref(false)
@@ -46,10 +47,10 @@ function closeBanner() {
     <div style="display:flex;align-items:center;gap:10px;">
       <div style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
         <span v-for="a in alerts" :key="a.id" style="margin-right:32px;">
-          ⚠️ <b>{{ a.alert_type }}{{ a.level }}预警</b>（生效 {{ (a.effective_time || '').slice(0, 16) }}）
+          <EIcon name="alert" :size="18" /> <b>{{ a.alert_type }}{{ a.level }}预警</b>（生效 {{ (a.effective_time || '').slice(0, 16) }}）
         </span>
       </div>
-      <button @click="closeBanner" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:99px;padding:2px 12px;cursor:pointer;font-size:0.8rem;">✕ 关闭（6 小时）</button>
+      <button @click="closeBanner" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:99px;padding:2px 12px;cursor:pointer;font-size:0.8rem;"><EIcon name="x" :size="18" /> 关闭（6 小时）</button>
     </div>
   </div>
 </template>

@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1037 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1038 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1037 项：1036 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1038 项：1037 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1037 项测试**（1036 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1038 项测试**（1037 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -136,6 +136,11 @@ elderly:  demo_elderly（免登录）
   两个审计脚本已内置 dist 新鲜度闸：落后于源码直接红字退出。
 - 语义文字色**一律用亮/暗成对令牌**（`--ink-*`、`--st-*-ink`、`--primary-ink`、`--danger-solid`/`--success-ink`），
   **不要在内联样式里写死 hex**：写死色在暗色下不跟着换，`ui_audit` 会抓（第九轮抓到 6 处这类问题）。
+- **界面图形一律用 `<EIcon name="…"/>`，禁止 emoji 当图标**（2026-09-29 全站换掉 539 处）：
+  emoji 是各厂商字形（大小/配色/有无都不同），`ui_audit` 与 `mobile_audit` 都测不出"字形不确定"。
+  图标在 `web/src/config/icons.js`（语义命名，不够就加一个）；写死的名字与配置里的 `icon: '…'`
+  必须是表里真实存在的名字（写错只会静默显示成「更多」图标）→ `tests/test_no_emoji_ui.py` 会红。
+  天气图标用 `utils/weatherIcon.js` 由**文字**选图标（后端仍返回 emoji 字段，但界面不再直接渲染它）。
 - **禁止静默吞异常**（本轮新增门禁）：`except` 块里必须 `_log.warning(...)` 或抛出；
   尤其**绝不能"吞掉异常后返回成功"**（`tests/test_silent_exceptions.py` 会红）。
   分诊工具：`python scripts/audit_silent_exceptions.py`（HIGH/MID 基线只减不增）；
@@ -202,7 +207,10 @@ elderly:  demo_elderly（免登录）
   连点两下**建出两张工单**）并各自补了回归测试（见 dev-log 五十八节）
 - **提交前最后一批（2026-09-29 深夜，v4 第 2/3 批收尾）**：居民端政策问答**依据面板**（含决策元数据 + 门禁）·
   语义文字色一律换 `-ink` 成对令牌（`ui_audit` 抓到方案详情 2.31:1）· 对抗集 **21 → 60 条**（四类各 15，
-  3 条未达标项登记在台账 §7.1，不调参掩盖）· 老年端顶部图标去 emoji（单色线性 SVG，正文 emoji 记棘轮）
-  （见 dev-log **五十九** 节）
+  3 条未达标项登记在台账 §7.1，不调参掩盖）（见 dev-log **五十九** 节）
+- **全站去 emoji（539 处 → 0，单色线性图标体系）**：`web/src/config/icons.js`（约 70 个语义图标）+
+  `components/EIcon.vue` 全站通用 + `utils/weatherIcon.js`（天气图标改由文字选图标，后端数据没动）；
+  门禁 `tests/test_no_emoji_ui.py`（0 emoji / 图标名必须存在 / 必须 currentColor 与 aria-hidden / 扫描器自检）
+  （见 dev-log **六十** 节）
 
-详见 `docs/spec/dev-log.md`（最新 **五十九** 节）。
+详见 `docs/spec/dev-log.md`（最新 **六十** 节）。

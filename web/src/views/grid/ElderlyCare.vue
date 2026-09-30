@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const tab = ref('meds')
@@ -66,12 +67,12 @@ async function sosAction(s, action) {
 
 <template>
   <div class="page">
-    <h2 class="page-title">👴 老年关怀管理</h2>
+    <h2 class="page-title"><EIcon name="users" :size="18" /> 老年关怀管理</h2>
     <p class="page-sub">用药提醒审核 · 紧急联系人审核 · 紧急求助处理</p>
 
     <n-tabs v-model:value="tab" type="line">
       <!-- P4 健康记录：选老人 → 看血压/血糖与分级（只提醒，不下结论） -->
-      <n-tab-pane name="vitals" tab="🩺 健康记录">
+      <n-tab-pane name="vitals" tab="健康记录">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
           <n-select :value="vitalUid" style="max-width:280px;" placeholder="选择老人"
                     :options="elders.map(e => ({ label: (e.name || ('老人#' + e.id)) + '（' + (e.community || '') + '）', value: e.id }))"
@@ -88,7 +89,7 @@ async function sosAction(s, action) {
             </n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
-            🕐 {{ (r.measured_at || '').slice(0, 16) }}
+            <EIcon name="clock" :size="18" /> {{ (r.measured_at || '').slice(0, 16) }}
             <template v-if="r.kind === 'glucose' && r.measure_when">
               · {{ r.measure_when === 'fasting' ? '空腹' : (r.measure_when === 'postprandial' ? '餐后' : '随机') }}
             </template>
@@ -101,7 +102,7 @@ async function sosAction(s, action) {
       </n-tab-pane>
 
       <!-- P3 安全闭环：久未互动 / 重点关注老人 -->
-      <n-tab-pane name="focus" tab="👀 重点关注老人">
+      <n-tab-pane name="focus" tab="重点关注老人">
         <div v-for="e in inactive" :key="e.user_id" class="card"
              style="border:2px solid #f59e0b;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -119,7 +120,7 @@ async function sosAction(s, action) {
       </n-tab-pane>
 
       <!-- 用药审核 -->
-      <n-tab-pane name="meds" tab="💊 用药审核">
+      <n-tab-pane name="meds" tab="用药审核">
         <div v-for="m in meds" :key="m.id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ m.drug_name }} <span class="muted" v-if="m.dosage">（{{ m.dosage }}）</span></b>
@@ -130,7 +131,7 @@ async function sosAction(s, action) {
           </div>
           <div v-if="m.status === '待审核'" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
             <n-input v-model:value="auditOp[m.id]" placeholder="审核意见" size="small" style="max-width:200px;" />
-            <n-button size="small" type="success" @click="auditMed(m, true)">✅ 通过</n-button>
+            <n-button size="small" type="success" @click="auditMed(m, true)"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
             <n-button size="small" type="warning" @click="auditMed(m, false)">↩️ 退回</n-button>
           </div>
         </div>
@@ -138,15 +139,15 @@ async function sosAction(s, action) {
       </n-tab-pane>
 
       <!-- 联系人审核 -->
-      <n-tab-pane name="contacts" tab="📞 联系人审核">
+      <n-tab-pane name="contacts" tab="联系人审核">
         <div v-for="c in contacts" :key="c.id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ c.name }}（{{ c.relation }}）</b>
             <n-tag size="small" :type="c.status === '审核通过' ? 'success' : 'warning'">{{ c.status }}</n-tag>
           </div>
-          <div class="muted" style="font-size:0.85rem;margin-top:4px;">📱 {{ c.phone }}</div>
+          <div class="muted" style="font-size:0.85rem;margin-top:4px;"><EIcon name="phone" :size="18" /> {{ c.phone }}</div>
           <div v-if="c.status === '待审核'" style="margin-top:10px;display:flex;gap:8px;">
-            <n-button size="small" type="success" @click="auditContact(c, true)">✅ 通过</n-button>
+            <n-button size="small" type="success" @click="auditContact(c, true)"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
             <n-button size="small" type="warning" @click="auditContact(c, false)">↩️ 退回</n-button>
           </div>
         </div>
@@ -154,7 +155,7 @@ async function sosAction(s, action) {
       </n-tab-pane>
 
       <!-- SOS 处理 -->
-      <n-tab-pane name="sos" tab="🚨 紧急求助">
+      <n-tab-pane name="sos" tab="紧急求助">
         <div v-for="s in sosList" :key="s.id" class="card"
              :style="s.status === '求助中' ? 'border:2px solid #dc2626;' : ''">
           <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -162,17 +163,17 @@ async function sosAction(s, action) {
             <n-tag size="small" :type="s.status === '求助中' ? 'error' : 'default'">{{ s.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
-            🕐 {{ (s.created_at || '').slice(0, 16) }}<template v-if="s.call_type"> · {{ s.call_type }}</template>
+            <EIcon name="clock" :size="18" /> {{ (s.created_at || '').slice(0, 16) }}<template v-if="s.call_type"> · {{ s.call_type }}</template>
             <template v-if="s.handle_note"> · 处理：{{ s.handle_note }}</template>
             <template v-else-if="s.result"> · {{ s.result }}</template>
           </div>
           <div v-if="s.status === '求助中'" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
             <n-input v-model:value="replyOp[s.id]" placeholder="处理备注" size="small" style="max-width:200px;" />
-            <n-button size="small" type="primary" @click="sosAction(s, 'respond')">✅ 确认响应</n-button>
+            <n-button size="small" type="primary" @click="sosAction(s, 'respond')"><EIcon name="checkCircle" :size="18" /> 确认响应</n-button>
           </div>
           <div v-if="s.status === '已响应'" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
             <n-input v-model:value="replyOp[s.id]" placeholder="处理结果" size="small" style="max-width:200px;" />
-            <n-button size="small" type="success" @click="sosAction(s, 'close')">✅ 结束求助</n-button>
+            <n-button size="small" type="success" @click="sosAction(s, 'close')"><EIcon name="checkCircle" :size="18" /> 结束求助</n-button>
           </div>
         </div>
         <n-empty v-if="sosList.length === 0" description="暂无求助记录" />

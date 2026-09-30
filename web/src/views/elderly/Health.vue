@@ -7,6 +7,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
 import { useSpeech, speechCapability } from '../../composables/useSpeech'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const { speak } = useSpeech()
@@ -18,7 +19,7 @@ const form = ref({ sys: '', dia: '', glucose: '', measure_when: 'random' })
 const records = ref([])
 const summary = ref({})
 
-/** 统一播报入口：接住 speak() 的返回值，失败就把 🔊 降级成"请看大字"（v3 复核 B3）。 */
+/** 统一播报入口：接住 speak() 的返回值，失败就把 降级成"请看大字"（v3 复核 B3）。 */
 async function say(text) {
   const t = (text || '').trim()
   if (!t) return false
@@ -75,7 +76,7 @@ function readAloud() {
 
 <template>
   <div class="page">
-    <h2 class="page-title">🩺 我的健康</h2>
+    <h2 class="page-title"><EIcon name="medical" :size="18" /> 我的健康</h2>
 
     <!-- 最近一次记录 -->
     <div class="card" style="border-radius:18px;">
@@ -100,9 +101,9 @@ function readAloud() {
         {{ latestBp.level_hint }}
       </div>
       <n-button v-if="ttsOk" size="large" block style="margin-top:12px;min-height:64px;font-size:1.3rem;"
-                @click="readAloud">🔊 听一遍</n-button>
+                @click="readAloud"><EIcon name="speaker" :size="18" /> 听一遍</n-button>
       <div v-else data-speech-fallback style="font-size:1.25rem;margin-top:10px;">
-        🔇 这台手机不能念出来，上面的字已经放大了，看字就行
+        <EIcon name="speaker-off" :size="18" /> 这台手机不能念出来，上面的字已经放大了，看字就行
       </div>
     </div>
 
@@ -141,7 +142,7 @@ function readAloud() {
 
       <n-button type="primary" size="large" block
                 style="margin-top:16px;min-height:76px;font-size:1.4rem;font-weight:800;border-radius:18px;"
-                @click="save">✅ 保存这一条</n-button>
+                @click="save"><EIcon name="checkCircle" :size="18" /> 保存这一条</n-button>
     </div>
 
     <!-- 最近记录 -->

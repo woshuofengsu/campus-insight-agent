@@ -8,6 +8,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -60,7 +61,7 @@ async function confirmCall() {
   calling.value = info
   try {
     window.location.href = info.tel || `tel:${info.phone}`
-    // ⚠️ 这里只能记录"已经打开拨号盘"：是否拨出、是否接通**网页不知道**
+    // 这里只能记录"已经打开拨号盘"：是否拨出、是否接通**网页不知道**
     await elderly.contactOutcome(info.call_id, 'dialer_opened')
   } catch (e) {
     try { await elderly.contactOutcome(info.call_id, 'failed') } catch { /* 留痕失败不阻塞老人 */ }
@@ -84,12 +85,12 @@ async function markCancelled() {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">👨‍👩‍👧 紧急联系人</div>
+    <div class="elderly-title"><EIcon name="family" :size="18" /> 紧急联系人</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">紧急时可以一键呼叫他们（最多 3 个）</p>
 
     <!-- 拨号进行中：只承诺"已帮您打开手机拨号"，并给一个"没拨出去"的出口 -->
     <div v-if="calling" class="card" style="font-size:1.25rem;border:2px solid var(--primary);">
-      <b>📱 已帮您打开手机拨号</b>
+      <b><EIcon name="phone" :size="18" /> 已帮您打开手机拨号</b>
       <div style="margin-top:8px;">
         请在手机上按绿色按钮拨给 <b>{{ calling.name }}</b>（{{ calling.phone }}）。
       </div>
@@ -107,17 +108,17 @@ async function markCancelled() {
           <n-tag size="large" :type="c.status === '审核通过' ? 'success' : 'warning'">{{ c.status }}</n-tag>
         </div>
       </div>
-      <div class="muted" style="margin-top:6px;">📱 {{ c.phone }}</div>
+      <div class="muted" style="margin-top:6px;"><EIcon name="phone" :size="18" /> {{ c.phone }}</div>
       <div v-if="c.status === '审核通过'" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:10px;">
-        <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" @click="callConfirm = c">📞 呼叫 {{ c.name }}</n-button>
+        <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" @click="callConfirm = c"><EIcon name="phone-call" :size="18" /> 呼叫 {{ c.name }}</n-button>
         <n-popconfirm @positive-click="remove(c)">
-          <template #trigger><n-button quaternary type="error" size="large" style="min-height:60px;">🗑️ 删除</n-button></template>
+          <template #trigger><n-button quaternary type="error" size="large" style="min-height:60px;"><EIcon name="trash" :size="18" /> 删除</n-button></template>
           删除后该联系人不再生效，确认删除？
         </n-popconfirm>
       </div>
       <div v-else style="margin-top:10px;">
         <n-popconfirm @positive-click="remove(c)">
-          <template #trigger><n-button quaternary type="error" size="large" block>🗑️ 删除（待审核）</n-button></template>
+          <template #trigger><n-button quaternary type="error" size="large" block><EIcon name="trash" :size="18" /> 删除（待审核）</n-button></template>
           确认删除该联系人？
         </n-popconfirm>
       </div>
@@ -125,13 +126,13 @@ async function markCancelled() {
     <n-empty v-if="list.length === 0" description="还没有紧急联系人" style="font-size:1.25rem;" />
 
     <n-button v-if="!showForm" type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
-              @click="showForm = true">➕ 添加联系人</n-button>
+              @click="showForm = true"><EIcon name="plus" :size="18" /> 添加联系人</n-button>
 
     <div v-if="showForm" class="card" style="margin-top:12px;">
       <n-input v-model:value="form.name" placeholder="联系人姓名" size="large" style="font-size:1.25rem;" />
       <n-input v-model:value="form.phone" placeholder="11 位手机号" size="large" style="margin-top:10px;" />
       <n-input v-model:value="form.relation" placeholder="与您的关系（如：儿子/女儿）" size="large" style="margin-top:10px;" />
-      <n-button type="primary" block size="large" style="margin-top:12px;min-height:60px;" @click="add">📨 提交（待审核）</n-button>
+      <n-button type="primary" block size="large" style="margin-top:12px;min-height:60px;" @click="add"><EIcon name="mail" :size="18" /> 提交（待审核）</n-button>
     </div>
 
     <!-- 呼叫确认（10 秒超时） -->

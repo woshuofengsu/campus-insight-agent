@@ -14,7 +14,7 @@ const theme = useThemeStore()
 const router = useRouter()
 
 // 登录后按角色跳对应端首页
-// ⚠ 修复（本轮）：原先在 onMounted 直接读 router.currentRoute.value.path —— 此时首屏导航
+// 修复（本轮）：原先在 onMounted 直接读 router.currentRoute.value.path —— 此时首屏导航
 // 往往还没解析完（路径仍是 '/'），于是任何**深链刷新**（如 /grid/work-orders）以及公开页
 // /screen 都会被强制弹回角色首页；刷新丢失当前页面、大屏在登录后永远打不开。
 // 正确做法：先 await router.isReady()，且**只**在根路径/登录页做兜底跳转。

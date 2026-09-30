@@ -6,6 +6,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { agent } from '../../api'
 import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const { recognize, speak } = useSpeech()
@@ -23,7 +24,7 @@ const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
-// 播报是否真的响过：失败就把 🔊 降级成"请看大字"，**不假装老人听到了**（v3 复核 B3）
+// 播报是否真的响过：失败就把 降级成"请看大字"，**不假装老人听到了**（v3 复核 B3）
 const ttsOk = ref(cap.hasTTS)
 const lastSpoken = ref('')
 
@@ -122,28 +123,28 @@ function sendOption(o) {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">🤖 社区小助手</div>
+    <div class="elderly-title"><EIcon name="robot" :size="18" /> 社区小助手</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">按住说话，或直接打字问我</p>
 
     <!-- 降级提示条：这台机器不能语音时提前说清（审计靠 data-speech-fallback 验证） -->
     <div v-if="asrBlocked" data-speech-fallback
          class="card panel-warm" style="border-radius:14px;font-size:1.3rem;margin:8px 0;">
-      🔇 {{ banner }}
+      <EIcon name="speaker-off" :size="18" /> {{ banner }}
     </div>
     <!-- 播报失败必须可见（v3 复核 B3）：不能假装老人听到了 -->
     <div v-if="lastSpoken && !ttsOk" class="card muted" style="font-size:1.15rem;margin:8px 0;">
-      🔇 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
+      <EIcon name="speaker-off" :size="18" /> 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
     </div>
     <n-button v-else-if="lastSpoken" block size="large" style="margin:8px 0;min-height:56px;font-size:1.2rem;"
-              @click="say(lastSpoken)">🔊 再听一遍</n-button>
+              @click="say(lastSpoken)"><EIcon name="speaker" :size="18" /> 再听一遍</n-button>
 
     <!-- 语音按钮（至少 80px 高） -->
     <div style="margin:8px 0;">
       <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:80px;font-size:1.4rem;" :loading="listening" @mousedown="startListen" @mouseup="stopListen" @touchstart="startListen" @touchend="stopListen">
-        🎤 {{ listening ? `正在聆听…（${remain} 秒）` : '按住说话（最多 60 秒）' }}
+        <EIcon name="mic" :size="18" /> {{ listening ? `正在聆听…（${remain} 秒）` : '按住说话（最多 60 秒）' }}
       </n-button>
       <div v-else style="font-size:1.3rem;font-weight:700;text-align:center;">
-        ✍️ 在下面的框里打字问我，一样能办事
+        <EIcon name="edit" :size="18" /> 在下面的框里打字问我，一样能办事
       </div>
     </div>
 
@@ -151,8 +152,8 @@ function sendOption(o) {
     <div v-if="pendingText" class="card" style="background:#fefce8;font-size:1.25rem;">
       <div>您说的是：<b>{{ pendingText }}</b></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-        <n-button type="success" size="large" style="min-height:56px;" @click="confirmText">✅ 对，提交</n-button>
-        <n-button size="large" style="min-height:56px;" @click="retryText">🔄 重新说</n-button>
+        <n-button type="success" size="large" style="min-height:56px;" @click="confirmText"><EIcon name="checkCircle" :size="18" /> 对，提交</n-button>
+        <n-button size="large" style="min-height:56px;" @click="retryText"><EIcon name="refresh" :size="18" /> 重新说</n-button>
       </div>
     </div>
 
@@ -165,22 +166,22 @@ function sendOption(o) {
     <div class="card" style="min-height:220px;max-height:420px;overflow-y:auto;font-size:1.25rem;">
       <div v-for="(m, i) in msgs" :key="i" style="margin-bottom:12px;">
         <div v-if="!m.bot" style="text-align:right;">
-          <div style="display:inline-block;background:#2E7D32;color:#fff;border-radius:12px;padding:10px 14px;max-width:85%;">🗣️ {{ m.text }}</div>
+          <div style="display:inline-block;background:#2E7D32;color:#fff;border-radius:12px;padding:10px 14px;max-width:85%;"><EIcon name="speak" :size="18" /> {{ m.text }}</div>
         </div>
         <div v-else>
           <div style="display:inline-block;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:10px 14px;max-width:90%;white-space:pre-wrap;"
                :style="m.error ? 'color:var(--ink-danger);' : ''">
-            🤖 {{ m.text }}
+            <EIcon name="robot" :size="18" /> {{ m.text }}
             <div v-if="m.intent" style="margin-top:6px;"><n-tag size="small" type="info">{{ m.intent }}</n-tag></div>
             <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
               <n-button v-for="(a, ai) in (m.actions || [])" :key="ai" size="large" type="primary"
                         @click="a.type === 'navigate' && $router.push(a.to)">{{ a.label }}</n-button>
-              <n-button size="large" style="font-size:1.25rem;min-height:56px;" @click="replay(m)">🔊 再听一次</n-button>
+              <n-button size="large" style="font-size:1.25rem;min-height:56px;" @click="replay(m)"><EIcon name="speaker" :size="18" /> 再听一次</n-button>
             </div>
           </div>
         </div>
       </div>
-      <div v-if="busy" style="color:var(--muted);">🤖 正在思考…</div>
+      <div v-if="busy" style="color:var(--muted);"><EIcon name="robot" :size="18" /> 正在思考…</div>
     </div>
 
     <!-- 文字输入 -->
@@ -193,7 +194,7 @@ function sendOption(o) {
     <!-- 底部紧急求助（长按 3 秒） -->
     <div style="margin-top:16px;">
       <n-button type="error" block size="large" style="min-height:70px;font-size:1.4rem;background:#dc2626;"
-                @click="$router.push('/elderly/home')">🆘 紧急求助（长按 3 秒，去首页）</n-button>
+                @click="$router.push('/elderly/home')"><EIcon name="siren" :size="18" /> 紧急求助（长按 3 秒，去首页）</n-button>
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { issues, exportApi, batch } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -128,7 +129,7 @@ async function batchClose() {
 
 <template>
   <div class="page">
-    <h2 class="page-title">🔧 工单管理</h2>
+    <h2 class="page-title"><EIcon name="wrench" :size="18" /> 工单管理</h2>
     <p class="page-sub">共 {{ list.length }} 条工单 · 超时按紧急程度计时（紧急1h/中等4h/一般24h/普通48h）</p>
 
     <n-tabs v-model:value="tab" type="line">
@@ -139,7 +140,7 @@ async function batchClose() {
           <n-select v-model:value="urgFilter" :options="URG_OPTIONS.map(v=>({label:v,value:v}))" style="width:110px;" />
           <n-input v-model:value="keyword" placeholder="搜索标题/地址/描述/报修人" clearable style="flex:1;min-width:200px;" />
           <n-button size="small" @click="load">刷新</n-button>
-          <n-button size="small" @click="exportIssues">⬇️ 导出</n-button>
+          <n-button size="small" @click="exportIssues"><EIcon name="arrowDown" :size="18" /> 导出</n-button>
         </div>
 
         <!-- 批量操作栏（P2-E2-01） -->
@@ -147,9 +148,9 @@ async function batchClose() {
           <n-checkbox :checked="selected.length === filtered.length && filtered.length > 0" @update:checked="toggleAll">全选（{{ selected.length }}）</n-checkbox>
           <n-input v-model:value="batchAssignee" placeholder="批量派单：维修人员姓名" size="small" style="width:180px;" />
           <n-input v-model:value="batchPhone" placeholder="电话" size="small" style="width:130px;" />
-          <n-button size="small" type="info" @click="batchDispatch">🔧 批量派单</n-button>
+          <n-button size="small" type="info" @click="batchDispatch"><EIcon name="wrench" :size="18" /> 批量派单</n-button>
           <n-input v-model:value="batchCloseReason" placeholder="批量关闭原因" size="small" style="width:160px;" />
-          <n-button size="small" quaternary type="error" @click="batchClose">🚫 批量关闭</n-button>
+          <n-button size="small" quaternary type="error" @click="batchClose"><EIcon name="ban" :size="18" /> 批量关闭</n-button>
         </div>
 
         <n-spin :show="loading">
@@ -168,9 +169,9 @@ async function batchClose() {
                     background: i.status === '处理结束' ? '#ecfdf5' : i.status === '已关闭' ? '#f5f5f5' : i.status === '已撤回' ? '#f5f5f5' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? '#fef2f2' : '#eef2ff',
                     color: i.status === '处理结束' ? 'var(--ink-success)' : i.status === '已关闭' || i.status === '已撤回' ? 'var(--muted)' : i.status === '已超时' || (i.overdue && i.status !== '处理结束') ? 'var(--ink-danger)' : 'var(--ink-info)',
                   }" style="margin-left:8px;">{{ i.status }}</span>
-                  <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;">🔴 紧急</span>
-                  <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;">🚫 违规标记</span>
-                  <span v-if="i.non_community_responsibility" class="status-pill" style="background:#fffbeb;color:var(--ink-warning);margin-left:4px;">🏗️ 第三方施工</span>
+                  <span v-if="i.urgency === '紧急'" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;"><EIcon name="dot" :size="18" /> 紧急</span>
+                  <span v-if="i.is_violation" class="status-pill" style="background:#fef2f2;color:var(--ink-danger);margin-left:4px;"><EIcon name="ban" :size="18" /> 违规标记</span>
+                  <span v-if="i.non_community_responsibility" class="status-pill" style="background:#fffbeb;color:var(--ink-warning);margin-left:4px;"><EIcon name="construction" :size="18" /> 第三方施工</span>
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
@@ -180,21 +181,21 @@ async function batchClose() {
               </div>
             </div>
             <div class="muted" style="font-size:0.85rem;margin-top:4px;">
-              {{ i.issue_type }} · {{ i.category }} · 📍{{ i.location }} · 报修人 {{ i.reporter_name }}
-              <span v-if="i.assignee_name"> · 👷 {{ i.assignee_name }}</span>
-              <span v-if="i.is_agent_report && i.agent_name"> · 🙋 代报：{{ i.agent_name }}（{{ i.agent_relation }}）</span>
+              {{ i.issue_type }} · {{ i.category }} · <EIcon name="pin" :size="18" /> {{ i.location }} · 报修人 {{ i.reporter_name }}
+              <span v-if="i.assignee_name"> · <EIcon name="user-worker" :size="18" /> {{ i.assignee_name }}</span>
+              <span v-if="i.is_agent_report && i.agent_name"> · <EIcon name="hand" :size="18" /> 代报：{{ i.agent_name }}（{{ i.agent_relation }}）</span>
             </div>
 
             <div v-if="expanded[i.id]" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
-              <div class="muted" style="font-size:0.9rem;">📝 {{ i.description }}</div>
-              <div v-if="i.resolve_note" class="muted" style="font-size:0.85rem;margin-top:6px;">📋 处理结果：{{ i.resolve_note }}</div>
+              <div class="muted" style="font-size:0.9rem;"><EIcon name="edit" :size="18" /> {{ i.description }}</div>
+              <div v-if="i.resolve_note" class="muted" style="font-size:0.85rem;margin-top:6px;"><EIcon name="clipboard" :size="18" /> 处理结果：{{ i.resolve_note }}</div>
 
               <div style="margin-top:12px;">
                 <!-- 审核 -->
                 <template v-if="['待审核', '退回补充信息'].includes(i.status)">
                   <n-input v-model:value="opOf(i).opinion" placeholder="审核意见（退回必填）" size="small" style="margin-bottom:8px;" />
                   <div style="display:flex;gap:8px;">
-                    <n-button size="small" type="success" @click="act(i, { action: 'audit', approve: true, opinion: opOf(i).opinion || '同意' }, '已审核通过')">✅ 审核通过</n-button>
+                    <n-button size="small" type="success" @click="act(i, { action: 'audit', approve: true, opinion: opOf(i).opinion || '同意' }, '已审核通过')"><EIcon name="checkCircle" :size="18" /> 审核通过</n-button>
                     <n-button size="small" type="warning" @click="requireValue(i, 'opinion', '退回必须填写审核意见') && act(i, { action: 'audit', approve: false, opinion: opOf(i).opinion }, '已退回')">↩️ 退回补充</n-button>
                   </div>
                 </template>
@@ -204,21 +205,21 @@ async function batchClose() {
                     <n-input v-model:value="opOf(i).assignee" placeholder="维修人员姓名（必填）" size="small" />
                     <n-input v-model:value="opOf(i).phone" placeholder="电话（必填）" size="small" />
                   </div>
-                  <n-button size="small" type="info" @click="requireValue(i, 'assignee', '请填写维修人员姓名') && requireValue(i, 'phone', '请填写维修人员电话') && act(i, { action: 'dispatch', assignee_name: opOf(i).assignee, assignee_phone: opOf(i).phone }, '已派单')">🔧 派单</n-button>
+                  <n-button size="small" type="info" @click="requireValue(i, 'assignee', '请填写维修人员姓名') && requireValue(i, 'phone', '请填写维修人员电话') && act(i, { action: 'dispatch', assignee_name: opOf(i).assignee, assignee_phone: opOf(i).phone }, '已派单')"><EIcon name="wrench" :size="18" /> 派单</n-button>
                 </template>
                 <!-- 开始处理（已派单 / 待协商均可推进） -->
-                <n-button v-if="['已派单', '待协商'].includes(i.status)" size="small" type="success" style="margin-top:8px;" @click="act(i, { action: 'start' }, '已开始处理')">🔨 开始处理</n-button>
+                <n-button v-if="['已派单', '待协商'].includes(i.status)" size="small" type="success" style="margin-top:8px;" @click="act(i, { action: 'start' }, '已开始处理')"><EIcon name="hammer" :size="18" /> 开始处理</n-button>
                 <!-- 解决 -->
                 <template v-if="i.status === '处理中'">
                   <n-input v-model:value="opOf(i).note" placeholder="处理结果（必填）" size="small" style="margin-bottom:8px;" />
                   <n-input v-model:value="opOf(i).noPhoto" placeholder="未上传照片原因（选填）" size="small" style="margin-bottom:8px;" />
-                  <n-button size="small" type="primary" @click="requireValue(i, 'note', '请填写处理结果') && act(i, { action: 'resolve', note: opOf(i).note, reason: opOf(i).noPhoto || '' }, '已提交处理结果')">✅ 提交处理结果</n-button>
+                  <n-button size="small" type="primary" @click="requireValue(i, 'note', '请填写处理结果') && act(i, { action: 'resolve', note: opOf(i).note, reason: opOf(i).noPhoto || '' }, '已提交处理结果')"><EIcon name="checkCircle" :size="18" /> 提交处理结果</n-button>
                 </template>
                 <!-- 确认补充信息 -->
                 <template v-if="i.supplement_pending">
                   <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                     <span style="font-size:0.85rem;">居民补充了信息：</span>
-                    <n-button size="small" type="primary" @click="act(i, { action: 'confirm_supplement', affects_timing: false }, '已确认补充')">✅ 确认（不影响时限）</n-button>
+                    <n-button size="small" type="primary" @click="act(i, { action: 'confirm_supplement', affects_timing: false }, '已确认补充')"><EIcon name="checkCircle" :size="18" /> 确认（不影响时限）</n-button>
                     <n-button size="small" type="warning" @click="act(i, { action: 'confirm_supplement', affects_timing: true }, '已确认（时限重算）')">⏱️ 确认且重算时限</n-button>
                   </div>
                 </template>
@@ -226,7 +227,7 @@ async function batchClose() {
                 <template v-if="['已派单', '处理中', '已审核待派单'].includes(i.status)">
                   <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                     <n-select v-model:value="opOf(i).cat" :options="CAT_OPTIONS.filter(c=>c!=='全部').map(v=>({label:v,value:v}))" size="small" style="width:160px;" placeholder="改分类" />
-                    <n-button size="small" @click="requireValue(i, 'cat', '请选择新分类') && act(i, { action: 'update_category', category: opOf(i).cat }, '分类已修改')">🗂️ 修改分类</n-button>
+                    <n-button size="small" @click="requireValue(i, 'cat', '请选择新分类') && act(i, { action: 'update_category', category: opOf(i).cat }, '分类已修改')"><EIcon name="folder" :size="18" /> 修改分类</n-button>
                     <span class="muted" style="font-size:0.75rem;">已派单后改分类将强制重新分派</span>
                   </div>
                 </template>
@@ -234,15 +235,15 @@ async function batchClose() {
                 <template v-if="['待审核', '处理中'].includes(i.status)">
                   <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
                     <n-input v-model:value="opOf(i).negReason" placeholder="协商原因" size="small" style="max-width:200px;" />
-                    <n-button size="small" @click="requireValue(i, 'negReason', '请填写协商原因') && act(i, { action: 'negotiate', reason: opOf(i).negReason }, '已转待协商')">🤝 转待协商</n-button>
-                    <n-button size="small" @click="act(i, { action: 'transfer' }, '已转出')">📤 转出</n-button>
+                    <n-button size="small" @click="requireValue(i, 'negReason', '请填写协商原因') && act(i, { action: 'negotiate', reason: opOf(i).negReason }, '已转待协商')"><EIcon name="handshake" :size="18" /> 转待协商</n-button>
+                    <n-button size="small" @click="act(i, { action: 'transfer' }, '已转出')"><EIcon name="send" :size="18" /> 转出</n-button>
                   </div>
                 </template>
                 <!-- 关闭 -->
                 <template v-if="['待审核', '处理中'].includes(i.status)">
                   <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                     <n-input v-model:value="opOf(i).reason" placeholder="关闭原因（必填）" size="small" style="max-width:240px;" />
-                    <n-button size="small" quaternary type="error" @click="requireValue(i, 'reason', '请填写关闭原因') && act(i, { action: 'close', reason: opOf(i).reason }, '已关闭')">🚫 关闭</n-button>
+                    <n-button size="small" quaternary type="error" @click="requireValue(i, 'reason', '请填写关闭原因') && act(i, { action: 'close', reason: opOf(i).reason }, '已关闭')"><EIcon name="ban" :size="18" /> 关闭</n-button>
                   </div>
                 </template>
               </div>
@@ -254,10 +255,10 @@ async function batchClose() {
 
       <n-tab-pane name="safety" tab="安全提醒记录">
         <div class="card">
-          <div style="font-weight:700;margin-bottom:8px;">⚠️ 安全隐患提醒记录（未生成工单，需线下处理）</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="alert" :size="18" /> 安全隐患提醒记录（未生成工单，需线下处理）</div>
           <div v-for="s in safety" :key="s.id" style="padding:8px 0;border-bottom:1px solid var(--border);">
             <div style="font-size:0.9rem;">{{ s.description }}</div>
-            <div class="muted" style="font-size:0.8rem;margin-top:2px;">📍 {{ s.location }} · {{ (s.created_at || '').slice(0, 16) }}</div>
+            <div class="muted" style="font-size:0.8rem;margin-top:2px;"><EIcon name="pin" :size="18" /> {{ s.location }} · {{ (s.created_at || '').slice(0, 16) }}</div>
           </div>
           <n-empty v-if="safety.length === 0" description="暂无安全提醒记录" />
         </div>
@@ -268,7 +269,7 @@ async function batchClose() {
       <n-drawer-content v-if="detailIssue" :title="'工单 #' + detailIssue.id + ' 详情'" :native-scrollbar="false">
         <div class="detail-status">
           <span class="status-pill">{{ detailIssue.status }}</span>
-          <span v-if="detailIssue.urgency === '紧急'" class="status-pill detail-danger">🔴 紧急</span>
+          <span v-if="detailIssue.urgency === '紧急'" class="status-pill detail-danger"><EIcon name="dot" :size="18" /> 紧急</span>
           <span v-if="deadlineText(detailIssue)" class="muted">{{ deadlineText(detailIssue) }}</span>
         </div>
         <h3 style="margin:12px 0 6px;">{{ detailIssue.title }}</h3>

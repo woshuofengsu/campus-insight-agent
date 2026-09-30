@@ -6,6 +6,8 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { weather, notices } from '../../api'
 import AgentChat from '../../components/AgentChat.vue'
+import EIcon from '../../components/EIcon.vue'
+import { weatherIcon } from '../../utils/weatherIcon'
 
 const router = useRouter()
 const store = useUserStore()
@@ -37,12 +39,12 @@ async function closeUrgent() {
 
 // 彩色快捷入口（每格独立色系，点击上浮 + 图标弹跳）
 const entries = [
-  { to: '/resident/work-orders', icon: '🔧', label: '报修', desc: '报修进度', color: '#2D5BFF', bg: 'rgba(45,91,255,0.10)' },
-  { to: '/resident/proposals', icon: '💡', label: '邻里议事', desc: '提案投票', color: '#FF8C42', bg: 'rgba(255,140,66,0.12)' },
-  { to: '/resident/qa', icon: '📖', label: '政策问答', desc: '医保社保', color: '#14B8A6', bg: 'rgba(20,184,166,0.12)' },
-  { to: '/resident/notices', icon: '📢', label: '通知', desc: '社区公告', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)' },
-  { to: '/resident/health', icon: '🏥', label: '健康防护', desc: '疾病预防', color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
-  { to: '/resident/weather', icon: '🌤️', label: '天气', desc: '生活建议', color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)' },
+  { to: '/resident/work-orders', icon: 'wrench', label: '报修', desc: '报修进度', color: '#2D5BFF', bg: 'rgba(45,91,255,0.10)' },
+  { to: '/resident/proposals', icon: 'bulb', label: '邻里议事', desc: '提案投票', color: '#FF8C42', bg: 'rgba(255,140,66,0.12)' },
+  { to: '/resident/qa', icon: 'book', label: '政策问答', desc: '医保社保', color: '#14B8A6', bg: 'rgba(20,184,166,0.12)' },
+  { to: '/resident/notices', icon: 'megaphone', label: '通知', desc: '社区公告', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)' },
+  { to: '/resident/health', icon: 'hospital', label: '健康防护', desc: '疾病预防', color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  { to: '/resident/weather', icon: 'cloud-sun', label: '天气', desc: '生活建议', color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)' },
 ]
 
 const hour = new Date().getHours()
@@ -65,7 +67,7 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
           </div>
         </div>
         <div v-if="w" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.24);border-radius:14px;padding:10px 14px;">
-          <span class="bob" style="font-size:1.9rem;">{{ w.emoji || '🌤️' }}</span>
+          <span class="bob" style="display:inline-flex;"><EIcon :name="weatherIcon(w.condition, w.emoji)" :size="30" weight="1.8" /></span>
           <div>
             <div style="font-size:1.35rem;font-weight:800;line-height:1.1;">{{ w.temp_high }}°C</div>
             <div style="font-size:0.76rem;opacity:0.9;">{{ w.condition }} · {{ w.temp_low }}°~{{ w.temp_high }}°</div>
@@ -76,7 +78,7 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
 
     <!-- 天气提示 / 预警 -->
     <div v-if="w?.note" class="card fade-up-d1" style="background:#fef2f2;border:1px solid #fca5a5;color:var(--ink-danger);font-weight:600;">
-      ⚠️ {{ w.note }}
+      <EIcon name="alert" :size="18" /> {{ w.note }}
     </div>
 
     <!-- 未读通知（红点呼吸提醒） -->
@@ -94,7 +96,7 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
     <div class="card fade-up-d2 hero-card" style="padding:0;">
       <div class="grad-flow" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--primary-gradient);color:#fff;">
         <b style="display:flex;align-items:center;gap:8px;">
-          <span class="pulse-primary" style="display:inline-flex;width:26px;height:26px;border-radius:9px;background:rgba(255,255,255,0.20);align-items:center;justify-content:center;">🤖</span>
+          <span class="pulse-primary" style="display:inline-flex;width:26px;height:26px;border-radius:9px;background:rgba(255,255,255,0.20);align-items:center;justify-content:center;"><EIcon name="robot" :size="18" /> </span>
           社区小助手
         </b>
         <n-button size="tiny" text style="color:#fff;" @click="agentOpen = !agentOpen">{{ agentOpen ? '收起 ▲' : '展开 ▼' }}</n-button>
@@ -108,7 +110,7 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
       <div v-for="e in entries" :key="e.to" class="entry-tile card"
            style="margin:0;text-align:center;padding:18px 12px;border-radius:18px;"
            @click="router.push(e.to)">
-        <div class="entry-icon" style="font-size:2.1rem;line-height:1;">{{ e.icon }}</div>
+        <div class="entry-icon" style="display:flex;justify-content:center;"><EIcon :name="e.icon" :size="30" /></div>
         <div style="font-weight:700;margin-top:8px;font-size:1.02rem;">{{ e.label }}</div>
         <div style="font-size:0.76rem;color:var(--muted);margin-top:2px;">{{ e.desc }}</div>
         <!-- 无障碍修正：原先用 e.color 作文字色（彩色浅底上仅 2.1~3.65:1，低于 AA 4.5:1），
@@ -122,7 +124,7 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
 
     <!-- 紧急通知强制弹窗 -->
     <n-modal :show="!!urgentModal" @update:show="(v) => { if (!v) urgentModal = null }" preset="dialog" type="error"
-             :title="urgentModal ? ('🚨 ' + urgentModal.title) : ''"
+             :title="urgentModal ? ('' + urgentModal.title) : ''"
              :content="urgentModal ? urgentModal.body : ''"
              positive-text="我知道了" @positive-click="closeUrgent" />
   </div>

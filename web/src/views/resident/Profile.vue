@@ -7,6 +7,7 @@ import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
 import { useThemeStore } from '../../stores/theme'
 import { issues, proposals, notices, messages, agent } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -95,47 +96,47 @@ async function deleteAccount() {
          直接当 24px 大字色在白底上只有 2.15~2.31:1；全站审计实测抓到） -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px;">
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/work-orders')">
-        <div class="num" style="color:var(--primary-ink);">🔧 {{ issueCount }}</div>
+        <div class="num" style="color:var(--primary-ink);"><EIcon name="wrench" :size="18" /> {{ issueCount }}</div>
         <div class="lbl">我的报修</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/proposals')">
-        <div class="num" style="color:var(--st-feedback-ink);">💡 {{ proposalCount }}</div>
+        <div class="num" style="color:var(--st-feedback-ink);"><EIcon name="bulb" :size="18" /> {{ proposalCount }}</div>
         <div class="lbl">我的提案</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/notices')">
-        <div class="num" style="color:var(--st-pending-ink);">📢 {{ unreadNotices }}</div>
+        <div class="num" style="color:var(--st-pending-ink);"><EIcon name="megaphone" :size="18" /> {{ unreadNotices }}</div>
         <div class="lbl">未读通知</div>
       </div>
       <div class="card stat-card" style="margin:0;cursor:pointer;" @click="router.push('/resident/messages')">
-        <div class="num" style="color:var(--ink-danger);">✉️ {{ unreadMsgs }}</div>
+        <div class="num" style="color:var(--ink-danger);"><EIcon name="mail" :size="18" /> {{ unreadMsgs }}</div>
         <div class="lbl">未读消息</div>
       </div>
     </div>
 
     <!-- 常用服务 -->
     <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">⚡ 常用服务</div>
+      <div style="font-weight:700;margin-bottom:8px;"><EIcon name="bolt" :size="18" /> 常用服务</div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <div class="svc" @click="router.push('/resident/qa')"><span>📖</span> 政策问答</div>
-        <div class="svc" @click="router.push('/resident/health')"><span>🏥</span> 健康防护</div>
-        <div class="svc" @click="router.push('/resident/weather')"><span>🌤️</span> 天气查询</div>
-        <div class="svc" @click="message.info(`社区服务中心电话：${contactPhone}`)"><span>📞</span> 联系社区（{{ contactPhone }}）</div>
+        <div class="svc" @click="router.push('/resident/qa')"><span><EIcon name="book" :size="18" /> </span> 政策问答</div>
+        <div class="svc" @click="router.push('/resident/health')"><span><EIcon name="hospital" :size="18" /> </span> 健康防护</div>
+        <div class="svc" @click="router.push('/resident/weather')"><span><EIcon name="cloud-sun" :size="18" /> </span> 天气查询</div>
+        <div class="svc" @click="message.info(`社区服务中心电话：${contactPhone}`)"><span><EIcon name="phone-call" :size="18" /> </span> 联系社区（{{ contactPhone }}）</div>
       </div>
     </div>
 
     <!-- 设置 -->
     <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">⚙️ 设置</div>
+      <div style="font-weight:700;margin-bottom:8px;"><EIcon name="settings" :size="18" /> 设置</div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <div class="svc" @click="theme.toggle()"><span>🌙</span> {{ theme.isDark ? '日间模式' : '夜间模式' }}</div>
-        <div class="svc" @click="clearHistory"><span>🗑️</span> 清除历史对话</div>
-        <div class="svc" @click="exportMyData"><span>📤</span> 导出我的数据（脱敏）</div>
-        <div class="svc" @click="router.push('/resident/privacy')"><span>🔒</span> 隐私政策</div>
+        <div class="svc" @click="theme.toggle()"><span><EIcon name="moon" :size="18" /> </span> {{ theme.isDark ? '日间模式' : '夜间模式' }}</div>
+        <div class="svc" @click="clearHistory"><span><EIcon name="trash" :size="18" /> </span> 清除历史对话</div>
+        <div class="svc" @click="exportMyData"><span><EIcon name="send" :size="18" /> </span> 导出我的数据（脱敏）</div>
+        <div class="svc" @click="router.push('/resident/privacy')"><span><EIcon name="lock" :size="18" /> </span> 隐私政策</div>
         <n-popconfirm @positive-click="deleteAccount" :positive-button-props="{ type: 'error' }">
-          <template #trigger><div class="svc" style="color:var(--ink-danger);"><span>🚪</span> 注销账号（数据匿名化）</div></template>
+          <template #trigger><div class="svc" style="color:var(--ink-danger);"><span><EIcon name="logout" :size="18" /> </span> 注销账号（数据匿名化）</div></template>
           注销后您的报修/提案记录将匿名化、不可恢复，确认注销？
         </n-popconfirm>
-        <div class="svc" @click="store.logout(); router.replace('/login')"><span>🔑</span> 退出登录</div>
+        <div class="svc" @click="store.logout(); router.replace('/login')"><span><EIcon name="key2" :size="18" /> </span> 退出登录</div>
       </div>
       <div class="muted" style="font-size:0.75rem;margin-top:12px;">社区先知 · 社区治理智能体 · 演示数据均为虚构</div>
     </div>

@@ -4,6 +4,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { messages } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -24,12 +25,13 @@ async function read(m) {
   } catch { /* 忽略 */ }
 }
 
-const TYPE_ICON = { issue: '🔧', proposal: '💡', notice: '📢', health_consult: '🏥', supplement: '📝', sla: '⏰', elderly: '👴' }
+// 消息类型 → 单色线性图标名（全站去 emoji；渲染处用 <EIcon>）
+const TYPE_ICON = { issue: 'wrench', proposal: 'bulb', notice: 'megaphone', health_consult: 'hospital', supplement: 'clipboard', sla: 'clock', elderly: 'users' }
 </script>
 
 <template>
   <div class="page">
-    <h2 class="page-title">✉️ 消息中心</h2>
+    <h2 class="page-title"><EIcon name="mail" :size="18" /> 消息中心</h2>
     <p class="page-sub">报修进度、咨询回复、通知提醒等系统消息</p>
 
     <n-spin :show="loading">
@@ -37,7 +39,7 @@ const TYPE_ICON = { issue: '🔧', proposal: '💡', notice: '📢', health_cons
            @click="read(m)" :style="m.is_read ? 'opacity:0.6;' : 'border-left:4px solid var(--primary);'">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div style="font-weight:700;">
-            <span>{{ TYPE_ICON[m.type] || '📌' }} {{ m.title }}</span>
+            <span><EIcon v-if="TYPE_ICON[m.type]" :name="TYPE_ICON[m.type]" :size="16" /> {{ m.title }}</span>
             <n-tag v-if="!m.is_read" size="tiny" type="primary" style="margin-left:6px;">未读</n-tag>
           </div>
           <span class="muted" style="font-size:0.8rem;">{{ (m.created_at || '').slice(0, 16) }}</span>

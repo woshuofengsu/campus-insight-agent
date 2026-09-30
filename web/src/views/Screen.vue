@@ -4,6 +4,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { issues, proposals, weather, agent } from '../api'
 import CountUp from '../components/CountUp.vue'
+import EIcon from '../components/EIcon.vue'
 
 const data = ref({
   issues: 0, pending: 0, props: 0, alerts: 0,
@@ -48,14 +49,14 @@ onMounted(() => {
 onUnmounted(() => { if (timer) clearInterval(timer) })
 
 const cards = [
-  { label: '今日工单', v: () => data.value.issues, color: '#4fc3f7', icon: '🔧', suffix: '' },
-  { label: '处理中', v: () => data.value.pending, color: '#ffb74d', icon: '🔄', suffix: '' },
-  { label: '公示提案', v: () => data.value.props, color: '#81c784', icon: '💡', suffix: '' },
-  { label: '天气预警', v: () => data.value.alerts, color: '#e57373', icon: '⚠️', suffix: '' },
-  { label: 'AI 自转率', v: () => data.value.selfRate, color: '#ba68c8', icon: '🤖', suffix: '%' },
-  { label: '知识库命中率', v: () => data.value.kbRate, color: '#4dd0e1', icon: '📚', suffix: '%' },
-  { label: '政策语料', v: () => data.value.kbCount, color: '#ffd54f', icon: '📄', suffix: ' 条' },
-  { label: '关怀触达率', v: () => data.value.careRate, color: '#f06292', icon: '💗', suffix: '%' },
+  { label: '今日工单', v: () => data.value.issues, color: '#4fc3f7', icon: 'wrench', suffix: '' },
+  { label: '处理中', v: () => data.value.pending, color: '#ffb74d', icon: 'refresh', suffix: '' },
+  { label: '公示提案', v: () => data.value.props, color: '#81c784', icon: 'bulb', suffix: '' },
+  { label: '天气预警', v: () => data.value.alerts, color: '#e57373', icon: 'alert', suffix: '' },
+  { label: 'AI 自转率', v: () => data.value.selfRate, color: '#ba68c8', icon: 'robot', suffix: '%' },
+  { label: '知识库命中率', v: () => data.value.kbRate, color: '#4dd0e1', icon: 'book', suffix: '%' },
+  { label: '政策语料', v: () => data.value.kbCount, color: '#ffd54f', icon: 'file', suffix: ' 条' },
+  { label: '关怀触达率', v: () => data.value.careRate, color: '#f06292', icon: 'heart', suffix: '%' },
 ]
 </script>
 
@@ -64,7 +65,7 @@ const cards = [
     <!-- 移动端降级（P1-G3）：治理大屏是桌面/投屏场景，手机上 8 卡会被压扁，
          这里明确告知而不是渲染挤压布局。仅 <900px 显示，桌面/大屏完全不受影响。 -->
     <div v-if="!forceShow" class="screen-mobile-only" style="position:absolute;inset:0;z-index:20;background:rgba(4,18,13,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;">
-      <div style="font-size:3rem;">🖥️</div>
+      <div style="display:flex;justify-content:center;"><EIcon name="monitor" :size="56" :weight="1.6" /></div>
       <div style="font-size:1.4rem;font-weight:800;margin-top:12px;">治理大屏请在电脑或投屏上查看</div>
       <div style="color:#9fd8c4;margin-top:10px;line-height:1.9;max-width:22rem;">
         大屏为 8 张实时指标卡设计，手机屏幕会挤压布局。<br />
@@ -83,7 +84,7 @@ const cards = [
     <!-- 顶栏 -->
     <div class="fade-up" style="text-align:center;margin-bottom:26px;position:relative;">
       <div class="title-sheen" style="font-size:2.7rem;font-weight:900;letter-spacing:0.1em;">
-        🏘️ 社区先知 · 治理大屏
+        <EIcon name="community" :size="18" /> 社区先知 · 治理大屏
       </div>
       <div style="color:#7fbfa8;font-size:1rem;margin-top:10px;letter-spacing:0.04em;">
         CommunityInsight · 社区治理多智能体平台
@@ -94,7 +95,7 @@ const cards = [
     <div class="wave" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:18px;flex:1;align-content:center;position:relative;">
       <div v-for="c in cards" :key="c.label" class="screen-card"
            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:28px 16px;text-align:center;backdrop-filter:blur(4px);">
-        <div style="font-size:2.5rem;line-height:1;">{{ c.icon }}</div>
+        <div style="display:flex;justify-content:center;"><EIcon :name="c.icon" :size="40" :weight="1.6" /></div>
         <div style="font-size:2.9rem;font-weight:900;margin-top:8px;letter-spacing:-0.01em;" :style="{ color: c.color, textShadow: '0 0 22px ' + c.color + '55' }">
           <template v-if="ready"><CountUp :value="c.v()" :suffix="c.suffix" :duration="1500" /></template>
           <template v-else>--</template>
@@ -105,7 +106,7 @@ const cards = [
 
     <!-- 天气 + 刷新状态 -->
     <div class="fade-up-d3" style="display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding:16px 22px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:16px;font-size:1.06rem;position:relative;">
-      <div>🌡️ 当前温度：<b style="color:#ffb74d;">{{ data.temp }}°C</b></div>
+      <div><EIcon name="thermometer" :size="18" /> 当前温度：<b style="color:#ffb74d;">{{ data.temp }}°C</b></div>
       <div style="color:#9ab8ab;">
         <span class="dot-breathe" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:6px;"></span>
         数据每 30 秒自动刷新

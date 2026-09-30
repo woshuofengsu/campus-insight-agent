@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { notices, upload, exportApi } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -131,11 +132,11 @@ async function exportNotices() {
 
 <template>
   <div class="page">
-    <h2 class="page-title">📢 通知管理</h2>
+    <h2 class="page-title"><EIcon name="megaphone" :size="18" /> 通知管理</h2>
     <p class="page-sub">发布公告、活动、停水停电与紧急通知（含定时发布）</p>
 
     <div class="card">
-      <div style="font-weight:700;margin-bottom:10px;">➕ 新建通知</div>
+      <div style="font-weight:700;margin-bottom:10px;"><EIcon name="plus" :size="18" /> 新建通知</div>
       <n-grid :cols="2" :x-gap="16">
         <n-form-item-gi label="标题">
           <n-input v-model:value="form.title" maxlength="50" />
@@ -157,7 +158,7 @@ async function exportNotices() {
       <n-form-item v-if="['指定小区', '指定楼栋'].includes(form.publish_scope)" label="目标（逗号分隔，多选）">
         <n-input v-model:value="form.scope_targets" :placeholder="form.publish_scope === '指定小区' ? '如：幸福小区,阳光小区' : '如：3号楼2单元,5号楼1单元'" />
       </n-form-item>
-      <n-checkbox v-model:checked="form.is_urgent">🚨 紧急通知（自动置顶 + 弹窗，需二次确认）</n-checkbox>
+      <n-checkbox v-model:checked="form.is_urgent"><EIcon name="siren" :size="18" /> 紧急通知（自动置顶 + 弹窗，需二次确认）</n-checkbox>
       <n-form-item v-if="form.is_urgent" label="老年端播报摘要（紧急必填，≤30字）">
         <n-input v-model:value="form.elderly_summary" maxlength="30" placeholder="口语化一句话" />
       </n-form-item>
@@ -171,18 +172,18 @@ async function exportNotices() {
       <div style="margin-top:10px;">
         <n-popconfirm v-if="form.is_urgent" @positive-click="create" :positive-button-props="{ type: 'error' }">
           <template #trigger>
-            <n-button type="error" :loading="creating">📨 {{ publishMode === 'schedule' ? '定时发布紧急通知' : '发布紧急通知' }}</n-button>
+            <n-button type="error" :loading="creating"><EIcon name="mail" :size="18" /> {{ publishMode === 'schedule' ? '定时发布紧急通知' : '发布紧急通知' }}</n-button>
           </template>
           紧急通知将自动置顶并在居民端/老年端强制弹窗，确认内容无误？
         </n-popconfirm>
-        <n-button v-else type="primary" :loading="creating" @click="create">📨 {{ publishMode === 'schedule' ? '创建并定时发布' : '创建并发布' }}</n-button>
+        <n-button v-else type="primary" :loading="creating" @click="create"><EIcon name="mail" :size="18" /> {{ publishMode === 'schedule' ? '创建并定时发布' : '创建并发布' }}</n-button>
       </div>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
       <n-select v-model:value="typeFilter" :options="TYPES.map(v=>({label:v,value:v}))" style="width:150px;" />
       <n-select v-model:value="statusFilter" :options="STATUS_OPTIONS.map(v=>({label:v,value:v}))" style="width:120px;" />
-      <n-button size="small" @click="exportNotices">⬇️ 导出</n-button>
+      <n-button size="small" @click="exportNotices"><EIcon name="arrowDown" :size="18" /> 导出</n-button>
       <span class="muted" style="font-size:0.8rem;">已发布 30 秒 / 紧急 10 秒自动刷新</span>
     </div>
 
@@ -191,7 +192,7 @@ async function exportNotices() {
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>
             <b style="cursor:pointer;" @click="showDetail(n)">{{ n.title }} ›</b>
-            <n-tag v-if="n.is_urgent" type="error" size="small" style="margin-left:8px;">🚨 紧急</n-tag>
+            <n-tag v-if="n.is_urgent" type="error" size="small" style="margin-left:8px;"><EIcon name="siren" :size="18" /> 紧急</n-tag>
             <n-tag size="small" style="margin-left:4px;">{{ n.status }}</n-tag>
           </div>
           <span class="muted" style="font-size:0.8rem;">
@@ -207,20 +208,20 @@ async function exportNotices() {
             <template #trigger><n-button size="small" type="warning">⏬ 下架</n-button></template>
             下架后居民端不再显示，将记录原因，确认？
           </n-popconfirm>
-          <n-button v-if="n.status === '已发布' && !n.is_pinned" size="small" @click="act(n, { action: 'pin' }, '已置顶')">📌 置顶</n-button>
-          <n-button v-if="n.is_pinned" size="small" quaternary @click="act(n, { action: 'unpin' }, '已取消置顶')">📌 取消置顶</n-button>
+          <n-button v-if="n.status === '已发布' && !n.is_pinned" size="small" @click="act(n, { action: 'pin' }, '已置顶')"><EIcon name="pushpin" :size="18" /> 置顶</n-button>
+          <n-button v-if="n.is_pinned" size="small" quaternary @click="act(n, { action: 'unpin' }, '已取消置顶')"><EIcon name="pushpin" :size="18" /> 取消置顶</n-button>
           <n-popconfirm v-if="n.status === '待发布'" @positive-click="act(n, { action: 'withdraw' }, '已撤回为草稿')">
             <template #trigger><n-button size="small">⏪ 撤回</n-button></template>
             撤回为草稿？
           </n-popconfirm>
-          <n-button v-if="n.status === '待发布'" size="small" type="primary" @click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')">🚀 立即发布</n-button>
+          <n-button v-if="n.status === '待发布'" size="small" type="primary" @click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')"><EIcon name="rocket" :size="18" /> 立即发布</n-button>
           <!-- 草稿：可立即发布（含紧急通知，二次确认） -->
           <n-popconfirm v-if="n.status === '草稿'" @positive-click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')">
-            <template #trigger><n-button size="small" type="primary">🚀 发布</n-button></template>
+            <template #trigger><n-button size="small" type="primary"><EIcon name="rocket" :size="18" /> 发布</n-button></template>
             {{ n.is_urgent ? '紧急通知将自动置顶并强制弹窗，确认发布？' : '确认发布该通知？' }}
           </n-popconfirm>
           <n-popconfirm v-if="n.status === '草稿'" @positive-click="act(n, { action: 'delete' }, '已删除')">
-            <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除</n-button></template>
+            <template #trigger><n-button size="small" quaternary type="error"><EIcon name="trash" :size="18" /> 删除</n-button></template>
             删除该草稿？
           </n-popconfirm>
         </div>
@@ -237,9 +238,9 @@ async function exportNotices() {
           <span class="muted" style="margin-left:8px;font-size:0.8rem;">{{ (detail.published_at || detail.created_at || '').slice(0, 16) }}</span>
         </div>
         <div style="font-size:0.95rem;line-height:1.8;white-space:pre-wrap;">{{ detail.body }}</div>
-        <div v-if="detail.elderly_summary" style="margin-top:10px;font-size:0.9rem;color:var(--ink-warning);">🔊 老年端播报：{{ detail.elderly_summary }}</div>
+        <div v-if="detail.elderly_summary" style="margin-top:10px;font-size:0.9rem;color:var(--ink-warning);"><EIcon name="speaker" :size="18" /> 老年端播报：{{ detail.elderly_summary }}</div>
         <div v-if="atts(detail).length" style="margin-top:10px;">
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📎 附件</div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;"><EIcon name="paperclip" :size="18" /> 附件</div>
           <div v-for="(a, i) in atts(detail)" :key="i" style="display:inline-block;margin-right:8px;">
             <img :src="a" style="max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--border);" :alt="'附件' + (i + 1)" />
           </div>
@@ -248,7 +249,7 @@ async function exportNotices() {
           居民已读 {{ detail.read_stats.resident_read }}/{{ detail.read_stats.resident_total }} · 老年已读 {{ detail.read_stats.elderly_read }}/{{ detail.read_stats.elderly_total }}
         </div>
         <div v-if="detail.timeline && detail.timeline.length" style="margin-top:10px;">
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">📜 操作留痕</div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;"><EIcon name="scroll" :size="18" /> 操作留痕</div>
           <div v-for="t in detail.timeline" :key="t.id" style="padding:3px 0;border-bottom:1px solid var(--border);font-size:0.8rem;" class="muted">
             {{ (t.created_at || '').slice(0, 16) }} · {{ t.actor || '' }} · {{ t.action || '' }}
           </div>

@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { issues, upload } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -76,7 +77,7 @@ const submit = async () => {
     // 特殊情况处理（spec 四）
     if (data.hint === 'safety') {
       special.value = { type: 'safety' }
-      return message.warning('⚠️ 检测到安全隐患，已记录安全提醒（未生成工单）')
+      return message.warning('检测到安全隐患，已记录安全提醒（未生成工单）')
     }
     if (data.hint === 'third_party') {
       special.value = { type: 'third_party' }
@@ -96,7 +97,7 @@ const submit = async () => {
     // 后端对 safety 用 fail(2001, "safety") 透传
     if (e.message === 'safety') {
       special.value = { type: 'safety' }
-      return message.warning('⚠️ 检测到安全隐患，已记录安全提醒（未生成工单）')
+      return message.warning('检测到安全隐患，已记录安全提醒（未生成工单）')
     }
     message.error(e.message || '提交失败')
   } finally {
@@ -107,12 +108,12 @@ const submit = async () => {
 
 <template>
   <div class="page">
-    <h2 class="page-title">📝 提交报修</h2>
+    <h2 class="page-title"><EIcon name="edit" :size="18" /> 提交报修</h2>
     <p class="page-sub">填一下问题描述，负责人会尽快电话核实</p>
 
     <!-- 草稿恢复 -->
     <div v-if="drafts.length" class="card urgent-bg" style="margin-bottom:12px;">
-      <b>📝 您有 {{ drafts.length }} 份未完成的报修草稿</b>
+      <b><EIcon name="edit" :size="18" /> 您有 {{ drafts.length }} 份未完成的报修草稿</b>
       <div v-for="d in drafts" :key="d.id" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
         <span>{{ d.title }} <span class="muted">（{{ (d.created_at || '').slice(0, 10) }}）</span></span>
         <n-button size="small" @click="restoreDraft(d)">继续填写</n-button>
@@ -122,21 +123,21 @@ const submit = async () => {
     <!-- 特殊情况提示（spec 四） -->
     <div v-if="special" class="card urgent-bg" style="margin-bottom:12px;">
       <template v-if="special.type === 'safety'">
-        <b>🚨 安全隐患提醒（已生成「安全提醒记录」）</b>
+        <b><EIcon name="siren" :size="18" /> 安全隐患提醒（已生成「安全提醒记录」）</b>
         <p style="margin:6px 0;font-size:0.9rem;">您描述的问题属于安全隐患（如漏电、燃气泄漏、危墙等），社区已记录并转告负责人处理，未生成报修工单。请远离危险区域，必要时立即联系紧急电话：</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <n-button type="error" tag="a" href="tel:120" size="small">🚑 急救 120</n-button>
-          <n-button type="warning" tag="a" href="tel:119" size="small">🧯 火警 119</n-button>
-          <n-button type="info" tag="a" href="tel:110" size="small">👮 报警 110</n-button>
-          <n-button type="primary" tag="a" href="tel:12345" size="small">🏛️ 市民热线 12345</n-button>
+          <n-button type="error" tag="a" href="tel:120" size="small"><EIcon name="siren" :size="18" /> 急救 120</n-button>
+          <n-button type="warning" tag="a" href="tel:119" size="small"><EIcon name="flame" :size="18" /> 火警 119</n-button>
+          <n-button type="info" tag="a" href="tel:110" size="small"><EIcon name="shield" :size="18" /> 报警 110</n-button>
+          <n-button type="primary" tag="a" href="tel:12345" size="small"><EIcon name="government" :size="18" /> 市民热线 12345</n-button>
         </div>
       </template>
       <template v-else-if="special.type === 'third_party'">
-        <b>🏗️ 第三方施工提醒</b>
+        <b><EIcon name="construction" :size="18" /> 第三方施工提醒</b>
         <p style="margin:6px 0;font-size:0.9rem;">您的问题涉及第三方施工方责任，工单已标记为「非社区责任」。请直接联系施工方处理，社区会协助跟进。</p>
       </template>
       <template v-else-if="special.type === 'violation'">
-        <b>🚫 违规标记提醒</b>
+        <b><EIcon name="ban" :size="18" /> 违规标记提醒</b>
         <p style="margin:6px 0;font-size:0.9rem;">您描述的内容涉及违规搭建，工单已标记，将由负责人核实后按流程处理（可能转出至城管等部门）。</p>
       </template>
     </div>
@@ -183,8 +184,8 @@ const submit = async () => {
           </n-form-item>
         </template>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <n-button type="primary" block size="large" :loading="loading" @click="submit">📨 提交报修</n-button>
-          <n-button size="large" @click="saveDraftNow">💾 存草稿</n-button>
+          <n-button type="primary" block size="large" :loading="loading" @click="submit"><EIcon name="mail" :size="18" /> 提交报修</n-button>
+          <n-button size="large" @click="saveDraftNow"><EIcon name="save" :size="18" /> 存草稿</n-button>
         </div>
       </n-form>
     </div>

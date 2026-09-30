@@ -1,10 +1,11 @@
 <script setup>
+import EIcon from '../../components/EIcon.vue'
 // 隐私政策与个人信息保护说明（PIPL 合规，静态页）
 </script>
 
 <template>
   <div class="page">
-    <h2 class="page-title">🔒 隐私政策</h2>
+    <h2 class="page-title"><EIcon name="lock" :size="18" /> 隐私政策</h2>
     <p class="page-sub">社区先知 · 个人信息保护说明</p>
 
     <div class="card">

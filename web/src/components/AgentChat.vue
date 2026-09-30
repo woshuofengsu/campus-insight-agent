@@ -5,6 +5,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { agent } from '../api'
+import EIcon from './EIcon.vue'
 
 const props = defineProps({
   role: { type: String, default: 'resident' }, // resident | grid
@@ -182,7 +183,7 @@ async function clearAll() {
     <!-- 简洁工具栏（无蓝色板块与标题文字；历史入口与 grid 收起保留） -->
     <div class="agent-head">
       <div style="display:flex;gap:6px;align-items:center;">
-        <n-button v-if="role !== 'grid'" size="tiny" quaternary @click="showHistory = !showHistory">{{ showHistory ? '收起历史' : '📋 历史' }}</n-button>
+        <n-button v-if="role !== 'grid'" size="tiny" quaternary @click="showHistory = !showHistory">{{ showHistory ? '收起历史' : '历史' }}</n-button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
         <n-button v-if="role === 'grid'" size="tiny" quaternary @click="emit('toggle')">{{ collapsed ? '展开' : '收起' }}</n-button>
@@ -193,12 +194,12 @@ async function clearAll() {
       <!-- 历史对话 -->
       <div v-if="showHistory" class="agent-history">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <b style="font-size:0.85rem;">📋 最近对话（5 条）</b>
+          <b style="font-size:0.85rem;"><EIcon name="clipboard" :size="18" /> 最近对话（5 条）</b>
           <n-button size="tiny" quaternary @click="clearAll">清空</n-button>
         </div>
         <div v-for="h in history" :key="h.id" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:0.8rem;">
           <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-            {{ h.is_bot ? '🤖' : '👤' }} {{ h.text }}
+            <EIcon :name="h.is_bot ? 'robot' : 'user'" :size="14" /> {{ h.text }}
           </span>
           <n-button size="tiny" quaternary type="error" @click="delHistory(h.id)">删</n-button>
         </div>
@@ -217,7 +218,7 @@ async function clearAll() {
             <div v-if="m.chain && m.chain.length" style="margin-top:8px;">
               <n-button size="tiny" text @click="m.chainOpen = !m.chainOpen"
                         style="font-size:0.78rem;color:var(--muted);">
-                🤖 多智能体执行链（{{ m.chain.length }} 步）{{ m.chainOpen ? '▴ 收起' : '▾ 展开' }}
+                <EIcon name="robot" :size="18" /> 多智能体执行链（{{ m.chain.length }} 步）{{ m.chainOpen ? '▴ 收起' : '▾ 展开' }}
               </n-button>
               <div v-if="m.chainOpen" style="margin-top:6px;border:1px dashed var(--border);border-radius:8px;padding:8px;background:var(--bg);">
                 <div v-for="(c, ci) in m.chain" :key="ci" style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:0.78rem;"
@@ -232,9 +233,9 @@ async function clearAll() {
             <div v-if="m.actions && m.actions.length" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
               <template v-for="(a, ai) in m.actions" :key="ai">
                 <n-button v-if="a.type === 'navigate'" size="small" type="primary" @click="onAction(a)">{{ a.label || '前往' }}</n-button>
-                <n-button v-if="a.type === 'confirm_call'" size="small" type="warning" @click="onAction(a)">📞 {{ a.label || '拨打' }}</n-button>
-                <n-button v-if="a.type === 'download'" size="small" type="success" @click="onAction(a)">⬇️ {{ a.label || '下载' }}</n-button>
-                <n-button v-if="a.type === 'confirm_transfer'" size="small" @click="onAction(a)">🙋 {{ a.label || '转人工' }}</n-button>
+                <n-button v-if="a.type === 'confirm_call'" size="small" type="warning" @click="onAction(a)"><EIcon name="phone-call" :size="18" /> {{ a.label || '拨打' }}</n-button>
+                <n-button v-if="a.type === 'download'" size="small" type="success" @click="onAction(a)"><EIcon name="arrowDown" :size="18" /> {{ a.label || '下载' }}</n-button>
+                <n-button v-if="a.type === 'confirm_transfer'" size="small" @click="onAction(a)"><EIcon name="hand" :size="18" /> {{ a.label || '转人工' }}</n-button>
               </template>
             </div>
             <!-- 快捷选项 -->
@@ -253,7 +254,7 @@ async function clearAll() {
 
       <!-- 上次没提交完的草稿：由用户自己决定续不续（不替他猜，也不把旧草稿当成新请求） -->
       <div v-if="draftHint" class="agent-draft-hint" data-draft-hint>
-        <span>📝 上次有一条没提交的报修：{{ draftHint.summary }}</span>
+        <span><EIcon name="edit" :size="18" /> 上次有一条没提交的报修：{{ draftHint.summary }}</span>
         <n-button size="tiny" type="primary" @click="resumeDraft">继续上次</n-button>
       </div>
 

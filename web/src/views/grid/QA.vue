@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { knowledge, qa, agent } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const kb = ref([])
@@ -155,13 +156,13 @@ async function kgSearch() {
 
 <template>
   <div class="page">
-    <h2 class="page-title">📖 政策问答管理</h2>
+    <h2 class="page-title"><EIcon name="book" :size="18" /> 政策问答管理</h2>
     <p class="page-sub">知识库维护 + 居民提问处理 + 运行统计与阈值配置</p>
 
     <n-tabs v-model:value="tab" type="line">
       <n-tab-pane name="kb" tab="知识库">
         <div class="card" style="margin-bottom:12px;">
-          <div style="font-weight:700;margin-bottom:8px;">➕ 新建知识条目（创建即提交审核，审核人≠发布人）</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="plus" :size="18" /> 新建知识条目（创建即提交审核，审核人≠发布人）</div>
           <n-form label-placement="top">
             <n-grid :cols="2" :x-gap="12">
               <n-form-item-gi label="标题">
@@ -208,7 +209,7 @@ async function kgSearch() {
             <n-form-item label="政策文号（选填）">
               <n-input v-model:value="kForm.policy_number" placeholder="如 京人社发〔2026〕1号" />
             </n-form-item>
-            <n-button type="primary" @click="createKb">📤 创建并提交审核</n-button>
+            <n-button type="primary" @click="createKb"><EIcon name="send" :size="18" /> 创建并提交审核</n-button>
           </n-form>
         </div>
         <div v-for="k in kb" :key="k.id" class="card">
@@ -219,30 +220,30 @@ async function kgSearch() {
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
             {{ k.category }} · {{ (k.updated_at || '').slice(0, 16) }}
             <!-- 属地（地区识别 WS7）：让"这条政策为谁优先"一眼可见 -->
-            <n-tag v-if="k.applicable_area" size="tiny" :bordered="false" style="margin-left:6px;">📍 {{ k.applicable_area }}</n-tag>
+            <n-tag v-if="k.applicable_area" size="tiny" :bordered="false" style="margin-left:6px;"><EIcon name="pin" :size="18" /> {{ k.applicable_area }}</n-tag>
           </div>
           <div style="margin-top:8px;font-size:0.9rem;">{{ k.plain_interpretation }}</div>
           <div v-if="k.audit_opinion" class="muted" style="font-size:0.8rem;margin-top:4px;">审核意见：{{ k.audit_opinion }}</div>
           <div v-if="['待审核', '已发布'].includes(k.status)" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <template v-if="k.status === '待审核'">
               <n-input v-model:value="kOpOf(k).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:220px;" />
-              <n-button size="small" type="success" @click="kAct(k, { action: 'audit', approve: true, opinion: kOpOf(k).opinion || '同意' }, '已通过发布')">✅ 通过</n-button>
+              <n-button size="small" type="success" @click="kAct(k, { action: 'audit', approve: true, opinion: kOpOf(k).opinion || '同意' }, '已通过发布')"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
               <n-button size="small" type="warning" @click="kAct(k, { action: 'audit', approve: false, opinion: kOpOf(k).opinion || '请补充' }, '已退回')">↩️ 退回</n-button>
               <n-button size="small" quaternary @click="kAct(k, { action: 'withdraw' }, '已撤回审核，转草稿')">⏪ 撤回审核</n-button>
               <n-popconfirm @positive-click="kAct(k, { action: 'delete' }, '已删除草稿')">
-                <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除</n-button></template>
+                <template #trigger><n-button size="small" quaternary type="error"><EIcon name="trash" :size="18" /> 删除</n-button></template>
                 确认删除该草稿？
               </n-popconfirm>
             </template>
             <template v-if="k.status === '已发布'">
               <n-input v-model:value="kOpOf(k).reason" placeholder="下架原因（必填）" size="small" style="max-width:200px;" />
               <n-popconfirm @positive-click="kAct(k, { action: 'offline', reason: kOpOf(k).reason || '内容过期' }, '已下架')">
-                <template #trigger><n-button size="small" quaternary type="error">📛 下架</n-button></template>
+                <template #trigger><n-button size="small" quaternary type="error"><EIcon name="ban" :size="18" /> 下架</n-button></template>
                 确认下架？将记录原因
               </n-popconfirm>
-              <n-button size="small" @click="newVersionOf(k)">🆕 建新版本</n-button>
+              <n-button size="small" @click="newVersionOf(k)"><EIcon name="plusCircle" :size="18" /> 建新版本</n-button>
               <n-popconfirm @positive-click="showVersions(k)">
-                <template #trigger><n-button size="small" quaternary>📜 版本历史</n-button></template>
+                <template #trigger><n-button size="small" quaternary><EIcon name="scroll" :size="18" /> 版本历史</n-button></template>
                 查看版本历史？
               </n-popconfirm>
             </template>
@@ -263,14 +264,14 @@ async function kgSearch() {
               · {{ q.overdue ? `⏰ 超时 ${Math.abs(q.remaining_hours).toFixed(1)}h` : `⏳ 剩 ${q.remaining_hours.toFixed(1)}h` }}
             </span>
           </div>
-          <div v-if="q.auto_answer" style="margin-top:6px;font-size:0.9rem;">🤖 自动回答：{{ q.auto_answer }}</div>
+          <div v-if="q.auto_answer" style="margin-top:6px;font-size:0.9rem;"><EIcon name="robot" :size="18" /> 自动回答：{{ q.auto_answer }}</div>
           <div v-if="q.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
-            💬 已回复：{{ q.reply }}
+            <EIcon name="chat-dots" :size="18" /> 已回复：{{ q.reply }}
           </div>
           <div v-if="['待人工回复', '处理中', '已转人工', '超时未回复'].includes(q.status)" style="margin-top:10px;">
             <div style="display:flex;gap:8px;">
               <n-input v-model:value="replyMap[q.id]" placeholder="人工回复内容（≤2000字）" />
-              <n-button type="primary" @click="reply(q)">💬 回复</n-button>
+              <n-button type="primary" @click="reply(q)"><EIcon name="chat-dots" :size="18" /> 回复</n-button>
             </div>
           </div>
         </div>
@@ -279,7 +280,7 @@ async function kgSearch() {
 
       <n-tab-pane name="kg" tab="知识图谱">
         <div class="card" style="margin-bottom:12px;">
-          <div style="font-weight:700;margin-bottom:6px;">🕸️ 实体关联查询</div>
+          <div style="font-weight:700;margin-bottom:6px;"><EIcon name="network" :size="18" /> 实体关联查询</div>
           <div class="muted" style="font-size:0.85rem;margin-bottom:10px;">
             按实体反查业务对象：「3号楼」→ 该楼栋历史工单与相关设施；「电梯」「加装电梯」→ 相关工单 + 政策。
             支持复合查询（如「3号楼 电梯」= 同时提及两者的工单）。
@@ -308,7 +309,7 @@ async function kgSearch() {
           </div>
 
           <div class="card" style="margin-bottom:12px;" v-if="kgResult.related_issues && kgResult.related_issues.length">
-            <div style="font-weight:700;margin-bottom:8px;">🔧 关联工单（{{ kgResult.related_issues.length }}）</div>
+            <div style="font-weight:700;margin-bottom:8px;"><EIcon name="wrench" :size="18" /> 关联工单（{{ kgResult.related_issues.length }}）</div>
             <div v-for="it in kgResult.related_issues.slice(0, 8)" :key="'i' + it.id"
                  style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
               #{{ it.id }} {{ it.title }}
@@ -317,7 +318,7 @@ async function kgSearch() {
           </div>
 
           <div class="card" style="margin-bottom:12px;" v-if="kgResult.related_knowledge && kgResult.related_knowledge.length">
-            <div style="font-weight:700;margin-bottom:8px;">📄 关联政策（{{ kgResult.related_knowledge.length }}）</div>
+            <div style="font-weight:700;margin-bottom:8px;"><EIcon name="file" :size="18" /> 关联政策（{{ kgResult.related_knowledge.length }}）</div>
             <div v-for="k in kgResult.related_knowledge.slice(0, 8)" :key="'k' + k.id"
                  style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;">
               {{ k.title }} <span class="muted">（{{ k.category || '' }}）</span>
@@ -325,7 +326,7 @@ async function kgSearch() {
           </div>
 
           <div class="card" v-if="kgResult.related_entities && kgResult.related_entities.length">
-            <div style="font-weight:700;margin-bottom:8px;">🔗 关联实体</div>
+            <div style="font-weight:700;margin-bottom:8px;"><EIcon name="link" :size="18" /> 关联实体</div>
             <div style="font-size:0.9rem;">
               <span v-for="re in kgResult.related_entities.slice(0, 15)" :key="re.name"
                     class="status-pill" style="background:#eef2ff;color:var(--ink-info);margin:0 6px 6px 0;display:inline-block;">
@@ -372,7 +373,7 @@ async function kgSearch() {
         </div>
 
         <div class="card" v-if="stats && stats.trend && stats.trend.length">
-          <div style="font-weight:700;margin-bottom:8px;">📈 近 8 天提问趋势</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="chart-line" :size="18" /> 近 8 天提问趋势</div>
           <div style="display:flex;align-items:flex-end;gap:8px;height:120px;padding-top:8px;">
             <div v-for="p in stats.trend" :key="p.day" style="flex:1;text-align:center;">
               <div style="font-size:0.8rem;color:#888;">{{ p.count }}</div>
@@ -391,7 +392,7 @@ async function kgSearch() {
         </div>
 
         <div class="card" v-if="stats && stats.match_failed_list && stats.match_failed_list.length">
-          <div style="font-weight:700;margin-bottom:8px;">❌ 匹配失败明细（留痕）</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="x" :size="18" /> 匹配失败明细（留痕）</div>
           <div v-for="f in stats.match_failed_list" :key="f.id" style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:0.9rem;">
             <b>{{ f.actor || '居民' }}</b>：{{ f.detail }}
             <span class="muted" style="font-size:0.8rem;"> · {{ (f.created_at || '').slice(0, 16) }}</span>
@@ -399,7 +400,7 @@ async function kgSearch() {
         </div>
 
         <div class="card" v-if="stats && stats.unhelpful_list && stats.unhelpful_list.length">
-          <div style="font-weight:700;margin-bottom:8px;">👎 居民点「无帮助」明细（留痕）</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="thumb-down" :size="18" /> 居民点「无帮助」明细（留痕）</div>
           <div v-for="(f, i) in stats.unhelpful_list" :key="i" style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:0.9rem;">
             <b>{{ f.actor || '居民' }}</b> 对「{{ f.target_title || '—' }}」：{{ f.detail }}
             <span class="muted" style="font-size:0.8rem;"> · {{ (f.created_at || '').slice(0, 16) }}</span>
@@ -407,7 +408,7 @@ async function kgSearch() {
         </div>
 
         <div class="card">
-          <div style="font-weight:700;margin-bottom:8px;">🎚️ 自动回答匹配阈值</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="sliders" :size="18" /> 自动回答匹配阈值</div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <n-slider v-model:value="threshold" :min="0.1" :max="5" :step="0.1" style="max-width:320px;flex:1;" />
             <span style="min-width:60px;font-weight:700;">{{ threshold.toFixed(2) }}</span>
@@ -422,7 +423,7 @@ async function kgSearch() {
 
     <!-- 版本管理弹窗 -->
     <n-modal :show="!!verModal" @update:show="(v) => { if (!v) verModal = null }" preset="card" style="width:600px;"
-             :title="verModal ? (verModal.mode === 'new' ? '🆕 创建新版本' : '📜 版本历史') : ''">
+             :title="verModal ? (verModal.mode === 'new' ? '创建新版本' : '版本历史') : ''">
       <template v-if="verModal">
         <template v-if="verModal.mode === 'new'">
           <n-form label-placement="top">
@@ -449,7 +450,7 @@ async function kgSearch() {
                 <n-input v-model:value="kForm2.expire_date" placeholder="如 2027-12-31" />
               </n-form-item-gi>
             </n-grid>
-            <n-button type="primary" @click="submitNewVersion">📤 创建并提交审核</n-button>
+            <n-button type="primary" @click="submitNewVersion"><EIcon name="send" :size="18" /> 创建并提交审核</n-button>
           </n-form>
         </template>
         <template v-else>

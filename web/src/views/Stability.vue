@@ -2,6 +2,7 @@
 // 演示安全屏（P3-04）：答辩时展示系统稳定性 + 可主动模拟异常
 import { ref } from 'vue'
 import ErrorState from '../components/ErrorState.vue'
+import EIcon from '../components/EIcon.vue'
 
 const demoType = ref(null)
 const CHECKS = [
@@ -18,18 +19,18 @@ const CHECKS = [
 
 <template>
   <div class="page" style="max-width:720px;">
-    <h2 class="page-title">🛡️ 系统稳定性演示</h2>
+    <h2 class="page-title"><EIcon name="shield" :size="18" /> 系统稳定性演示</h2>
     <p class="page-sub">答辩用：展示兜底能力，异常也能成为亮点</p>
 
     <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">✅ 质量基线</div>
+      <div style="font-weight:700;margin-bottom:8px;"><EIcon name="checkCircle" :size="18" /> 质量基线</div>
       <div v-for="(c, i) in CHECKS" :key="i" style="padding:4px 0;font-size:0.92rem;">
-        <span style="color:var(--ink-success);">✔</span> {{ c }}
+        <span style="color:var(--ink-success);"><EIcon name="check" :size="18" /> </span> {{ c }}
       </div>
     </div>
 
     <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">🧪 模拟异常（点按展示兜底屏）</div>
+      <div style="font-weight:700;margin-bottom:8px;"><EIcon name="flask" :size="18" /> 模拟异常（点按展示兜底屏）</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <n-button size="small" @click="demoType = 'network'">模拟网络异常</n-button>
         <n-button size="small" @click="demoType = 'service'">模拟服务异常</n-button>

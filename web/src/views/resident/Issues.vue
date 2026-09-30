@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { issues } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -40,7 +41,7 @@ async function act(id, data) {
 
 <template>
   <div class="page">
-    <h2 class="page-title">🔧 我的报修</h2>
+    <h2 class="page-title"><EIcon name="wrench" :size="18" /> 我的报修</h2>
     <p class="page-sub">共 {{ list.length }} 条工单</p>
 
     <n-spin :show="loading">
@@ -50,27 +51,27 @@ async function act(id, data) {
           <n-tag :type="STATUS_COLOR[i.status] || 'default'" size="small">{{ i.status }}</n-tag>
         </div>
         <div class="muted" style="font-size:0.85rem;margin-top:6px;">
-          {{ i.issue_type }} · {{ i.category }} · 📍{{ i.location }} · 🕐{{ (i.created_at || '').slice(0, 16) }}
+          {{ i.issue_type }} · {{ i.category }} · <EIcon name="pin" :size="18" /> {{ i.location }} · <EIcon name="clock" :size="18" /> {{ (i.created_at || '').slice(0, 16) }}
         </div>
-        <div v-if="i.resolve_note" class="muted" style="font-size:0.85rem;">📋 处理结果：{{ i.resolve_note }}</div>
+        <div v-if="i.resolve_note" class="muted" style="font-size:0.85rem;"><EIcon name="clipboard" :size="18" /> 处理结果：{{ i.resolve_note }}</div>
 
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <!-- 待居民反馈 → 满意度反馈 -->
           <template v-if="i.status === '待居民反馈'">
             <n-input v-model:value="opOf(i).reason" placeholder="不满意原因（可选）" size="small" style="max-width:220px;" />
-            <n-button size="small" type="success" @click="act(i.id, { action: 'feedback', satisfied: true })">✅ 满意，结单</n-button>
-            <n-button size="small" type="warning" @click="act(i.id, { action: 'feedback', satisfied: false, reason: opOf(i).reason || '还需处理' })">😕 不满意</n-button>
+            <n-button size="small" type="success" @click="act(i.id, { action: 'feedback', satisfied: true })"><EIcon name="checkCircle" :size="18" /> 满意，结单</n-button>
+            <n-button size="small" type="warning" @click="act(i.id, { action: 'feedback', satisfied: false, reason: opOf(i).reason || '还需处理' })"><EIcon name="face-sad" :size="18" /> 不满意</n-button>
           </template>
           <!-- 待审核 → 撤回 -->
           <n-button v-if="i.status === '待审核'" size="small" quaternary @click="act(i.id, { action: 'withdraw' })">↩️ 撤回</n-button>
           <!-- 已撤回 → 重新打开（回待审核，可修改一次） -->
-          <n-button v-if="i.status === '已撤回'" size="small" type="info" @click="act(i.id, { action: 'reopen' })">🔓 重新打开</n-button>
+          <n-button v-if="i.status === '已撤回'" size="small" type="info" @click="act(i.id, { action: 'reopen' })"><EIcon name="unlock" :size="18" /> 重新打开</n-button>
           <!-- 退回补充信息 → 重新提交 -->
-          <n-button v-if="i.status === '退回补充信息'" size="small" type="warning" @click="act(i.id, { action: 'resubmit' })">📤 重新提交</n-button>
+          <n-button v-if="i.status === '退回补充信息'" size="small" type="warning" @click="act(i.id, { action: 'resubmit' })"><EIcon name="send" :size="18" /> 重新提交</n-button>
           <!-- 补充信息（必填校验） -->
           <template v-if="['已审核待派单', '已派单', '处理中'].includes(i.status)">
             <n-input v-model:value="opOf(i).content" placeholder="补充内容（必填）" size="small" style="max-width:240px;" />
-            <n-button size="small" @click="(opOf(i).content || '').trim() ? act(i.id, { action: 'supplement', opinion: opOf(i).content }, '补充已提交') : message.warning('请填写补充内容')">📝 补充信息</n-button>
+            <n-button size="small" @click="(opOf(i).content || '').trim() ? act(i.id, { action: 'supplement', opinion: opOf(i).content }, '补充已提交') : message.warning('请填写补充内容')"><EIcon name="edit" :size="18" /> 补充信息</n-button>
           </template>
         </div>
       </div>

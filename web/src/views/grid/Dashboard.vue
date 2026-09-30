@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { issues, proposals, agent } from '../../api'
 import CountUp from '../../components/CountUp.vue'
+import EIcon from '../../components/EIcon.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -64,23 +65,23 @@ onMounted(async () => {
 // 注意：必须是 computed —— 普通数组在 setup 期求值，会永久锁死在初始的 0，
 // 导致四个统计卡恒显示 0（数据在 onMounted 才回来）。
 const cards = computed(() => [
-  { label: '待处理工单', value: stats.value.pending, color: '#f59e0b', icon: '📥' },
-  { label: '处理中', value: stats.value.processing, color: '#059669', icon: '🔧' },
-  { label: '待审核提案', value: pendingProps.value.length, color: '#2563eb', icon: '💡' },
-  { label: '已结工单', value: stats.value.resolved, color: '#64748b', icon: '✅' },
+  { label: '待处理工单', value: stats.value.pending, color: '#f59e0b', icon: 'inbox' },
+  { label: '处理中', value: stats.value.processing, color: '#059669', icon: 'wrench' },
+  { label: '待审核提案', value: pendingProps.value.length, color: '#2563eb', icon: 'bulb' },
+  { label: '已结工单', value: stats.value.resolved, color: '#64748b', icon: 'checkCircle' },
 ])
 </script>
 
 <template>
   <div class="page">
-    <h2 class="page-title">📊 工作台</h2>
+    <h2 class="page-title"><EIcon name="chart" :size="18" /> 工作台</h2>
     <p class="page-sub">社区治理 · 今日待办概览</p>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
       <div v-for="c in cards" :key="c.label" class="card fade-up"
            style="text-align:center;margin:0;position:relative;overflow:hidden;border-radius:16px;">
         <div :style="{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: c.color, opacity: 0.85 }"></div>
-        <div class="entry-icon" style="font-size:1.1rem;opacity:0.7;margin-bottom:2px;">{{ c.icon }}</div>
+        <div class="entry-icon" style="display:flex;justify-content:center;opacity:0.8;margin-bottom:2px;"><EIcon :name="c.icon" :size="22" /></div>
         <div style="font-size:2rem;font-weight:800;line-height:1.15;">
           <CountUp :value="c.value" :duration="900" />
         </div>
@@ -90,7 +91,7 @@ const cards = computed(() => [
 
     <div class="card todo-panel" v-if="todo.length">
       <div class="todo-head">
-        <div><div class="todo-title">📥 今日待办</div><div class="muted todo-sub">先处理超时和紧急事项，再处理普通工单</div></div>
+        <div><div class="todo-title"><EIcon name="inbox" :size="18" /> 今日待办</div><div class="muted todo-sub">先处理超时和紧急事项，再处理普通工单</div></div>
         <n-button size="small" type="primary" ghost @click="router.push('/grid/work-orders')">进入工单台</n-button>
       </div>
       <div class="todo-list">
@@ -131,7 +132,7 @@ const cards = computed(() => [
     </div>
 
     <div class="card" v-if="urgent.length" style="border:2px solid #dc2626;">
-      <div style="font-weight:700;color:var(--ink-danger);margin-bottom:10px;">🚨 需要立即处理</div>
+      <div style="font-weight:700;color:var(--ink-danger);margin-bottom:10px;"><EIcon name="siren" :size="18" /> 需要立即处理</div>
       <div v-for="i in urgent" :key="i.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <b>#{{ i.id }} {{ i.title }}</b>
@@ -142,7 +143,7 @@ const cards = computed(() => [
     </div>
 
     <div class="card" v-if="pendingProps.length">
-      <div style="font-weight:700;margin-bottom:10px;">💡 待审核提案</div>
+      <div style="font-weight:700;margin-bottom:10px;"><EIcon name="bulb" :size="18" /> 待审核提案</div>
       <div v-for="p in pendingProps" :key="p.id" style="padding:8px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;">
         <span>{{ p.title }} <span class="muted">（{{ p.status }}）</span></span>
         <n-button size="small" type="primary" ghost @click="router.push('/grid/proposals')">审核</n-button>
@@ -152,7 +153,7 @@ const cards = computed(() => [
     <!-- 红黑榜（P2-B4-01） -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
       <div class="card" style="border:1px solid #dcfce7;margin:0;">
-        <div style="font-weight:700;color:var(--ink-success);margin-bottom:10px;">🏆 红榜 · 值得表扬</div>
+        <div style="font-weight:700;color:var(--ink-success);margin-bottom:10px;"><EIcon name="trophy" :size="18" /> 红榜 · 值得表扬</div>
         <div v-if="board.red_board.satisfied_issues.length">
           <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">近期满意工单</div>
           <div v-for="i in board.red_board.satisfied_issues.slice(0,3)" :key="'ri'+i.id"
@@ -165,14 +166,14 @@ const cards = computed(() => [
           <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">高效网格员</div>
           <div v-for="w in board.red_board.good_workers.slice(0,3)" :key="'rw'+w.name"
                style="padding:6px 0;font-size:0.9rem;">
-            👍 {{ w.name }} · 解决 {{ w.solved }} 单 · 满意 {{ w.satisfied }}
+            <EIcon name="thumb-up" :size="18" /> {{ w.name }} · 解决 {{ w.solved }} 单 · 满意 {{ w.satisfied }}
             <span class="muted" v-if="w.avg_hours">（均 {{ w.avg_hours }}h）</span>
           </div>
         </div>
         <div v-if="!board.red_board.satisfied_issues.length && !board.red_board.good_workers.length" class="muted" style="font-size:0.9rem;">暂无红榜数据</div>
       </div>
       <div class="card" style="border:1px solid #fee2e2;margin:0;">
-        <div style="font-weight:700;color:var(--ink-danger);margin-bottom:10px;">⚠️ 黑榜 · 需要改进</div>
+        <div style="font-weight:700;color:var(--ink-danger);margin-bottom:10px;"><EIcon name="alert" :size="18" /> 黑榜 · 需要改进</div>
         <div v-if="board.black_board.dissatisfied_issues.length">
           <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">不满意工单</div>
           <div v-for="i in board.black_board.dissatisfied_issues.slice(0,3)" :key="'bi'+i.id"

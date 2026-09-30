@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { qa, knowledge } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const question = ref('')
@@ -84,7 +85,7 @@ async function delQuestion(q) {
 
 <template>
   <div class="page">
-    <h2 class="page-title">📖 政策问答</h2>
+    <h2 class="page-title"><EIcon name="book" :size="18" /> 政策问答</h2>
     <p class="page-sub">问问医保、养老、住房政策，系统自动回答</p>
 
     <n-tabs v-model:value="tab" type="line">
@@ -92,22 +93,22 @@ async function delQuestion(q) {
         <div class="card">
           <n-input v-model:value="question" type="textarea" :rows="3" placeholder="输入您想问的政策问题，比如：医保报销需要带什么材料？" />
           <div style="margin-top:10px;display:flex;gap:8px;">
-            <n-button type="primary" :loading="asking" @click="ask">🔍 提问</n-button>
-            <n-button secondary @click="transfer">🙋 转人工</n-button>
+            <n-button type="primary" :loading="asking" @click="ask"><EIcon name="search" :size="18" /> 提问</n-button>
+            <n-button secondary @click="transfer"><EIcon name="hand" :size="18" /> 转人工</n-button>
           </div>
         </div>
 
         <div v-if="result" class="card">
           <template v-if="result.matched">
-            <div style="font-weight:700;color:#2E7D32;">✅ 已自动回答</div>
-            <div v-if="result.rag" class="muted" style="font-size:0.8rem;margin-top:2px;">🤖 AI 依据知识库生成 · 已校验引用</div>
+            <div style="font-weight:700;color:#2E7D32;"><EIcon name="checkCircle" :size="18" /> 已自动回答</div>
+            <div v-if="result.rag" class="muted" style="font-size:0.8rem;margin-top:2px;"><EIcon name="robot" :size="18" /> AI 依据知识库生成 · 已校验引用</div>
             <!-- 属地可解释性：让居民看见"这条政策是按哪个属地选的"（属地只影响选谁，不影响能否自动回答） -->
             <div v-if="result.applicable_area" style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <n-tag size="small" type="info" round>📍 适用地区：{{ result.applicable_area }}</n-tag>
+              <n-tag size="small" type="info" round><EIcon name="pin" :size="18" /> 适用地区：{{ result.applicable_area }}</n-tag>
               <span v-if="result.region_label" class="muted" style="font-size:0.78rem;">按您的社区「{{ result.region_label }}」优先</span>
             </div>
             <div v-if="result.knowledge" class="evidence-card" data-evidence-card>
-              <div class="evidence-title">🔎 这条回答依据</div>
+              <div class="evidence-title"><EIcon name="search" :size="18" /> 这条回答依据</div>
               <div class="evidence-main">{{ result.knowledge.title }}</div>
               <div class="evidence-meta">
                 <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }}</span>
@@ -122,7 +123,7 @@ async function delQuestion(q) {
             <div class="evidence-meta" style="margin-top:8px;">
               <span v-if="result.score != null">匹配度：{{ Number(result.score).toFixed(2) }}</span>
               <span v-if="result.knowledge && result.knowledge.retrieval">检索方式：{{ result.knowledge.retrieval === 'hybrid' ? '词法+语义混合' : '词法' }}</span>
-              <span v-if="result.region_level === 'other'">⚠️ 该依据适用地区与您所在社区不同</span>
+              <span v-if="result.region_level === 'other'"><EIcon name="alert" :size="18" /> 该依据适用地区与您所在社区不同</span>
             </div>
           </template>
           <template v-else>
@@ -130,12 +131,12 @@ async function delQuestion(q) {
             <div class="muted" style="margin-top:6px;">{{ result.manual_text }}</div>
             <div v-if="result.reason" class="muted evidence-reason">系统状态：{{ result.reason === 'weak_evidence' ? '依据不够直接，已转人工核对' : result.reason === 'manual' ? '涉及需要人工判断的内容' : '暂未找到匹配依据' }}</div>
             <div v-if="result.expired_hint" class="muted">{{ result.expired_hint }}</div>
-            <n-button size="small" type="primary" ghost style="margin-top:10px;" @click="transfer">🙋 转人工咨询</n-button>
+            <n-button size="small" type="primary" ghost style="margin-top:10px;" @click="transfer"><EIcon name="hand" :size="18" /> 转人工咨询</n-button>
           </template>
         </div>
       </n-tab-pane>
 
-      <n-tab-pane name="history" tab="📋 我的提问">
+      <n-tab-pane name="history" tab="我的提问">
         <div v-for="q in myQuestions" :key="q.id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ q.summary }}</b>
@@ -144,31 +145,31 @@ async function delQuestion(q) {
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">{{ q.q_type }} · {{ (q.created_at || '').slice(0, 16) }}</div>
           <div v-if="q.auto_answer" style="margin-top:6px;font-size:0.9rem;">{{ q.auto_answer }}</div>
           <div v-if="q.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px;font-size:0.9rem;">
-            💬 负责人：{{ q.reply }}
-            <div v-if="q.reply_ref" class="muted" style="font-size:0.8rem;margin-top:4px;">📎 参考：{{ q.reply_ref }}</div>
+            <EIcon name="chat-dots" :size="18" /> 负责人：{{ q.reply }}
+            <div v-if="q.reply_ref" class="muted" style="font-size:0.8rem;margin-top:4px;"><EIcon name="paperclip" :size="18" /> 参考：{{ q.reply_ref }}</div>
           </div>
           <!-- 有帮助/无帮助反馈（无帮助提示可转人工，不自动转） -->
           <div v-if="q.status === '已自动回答'" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
             <span class="muted" style="font-size:0.85rem;">这个回答有帮助吗？</span>
-            <n-button size="small" type="success" @click="fb(q, true)">👍 有帮助</n-button>
+            <n-button size="small" type="success" @click="fb(q, true)"><EIcon name="thumb-up" :size="18" /> 有帮助</n-button>
             <n-input v-model:value="fbReason[q.id]" placeholder="无帮助原因（选填）" size="small" style="max-width:200px;" />
-            <n-button size="small" type="warning" @click="fb(q, false)">👎 无帮助</n-button>
+            <n-button size="small" type="warning" @click="fb(q, false)"><EIcon name="thumb-down" :size="18" /> 无帮助</n-button>
           </div>
           <!-- 已转人工 → 人工回复后反馈 -->
           <div v-if="q.reply && q.status !== '已自动回答'" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
             <span class="muted" style="font-size:0.85rem;">问题解决了吗？</span>
-            <n-button size="small" type="success" @click="fb(q, true)">✅ 已解决</n-button>
+            <n-button size="small" type="success" @click="fb(q, true)"><EIcon name="checkCircle" :size="18" /> 已解决</n-button>
             <n-input v-model:value="fbReason[q.id]" placeholder="未解决原因" size="small" style="max-width:200px;" />
-            <n-button size="small" type="warning" @click="fb(q, false)">😕 未解决</n-button>
+            <n-button size="small" type="warning" @click="fb(q, false)"><EIcon name="face-sad" :size="18" /> 未解决</n-button>
           </div>
           <!-- 待回复/处理中可转人工 -->
           <div v-if="q.status === '待人工回复' || q.status === '处理中'" style="margin-top:8px;">
-            <n-button size="small" @click="transferQuestion(q)">🙋 转人工</n-button>
+            <n-button size="small" @click="transferQuestion(q)"><EIcon name="hand" :size="18" /> 转人工</n-button>
           </div>
           <!-- 删除记录（二次确认；处理中拦截由后端） -->
           <div style="margin-top:8px;">
             <n-popconfirm @positive-click="delQuestion(q)">
-              <template #trigger><n-button size="small" quaternary type="error">🗑️ 删除记录</n-button></template>
+              <template #trigger><n-button size="small" quaternary type="error"><EIcon name="trash" :size="18" /> 删除记录</n-button></template>
               删除后不可恢复，确认删除该提问记录？
             </n-popconfirm>
           </div>
@@ -176,7 +177,7 @@ async function delQuestion(q) {
         <n-empty v-if="myQuestions.length === 0" description="还没有提问记录" />
       </n-tab-pane>
 
-      <n-tab-pane name="hot" tab="🔥 高频问题">
+      <n-tab-pane name="hot" tab="高频问题">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
           <n-tag v-for="t in Q_TYPES" :key="t" size="small" :type="hotType === t ? 'primary' : 'default'"
                  style="cursor:pointer;" @click="hotType = t">{{ t }}</n-tag>
@@ -188,7 +189,7 @@ async function delQuestion(q) {
         <n-empty v-if="fHot().length === 0" description="暂无高频问题" />
       </n-tab-pane>
 
-      <n-tab-pane name="kb" tab="📚 政策知识库">
+      <n-tab-pane name="kb" tab="政策知识库">
         <div v-for="k in kb" :key="k.id" class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ k.title }}</b>
@@ -196,7 +197,7 @@ async function delQuestion(q) {
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:6px;">{{ k.plain_interpretation }}</div>
           <div style="margin-top:8px;display:flex;gap:8px;">
-            <n-button v-if="k.attachment" size="small" tag="a" :href="k.attachment" target="_blank">📄 查看政策原文</n-button>
+            <n-button v-if="k.attachment" size="small" tag="a" :href="k.attachment" target="_blank"><EIcon name="file" :size="18" /> 查看政策原文</n-button>
           </div>
         </div>
         <n-empty v-if="kb.length === 0" description="暂无知识库条目" />

@@ -7,6 +7,7 @@ import { useMessage } from 'naive-ui'
 import { useUserStore } from '../stores/user'
 import CountUp from '../components/CountUp.vue'
 import { BRAND_METRICS } from '../config/meta.js'
+import EIcon from '../components/EIcon.vue'
 const stats = BRAND_METRICS
 
 const router = useRouter()
@@ -45,9 +46,9 @@ async function demo(role) {
 }
 
 const roles = [
-  { role: 'resident', icon: '🏠', label: '居民', desc: '报修 · 议事 · 问策' },
-  { role: 'elderly', icon: '👴', label: '老年', desc: '大字 · 语音 · 免密' },
-  { role: 'grid', icon: '🛠️', label: '网格员', desc: '工单 · 督办 · 决策' },
+  { role: 'resident', icon: 'home', label: '居民', desc: '报修 · 议事 · 问策' },
+  { role: 'elderly', icon: 'users', label: '老年', desc: '大字 · 语音 · 免密' },
+  { role: 'grid', icon: 'wrench', label: '网格员', desc: '工单 · 督办 · 决策' },
 ]
 
 // 品牌指标：唯一来源 web/src/config/meta.js（原先硬编码在这里，其中「AI 自转率 62%」与后端
@@ -87,7 +88,7 @@ const particles = [
 
         <div class="fade-up-d1" style="position:relative;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-            <div class="tilt-hover" style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:1.55rem;border:1px solid rgba(255,255,255,0.28);">🏘️</div>
+            <div class="tilt-hover" style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.28);"><EIcon name="community" :size="30" /></div>
             <div>
               <div style="font-size:1.55rem;font-weight:800;letter-spacing:0.02em;">社区先知</div>
               <div style="font-size:0.76rem;opacity:0.75;letter-spacing:0.06em;">CommunityInsight</div>
@@ -100,13 +101,13 @@ const particles = [
           </div>
 
           <div style="margin-top:22px;display:flex;flex-direction:column;gap:9px;">
-            <div v-for="(f, i) in [
-              ['🤝', '9 个智能体黑板协作 · 真协商'],
-              ['🛡️', 'Verifier + Arbiter 双层防线'],
-              ['👴', '适老语音 · 免登录 · 人文关怀'],
-            ]" :key="i"
+            <div v-for="f in [
+              { icon: 'handshake', text: '9 个智能体黑板协作 · 真协商' },
+              { icon: 'shield', text: 'Verifier + Arbiter 双层防线' },
+              { icon: 'users', text: '适老语音 · 免登录 · 人文关怀' },
+            ]" :key="f.text"
                  style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.16);border-radius:12px;padding:9px 13px;font-size:0.87rem;">
-              <span style="font-size:1.1rem;">{{ f[0] }}</span>{{ f[1] }}
+              <EIcon :name="f.icon" :size="18" />{{ f.text }}
             </div>
           </div>
         </div>
@@ -150,7 +151,7 @@ const particles = [
                :style="loading ? 'opacity:.6;pointer-events:none' : ''"
                style="border:1px solid var(--border);border-radius:14px;padding:13px 8px;text-align:center;background:var(--card-bg);"
                @click="demo(r.role)">
-            <div class="entry-icon" style="font-size:1.65rem;">{{ r.icon }}</div>
+            <div class="entry-icon" style="display:flex;justify-content:center;"><EIcon :name="r.icon" :size="30" /></div>
             <div style="font-weight:700;margin-top:3px;">{{ r.label }}</div>
             <div style="font-size:0.75rem;color:var(--muted);margin-top:3px;">{{ r.desc }}</div>
           </div>

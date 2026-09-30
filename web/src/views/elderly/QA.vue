@@ -11,6 +11,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { qa } from '../../api'
 import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const { recognize, speak } = useSpeech()
@@ -28,7 +29,7 @@ const cap = speechCapability()
 const asrBlocked = ref(!cap.hasASR || !cap.secure)
 const blockReason = ref(cap.asrReason || '')
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
-// 播报是否真的响过：失败就把 🔊 降级成"请看大字"（见 useSpeech 顶部说明）
+// 播报是否真的响过：失败就把 降级成"请看大字"（见 useSpeech 顶部说明）
 const ttsOk = ref(cap.hasTTS)
 const lastSpoken = ref('')
 
@@ -130,52 +131,52 @@ async function doTransfer() {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">📖 政策问答</div>
+    <div class="elderly-title"><EIcon name="book" :size="18" /> 政策问答</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">问医保、养老、住房政策</p>
 
     <div class="card">
       <div v-if="asrBlocked" data-speech-fallback class="panel-warm"
            style="border-radius:12px;padding:10px;margin-bottom:10px;font-size:1.3rem;">
-        🔇 {{ banner }}
+        <EIcon name="speaker-off" :size="18" /> {{ banner }}
       </div>
       <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:64px;font-size:1.3rem;"
                 :loading="listening" @pointerdown="startListen" @pointerup="stopListen"
                 @pointerleave="stopListen" @touchstart.prevent="startListen" @touchend="stopListen">
-        🎤 {{ listening ? '正在聆听…（松开结束，最多 60 秒）' : '按住说话提问' }}
+        <EIcon name="mic" :size="18" /> {{ listening ? '正在聆听…（松开结束，最多 60 秒）' : '按住说话提问' }}
       </n-button>
       <!-- 播报失败必须可见（v3 复核 B3）：不能假装老人听到了 -->
       <div v-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
-        🔇 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
+        <EIcon name="speaker-off" :size="18" /> 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
       </div>
       <n-button v-else-if="lastSpoken" block size="large" style="margin-top:8px;min-height:56px;font-size:1.2rem;"
-                @click="say(lastSpoken)">🔊 再听一遍</n-button>
+                @click="say(lastSpoken)"><EIcon name="speaker" :size="18" /> 再听一遍</n-button>
 
       <!-- 转写确认（对，提交 / 重新说） -->
       <div v-if="pendingText" class="card" style="margin-top:10px;background:#fefce8;font-size:1.25rem;">
         <div>您说的是：<b>{{ pendingText }}</b></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-          <n-button type="success" size="large" style="min-height:56px;" @click="confirmText">✅ 对，提交</n-button>
-          <n-button size="large" style="min-height:56px;" @click="retryText">🔄 重新说</n-button>
+          <n-button type="success" size="large" style="min-height:56px;" @click="confirmText"><EIcon name="checkCircle" :size="18" /> 对，提交</n-button>
+          <n-button size="large" style="min-height:56px;" @click="retryText"><EIcon name="refresh" :size="18" /> 重新说</n-button>
         </div>
       </div>
 
       <n-input v-model:value="question" type="textarea" :rows="3" placeholder="想问什么政策？"
                style="font-size:1.3rem;margin-top:12px;" />
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">
-        <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" :loading="asking" @click="ask">🔍 提问</n-button>
-        <n-button size="large" style="min-height:60px;font-size:1.25rem;" @click="transferConfirm = true">🙋 转人工</n-button>
+        <n-button type="primary" size="large" style="min-height:60px;font-size:1.25rem;" :loading="asking" @click="ask"><EIcon name="search" :size="18" /> 提问</n-button>
+        <n-button size="large" style="min-height:60px;font-size:1.25rem;" @click="transferConfirm = true"><EIcon name="hand" :size="18" /> 转人工</n-button>
       </div>
     </div>
 
     <div v-if="result" class="card" style="font-size:1.25rem;">
       <template v-if="result.matched">
-        <div style="font-weight:700;color:#2E7D32;">✅ 已回答</div>
+        <div style="font-weight:700;color:#2E7D32;"><EIcon name="checkCircle" :size="18" /> 已回答</div>
         <!-- 属地可解释性（三端口径一致）：大字告知这条政策适用于哪里 -->
         <div v-if="result.applicable_area" style="margin-top:6px;font-size:1.15rem;">
-          📍 适用地区：<b>{{ result.applicable_area }}</b>
+          <EIcon name="pin" :size="18" /> 适用地区：<b>{{ result.applicable_area }}</b>
         </div>
         <div v-if="result.knowledge" class="elderly-evidence" data-evidence-card>
-          <div style="font-weight:700;color:var(--primary-ink);">🔎 这条回答依据</div>
+          <div style="font-weight:700;color:var(--primary-ink);"><EIcon name="search" :size="18" /> 这条回答依据</div>
           <div style="margin-top:5px;">{{ result.knowledge.title }}</div>
           <div style="margin-top:5px;color:var(--muted);font-size:1rem;line-height:1.6;">
             <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }} </span>
@@ -185,26 +186,26 @@ async function doTransfer() {
           <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener" style="display:inline-block;margin-top:4px;color:var(--primary-ink);">查看政策原文 ↗</a>
         </div>
         <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
-        <n-button type="primary" ghost block size="large" style="margin-top:12px;min-height:56px;" @click="playAnswer">🔊 播放回答</n-button>
+        <n-button type="primary" ghost block size="large" style="margin-top:12px;min-height:56px;" @click="playAnswer"><EIcon name="speaker" :size="18" /> 播放回答</n-button>
       </template>
       <template v-else>
         <div style="font-weight:700;color:#d97706;">暂未找到答案</div>
         <div class="muted" style="margin-top:6px;">{{ result.manual_text }}</div>
         <div v-if="result.reason" class="elderly-evidence elderly-evidence-muted">{{ result.reason === 'weak_evidence' ? '系统提示：依据不够直接，已转人工核对。' : result.reason === 'manual' ? '系统提示：这类问题需要负责人判断。' : '系统提示：暂未找到匹配依据。' }}</div>
-        <n-button size="large" type="primary" ghost block style="margin-top:12px;min-height:56px;" @click="transferConfirm = true">🙋 转人工咨询</n-button>
+        <n-button size="large" type="primary" ghost block style="margin-top:12px;min-height:56px;" @click="transferConfirm = true"><EIcon name="hand" :size="18" /> 转人工咨询</n-button>
       </template>
     </div>
 
     <!-- 最近 5 条历史（大字版） -->
     <div v-if="history.length" class="card" style="margin-top:12px;">
-      <div style="font-weight:700;font-size:1.25rem;margin-bottom:8px;">📋 最近提问</div>
+      <div style="font-weight:700;font-size:1.25rem;margin-bottom:8px;"><EIcon name="clipboard" :size="18" /> 最近提问</div>
       <div v-for="h in history" :key="h.id" style="padding:8px 0;border-bottom:1px solid var(--border);font-size:1.25rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <b>{{ h.summary }}</b>
           <n-tag size="large" :type="h.status === '已自动回答' ? 'success' : h.status === '已回复' ? 'success' : 'warning'">{{ h.status }}</n-tag>
         </div>
         <div v-if="h.auto_answer" class="muted" style="font-size:1rem;margin-top:4px;">{{ h.auto_answer }}</div>
-        <div v-if="h.reply" style="margin-top:4px;color:#2E7D32;">💬 {{ h.reply }}</div>
+        <div v-if="h.reply" style="margin-top:4px;color:#2E7D32;"><EIcon name="chat-dots" :size="18" /> {{ h.reply }}</div>
       </div>
     </div>
 

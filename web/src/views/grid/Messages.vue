@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { messages, agent } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const list = ref([])
@@ -36,32 +37,33 @@ async function resolve(h) {
   }
 }
 
-const TYPE_ICON = { issue: '🔧', proposal: '💡', notice: '📢', health_consult: '🏥', supplement: '📝', sla: '⏰', elderly: '👴', agent_handoff: '🤝' }
+// 消息类型 → 单色线性图标名（全站去 emoji；渲染处用 <EIcon>）
+const TYPE_ICON = { issue: 'wrench', proposal: 'bulb', notice: 'megaphone', health_consult: 'hospital', supplement: 'clipboard', sla: 'clock', elderly: 'users', agent_handoff: 'hand' }
 </script>
 
 <template>
   <div class="page">
-    <h2 class="page-title">📬 消息中心</h2>
+    <h2 class="page-title"><EIcon name="mail" :size="18" /> 消息中心</h2>
     <p class="page-sub">系统通知 + 人工处理包（AI 已整理上下文，可直接处理）</p>
 
     <n-tabs v-model:value="tab" type="line">
-      <n-tab-pane name="handoffs" tab="🤝 人工处理包">
+      <n-tab-pane name="handoffs" tab="人工处理包">
         <div v-for="h in handoffs" :key="h.id" class="card"
              :style="h.status === '待处理' ? 'border-left:4px solid var(--st-pending);' : 'opacity:0.6;'">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>#{{ h.id }} {{ h.package?.intent || h.intent }}（{{ h.status }}）</b>
             <span class="muted" style="font-size:0.8rem;">{{ (h.created_at || '').slice(0, 16) }}</span>
           </div>
-          <div class="muted" style="font-size:0.85rem;margin-top:4px;">👤 用户 #{{ h.user_id }} · 原始问题：{{ h.package?.original_input || '—' }}</div>
-          <div v-if="h.reason" style="margin-top:4px;font-size:0.9rem;">⚠️ 待确认：{{ h.reason }}</div>
+          <div class="muted" style="font-size:0.85rem;margin-top:4px;"><EIcon name="user" :size="18" /> 用户 #{{ h.user_id }} · 原始问题：{{ h.package?.original_input || '—' }}</div>
+          <div v-if="h.reason" style="margin-top:4px;font-size:0.9rem;"><EIcon name="alert" :size="18" /> 待确认：{{ h.reason }}</div>
           <div v-if="h.package?.collected_fields && Object.keys(h.package.collected_fields).length" style="margin-top:4px;" class="muted">
-            📋 AI 已收集：{{ JSON.stringify(h.package.collected_fields) }}
+            <EIcon name="clipboard" :size="18" /> AI 已收集：{{ JSON.stringify(h.package.collected_fields) }}
           </div>
           <div v-if="h.package?.recent_history && h.package.recent_history.length" style="margin-top:4px;" class="muted">
-            💬 最近对话：{{ h.package.recent_history.map(x => (x.role === 'user' ? '👤' : '🤖') + x.content.slice(0, 30)).join(' / ') }}
+            <EIcon name="chat-dots" :size="18" /> 最近对话：{{ h.package.recent_history.map(x => (x.role === 'user' ? '居民' : 'AI') + '：' + x.content.slice(0, 30)).join(' / ') }}
           </div>
           <n-button v-if="h.status === '待处理'" size="small" type="primary" style="margin-top:8px;" @click="resolve(h)">
-            ✅ 已处理完成
+            <EIcon name="checkCircle" :size="18" /> 已处理完成
           </n-button>
         </div>
         <n-empty v-if="handoffs.length === 0" description="暂无人工处理包" />
@@ -71,7 +73,7 @@ const TYPE_ICON = { issue: '🔧', proposal: '💡', notice: '📢', health_cons
         <div v-for="m in list" :key="m.id" class="card" style="cursor:pointer;" @click="read(m)"
              :style="m.is_read ? 'opacity:0.6;' : 'border-left:4px solid var(--primary);'">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <b>{{ TYPE_ICON[m.type] || '📌' }} {{ m.title }}</b>
+            <b><EIcon v-if="TYPE_ICON[m.type]" :name="TYPE_ICON[m.type]" :size="16" /> {{ m.title }}</b>
             <span class="muted" style="font-size:0.8rem;">{{ (m.created_at || '').slice(0, 16) }}</span>
           </div>
           <div class="muted" style="font-size:0.9rem;margin-top:6px;">{{ m.content }}</div>

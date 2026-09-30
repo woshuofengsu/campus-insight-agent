@@ -249,7 +249,7 @@ def elderly_report_text(page, base, text):
     page.goto(f"{base}/elderly/report", wait_until="networkidle")
     page.wait_for_timeout(1600)
     page.fill("textarea", text)
-    btn(page, "🔍 帮我看看还缺什么").first.click()
+    btn(page, "帮我看看还缺什么").first.click()
     page.wait_for_timeout(2200)
     return page.inner_text("body")
 
@@ -310,25 +310,25 @@ def journey_1(page, base):
         if exp.count():
             exp.first.click()
             page.wait_for_timeout(1200)
-        b = card.get_by_role("button", name="✅ 审核通过", exact=True)
+        b = card.get_by_role("button", name="审核通过", exact=True)
         if b.count():
             b.first.click()
             page.wait_for_timeout(2000)
         card = page.locator("div.card").filter(has_text=mark).first
-        check("⑤ 审核通过", card.get_by_role("button", name="🔧 派单", exact=True).count() > 0,
+        check("⑤ 审核通过", card.get_by_role("button", name="派单", exact=True).count() > 0,
               "出现「🔧 派单」= 已进入已审核待派单")
         page.fill("input[placeholder='维修人员姓名（必填）']", "王师傅")
         page.fill("input[placeholder='电话（必填）']", "13800001234")
-        card.get_by_role("button", name="🔧 派单", exact=True).first.click()
+        card.get_by_role("button", name="派单", exact=True).first.click()
         page.wait_for_timeout(2000)
         card = page.locator("div.card").filter(has_text=mark).first
         check("⑥ 派单（填维修人员与电话）",
-              card.get_by_role("button", name="🔨 开始处理", exact=True).count() > 0)
-        card.get_by_role("button", name="🔨 开始处理", exact=True).first.click()
+              card.get_by_role("button", name="开始处理", exact=True).count() > 0)
+        card.get_by_role("button", name="开始处理", exact=True).first.click()
         page.wait_for_timeout(2000)
         card = page.locator("div.card").filter(has_text=mark).first
         page.fill("input[placeholder='处理结果（必填）']", "已更换水龙头阀芯，不再滴水，现场已试水。")
-        card.get_by_role("button", name="✅ 提交处理结果", exact=True).first.click()
+        card.get_by_role("button", name="提交处理结果", exact=True).first.click()
         page.wait_for_timeout(2500)
     row = issue_by_mark(mark)
     check("⑦ 处理结果入库，状态进入「待居民反馈」（等居民说话，不替居民结单）",
@@ -341,7 +341,7 @@ def journey_1(page, base):
     page.wait_for_timeout(1800)
     body = page.inner_text("body")
     check("⑧ 居民能看到处理结果与时限", ("处理结果" in body) and ("阀芯" in body))
-    fb = btn(page, "✅ 满意，结单")
+    fb = btn(page, "满意，结单")
     check("⑨ 待反馈时居民端出现「满意，结单」（权限对：这一步只有居民能做）", fb.count() > 0)
     if fb.count():
         fb.first.click()
@@ -371,25 +371,25 @@ def journey_2(page, base):
     # 更正 1：答一个"太笼统"的位置 → 必须说明为什么不算，且仍不给提交
     if page.locator(LOC_FILL).count():
         fill_location(page, "小区")
-        btn(page, "✅ 补充好了，再看一遍").first.click()
+        btn(page, "补充好了，再看一遍").first.click()
         page.wait_for_timeout(2200)
     body = page.inner_text("body")
     check("② 笼统的更正被如实拒绝并说明原因（不是默默不理会）",
           page.locator("[data-reject-hint]").count() > 0 and "太笼统" in body,
           "老人答「小区」→ 页面说清「太笼统了，请说到哪栋楼、哪一层」")
-    check("②b 位置不合法时「确认上报」不出现（缺着就不允许提交）", btn(page, "✅ 确认上报").count() == 0)
+    check("②b 位置不合法时「确认上报」不出现（缺着就不允许提交）", btn(page, "确认上报").count() == 0)
 
     # 更正 2：给到楼栋+楼层 → 出提交按钮
     if page.locator(LOC_FILL).count():
         fill_location(page, good)
-        btn(page, "✅ 补充好了，再看一遍").first.click()
+        btn(page, "补充好了，再看一遍").first.click()
         page.wait_for_timeout(2500)
-    has_submit = btn(page, "✅ 确认上报").count() > 0
+    has_submit = btn(page, "确认上报").count() > 0
     check("③ 补充有效位置后出现「确认上报」（补充真的进入了判定，不是死路）", has_submit,
           "这一步曾经是坏的：补充值没上行，缺位置时永远出不来提交按钮")
 
     if has_submit:
-        btn(page, "✅ 确认上报").first.click()
+        btn(page, "确认上报").first.click()
     row = wait_issue(mark)
     check("④ 提交后入库位置 = 老人更正的那个（不是系统猜的）",
           (row.get("location") or "").startswith(good), f"入库位置「{row.get('location')}」")
@@ -454,7 +454,7 @@ def journey_4(page, base):
     posts = []
     page.on("request", lambda r: posts.append(r.url) if "/report/submit" in r.url else None)
     elderly_report_text(page, base, text)
-    check("① 信息齐了 → 直接给「确认上报」", btn(page, "✅ 确认上报").count() > 0,
+    check("① 信息齐了 → 直接给「确认上报」", btn(page, "确认上报").count() > 0,
           "缺什么才问什么：这句里楼栋/楼层/公共部位都说了")
     # 界面层：同一帧里连点两下（真实连点行为；界面若置灰则由服务端幂等兜住）
     page.evaluate("""() => {
@@ -511,14 +511,14 @@ def journey_5(page, base):
     # ---- 5a：请求没出去 ----
     page.route("**/api/web/elderly/report/submit", lambda route: route.abort("timedout"))
     elderly_report_text(page, base, f"8号楼四层楼道灯不亮 {mark_a}")
-    btn(page, "✅ 确认上报").first.click()
+    btn(page, "确认上报").first.click()
     page.wait_for_timeout(4500)
     body = page.inner_text("body")
     check("①［请求没出去］页面**不谎报成功**（没有「已上报」结果卡）",
           "已上报（工单号" not in body and page.locator("[data-result-via]").count() == 0,
           "网络超时 ≠ 提交成功")
     check("②［请求没出去］库里也确实没有建单，并给出「查一下」的出口",
-          issue_count(mark_a) == 0 and btn(page, "🔍 查一下是否已经提交了").count() > 0,
+          issue_count(mark_a) == 0 and btn(page, "查一下是否已经提交了").count() > 0,
           f"匹配工单数 {issue_count(mark_a)}")
     page.unroute("**/api/web/elderly/report/submit")
 
@@ -538,11 +538,11 @@ def journey_5(page, base):
     page.reload(wait_until="networkidle")
     page.wait_for_timeout(1500)
     elderly_report_text(page, base, f"9号楼二层楼道声控灯不亮 {mark_b}")
-    btn(page, "✅ 确认上报").first.click()
+    btn(page, "确认上报").first.click()
     # 断网后页面会**自动**按提交编号核对；核对没自动跑（或还在跑）时，点一下出口按钮
     got = wait_attr(page, "[data-result-via]", "data-result-via", "verify", timeout=14)
-    if not got and btn(page, "🔍 查一下是否已经提交了").count():
-        btn(page, "🔍 查一下是否已经提交了").first.click()
+    if not got and btn(page, "查一下是否已经提交了").count():
+        btn(page, "查一下是否已经提交了").first.click()
         got = wait_attr(page, "[data-result-via]", "data-result-via", "verify", timeout=14)
     row = wait_issue(mark_b)
     body = page.inner_text("body")
@@ -592,7 +592,7 @@ def journey_6(page, base):
     check("③ 网格端「人工待办」看得到这个包，且带着居民原话", card.count() > 0)
     if not card.count():
         return
-    claim = card.get_by_role("button", name="🙋 领取", exact=True)
+    claim = card.get_by_role("button", name="领取", exact=True)
     if claim.count():
         claim.first.click()
         page.wait_for_timeout(2200)
@@ -602,11 +602,11 @@ def journey_6(page, base):
           f"状态 {row.get('status')} · 领取人 {row.get('assignee_name')}")
     card = page.locator("div.card").filter(has_text=mark).first
     page.fill("input[placeholder='回复内容（会通知居民）']", "已帮您核实：带身份证与医保卡到社区服务站即可办理报销。")
-    card.get_by_role("button", name="✅ 回复", exact=True).first.click()
+    card.get_by_role("button", name="回复", exact=True).first.click()
     page.wait_for_timeout(2200)
     card = page.locator("div.card").filter(has_text=mark).first
     page.fill("input[placeholder='关闭说明（居民看得到的处理结果）']", "已电话告知居民办理流程，居民确认理解。")
-    card.get_by_role("button", name="🏁 关闭", exact=True).first.click()
+    card.get_by_role("button", name="关闭", exact=True).first.click()
     page.wait_for_timeout(2500)
     row = one("SELECT * FROM agent_handoffs WHERE id=?", (hid,))
     check("⑤ 回复 + 关闭都落库（回复内容/关闭说明/时间齐全）",

@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useMessage, NModal } from 'naive-ui'
 import { health, upload } from '../../api'
+import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
 const articles = ref([])
@@ -101,16 +102,16 @@ function atts(c) {
 
 <template>
   <div class="page">
-    <h2 class="page-title">🏥 健康防护</h2>
+    <h2 class="page-title"><EIcon name="hospital" :size="18" /> 健康防护</h2>
     <p class="page-sub">疾病预防内容 + 健康咨询（负责人 24 小时内回复）</p>
 
     <!-- 天气联动提醒卡片（最多 3 张，其余折叠，可临时关闭） -->
     <div v-if="linkage.length && !linkageHidden" class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-weight:700;">🌦️ 天气提醒</div>
+        <div style="font-weight:700;"><EIcon name="cloud-sun" :size="18" /> 天气提醒</div>
         <div style="display:flex;gap:8px;">
           <n-button v-if="linkage.length > 3" size="tiny" @click="linkageCollapsed = !linkageCollapsed">{{ linkageCollapsed ? '展开' : '折叠' }}</n-button>
-          <n-button size="tiny" quaternary @click="linkageHidden = true">✕ 关闭</n-button>
+          <n-button size="tiny" quaternary @click="linkageHidden = true"><EIcon name="x" :size="18" /> 关闭</n-button>
         </div>
       </div>
       <div v-for="(l, i) in (linkageCollapsed ? linkage.slice(0, 3) : linkage)" :key="l.content_id + '-' + i" style="padding:6px 0;font-size:0.9rem;">
@@ -128,7 +129,7 @@ function atts(c) {
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <b>{{ a.title }}</b>
             <div>
-              <n-tag v-if="a.is_pinned" size="small" type="error" style="margin-right:6px;">📌 置顶</n-tag>
+              <n-tag v-if="a.is_pinned" size="small" type="error" style="margin-right:6px;"><EIcon name="pushpin" :size="18" /> 置顶</n-tag>
               <n-tag size="small" :type="TYPE_COLOR[a.content_type] || 'default'">{{ a.content_type }}</n-tag>
             </div>
           </div>
@@ -142,7 +143,7 @@ function atts(c) {
 
       <n-tab-pane name="ask" tab="健康咨询">
         <div class="card" style="border:1px solid #fca5a5;background:var(--card-bg);">
-          <b>⚠️ 紧急情况提醒</b>
+          <b><EIcon name="alert" :size="18" /> 紧急情况提醒</b>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
             如遇胸闷胸痛、呼吸困难、意识不清等急症，请立即拨打 <b>120</b> 急救电话，不要等待在线回复。
           </div>
@@ -182,12 +183,12 @@ function atts(c) {
                 <n-input v-model:value="cform.agent_relation" placeholder="如：家人 / 邻居" />
               </n-form-item>
             </template>
-            <n-button type="primary" block :loading="submitting" @click="submit">🩺 提交咨询</n-button>
+            <n-button type="primary" block :loading="submitting" @click="submit"><EIcon name="medical" :size="18" /> 提交咨询</n-button>
           </n-form>
         </div>
         <!-- 提交成功反馈 -->
         <div v-if="submitted" class="card" style="border-color:#86efac;">
-          <b style="color:var(--ink-success);">✅ 咨询已提交</b>
+          <b style="color:var(--ink-success);"><EIcon name="checkCircle" :size="18" /> 咨询已提交</b>
           <div class="muted" style="font-size:0.9rem;margin-top:6px;">
             编号：<b>{{ submitted.code }}</b> · 状态：待回复 · 类型：{{ submitted.consult_type || cform.consult_type }} · 提交时间：{{ new Date().toLocaleString('zh-CN') }}
           </div>
@@ -206,27 +207,27 @@ function atts(c) {
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:6px;">{{ c.content }}</div>
           <div v-if="atts(c).length" style="margin-top:6px;">
-            <div class="muted" style="font-size:0.75rem;">📎 附件 {{ atts(c).length }} 张（仅您和负责人可见）</div>
+            <div class="muted" style="font-size:0.75rem;"><EIcon name="paperclip" :size="18" /> 附件 {{ atts(c).length }} 张（仅您和负责人可见）</div>
             <div v-for="(a, i) in atts(c)" :key="i" style="display:inline-block;margin-right:6px;">
               <img :src="a" style="max-width:100px;max-height:100px;border-radius:6px;border:1px solid var(--border);" />
             </div>
           </div>
           <div v-if="c.reply" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:0.9rem;">
-            💬 负责人：{{ c.reply }}
-            <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:var(--ink-warning);">🏥 就医指引：{{ c.doctor_guide }}</div>
-            <div v-if="c.need_offline" style="margin-top:4px;font-size:0.85rem;color:var(--ink-danger);">⚠️ 建议尽快线下就医</div>
+            <EIcon name="chat-dots" :size="18" /> 负责人：{{ c.reply }}
+            <div v-if="c.doctor_guide" style="margin-top:4px;font-size:0.85rem;color:var(--ink-warning);"><EIcon name="hospital" :size="18" /> 就医指引：{{ c.doctor_guide }}</div>
+            <div v-if="c.need_offline" style="margin-top:4px;font-size:0.85rem;color:var(--ink-danger);"><EIcon name="alert" :size="18" /> 建议尽快线下就医</div>
           </div>
           <!-- 反馈已解决/未解决 -->
           <div v-if="c.status === '已回复' && !c.solved_feedback" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
             <span class="muted" style="font-size:0.85rem;">问题解决了吗？</span>
-            <n-button size="small" type="success" @click="fb(c, true)">✅ 已解决</n-button>
+            <n-button size="small" type="success" @click="fb(c, true)"><EIcon name="checkCircle" :size="18" /> 已解决</n-button>
             <n-input v-model:value="fbReason[c.id]" placeholder="未解决原因（必填）" size="small" style="max-width:200px;" />
-            <n-button size="small" type="warning" @click="fb(c, false)">😕 未解决</n-button>
+            <n-button size="small" type="warning" @click="fb(c, false)"><EIcon name="face-sad" :size="18" /> 未解决</n-button>
           </div>
           <div v-if="['待回复','已回复','超时未回复','已撤回'].includes(c.status)" style="margin-top:8px;display:flex;gap:8px;">
             <n-button v-if="c.status === '待回复'" size="small" quaternary @click="toggle(c, 'withdraw')">↩️ 撤回</n-button>
-            <n-button v-if="c.status === '已撤回'" size="small" @click="toggle(c, 'reopen')">🔄 重新打开</n-button>
-            <n-button v-if="['已回复','超时未回复'].includes(c.status)" size="small" @click="toggle(c, 'close')">✕ 关闭</n-button>
+            <n-button v-if="c.status === '已撤回'" size="small" @click="toggle(c, 'reopen')"><EIcon name="refresh" :size="18" /> 重新打开</n-button>
+            <n-button v-if="['已回复','超时未回复'].includes(c.status)" size="small" @click="toggle(c, 'close')"><EIcon name="x" :size="18" /> 关闭</n-button>
           </div>
         </div>
         <n-empty v-if="myConsults.length === 0" description="还没有咨询记录" />

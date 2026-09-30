@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
 import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
+import EIcon from '../../components/EIcon.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -95,7 +96,7 @@ const blockReason = ref(cap.asrReason || '')
 const showPhrases = ref(!cap.hasASR || !cap.secure)
 const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
 // 播报是否真的响过：iOS Safari 的 TTS 必须由**用户手势**触发，挂载即播会静默不响，
-// 所以本页**不自动播报**，只提供"🔊 听一遍"，并且播不出来时如实说明（不假装老人听到了）
+// 所以本页**不自动播报**，只提供"听一遍"，并且播不出来时如实说明（不假装老人听到了）
 const ttsOk = ref(cap.hasTTS)
 const lastSpoken = ref('')
 
@@ -109,7 +110,7 @@ const SOURCE_LABEL = {
 }
 const srcTip = (k) => SOURCE_LABEL[k] || ''
 
-/** 统一播报入口：返回是否真的响了；失败就把 🔊 降级成"请看大字"的说明。 */
+/** 统一播报入口：返回是否真的响了；失败就把 降级成"请看大字"的说明。 */
 async function say(text) {
   const t = (text || '').trim()
   if (!t) return false
@@ -138,7 +139,7 @@ async function startListen() {
   listening.value = false
   if (r.ok && r.text) {
     text.value = r.text
-    // 识别结果**显示**在页面上即可，播报交给"🔊 听一遍"（挂载/自动播在 iOS 不响）
+    // 识别结果**显示**在页面上即可，播报交给"听一遍"（挂载/自动播在 iOS 不响）
     await say(`您说的是：${r.text}。请确认下面的信息`)
     await loadDraft()
     return
@@ -196,7 +197,7 @@ function restart() {
 /** 让服务端把原话解析成结构化摘要（缺什么会明说，且**此时不会建单**）。
  *
  * `withAnswer=true`（"补充好了，再看一遍"）：把老人在追问里填的补充值一起送上去重算。
- * ⚠️ 这里踩过一次真坑：补充值原来只存在页面上、重查时不送上行，而后端只按原话解析，
+ * 这里踩过一次真坑：补充值原来只存在页面上、重查时不送上行，而后端只按原话解析，
  * 于是"缺位置 → 补 → 再看"永远是同一个缺失结论，**「确认上报」根本不出现**（两步契约成死路）。
  * 首批八条浏览器旅程第 2 条（缺位置→追问→更正→确认提交）就是为抓这类问题立的。
  */
@@ -218,7 +219,7 @@ async function loadDraft(withAnswer = false) {
       scope: d.fields.issue_type || '',
       urgency: d.fields.urgency || '一般',
     }
-    // ⚠️ 先松开"正在识别"再播报：播报是增强项，**不能拖住按钮**。
+    // 先松开"正在识别"再播报：播报是增强项，**不能拖住按钮**。
     // （实测踩到：某些机型 speak() 既不回 onend 也不回 onerror，按钮会一直转圈，
     //  老人既看不到结果也点不了第二次——现在 speak() 有兜底超时，这里再把顺序摆正。）
     loadingDraft.value = false
@@ -282,7 +283,7 @@ async function submit() {
     text.value = ''
     await clearDraft()             // 已经建单了：服务端草稿失效
   } catch (e) {
-    // ⚠️ 断网/超时时**不能**说"提交失败"就完事 —— 可能其实已经提交成功了。
+    // 断网/超时时**不能**说"提交失败"就完事 —— 可能其实已经提交成功了。
     // 如实告诉老人"结果还不确定"，并给一个"查一下"的出口，**不诱导他再点一次**（§6-I5）。
     const msg = String((e && e.message) || '')
     if (/提交中/.test(msg)) {
@@ -339,43 +340,43 @@ async function checkSubmitted() {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title">🗣️ 一句话报修</div>
+    <div class="elderly-title"><EIcon name="speak" :size="18" /> 一句话报修</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">说一句或打几个字，我帮您整理成工单</p>
 
     <!-- 页面提示也做成"点一下听"（不在挂载时自动播：iOS 需要用户手势，否则静默不响） -->
     <n-button v-if="ttsOk && !lastSpoken" block size="large"
               style="margin-bottom:10px;min-height:60px;font-size:1.2rem;"
               @click="say('说一句或打几个字，我帮您整理成工单。位置要说清楚是哪个楼、哪一层。')">
-      🔊 听一遍怎么用
+      <EIcon name="speaker" :size="18" /> 听一遍怎么用
     </n-button>
     <div v-else-if="!ttsOk" class="card muted" style="font-size:1.1rem;">
-      🔇 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
+      <EIcon name="speaker-off" :size="18" /> 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
     </div>
 
     <!-- 降级提示条：语音不可用时明说"打字就行"（审计靠 data-speech-fallback 做机器验证） -->
     <div v-if="asrBlocked" data-speech-fallback
          class="card panel-warm" style="border-radius:14px;font-size:1.3rem;">
-      🔇 {{ banner }}
+      <EIcon name="speaker-off" :size="18" /> {{ banner }}
     </div>
 
     <!-- 上次没填完的报修（v3 §7.4 中断可恢复）：**先给摘要再让老人选**，
          不替他决定继续还是新建；换人/换社区时这张卡根本不会出现（见 loadLocalDraft）。 -->
     <div v-if="resumeOffer" class="card panel-lemon" data-resume-draft
          style="border-radius:14px;font-size:1.25rem;">
-      <b>📝 上次有一条没填完的报修</b>
+      <b><EIcon name="edit" :size="18" /> 上次有一条没填完的报修</b>
       <div style="margin-top:6px;">{{ resumeOffer.summary }}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <n-button type="primary" size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
                   @click="resumeDraft">▶️ 接着填</n-button>
         <n-button size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
-                  @click="dropLocalDraft">🗑 重新开始</n-button>
+                  @click="dropLocalDraft"><EIcon name="trash" :size="18" /> 重新开始</n-button>
       </div>
     </div>
 
     <div class="card" style="font-size:1.3rem;">
       <n-button v-if="!asrBlocked" type="error" block size="large"
                 style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
-        🎤 {{ listening ? '正在聆听…（最多 60 秒）' : '点一下开始说话' }}
+        <EIcon name="mic" :size="18" /> {{ listening ? '正在聆听…（最多 60 秒）' : '点一下开始说话' }}
       </n-button>
       <!-- 「允许停止和取消」（v3 §7.1）：点了开始就必须能自己停下，别被倒计时拖着 -->
       <n-button v-if="listening" block size="large" data-speech-stop
@@ -383,7 +384,7 @@ async function checkSubmitted() {
         ⏹ 停下（我说完了 / 不想说了）
       </n-button>
       <div v-else style="font-size:1.3rem;font-weight:700;">
-        ✍️ 请在下面的框里打字告诉我们（最少 5 个字）
+        <EIcon name="edit" :size="18" /> 请在下面的框里打字告诉我们（最少 5 个字）
       </div>
 
       <n-input v-model:value="text" type="textarea" :rows="3" placeholder="比如：五号楼二层楼道灯坏了"
@@ -393,13 +394,13 @@ async function checkSubmitted() {
       <div style="margin-top:12px;">
         <n-button block size="large" quaternary style="min-height:52px;font-size:1.15rem;"
                   @click="showPhrases = !showPhrases">
-          💬 {{ showPhrases ? '收起常见说法' : '说不出来？点一个常见说法' }}
+          <EIcon name="chat-dots" :size="18" /> {{ showPhrases ? '收起常见说法' : '说不出来？点一个常见说法' }}
         </n-button>
         <div v-if="showPhrases" data-phrases
              style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px;">
           <n-button v-for="p in PHRASES" :key="p" block size="large"
                     style="min-height:60px;font-size:1.25rem;" @click="usePhrase(p)">
-            🗣️ {{ p }}
+            <EIcon name="speak" :size="18" /> {{ p }}
           </n-button>
         </div>
       </div>
@@ -407,7 +408,7 @@ async function checkSubmitted() {
       <!-- 播报一律"点一下听"（v3 复核 B3）：挂载自动播在 iOS 静默不响，不能假装老人听到了 -->
       <n-button v-if="lastSpoken && ttsOk" block size="large"
                 style="margin-top:10px;min-height:60px;font-size:1.25rem;" @click="say(lastSpoken)">
-        🔊 听一遍
+        <EIcon name="speaker" :size="18" /> 听一遍
       </n-button>
       <!-- v3 §7.3：允许重听、暂停与停止 —— 念到一半不想听了要能停（不能只能等它念完） -->
       <n-button v-if="speaking" block size="large" data-hush
@@ -415,28 +416,28 @@ async function checkSubmitted() {
         ⏹ 别念了
       </n-button>
       <div v-else-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
-        🔇 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
+        <EIcon name="speaker-off" :size="18" /> 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
       </div>
 
       <n-button type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;"
                 :loading="loadingDraft" @click="loadDraft">
-        🔍 帮我看看还缺什么
+        <EIcon name="search" :size="18" /> 帮我看看还缺什么
       </n-button>
     </div>
 
     <!-- 结构化摘要：老人核对的就是**办理信息**，不是一串转写文本 -->
     <div v-if="draft" class="card" style="font-size:1.25rem;">
-      <b>📋 请您核对这几项</b>
-      <div style="margin-top:8px;">🗣️ 您说的：{{ draft.original_text }}</div>
-      <div style="margin-top:6px;">🔧 问题：{{ draft.fields.title }}</div>
+      <b><EIcon name="clipboard" :size="18" /> 请您核对这几项</b>
+      <div style="margin-top:8px;"><EIcon name="speak" :size="18" /> 您说的：{{ draft.original_text }}</div>
+      <div style="margin-top:6px;"><EIcon name="wrench" :size="18" /> 问题：{{ draft.fields.title }}</div>
       <div style="margin-top:6px;">
-        📍 位置：
+        <EIcon name="pin" :size="18" /> 位置：
         <b v-if="draft.fields.location">{{ draft.fields.location }}</b>
         <span v-else style="color:var(--danger,#c00);">还缺，请在下面补充</span>
         <span class="muted" style="font-size:1rem;">（{{ srcTip(draft.sources.location) }}）</span>
       </div>
       <div style="margin-top:6px;">
-        🏠 责任范围：
+        <EIcon name="home" :size="18" /> 责任范围：
         <b v-if="draft.fields.issue_type === '室内'">您家里（自己家的事）</b>
         <b v-else-if="draft.fields.issue_type === '室外'">公共地方（楼道/电梯等）</b>
         <span v-else style="color:var(--danger,#c00);">还没定，请选一下</span>
@@ -445,30 +446,30 @@ async function checkSubmitted() {
 
       <!-- 缺失项：就地追问（缺什么问什么，缺着就不给提交） -->
       <div v-if="draft.need_more" class="panel-warm" style="margin-top:12px;border-radius:10px;padding:10px;">
-        <b>❓ {{ draft.ask }}</b>
+        <b><EIcon name="question" :size="18" /> {{ draft.ask }}</b>
         <!-- 补充值不够用时说明原因（不能默默不理会老人答的话） -->
         <div v-if="draft.reject_hint" data-reject-hint
              style="color:var(--danger,#c00);font-weight:700;margin-top:6px;font-size:1.15rem;">
-          ⚠️ {{ draft.reject_hint }}
+          <EIcon name="alert" :size="18" /> {{ draft.reject_hint }}
         </div>
         <!-- 系统已经能猜出位置时，给一个"就是它"的大按钮：老人点一下就行，不用打字 -->
         <n-button v-if="draft.suggestion.location" type="primary" block size="large"
                   style="margin-top:8px;min-height:64px;font-size:1.25rem;"
                   @click="answer.location = draft.suggestion.location; recheck()">
-          ✅ 就是这里：{{ draft.suggestion.location }}
+          <EIcon name="checkCircle" :size="18" /> 就是这里：{{ draft.suggestion.location }}
         </n-button>
         <n-input v-model:value="answer.location" placeholder="或者告诉我别的：比如 5号楼二层楼道"
                  size="large" style="font-size:1.2rem;margin-top:8px;" />
         <div style="display:flex;gap:8px;margin-top:8px;">
           <n-button size="large" style="flex:1;min-height:56px;font-size:1.2rem;"
                     :type="answer.scope === '室内' ? 'primary' : 'default'"
-                    @click="answer.scope = '室内'">🏠 是我家里</n-button>
+                    @click="answer.scope = '室内'"><EIcon name="home" :size="18" /> 是我家里</n-button>
           <n-button size="large" style="flex:1;min-height:56px;font-size:1.2rem;"
                     :type="answer.scope === '室外' ? 'primary' : 'default'"
-                    @click="answer.scope = '室外'">🏢 是公共地方</n-button>
+                    @click="answer.scope = '室外'"><EIcon name="building" :size="18" /> 是公共地方</n-button>
         </div>
         <n-button type="primary" block size="large" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
-                  :loading="loadingDraft" @click="recheck">✅ 补充好了，再看一遍</n-button>
+                  :loading="loadingDraft" @click="recheck"><EIcon name="checkCircle" :size="18" /> 补充好了，再看一遍</n-button>
       </div>
 
       <template v-else>
@@ -482,10 +483,10 @@ async function checkSubmitted() {
           </div>
         </div>
         <n-button type="primary" block size="large" style="margin-top:14px;min-height:64px;font-size:1.3rem;"
-                  :loading="submitting" @click="submit">✅ 确认上报</n-button>
+                  :loading="submitting" @click="submit"><EIcon name="checkCircle" :size="18" /> 确认上报</n-button>
         <!-- 结果未知的出口（§6-I5）：不诱导老人重复点提交，而是帮他查清楚 -->
         <n-button v-if="unknownToken" block size="large" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
-                  @click="checkSubmitted">🔍 查一下是否已经提交了</n-button>
+                  @click="checkSubmitted"><EIcon name="search" :size="18" /> 查一下是否已经提交了</n-button>
         <div class="muted" style="margin-top:6px;font-size:1rem;">
           上报后工单进入待审核，负责人会在「我的报修」里回复您。
         </div>
@@ -496,23 +497,23 @@ async function checkSubmitted() {
            翻到页面底下才找到"重新说"等于没有这个入口（实测：手机上一屏根本看不到）。 -->
       <div style="display:flex;gap:8px;margin-top:14px;">
         <n-button size="large" data-restart style="flex:1;min-height:60px;font-size:1.2rem;"
-                  @click="restart">🔄 说错了，重新说</n-button>
+                  @click="restart"><EIcon name="refresh" :size="18" /> 说错了，重新说</n-button>
         <n-button size="large" data-giveup style="flex:1;min-height:60px;font-size:1.2rem;"
-                  @click="giveUp">❌ 先不报修了</n-button>
+                  @click="giveUp"><EIcon name="x" :size="18" /> 先不报修了</n-button>
       </div>
     </div>
 
     <!-- 提交结果：原话 / 系统建议 / 您确认的 / 入库值 四段分开展示（不混成一句"已纠正"） -->
     <div v-if="submitted" class="card" :data-result-via="resultVia || 'submit'"
          style="background:#ecfdf5;font-size:1.2rem;">
-      <b>✅ 已上报（工单号 {{ submitted.issue_id }}）</b>
+      <b><EIcon name="checkCircle" :size="18" /> 已上报（工单号 {{ submitted.issue_id }}）</b>
       <!-- 结果是从"核对"来的就说清楚：老人/家属才知道这条不是当时服务端回的 -->
       <div v-if="resultVia === 'verify'" style="margin-top:6px;font-weight:700;color:var(--ink-info);">
-        📶 刚才网络没回话，工单号是按提交编号**核对**到的真实结果（没有重复上报）
+        <EIcon name="signal" :size="18" /> 刚才网络没回话，工单号是按提交编号**核对**到的真实结果（没有重复上报）
       </div>
-      <div style="margin-top:8px;">🗣️ 您说的：{{ submitted.original_text }}</div>
-      <div style="margin-top:4px;">📍 最终记录的位置：{{ submitted.confirmed.location }}</div>
-      <div style="margin-top:4px;">🏠 责任范围：
+      <div style="margin-top:8px;"><EIcon name="speak" :size="18" /> 您说的：{{ submitted.original_text }}</div>
+      <div style="margin-top:4px;"><EIcon name="pin" :size="18" /> 最终记录的位置：{{ submitted.confirmed.location }}</div>
+      <div style="margin-top:4px;"><EIcon name="home" :size="18" /> 责任范围：
         {{ submitted.confirmed.issue_type === '室内' ? '您家里' : '公共地方' }}</div>
       <div style="margin-top:4px;">⏱️ 紧急程度：{{ submitted.confirmed.urgency }}</div>
       <div class="muted" style="margin-top:6px;font-size:1rem;">
@@ -520,6 +521,6 @@ async function checkSubmitted() {
       </div>
     </div>
 
-    <n-button size="large" block style="margin-top:12px;min-height:56px;" @click="router.push('/elderly/home')">🏠 返回首页</n-button>
+    <n-button size="large" block style="margin-top:12px;min-height:56px;" @click="router.push('/elderly/home')"><EIcon name="home" :size="18" /> 返回首页</n-button>
   </div>
 </template>
