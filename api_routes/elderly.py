@@ -464,6 +464,9 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         location=fields["location"], description=fields["description"],
         urgency=urgency, reporter_name=profile.get("name") or u.get("name") or "老人",
         reporter_phone=phone, reporter_id=uid,
+        # v52：把"每个字段从哪来"一起落库（老人确认过的那份来源），
+        # 否则刷新之后没人能回答"这条位置是老人说的还是我们替他填的"
+        field_sources=r.get("sources") or {},
     )
     if iid <= 0:
         if hint == "safety":

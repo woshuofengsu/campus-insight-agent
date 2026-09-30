@@ -127,7 +127,7 @@ async function sosAction(s, action) {
             <n-tag size="small" :type="m.status === '审核通过' ? 'success' : 'warning'">{{ m.status }}</n-tag>
           </div>
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
-            {{ m.patient_name || '老人' }} · ⏰ {{ m.times }} · {{ m.repeat_rule }}
+            {{ m.patient_name || '老人' }} · <EIcon name="clock" :size="18" /> {{ m.times }} · {{ m.repeat_rule }}
           </div>
           <div v-if="m.status === '待审核'" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
             <n-input v-model:value="auditOp[m.id]" placeholder="审核意见" size="small" style="max-width:200px;" />

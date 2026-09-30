@@ -4,12 +4,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { notices, upload, exportApi } from '../../api'
 import EIcon from '../../components/EIcon.vue'
+import { tokenOnce, dropToken } from '../../utils/idemToken'
 
 const message = useMessage()
 const list = ref([])
 const loading = ref(true)
 const detail = ref(null)
 const files = ref([])
+// 幂等编号（卡8 推广到通知链路）：通知是**一对多**写操作，重复执行 = 全社区各多收一条，
+// 所以"创建/发布/撤回"这些动作都要带编号；同一次意图重试沿用同一个，做成了才清掉。
+const tokens = ref({})
+const tokenOf = (key) => tokenOnce(tokens, key)
 
 const form = ref({
   title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '',
@@ -76,6 +81,8 @@ async function create() {
   if (form.value.is_urgent && !form.value.elderly_summary) return message.warning('紧急通知必填老年端播报摘要')
   if (publishMode.value === 'schedule' && !form.value.scheduled_at) return message.warning('定时发布请选择时间')
   creating.value = true
+  // 这次"创建并发布"是一个意图：连点/网络重试沿用同一个编号（服务端只发一次）
+  const tkey = 'create'
   try {
     // 附件上传
     if (files.value.length) {
@@ -86,7 +93,12 @@ async function create() {
     form.value.scope_target_json = JSON.stringify(
       (form.value.scope_targets || '').split(/[,，]/).map((s) => s.trim()).filter(Boolean),
     )
-    await notices.create({ ...form.value, scheduled_at: publishMode.value === 'schedule' ? form.value.scheduled_at : '' })
+    await notices.create({
+      ...form.value,
+      scheduled_at: publishMode.value === 'schedule' ? form.value.scheduled_at : '',
+      client_token: tokenOf(tkey),
+    })
+    dropToken(tokens, tkey)   // 发成了：这次意图结束，下次是新通知
     message.success(publishMode.value === 'schedule' ? '通知已创建并定时发布' : '通知已创建并发布')
     form.value = { title: '', notice_type: '社区公告', publish_scope: '全体居民', body: '', is_urgent: 0, elderly_summary: '', scheduled_at: '', attachment_json: '[]', scope_target_json: '[]', scope_targets: '' }
     files.value = []
@@ -100,8 +112,10 @@ async function create() {
 }
 
 async function act(n, data, okMsg) {
+  const tkey = `${n.id}:${data.action}`
   try {
-    await notices.action(n.id, data)
+    await notices.action(n.id, { ...data, client_token: tokenOf(tkey) })
+    dropToken(tokens, tkey)   // 做成了：这次意图结束
     message.success(okMsg || '操作成功')
     load()
   } catch (e) {
@@ -205,13 +219,13 @@ async function exportNotices() {
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <n-input v-if="n.status === '已发布'" :value="n.downReason || ''" placeholder="下架原因（必填）" size="small" style="max-width:200px;" @update:value="(v) => (n.downReason = v)" />
           <n-popconfirm v-if="n.status === '已发布'" @positive-click="act(n, { action: 'take_down', reason: n.downReason || '内容更新' }, '已下架')">
-            <template #trigger><n-button size="small" type="warning">⏬ 下架</n-button></template>
+            <template #trigger><n-button size="small" type="warning"><EIcon name="arrowDown" :size="18" /> 下架</n-button></template>
             下架后居民端不再显示，将记录原因，确认？
           </n-popconfirm>
           <n-button v-if="n.status === '已发布' && !n.is_pinned" size="small" @click="act(n, { action: 'pin' }, '已置顶')"><EIcon name="pushpin" :size="18" /> 置顶</n-button>
           <n-button v-if="n.is_pinned" size="small" quaternary @click="act(n, { action: 'unpin' }, '已取消置顶')"><EIcon name="pushpin" :size="18" /> 取消置顶</n-button>
           <n-popconfirm v-if="n.status === '待发布'" @positive-click="act(n, { action: 'withdraw' }, '已撤回为草稿')">
-            <template #trigger><n-button size="small">⏪ 撤回</n-button></template>
+            <template #trigger><n-button size="small"><EIcon name="arrowLeft" :size="18" /> 撤回</n-button></template>
             撤回为草稿？
           </n-popconfirm>
           <n-button v-if="n.status === '待发布'" size="small" type="primary" @click="act(n, { action: 'publish', confirm_urgent: !!n.is_urgent }, '已发布')"><EIcon name="rocket" :size="18" /> 立即发布</n-button>

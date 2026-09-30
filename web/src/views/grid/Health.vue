@@ -278,7 +278,7 @@ async function exportContents() {
               <n-input v-model:value="cOpOf(c).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:220px;" />
               <n-button size="small" type="success" @click="cAct(c, { action: 'audit', approve: true, opinion: cOpOf(c).opinion || '同意' }, '已通过并发布')"><EIcon name="checkCircle" :size="18" /> 通过发布</n-button>
               <n-button size="small" type="warning" @click="cAct(c, { action: 'audit', approve: false, opinion: cOpOf(c).opinion || '请补充' }, '已退回')"><EIcon name="arrowLeft" :size="18" />  退回</n-button>
-              <n-button size="small" quaternary @click="cAct(c, { action: 'withdraw' }, '已撤回审核，转草稿')">⏪ 撤回审核</n-button>
+              <n-button size="small" quaternary @click="cAct(c, { action: 'withdraw' }, '已撤回审核，转草稿')"><EIcon name="arrowLeft" :size="18" /> 撤回审核</n-button>
             </template>
             <template v-if="['草稿'].includes(c.status)">
               <n-popconfirm @positive-click="cAct(c, { action: 'delete' }, '已删除草稿')">

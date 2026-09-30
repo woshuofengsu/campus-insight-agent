@@ -2,7 +2,7 @@
 // 政策问答管理：知识库维护（创建/审核/下架）+ 提问处理（回复）+ 统计与阈值
 import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { knowledge, qa, agent } from '../../api'
+import { knowledge, qa, agent, issues } from '../../api'
 import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
@@ -36,6 +36,7 @@ onMounted(async () => {
     const t = await qa.getThreshold()
     if (t && t.threshold != null) threshold.value = Number(t.threshold)
   } catch { /* 忽略 */ }
+  await loadProfile()   // 同类处置画像：进页面就给一份"全部"的口径
 })
 
 async function transfer(q) {
@@ -139,6 +140,30 @@ async function showVersions(k) {
 const kgQuery = ref('')
 const kgResult = ref(null)
 const kgLoading = ref(false)
+
+// 同类问题处置画像（v52 沉淀）：按分类看历史处置，把经验变成可查询结构
+const profileCat = ref('')
+const profileLoading = ref(false)
+const profile = ref({ category: '全部', days: 180, total: 0, resolved: 0, resolved_rate: 0,
+                      avg_hours: null, overdue: 0, overdue_rate: 0, third_party: 0,
+                      third_party_rate: 0, top_assignees: [], top_keywords: [],
+                      categories: [], note: '' })
+const profileOptions = ref([{ label: '全部分类', value: '' }])
+async function loadProfile() {
+  profileLoading.value = true
+  try {
+    const r = (await issues.knowledge({ category: profileCat.value || '', days: 180 })) || {}
+    profile.value = { ...profile.value, ...r }
+    if (r.categories && r.categories.length) {
+      profileOptions.value = [{ label: '全部分类', value: '' },
+        ...r.categories.map((c) => ({ label: `${c.category}（${c.count}）`, value: c.category }))]
+    }
+  } catch (e) {
+    message.error(e.message)
+  } finally {
+    profileLoading.value = false
+  }
+}
 async function kgSearch() {
   const q = kgQuery.value.trim()
   if (!q) return message.warning('请输入实体，如「3号楼」「电梯」「加装电梯」')
@@ -229,7 +254,7 @@ async function kgSearch() {
               <n-input v-model:value="kOpOf(k).opinion" placeholder="审核意见（退回必填）" size="small" style="max-width:220px;" />
               <n-button size="small" type="success" @click="kAct(k, { action: 'audit', approve: true, opinion: kOpOf(k).opinion || '同意' }, '已通过发布')"><EIcon name="checkCircle" :size="18" /> 通过</n-button>
               <n-button size="small" type="warning" @click="kAct(k, { action: 'audit', approve: false, opinion: kOpOf(k).opinion || '请补充' }, '已退回')"><EIcon name="arrowLeft" :size="18" />  退回</n-button>
-              <n-button size="small" quaternary @click="kAct(k, { action: 'withdraw' }, '已撤回审核，转草稿')">⏪ 撤回审核</n-button>
+              <n-button size="small" quaternary @click="kAct(k, { action: 'withdraw' }, '已撤回审核，转草稿')"><EIcon name="arrowLeft" :size="18" /> 撤回审核</n-button>
               <n-popconfirm @positive-click="kAct(k, { action: 'delete' }, '已删除草稿')">
                 <template #trigger><n-button size="small" quaternary type="error"><EIcon name="trash" :size="18" /> 删除</n-button></template>
                 确认删除该草稿？
@@ -261,7 +286,7 @@ async function kgSearch() {
           <div class="muted" style="font-size:0.85rem;margin-top:4px;">
             {{ q.nickname_masked || q.nickname || '居民' }} · {{ q.q_type }} · {{ (q.created_at || '').slice(0, 16) }}
             <span v-if="q.remaining_hours != null" :style="q.overdue ? 'color:var(--ink-danger);font-weight:700;' : ''">
-              · {{ q.overdue ? `⏰ 超时 ${Math.abs(q.remaining_hours).toFixed(1)}h` : `⏳ 剩 ${q.remaining_hours.toFixed(1)}h` }}
+              · {{ q.overdue ? `超时 ${Math.abs(q.remaining_hours).toFixed(1)}h` : `剩 ${q.remaining_hours.toFixed(1)}h` }}
             </span>
           </div>
           <div v-if="q.auto_answer" style="margin-top:6px;font-size:0.9rem;"><EIcon name="robot" :size="18" /> 自动回答：{{ q.auto_answer }}</div>
@@ -279,6 +304,38 @@ async function kgSearch() {
       </n-tab-pane>
 
       <n-tab-pane name="kg" tab="知识图谱">
+        <!-- 同类问题处置画像（v52 沉淀）：把散在处置说明里的经验变成可查询结构 -->
+        <div class="card" style="margin-bottom:12px;" data-category-profile>
+          <div style="font-weight:700;margin-bottom:6px;"><EIcon name="chart" :size="18" /> 同类问题处置画像</div>
+          <div class="muted" style="font-size:0.85rem;margin-bottom:10px;">
+            按分类看历史：办结率 / 平均时长 / 超时率 / 第三方责任占比 / 常见责任方 / 常见处置关键词。
+            样本不足会明确标注，不拿两三条记录当规律。
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <n-select v-model:value="profileCat" :options="profileOptions" style="width:170px;"
+                      @update:value="loadProfile" />
+            <n-button type="primary" :loading="profileLoading" @click="loadProfile">查询</n-button>
+            <span class="muted" style="font-size:0.82rem;align-self:center;">
+              近 {{ profile.days }} 天 · 共 {{ profile.total }} 单
+            </span>
+          </div>
+          <div v-if="profile.total" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;">
+            <div><div style="font-weight:800;font-size:1.2rem;">{{ profile.resolved_rate }}%</div><div class="muted" style="font-size:0.8rem;">办结率（{{ profile.resolved }}/{{ profile.total }}）</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;">{{ profile.avg_hours ?? '—' }}</div><div class="muted" style="font-size:0.8rem;">平均处理小时</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;">{{ profile.overdue_rate }}%</div><div class="muted" style="font-size:0.8rem;">超时率（{{ profile.overdue }} 单）</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;">{{ profile.third_party_rate }}%</div><div class="muted" style="font-size:0.8rem;">第三方责任</div></div>
+          </div>
+          <div v-if="profile.total" style="margin-top:8px;font-size:0.85rem;">
+            <div v-if="profile.top_assignees.length">
+              常见责任方：<b v-for="a in profile.top_assignees" :key="a.name" style="margin-right:10px;">{{ a.name }}（{{ a.count }}）</b>
+            </div>
+            <div v-if="profile.top_keywords.length" class="muted" style="margin-top:4px;">
+              常见处置关键词：{{ profile.top_keywords.map(k => k[0]).join(' · ') }}
+            </div>
+            <div v-if="profile.note" style="color:var(--ink-warning);margin-top:4px;">{{ profile.note }}</div>
+          </div>
+        </div>
+
         <div class="card" style="margin-bottom:12px;">
           <div style="font-weight:700;margin-bottom:6px;"><EIcon name="network" :size="18" /> 实体关联查询</div>
           <div class="muted" style="font-size:0.85rem;margin-bottom:10px;">
@@ -384,7 +441,7 @@ async function kgSearch() {
         </div>
 
         <div class="card" v-if="stats && stats.expiring && stats.expiring.length">
-          <div style="font-weight:700;margin-bottom:8px;">⏳ 7 天内到期知识条目</div>
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="hourglass" :size="18" /> 7 天内到期知识条目</div>
           <div v-for="e in stats.expiring" :key="e.id" style="padding:4px 0;display:flex;justify-content:space-between;">
             <span>{{ e.title }}</span>
             <span class="muted" style="font-size:0.85rem;">到期 {{ e.expire_date }}</span>

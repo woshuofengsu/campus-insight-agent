@@ -77,6 +77,32 @@ def _validate_phone(phone: str) -> bool:
     return bool(_PHONE_RE.match(phone or ""))
 
 
+#: 字段来源的**白名单**（与 `utils/elderly_report` 的 sources 取值一致）——
+#: 只认这几个值，别的值一律丢掉：这张表是拿来做"不许编造"事后审计的，脏值比空值更危险。
+ALLOWED_FIELD_SOURCES = ("user", "text", "profile", "suggestion", "default", "form", "agent")
+#: 允许记住来源的字段（工单的四个结构化字段，与提交契约一一对应）
+FIELD_SOURCE_KEYS = ("title", "location", "scope", "urgency")
+
+
+def _clean_field_sources(sources: dict | None) -> str:
+    """把"字段 → 来源"清洗成可入库的 JSON（超长/未知来源/未知字段一律丢弃）。
+
+    ⚠️ 只存**来源标签**，不存字段值本身——字段值已经在工单行里了，
+    再存一份等于多一处会不同步的副本（本项目反复踩过这个坑）。
+    """
+    if not isinstance(sources, dict):
+        return ""
+    out: dict[str, str] = {}
+    for k, v in sources.items():
+        key = str(k or "").strip()
+        val = str(v or "").strip()
+        if key in FIELD_SOURCE_KEYS and val in ALLOWED_FIELD_SOURCES:
+            out[key] = val
+    if not out:
+        return ""
+    return json.dumps(out, ensure_ascii=False)[:400]
+
+
 def _status_color(status: str) -> str:
     """状态 → 颜色标签（居民端/负责人端一致）。"""
     colors = {
@@ -146,7 +172,8 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
                  photo_before: str = "[]", is_agent_report: int = 0,
                  agent_name: str = "", agent_phone: str = "", agent_relation: str = "",
                  draft_id: int | None = None,
-                 allow_missing_phone: bool = False) -> tuple[int, str]:
+                 allow_missing_phone: bool = False,
+                 field_sources: dict | None = None) -> tuple[int, str]:
     """提交报修。返回 (工单 ID, 提示语)。
 
     校验必填项、手机号格式；识别特殊情况；信息齐全生成工单（状态待审核）。
@@ -155,10 +182,16 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
     传 True 表示"允许没有电话"（存空串、页面显示未留电话）——
     **绝不允许调用方编一个号码**（历史上有写死 `13800000000` 的，那是编造数据：
     工单里躺着一个打不通的号，页面却显示"已受理"）。
+
+    `field_sources`（v52）：提交那一刻"每个字段从哪来"（用户说的 / 文本抽取 / 档案 / 系统建议 / 默认），
+    来自 `utils/elderly_report` 的 `sources`。**落库**而不是只显示一次——
+    否则事后无法回答"这条位置是老人自己说的，还是我们替他填的"（见 `_m52_issue_field_sources`）。
+    只允许白名单里的来源值，多余键值一律丢掉（不让脏数据进这张要审计的表）。
     """
     title = scrub_field(title, "issue.title")
     location = scrub_field(location, "issue.location")
     description = scrub_field(description, "issue.description")
+    sources_json = _clean_field_sources(field_sources)
     # 校验
     if not title or not description or not location:
         return 0, "报修标题、地址和问题描述都不能为空，请补充完整。"
@@ -201,12 +234,12 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
             "description, urgency, status, reporter_id, reporter_name, reporter_phone, "
             "photo_before, is_agent_report, agent_name, agent_phone, agent_relation, "
             "is_violation, non_community_responsibility, "
-            "reporter_phone_enc, agent_phone_enc) "
-            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?)",
+            "reporter_phone_enc, agent_phone_enc, field_sources) "
+            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?)",
             (title, category, issue_type, location, description, urgency, reporter_id,
              reporter_name, photo_before, is_agent_report,
              agent_name, agent_relation, is_violation, non_resp,
-             _enc_phone(reporter_phone), _enc_phone(agent_phone)),
+             _enc_phone(reporter_phone), _enc_phone(agent_phone), sources_json),
         )
         issue_id = cur.lastrowid
         # 多租户（v48）：写入侧必须落租户——报修人

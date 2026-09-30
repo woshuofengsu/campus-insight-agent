@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1038 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1057 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -19,7 +19,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ```
 
 - **主服务**：`uvicorn api_web:app --port 8000`（FastAPI）
-- **数据库**：SQLite（`data/community_insight.db`），schema **v51**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
+- **数据库**：SQLite（`data/community_insight.db`），schema **v52**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
 
 ## 多智能体核心（9 个声明式角色）
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1038 项：1037 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1057 项：1056 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -54,7 +54,7 @@ elderly:  demo_elderly（免登录）
 ## 数据库迁移约定
 
 - schema 版本在 `data/db_core.py`，迁移函数命名 `_m{N}_{name}`，注册进 `post` 列表（`(version, name, fn)`），幂等（`_add_column` 用 PRAGMA 检查）
-- **当前版本 v51**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
+- **当前版本 v52**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
 - 迁移脚本放 `scripts/`（照 `migrate_phone_encryption_v39.py` 模式：含 `_ensure_db()`、可回滚 `--rollback`、幂等）
 - **D12（评审建议）**：`data/db_policy.proposal/elderly_care/health_content/weather/notice` 各 800–1240 行，**比赛期不做大重构**；答辩后按 read/write 拆分（纯计算抽 `data/_*_logic.py` + 单测），其结构写入 WS11
 
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1038 项测试**（1037 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1057 项测试**（1056 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -168,7 +168,7 @@ elderly:  demo_elderly（免登录）
 | `agent/orchestrator.py` | 多 Agent 编排（黑板、协商、Verifier/Arbiter 接入、转人工）|
 | `agent/roles/business_agents.py` | 5 个业务角色（报修/提案/政策/健康/通知）|
 | `agent/roles/auto_agents.py` | 天气守护 + 网格助手 |
-| `data/db_core.py` | schema + 迁移注册（**v51**）|
+| `data/db_core.py` | schema + 迁移注册（**v52**）|
 | `web/src/views/{resident,grid,elderly}/` | 三端页面 |
 | `docs/mobile-deploy.md` | 移动端部署 + 发布检查清单 |
 | `scripts/serve_public.py` | **本机常开一键工具**：起服务（默认只绑 127.0.0.1）+ 公网 HTTPS 隧道 + 抓新域名 + 刷新扫码页（`--status` / `--stop` / `--lan` / `--autostart`）|
@@ -212,5 +212,10 @@ elderly:  demo_elderly（免登录）
   `components/EIcon.vue` 全站通用 + `utils/weatherIcon.js`（天气图标改由文字选图标，后端数据没动）；
   门禁 `tests/test_no_emoji_ui.py`（0 emoji / 图标名必须存在 / 必须 currentColor 与 aria-hidden / 扫描器自检）
   （见 dev-log **六十** 节）
+- **计划内欠账清账（2026-09-29 深夜，v4 §6 B 栏清空）**：`senior_manager_ids` **前端入口**（天气管理页 +
+  按社区分键、只收本社区负责人）· 通知创建/操作**接幂等键**（前端统一 `utils/idemToken.js`；
+  编号不合规要告警，别静默不幂等）· **重复报修率 + 转人工原因分布**（`/agent/governance-metrics`，
+  工作台"治理指标"卡）· **字段来源落库 + 同类处置画像**（迁移 **v52**、`/issues/{id}/field-sources`、
+  `/issues/knowledge`；样本 <5 标注"样本不足"）（见 dev-log **六十一** 节）
 
-详见 `docs/spec/dev-log.md`（最新 **六十** 节）。
+详见 `docs/spec/dev-log.md`（最新 **六十一** 节）。

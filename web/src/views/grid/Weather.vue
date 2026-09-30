@@ -48,6 +48,7 @@ onMounted(async () => {
   try { history.value = (await weather.history({ limit: 200 })) || [] } catch { /* 忽略 */ }
   try { overview.value = (await weather.overview({ limit: 50 })) || [] } catch { /* 忽略 */ }
   try { exLogs.value = (await weather.exceptionLogs({ limit: 100 })) || [] } catch { /* 忽略 */ }
+  await loadSenior()
 })
 
 async function confirm(t) {
@@ -56,6 +57,35 @@ async function confirm(t) {
     item, status: '已检查',
   }))
   confirmTask.value = { ...t, items, note: '' }
+}
+
+// ---- 超时升级通知名单（第 2 层）：原来只有程序化配置、没有入口，这里把它接上 ----
+const seniorIds = ref([])
+const seniorCandidates = ref([])
+const seniorScope = ref('')
+const savingSenior = ref(false)
+
+async function loadSenior() {
+  try {
+    const r = (await weather.seniorManagers()) || {}
+    seniorIds.value = r.ids || []
+    seniorCandidates.value = r.candidates || []
+    seniorScope.value = r.scope || ''
+  } catch { /* 读不到就不显示候选，保存仍会被后端 fail-closed 拦住 */ }
+}
+
+async function saveSenior() {
+  savingSenior.value = true
+  try {
+    const r = (await weather.setSeniorManagers(seniorIds.value)) || {}
+    seniorIds.value = r.ids || []
+    message.success(`已保存（${seniorIds.value.length} 人）`)
+    await loadSenior()
+  } catch (e) {
+    message.error(e.message)
+  } finally {
+    savingSenior.value = false
+  }
 }
 
 async function submitConfirm() {
@@ -81,8 +111,8 @@ function remainingText(t) {
     const created = new Date((t.created_at || '').replace(' ', 'T'))
     const remain = 3 - (Date.now() - created.getTime()) / 3600000
     if (remain < 0) return { text: '已超时', cls: 'background:#fef2f2;color:var(--ink-danger);' }
-    if (remain < 1) return { text: `⏰ ${remain.toFixed(1)}h 内需确认`, cls: 'background:#fef2f2;color:var(--ink-danger);' }
-    return { text: `⏳ 剩余 ${remain.toFixed(1)}h`, cls: 'background:#f0fdf4;color:var(--ink-success);' }
+    if (remain < 1) return { text: `${remain.toFixed(1)}h 内需确认`, cls: 'background:#fef2f2;color:var(--ink-danger);' }
+    return { text: `剩余 ${remain.toFixed(1)}h`, cls: 'background:#f0fdf4;color:var(--ink-success);' }
   } catch {
     return { text: '', cls: '' }
   }
@@ -100,6 +130,32 @@ function remainingText(t) {
           <b>当前：{{ w.condition }} {{ w.temp_low }}°~{{ w.temp_high }}°</b>
           <span class="muted" style="margin-left:8px;">{{ w.wind }} · <EIcon name="droplet" :size="18" /> {{ w.rain_prob }}%</span>
           <div v-if="w.note" style="color:var(--ink-danger);font-size:0.85rem;margin-top:6px;"><EIcon name="alert" :size="18" /> {{ w.note }}</div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:8px;"><EIcon name="users" :size="18" /> 超时升级通知名单（第 2 层）</div>
+          <div class="muted" style="font-size:0.85rem;margin-bottom:8px;">
+            检查任务 3 小时未确认时，先通知本社区负责人；仍无人处理时再通知这里的名单。
+            名单**按本社区保存**，候选人只列本社区负责人（跨社区的 id 会被拒绝）。
+          </div>
+          <div v-if="seniorCandidates.length === 0" class="muted" style="font-size:0.85rem;">
+            暂时读不到本社区负责人名单（可能是负责人未登记所属社区）。
+          </div>
+          <n-checkbox-group v-else v-model:value="seniorIds" data-senior-managers>
+            <n-space>
+              <n-checkbox v-for="c in seniorCandidates" :key="c.id" :value="c.id"
+                          :label="`${c.name || c.username || ('#' + c.id)}（${c.role || '负责人'}）`" />
+            </n-space>
+          </n-checkbox-group>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <n-button size="small" type="primary" :loading="savingSenior" @click="saveSenior">
+              <EIcon name="save" :size="18" /> 保存名单
+            </n-button>
+            <span class="muted" style="font-size:0.82rem;" data-senior-scope>
+              当前生效范围：{{ seniorScope }} · 已选 {{ seniorIds.length }} 人
+              <template v-if="seniorIds.length === 0">（空名单 = 超时后无法升级，只会保持最高优先级告警）</template>
+            </span>
+          </div>
         </div>
 
         <div class="card" v-if="alerts.length">

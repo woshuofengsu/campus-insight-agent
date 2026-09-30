@@ -176,6 +176,38 @@ def issue_safety_reminders(request: Request, limit: int = 100):
     return _ok(get_safety_reminders(limit=limit))
 
 
+# ---- 工单知识（v52 沉淀：字段来源 + 同类处置画像）----
+# 必须注册在 `/{issue_id}` 之前，否则 `/knowledge` 会被动态路由当成 issue_id 吃掉。
+
+@router.get("/knowledge")
+def issue_knowledge(request: Request, category: str = "", days: int = 180):
+    """**同类问题处置画像**：条数 / 办结率 / 平均时长 / 超时率 / 第三方占比 / 常见责任方 / 常见处置词。
+
+    给谁用：新来的网格员想先看看"这类事以前一般怎么处理"；以及答辩时回答
+    "你们的处置结果有没有沉淀成可查询的数据"——这条就是。
+    样本量低于阈值会如实标注"样本不足"，不让人拿两条记录当规律。
+    """
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_issue_knowledge import category_profile
+    return _ok(category_profile(category=category, days=days, tenant=_tenant(request)))
+
+
+@router.get("/{issue_id}/field-sources")
+def issue_field_sources_get(issue_id: int, request: Request):
+    """单条工单的**字段来源**（问题/位置/责任范围/紧急程度分别从哪来）。
+
+    为什么单列：这是"不许编造"最需要事后可审计的东西——位置到底是老人自己说的、
+    还是系统按档案替他填的，出事时要能查出来。网页表单直接填写的单没有来源记录，会如实说明。
+    """
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    if not _same_tenant(request, "community_issues", issue_id):
+        return _fail(1003, "无权限查看该工单（非本社区）")
+    from data.db_issue_knowledge import issue_field_sources
+    return _ok(issue_field_sources(issue_id, tenant=_tenant(request)))
+
+
 # ---- 报修草稿（必须注册在 /{issue_id} 之前，避免被动态路由遮蔽） ----
 
 @router.get("/drafts")

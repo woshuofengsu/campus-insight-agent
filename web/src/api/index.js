@@ -30,7 +30,7 @@ api.interceptors.response.use(
       localStorage.removeItem('ci_user')
       if (!location.pathname.startsWith('/login')) location.href = '/login'
     }
-    // <EIcon name="alert" :size="18" /> 必须 reject 一个 **Error**（而不是字符串）：页面里普遍写的是
+    // 注意：必须 reject 一个 **Error**（而不是字符串）：页面里普遍写的是
     // `catch (e) { message.error(e.message) }`，如果这里 reject 字符串，
     // `e.message` 就是 undefined —— 结果"接口 500 / 断网"时**什么都不提示**，
     // 页面还常常显示"暂无数据"，等于把失败说成了"没有数据"（实测踩到：
@@ -59,6 +59,9 @@ export const issues = {
   saveDraft: (data) => api.post('/issues/drafts', data),
   deleteDraft: (id) => api.delete(`/issues/drafts/${id}`),
   safetyReminders: (params) => api.get('/issues/safety-reminders', { params }),
+  // 工单知识（v52 沉淀）：同类处置画像 + 单条工单的字段来源
+  knowledge: (params) => api.get('/issues/knowledge', { params }),
+  fieldSources: (id) => api.get(`/issues/${id}/field-sources`),
 }
 
 // 提案
@@ -93,6 +96,9 @@ export const weather = {
   history: (params) => api.get('/weather/history', { params }),
   overview: (params) => api.get('/weather/overview', { params }),
   exceptionLogs: (params) => api.get('/weather/exception-logs', { params }),
+  // 升级通知名单（超时后第 2 层通知谁）：按社区配置，候选人只来自本社区负责人
+  seniorManagers: () => api.get('/weather/senior-managers'),
+  setSeniorManagers: (ids) => api.post('/weather/senior-managers', { ids }),
 }
 
 // 政策
@@ -223,6 +229,7 @@ export const agent = {
   resolveHandoff: (id) => api.post(`/agent/handoffs/${id}/resolve`),
   llmUsage: (params) => api.get('/agent/llm-usage', { params }),
   selfResolution: (params) => api.get('/agent/self-resolution', { params }),
+  governanceMetrics: (params) => api.get('/agent/governance-metrics', { params }),
   kbHealth: (params) => api.get('/agent/kb-health', { params }),
   careMetrics: (params) => api.get('/agent/care-metrics', { params }),
   kgEntity: (name, params) => api.get('/agent/kg/entity', { params: { name, ...(params || {}) } }),

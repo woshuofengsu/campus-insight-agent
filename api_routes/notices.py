@@ -23,6 +23,9 @@ class NoticeCreate(BaseModel):
     scheduled_at: str = Field(default="")
     attachment_json: str = Field(default="[]")
     scope_target_json: str = Field(default="[]")
+    # 幂等键（卡8 推广）：前端每次"点发布"生成一次，网络重试沿用同一个。
+    # 不带也能用（老客户端），但带上就能保证"连点两下只发一条通知"。
+    client_token: str = Field(default="", max_length=64)
 
 
 @router.post("")
@@ -31,8 +34,39 @@ def web_notice_create(req: NoticeCreate, request: Request):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     actor = _user(request).get("name") or "负责人"
+    uid = _user(request).get("uid") or 0
+    # 幂等（卡8 推广到通知链路）：通知是**一对多**的写操作（发一次 = 全社区收一条），
+    # 重复执行不只是"多一条记录"，而是**所有居民/老人各多收一条**，所以这条链路最该有幂等。
+    scope = "notice_create"
+    reserved = False
+    if req.client_token:
+        from data.db_idempotency import begin, valid_key, wait_result
+        if not valid_key(req.client_token):
+            # 编号格式不合规（服务端要求 8–64 位 [A-Za-z0-9_-]）→ **不能静默当没带**：
+            # 静默的后果是"以为有幂等、其实没有"。这里如实告警，并继续按无编号处理（旧客户端不受影响）。
+            _log.warning("通知创建的幂等编号格式不合规（%s 位），本次按无编号处理：%s",
+                         len(req.client_token), req.client_token[:12])
+            req.client_token = ""
+    if req.client_token:
+        state, prev = begin(scope, req.client_token, uid)
+        if state == "done":
+            _log.info("通知重复创建（幂等命中）：uid=%s token=%s", uid, req.client_token)
+            return _ok({**(prev or {}), "duplicate": True}, "这条通知已经创建过了")
+        if state == "pending":
+            prev = wait_result(scope, req.client_token, uid, timeout=8)
+            if prev is not None:
+                return _ok({**(prev or {}), "duplicate": True}, "这条通知已经创建过了")
+            return _fail(2003, "这条通知正在创建中，请稍等几秒后再看结果。")
+        if state == "unknown":
+            # 占位没做成 → fail-closed：通知发出去就收不回来（居民端已经收到推送），
+            # 无法确认"是不是已经发过了"时宁可让负责人刷新列表确认。
+            return _fail(2003, "创建状态暂时无法确认（系统繁忙），请刷新通知列表确认是否已发布，不要重复点。")
+        reserved = True
     # 紧急通知权限白名单（方案权限矩阵：仅紧急通知发布人）
     if req.is_urgent and not can_publish_urgent(_user(request).get("uid")):
+        if reserved:
+            from data.db_idempotency import release
+            release(scope, req.client_token, uid)
         return _fail(1003, "您无权发布紧急通知（仅指定负责人）")
     nid = create_notice(
         title=req.title, notice_type=req.notice_type, publish_scope=req.publish_scope,
@@ -42,6 +76,9 @@ def web_notice_create(req: NoticeCreate, request: Request):
         actor=actor, publisher_id=_user(request).get("uid"),
     )
     if nid <= 0:
+        if reserved:
+            from data.db_idempotency import release
+            release(scope, req.client_token, uid)
         return _fail(2001, "通知类型或敏感词校验不通过")
     # 定时 / 立即发布
     if req.scheduled_at:
@@ -49,12 +86,21 @@ def web_notice_create(req: NoticeCreate, request: Request):
         ok_, msg = schedule_notice(nid, req.scheduled_at, _user(request).get("uid"), actor,
                                    confirm_urgent=bool(req.is_urgent))
         if not ok_:
+            if reserved:
+                from data.db_idempotency import release
+                release(scope, req.client_token, uid)
             return _fail(2001, msg)
     elif req.notice_type != "紧急通知":
         from data.db_notice import publish_notice
         ok_, msg = publish_notice(nid, _user(request).get("uid"), actor)
         if not ok_:
+            if reserved:
+                from data.db_idempotency import release
+                release(scope, req.client_token, uid)
             return _fail(2001, msg)
+    if reserved:
+        from data.db_idempotency import remember
+        remember(scope, req.client_token, uid, {"notice_id": nid})
     return _ok({"notice_id": nid}, "通知已创建")
 
 
@@ -92,6 +138,8 @@ class NoticeAction(BaseModel):
     scheduled_at: str = Field(default="")
     reason: str = Field(default="")
     confirm_urgent: bool = Field(default=False)
+    # 幂等键（卡8 推广）：同一次"点发布/撤回/下架"重试沿用同一个 token
+    client_token: str = Field(default="", max_length=64)
 
 
 @router.post("/{nid}/action")
@@ -110,7 +158,37 @@ def web_notice_action(nid: int, req: NoticeAction, request: Request):
     if not _same_tenant(request, "notices", nid):
         return _fail(1003, "无权限操作该通知（非本社区）")
     actor = u.get("name") or "负责人"
+    uid = u.get("uid") or 0
     a = req.action
+    # 幂等（卡8 推广）：**发布类**动作连点两下会让全社区各收两条；
+    # 撤回/下架/置顶这类"改状态"的动作重复执行不会多出东西，但同样按 token 挡一层，
+    # 免得"以为失败了又点一次"之后状态被反复翻转。
+    scope = f"notice_{a}"
+    reserved = False
+    if req.client_token and a != "mark_read":
+        from data.db_idempotency import begin, valid_key, wait_result
+        if not valid_key(req.client_token):
+            _log.warning("通知操作的幂等编号格式不合规（%s 位），本次按无编号处理：%s",
+                         len(req.client_token), req.client_token[:12])
+        else:
+            state, prev = begin(scope, req.client_token, uid)
+            if state == "done":
+                _log.info("通知重复操作（幂等命中）：uid=%s token=%s action=%s", uid, req.client_token, a)
+                return _ok({**(prev or {}), "duplicate": True}, f"这个操作已经做过了：{a}")
+            if state == "pending":
+                prev = wait_result(scope, req.client_token, uid, timeout=8)
+                if prev is not None:
+                    return _ok({**(prev or {}), "duplicate": True}, f"这个操作已经做过了：{a}")
+                return _fail(2003, "这个操作正在处理中，请稍等几秒后再看结果。")
+            if state == "unknown":
+                return _fail(2003, "操作状态暂时无法确认（系统繁忙），请刷新后确认结果，不要重复点。")
+            reserved = True
+
+    def _drop():
+        if reserved:
+            from data.db_idempotency import release
+            release(scope, req.client_token, uid)
+
     try:
         if a == "publish":
             ok_, msg = publish_notice(nid, u.get("uid"), actor, confirm_urgent=req.confirm_urgent)
@@ -131,14 +209,24 @@ def web_notice_action(nid: int, req: NoticeAction, request: Request):
         elif a == "delete":
             delete_notice(nid, actor)
             invalidate_notices()
+            if reserved:
+                from data.db_idempotency import remember
+                remember(scope, req.client_token, uid, {"notice_id": nid})
             return _ok({"notice_id": nid}, "已删除")
         else:
+            _drop()
             return _fail(1001, "不支持的操作")
     except Exception as e:  # noqa: BLE001
         _log.warning("通知操作异常：%s", e)
+        _drop()
         return _fail(2001, "操作失败，请稍后再试")
     if not ok_:
+        # 没做成 → 放掉占位，让同一次点击可以重试
+        _drop()
         return _fail(2001, msg or "操作被拒绝")
+    if reserved:
+        from data.db_idempotency import remember
+        remember(scope, req.client_token, uid, {"notice_id": nid, "action": a})
     invalidate_notices()
     return _ok({"notice_id": nid}, msg or "操作成功")
 

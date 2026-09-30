@@ -447,3 +447,97 @@ def get_self_resolution_stats(days: int = 30, tenant: str | None = None) -> dict
             "ai_self_resolution_rate": ai_rate,
             "total_issues": total_issues, "done_issues": done_issues,
             "issue_self_resolution_rate": issue_rate}
+
+
+# ---------------------------------------------------------------------------
+# 治理指标（v4 §5 壁垒层四的"下一步"）：重复报修率 + 转人工原因分布
+#
+# 为什么这两项（都是评委最容易追问的治理问题）：
+#   · **重复报修率**回答"同一件事是不是被反复报"——它衡量"办没办到根上"，
+#     比办结率更接近居民体感（办结率 100% 也可能是同一个路灯坏了三次各结一次）。
+#   · **转人工原因分布**回答"AI 到底卡在哪"——只报"转人工 N 次"说明不了问题，
+#     要看是"安全红线"还是"库里没依据"还是"用户自己要求人工"，前者要改口径、后者要补语料。
+#
+# 口径纪律（写死在这里，材料里照抄）：
+#   · 重复报修 = **同一报告人 + 同一分类**在窗口内出现在 **≥2 个不同日期**；
+#     分母 = 窗口内本社区工单数。按"天"去重是刻意的：同一分钟内连点两次不算重复报修
+#     （那是幂等该管的事），跨天的再次报修才是"这事没办到根上"。
+#   · 转人工原因按**库里已有的编码字段**归类（`agent_handoffs.reason`，空则用 `intent`），
+#     不按自然语言猜；另外单列"政策问答转人工"（`policy_questions.status='已转人工'`）。
+# ---------------------------------------------------------------------------
+
+#: 转人工原因的展示顺序（材料里照这个顺序讲；认不出的原因归"其它"，不丢样本）
+TRANSFER_REASON_ORDER = ["安全红线", "无依据", "主动要求", "其它"]
+
+
+def _transfer_bucket(handoff_reason: str) -> str:
+    """把 `agent_handoffs.reason` 归到四类桶里（口径见本段注释）。
+
+    为什么要分桶而不是直接列原文：原文是给人看的一句话（"校验拦截：无法自动裁决，转人工处理"），
+    直接统计会得到一堆各不相同的句子、看不出结构；分桶后每个桶都能对应一条改进动作。
+
+    ⚠️ 判断**顺序**有讲究（实测踩到）：先判"主动要求"会把
+    「校验拦截：无法自动裁决，转人工处理」也算成主动要求——因为几乎所有原因里都有"转人工"三个字。
+    所以先判**安全红线**、再判**无依据**（这两类的关键词是原因特有的），最后才判主动要求。
+    """
+    r = (handoff_reason or "").strip()
+    if any(k in r for k in ("疑似紧急", "症状", "健康", "医疗", "安全", "停机点")):
+        return "安全红线"
+    if any(k in r for k in ("无依据", "没有依据", "库里", "未命中", "低分", "弱证据",
+                            "无法自动裁决", "校验拦截")):
+        return "无依据"
+    if any(k in r for k in ("用户主动", "主动要求", "请求人工", "自己要求")):
+        return "主动要求"
+    return "其它"
+
+
+def get_governance_metrics(days: int = 30, tenant: str | None = None) -> dict:
+    """治理指标：重复报修率 + 转人工原因分布（**只算本社区**，派生指标不跨社区汇总）。"""
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    targs: list = []
+    tc = tenant_clause(tenant, targs)
+    empty = {"days": days,
+             "repeat": {"total": 0, "repeat_groups": 0, "repeat_issues": 0, "rate": 0.0, "top": []},
+             "transfer": {"total": 0, "by_reason": {k: 0 for k in TRANSFER_REASON_ORDER},
+                          "by_source": {}, "top": []}}
+    if tc is None:
+        return empty
+    with get_db() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) c FROM community_issues WHERE reported_at>=?{tc}",
+            (since, *targs)).fetchone()["c"]
+        groups = conn.execute(
+            "SELECT reporter_id, category, COUNT(DISTINCT date(reported_at)) d, COUNT(*) n"
+            f" FROM community_issues WHERE reported_at>=?{tc}"
+            " GROUP BY reporter_id, category HAVING d>=2 ORDER BY n DESC, d DESC LIMIT 200",
+            (since, *targs)).fetchall()
+        repeat_issues = sum(int(g["n"] or 0) for g in groups)
+        top = [{"reporter_id": g["reporter_id"], "category": g["category"],
+                "days": int(g["d"] or 0), "count": int(g["n"] or 0)} for g in groups[:8]]
+        # 转人工：处理包原因（编码字段）→ 分桶；空原因用 intent 兜底
+        handoffs = conn.execute(
+            "SELECT COALESCE(NULLIF(reason,''), NULLIF(intent,''), '') r, COUNT(*) c"
+            f" FROM agent_handoffs WHERE created_at>=?{tc} GROUP BY r",
+            (since, *targs)).fetchall()
+        h_total = sum(int(h["c"] or 0) for h in handoffs)
+        by_bucket = {k: 0 for k in TRANSFER_REASON_ORDER}
+        for h in handoffs:
+            by_bucket[_transfer_bucket(h["r"])] += int(h["c"] or 0)
+        # 政策问答转人工（老链路：`ask_question` 里转人工的提问）
+        try:
+            pq = conn.execute(
+                "SELECT COUNT(*) c FROM policy_questions WHERE created_at>=? AND status='已转人工'"
+                + (" AND tenant_id=?" if tc else ""),
+                (since, *targs)).fetchone()["c"]
+        except Exception as e:  # noqa: BLE001
+            _log.warning("政策转人工计数失败（按 0 计）：%s", e)
+            pq = 0
+    rate = round(repeat_issues / total * 100, 1) if total else 0.0
+    return {
+        "days": days,
+        "repeat": {"total": total, "repeat_groups": len(groups), "repeat_issues": repeat_issues,
+                   "rate": rate, "top": top},
+        "transfer": {"total": h_total + pq, "by_reason": by_bucket,
+                     "by_source": {"处理包": h_total, "政策问答": pq},
+                     "top": [(k, v) for k, v in by_bucket.items() if v]},
+    }

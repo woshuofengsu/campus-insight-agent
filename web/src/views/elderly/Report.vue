@@ -15,6 +15,7 @@ import { useMessage } from 'naive-ui'
 import { elderly } from '../../api'
 import { useSpeech, speechCapability, reasonText } from '../../composables/useSpeech'
 import EIcon from '../../components/EIcon.vue'
+import { newToken } from '../../utils/idemToken'
 
 const router = useRouter()
 const message = useMessage()
@@ -23,7 +24,7 @@ const { recognize, speak, stopListening, stopSpeaking } = useSpeech()
 // 未提交草稿由服务端按用户保存；浏览器不再保存原话、位置等正文。
 // 共享设备换人时，接口按当前会话 uid 查询，避免 localStorage/sessionStorage 被篡改后越权展示。
 const resumeOffer = ref(null)     // 待恢复的草稿摘要（有值才显示恢复卡）
-const speaking = ref(false)       // 正在播报（用于显示「⏹ 别念了」）
+const speaking = ref(false)       // 正在播报（用于显示「别念了」）
 
 async function saveDraft() {
   const t = (text.value || '').trim()
@@ -126,7 +127,7 @@ async function say(text) {
   return ok
 }
 
-/** 老人按「⏹ 别念了」：立刻停下播报（v3 §7.3：允许重听、暂停与停止）。 */
+/** 老人按「别念了」：立刻停下播报（v3 §7.3：允许重听、暂停与停止）。 */
 function hush() {
   stopSpeaking()
   speaking.value = false
@@ -245,18 +246,11 @@ async function recheck() {
   await loadDraft(true)
 }
 
-/** 每次"准备提交"生成一个幂等编号：网络重试沿用同一个（卡8 / §6-I5）。 */
-function newToken() {
-  try {
-    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID().replace(/-/g, '')
-  } catch { /* 忽略：回落下面的方案 */ }
-  return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-}
-
 async function submit() {
   if (!draft.value) return
   submitting.value = true
-  // 同一个草稿只在第一次生成 token，重试沿用（否则重试会变成"新的一次提交"）
+  // 同一个草稿只在第一次生成 token，重试沿用（否则重试会变成"新的一次提交"）；
+  // 生成逻辑统一在 `utils/idemToken.js`（三处调用方共用一份，格式不一致会**静默不幂等**）
   if (!unknownToken.value) unknownToken.value = newToken()
   const token = unknownToken.value
   try {
@@ -381,7 +375,7 @@ async function checkSubmitted() {
       <!-- 「允许停止和取消」（v3 §7.1）：点了开始就必须能自己停下，别被倒计时拖着 -->
       <n-button v-if="listening" block size="large" data-speech-stop
                 style="min-height:64px;font-size:1.3rem;margin-top:10px;" @click="haltListen">
-        ⏹ 停下（我说完了 / 不想说了）
+        <EIcon name="stop" :size="18" /> 停下（我说完了 / 不想说了）
       </n-button>
       <div v-else style="font-size:1.3rem;font-weight:700;">
         <EIcon name="edit" :size="18" /> 请在下面的框里打字告诉我们（最少 5 个字）
@@ -413,7 +407,7 @@ async function checkSubmitted() {
       <!-- v3 §7.3：允许重听、暂停与停止 —— 念到一半不想听了要能停（不能只能等它念完） -->
       <n-button v-if="speaking" block size="large" data-hush
                 style="margin-top:8px;min-height:56px;font-size:1.2rem;" @click="hush">
-        ⏹ 别念了
+        <EIcon name="stop" :size="18" /> 别念了
       </n-button>
       <div v-else-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
         <EIcon name="speaker-off" :size="18" /> 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）

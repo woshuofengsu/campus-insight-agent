@@ -302,6 +302,20 @@ def agent_analytics(request: Request, days: int = 7):
                 "brief": build_data_brief(tenant=_t)})
 
 
+@router.get("/governance-metrics")
+def agent_governance_metrics(request: Request, days: int = 30):
+    """治理指标（v4 §5 壁垒层四）：**重复报修率** + **转人工原因分布**（grid 专属、只算本社区）。
+
+    重复报修率回答"这事办到根上了吗"（同人同分类跨天再报）；转人工原因分布回答
+    "AI 卡在哪"（安全红线 / 无依据 / 主动要求）。口径写死在 `data/db_agent.get_governance_metrics`
+    的注释里，材料照抄即可。
+    """
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_agent import get_governance_metrics
+    return _ok(get_governance_metrics(days=max(1, min(days, 365)), tenant=_tenant(request)))
+
+
 @router.get("/care-metrics")
 def agent_care_metrics(request: Request, days: int = 7):
     """关怀量化（U4）：情绪识别 / 关怀触达率 / 情绪→转人工率 / 场景分布（grid 专属）。

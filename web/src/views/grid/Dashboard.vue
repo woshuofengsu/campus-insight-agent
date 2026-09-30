@@ -17,6 +17,9 @@ const pendingProps = ref([])
 const selfRes = ref({ ai_self_resolution_rate: 0, issue_self_resolution_rate: 0, total_dialogs: 0, total_issues: 0 })
 const llm = ref({ calls: 0, cost_yuan: 0, cache_hits: 0 })
 const board = ref({ red_board: { satisfied_issues: [], good_workers: [], done_proposals: [] }, black_board: { dissatisfied_issues: [], slow_workers: [], sla_breaches: [] } })
+// 治理指标（v4 §5 壁垒层四）：重复报修率 + 转人工原因分布（后端只算本社区）
+const gov = ref({ repeat: { rate: 0, total: 0, repeat_groups: 0, top: [] },
+                  transfer: { total: 0, by_reason: {}, by_source: {} } })
 const drillOpen = ref(false)
 const drill = ref({ summary: { satisfied: 0, dissatisfied: 0, total: 0, rate: 0 }, items: [] })
 const drillTitle = ref('')
@@ -30,6 +33,9 @@ async function openDrilldown(category = '', assignee = '', satisfaction = '', ti
 }
 
 onMounted(async () => {
+  try {
+    gov.value = (await agent.governanceMetrics({ days: 30 })) || gov.value
+  } catch { /* 指标失败不阻塞工作台 */ }
   try {
     const all = (await issues.list()) || []
     stats.value = {
@@ -186,10 +192,41 @@ const cards = computed(() => [
           <div style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">SLA 超时</div>
           <div v-for="b in board.black_board.sla_breaches.slice(0,3)" :key="'sl'+b.id"
                style="padding:6px 0;font-size:0.9rem;">
-            ⏰ #{{ b.id }} {{ b.title }} <span class="muted">（{{ b.level }}）</span>
+            <EIcon name="clock" :size="18" /> #{{ b.id }} {{ b.title }} <span class="muted">（{{ b.level }}）</span>
           </div>
         </div>
         <div v-if="!board.black_board.dissatisfied_issues.length && !board.black_board.sla_breaches.length" class="muted" style="font-size:0.9rem;">暂无黑榜数据</div>
+      </div>
+    </div>
+
+    <!-- 治理指标（v4 §5 壁垒层四）：重复报修率 + 转人工原因分布 -->
+    <div class="card" data-gov-metrics style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:700;"><EIcon name="chart-line" :size="18" /> 治理指标（近 30 天 · 仅本社区）</div>
+        <span class="muted" style="font-size:0.8rem;">重复报修＝同一人同一分类**跨天**再报（同一分钟连点不算）</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px;">
+        <div>
+          <div style="font-size:1.7rem;font-weight:800;">{{ gov.repeat.rate }}%</div>
+          <div class="muted" style="font-size:0.85rem;">
+            重复报修率 · {{ gov.repeat.repeat_groups }} 组 / 共 {{ gov.repeat.total }} 单
+          </div>
+          <div v-for="t in gov.repeat.top.slice(0,3)" :key="'rp'+t.reporter_id+t.category"
+               class="muted" style="font-size:0.8rem;margin-top:2px;">
+            #{{ t.reporter_id }} · {{ t.category }} · {{ t.days }} 天里报了 {{ t.count }} 次
+          </div>
+          <div v-if="!gov.repeat.top.length" class="muted" style="font-size:0.8rem;margin-top:2px;">近 30 天没有重复报修</div>
+        </div>
+        <div>
+          <div style="font-size:1.7rem;font-weight:800;">{{ gov.transfer.total }}</div>
+          <div class="muted" style="font-size:0.85rem;">
+            转人工 · 处理包 {{ gov.transfer.by_source['处理包'] || 0 }} · 政策问答 {{ gov.transfer.by_source['政策问答'] || 0 }}
+          </div>
+          <div v-for="(n, k) in gov.transfer.by_reason" :key="'tr'+k" style="margin-top:2px;font-size:0.82rem;"
+               :class="n ? '' : 'muted'">
+            {{ k }}：{{ n }}
+          </div>
+        </div>
       </div>
     </div>
 

@@ -33,6 +33,10 @@ ICONS = os.path.join(WEB, "config", "icons.js")
 # 第一遍就漏了 `⏱️/↩️/▶️` 共 18 处（页面上真看得见），所以判据加一条：**出现 U+FE0F 就算 emoji**。
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B50\u2B55\u20E3]"
                    "|[\u2190-\u21FF\u23E9-\u23FA\u25A0-\u25FF\u2B00-\u2BFF]\uFE0F"
+                   # 第二遍又补：这些码位**默认就是彩色 emoji 呈现**，根本不需要 VS16
+                   # （⏰ U+23F0 / ⌛ U+231B / ▶ U+25B6 / ▪ U+25AA …）。
+                   # 判据只按"有没有 VS16"会漏掉它们——实测就是在网格端"剩余时间"里漏了 ⏰⏳。
+                   "|[\u231A-\u231B\u23E9-\u23FA\u25AA-\u25AB\u25B6\u25C0\u25FB-\u25FE]"
                    "|\uFE0F")
 # 唯一豁免：这份文件里的 emoji 是**用来匹配后端数据里可能出现的 emoji**的
 # （天气接口历史上会给 `emoji` 字段；没有 condition 文本时靠它兜底选图标），

@@ -1,9 +1,13 @@
 # api_routes/weather.py
 """天气历史 / 社区概况 / 预报 / 检查任务路由（从 api_web.py 拆出）。"""
+import logging
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from api_routes.deps import _ok, _fail, _user, _require_role, _tenant
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/web/weather", tags=["weather"])
 
@@ -129,3 +133,68 @@ def web_weather_tasks(request: Request, status: str = ""):
         return _require_role(request, "grid")
     rows = list_check_tasks(status=status or None, limit=200, tenant=_tenant(request))
     return _ok([dict(r) for r in rows])
+
+
+# ---------------------------------------------------------------- 升级通知名单（卡10 的"入口待做"）
+# 背景（v4 方案 §6 B 栏登记的老问题）：`senior_manager_ids`（天气检查任务超时后**第 2 层**要通知谁）
+# 机制早就有了（`data/db_weather.get_senior_manager_ids/set_senior_manager_ids`，按社区分键、留痕），
+# 但**一直没有前端入口** —— 也就是说"配置项接到了判定点，却没接到人手上"：
+# 现场想在界面里指定"超时升级通知谁"是做不到的。这两条接口把它接上。
+
+@router.get("/senior-managers")
+def web_weather_senior_managers_get(request: Request):
+    """看本社区的升级通知名单 + 可选的候选人（候选人来自本社区负责人，不跨社区）。"""
+    from data.db_weather import get_senior_manager_ids
+    from data.db_user import managers_of
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    tenant = _tenant(request)
+    ids = get_senior_manager_ids(tenant=tenant or None)
+    # 候选人：本社区负责人（`managers_of` 内部 fail-closed：非法/空社区返回空表）
+    try:
+        cands = [{"id": u.get("id"), "name": u.get("name"), "username": u.get("username"),
+                  "role": u.get("role")} for u in managers_of(tenant)]
+    except Exception as e:  # noqa: BLE001
+        _log.warning("升级名单候选人读取失败（tenant=%s）：%s", tenant, e)
+        cands = []
+    return _ok({"ids": ids, "candidates": cands, "scope": tenant or "全局",
+                "count": len(ids)})
+
+
+class SeniorManagersSet(BaseModel):
+    ids: list[int] = Field(default_factory=list)
+
+
+@router.post("/senior-managers")
+def web_weather_senior_managers_set(req: SeniorManagersSet, request: Request):
+    """配置升级通知名单（只对本社区生效）。
+
+    三条硬规矩：
+      ① **只接受本社区负责人**作为候选人（跨社区 id 一律拒绝）——名单里塞别人社区的人，
+         等于把天气超时告警发到隔壁社区；
+      ② 空名单是**合法**配置（升级逻辑会记为"无法升级"并保持最高优先级告警），
+         但要在返回里说清楚，避免"存了个空的还以为配好了"；
+      ③ 写入即留痕（`activity_log`），留痕里只记 id 与人数，不记手机号。
+    """
+    from data.db_user import managers_of
+    from data.db_weather import get_senior_manager_ids, set_senior_manager_ids
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    tenant = _tenant(request)
+    try:
+        allowed = {int(u.get("id")) for u in managers_of(tenant) if u.get("id")}
+    except Exception as e:  # noqa: BLE001
+        # 拿不到本社区负责人名单 → **拒绝**（fail-closed）：宁可不让配，也不能配出跨社区名单
+        _log.warning("升级名单写入前取候选人失败（tenant=%s）：%s", tenant, e)
+        return _fail(2001, "暂时无法确认本社区负责人名单，请稍后重试")
+    wanted = [int(x) for x in (req.ids or [])]
+    bad = [x for x in wanted if x not in allowed]
+    if bad:
+        return _fail(1003, f"名单里有非本社区负责人：{bad}（升级通知不能跨社区）")
+    before = get_senior_manager_ids(tenant=tenant or None)
+    key = set_senior_manager_ids(sorted(set(wanted)), actor=_user(request).get("name") or "负责人",
+                                 tenant=tenant or None)
+    after = get_senior_manager_ids(tenant=tenant or None)
+    hint = "" if after else "（空名单 = 超时后无法升级，只会保持最高优先级告警）"
+    return _ok({"ids": after, "before": before, "key": key, "scope": tenant or "全局"},
+               f"已保存（{len(after)} 人）{hint}")

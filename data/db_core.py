@@ -817,6 +817,30 @@ def _m51_notification_outbox(conn):
         "CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status, id)")
 
 
+def _m52_issue_field_sources(conn):
+    """v52：把报修单的**字段来源**与**处置画像**沉淀成可查询结构（v4 §5 壁垒层二的"下一步"）。
+
+    背景（原来丢掉了什么）：老人/居民提交报修时，`utils/elderly_report` 会算出
+    "问题/位置/责任范围/紧急程度**这几个字段分别从哪来**"（用户说的 / 文本里抽的 / 档案里的 /
+    系统建议 / 默认值），并且这一版**当场展示给老人核对**——但**没有落库**：
+    页面一刷新，这份"来源"就没了，事后想回答"这条位置是老人自己说的，还是我们替他填的？"
+    只能靠翻对话留痕猜。字段来源恰恰是"**不许编造**"这条价值观最需要被事后审计的东西。
+
+    所以 v52 做两件事（都很小、都只加列，不动既有数据）：
+      · `community_issues.field_sources`：提交那一刻的"字段 → 来源"JSON（含用户原话片段）；
+      · `community_issues.resolution_category`：办结时负责人选的**处置归类**（可为空，
+        空表示"没归类"而不是"没处置"）——它与 `resolve_note` 一起构成"处置结果"的可统计口径。
+
+    ⚠️ 与 v46 的规矩一致：**运行时不许 ALTER**，加列只走迁移；幂等（`_add_column` 自己查 PRAGMA）。
+    """
+    from data.db_core import _add_column
+    _add_column(conn, "community_issues", "field_sources", "field_sources TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "resolution_category", "resolution_category TEXT DEFAULT ''")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_issues_category_resolved "
+        "ON community_issues(category, status)")
+
+
 def _m48_tenant_isolation(conn):
     """v48：多租户真隔离（核心表）——加列 → 归一化 → 按归属人回填 → 索引。
 
@@ -1292,6 +1316,7 @@ def init_db(db_path: str):
         (49, "draft_versioning_and_idempotency", _m49_draft_versioning_and_idempotency),
         (50, "handoff_workbench", _m50_handoff_workbench),
         (51, "notification_outbox", _m51_notification_outbox),
+        (52, "issue_field_sources", _m52_issue_field_sources),
     ]
     for version, name, fn in post:
         if version <= current:

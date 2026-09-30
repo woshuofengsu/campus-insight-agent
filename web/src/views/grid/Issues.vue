@@ -60,13 +60,33 @@ function opOf(i) {
 function openDetail(i) {
   detailIssue.value = i
   detailOpen.value = true
+  loadFieldSources(i.id)
+}
+
+// 字段来源（v52 沉淀）：问题/位置/责任范围/紧急程度分别从哪来 ——「不许编造」最需要事后可审计的东西
+const fieldSources = ref({})
+const fieldSourceNote = ref('')
+const SOURCE_LABEL = {
+  user: '用户自己说的', text: '从原话里抽出来的', profile: '来自登记档案',
+  suggestion: '系统建议（老人确认过）', default: '默认值', form: '表单直接填写', agent: '代办人填写',
+}
+async function loadFieldSources(id) {
+  fieldSources.value = {}
+  fieldSourceNote.value = ''
+  try {
+    const r = (await issues.fieldSources(id)) || {}
+    fieldSources.value = r.sources || {}
+    fieldSourceNote.value = r.note || ''
+  } catch (e) {
+    fieldSourceNote.value = `字段来源读取失败：${e.message}`
+  }
 }
 
 function deadlineText(i) {
   if (i.status === '处理结束' || i.status === '已关闭' || i.status === '已撤回' || i.status === '已转出') return ''
   if (i.remaining_hours == null) return ''
-  if (i.overdue) return `⏰ 已超时 ${Math.abs(i.remaining_hours).toFixed(1)}h`
-  return `⏳ 剩余 ${i.remaining_hours.toFixed(1)}h`
+  if (i.overdue) return `已超时 ${Math.abs(i.remaining_hours).toFixed(1)}h`
+  return `剩余 ${i.remaining_hours.toFixed(1)}h`
 }
 
 async function act(i, data, okMsg) {
@@ -281,6 +301,17 @@ async function batchClose() {
           <span>责任人</span><b>{{ detailIssue.assignee_name || '待派单' }}</b>
         </div>
         <div class="detail-block"><div class="muted">居民原话 / 问题描述</div><div>{{ detailIssue.description || '—' }}</div></div>
+        <!-- 字段来源（v52）：位置到底是老人自己说的、还是系统按档案替他填的，这里能查 -->
+        <div class="detail-block" data-field-sources>
+          <div class="muted">字段来源（谁说的）</div>
+          <div v-if="Object.keys(fieldSources).length" class="detail-grid" style="border:0;padding:6px 0;">
+            <template v-for="(v, k) in fieldSources" :key="k">
+              <span>{{ { title: '问题', location: '位置', scope: '责任范围', urgency: '紧急程度' }[k] || k }}</span>
+              <b>{{ SOURCE_LABEL[v] || v }}</b>
+            </template>
+          </div>
+          <div v-else class="muted" style="font-size:0.85rem;">{{ fieldSourceNote || '—' }}</div>
+        </div>
         <div v-if="detailIssue.resolve_note" class="detail-block"><div class="muted">处理结果</div><div>{{ detailIssue.resolve_note }}</div></div>
         <n-button type="primary" block @click="expanded[detailIssue.id] = true; detailOpen = false">回到列表处理</n-button>
       </n-drawer-content>

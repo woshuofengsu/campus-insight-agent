@@ -27,6 +27,8 @@ export const ICON_PATHS = {
   arrowRight: 'M4 12h15M13 6l6 6-6 6',
   arrowLeft: 'M20 12H5M11 6l-6 6 6 6',
   arrowDown: 'M12 4v15M6 13l6 6 6-6',
+  arrowUp: 'M12 20V5M6 11l6-6 6 6',
+  stop: 'M7.5 7.5h9v9h-9v-9Z',
   handshake: 'M4 12.5 8 8.5l3 2 2-2 3 2 4-4M4 12.5 7.5 16l2 2 2.5-2.5M20 8.5 16.5 12l-2 2',
   search: 'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM15.5 15.5 20.5 20.5',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7.5V12l3 2',

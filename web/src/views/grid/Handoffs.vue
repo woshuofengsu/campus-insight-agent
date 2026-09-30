@@ -12,6 +12,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { agent } from '../../api'
 import EIcon from '../../components/EIcon.vue'
+import { tokenOnce, dropToken } from '../../utils/idemToken'
 
 const message = useMessage()
 const list = ref([])
@@ -22,24 +23,14 @@ const draft = ref({})        // { [hid]: { ask, reply, close } }
 const tokens = ref({})       // { "hid:action": 幂等编号 } —— 一次"意图"一个编号，重试沿用（卡8）
 const filter = ref('待处理')
 
-/** 生成一次操作的幂等编号（与服务端 `begin()` 配套：同编号重复/并发只执行一次）。 */
-function newToken() {
-  try {
-    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID().replace(/-/g, '')
-  } catch { /* 忽略：回落下面的方案 */ }
-  return 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-}
-
-/** 同一次意图（这条待办 + 这个动作）沿用同一个编号，办成才清掉。 */
+/** 同一次意图（这条待办 + 这个动作）沿用同一个编号，办成才清掉（生成逻辑见 `utils/idemToken.js`）。 */
 function tokenOf(row, action) {
-  const k = `${row.id}:${action}`
-  if (!tokens.value[k]) tokens.value[k] = newToken()
-  return tokens.value[k]
+  return tokenOnce(tokens, `${row.id}:${action}`)
 }
 
 const STATUS_OPTIONS = ['待处理', '已领取', '等居民补充', '已回复', '已处理', '']
 const STATUS_LABEL = {
-  待处理: '⏳ 没人领取', 已领取: '已领取（办理中）', 等居民补充: '等居民补充',
+  待处理: '没人领取', 已领取: '已领取（办理中）', 等居民补充: '等居民补充',
   已回复: '已回复（待关闭）', 已处理: '已办结',
 }
 const STATUS_TYPE = {
@@ -84,7 +75,7 @@ async function act(row, action, textKey) {
     // 带幂等编号：连点/网络重试**只执行一次**（补问与回复会给居民发通知，重复执行居民会收到两条）
     const r = await agent.handoffAction(row.id, { action, text, client_token: tokenOf(row, action) })
     message.success((r && r.message) || '操作成功')
-    delete tokens.value[key]                 // 办成了：这次意图结束，下次点击是新意图
+    dropToken(tokens, key)                   // 办成了：这次意图结束，下次点击是新意图
     if (textKey) draft.value[row.id] = { ask: '', reply: '', close: '' }
     // 操作后**把筛选切到刚进入的状态**：否则这条会因为被筛掉而"瞬间消失"，
     // 网格员会以为没点成功（实测踩到：领取后列表里就找不到这条了）。

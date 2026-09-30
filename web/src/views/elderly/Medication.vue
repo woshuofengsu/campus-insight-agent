@@ -16,7 +16,7 @@ async function load() {
 }
 
 // 后端 times 可能是数组（如 ["08:00","20:00"]）或字符串；直接插值会把数组打印成 JSON
-// （页面上出现 ⏰ ["08:00","20:00"] 这种给老人看的乱码），这里统一格式化。
+// （页面上出现 ["08:00","20:00"] 这种给老人看的乱码），这里统一格式化。
 function fmtTimes(v) {
   if (Array.isArray(v)) return v.join('、')
   return v || '—'
@@ -101,7 +101,7 @@ async function saveEdit() {
           <n-button v-if="['审核通过', '已暂停', '审核不通过'].includes(m.status)" size="large" class="elder-act" style="margin-left:8px;" @click="startEdit(m)"><EIcon name="edit" :size="18" /> 修改</n-button>
         </div>
       </div>
-      <div class="muted" style="margin-top:6px;">⏰ {{ fmtTimes(m.times) }} · {{ m.repeat_rule }}</div>
+      <div class="muted" style="margin-top:6px;"><EIcon name="clock" :size="18" /> {{ fmtTimes(m.times) }} · {{ m.repeat_rule }}</div>
       <div v-if="m.audit_opinion" class="muted" style="margin-top:4px;">审核意见：{{ m.audit_opinion }}</div>
     </div>
     <n-empty v-if="list.length === 0" description="还没有用药提醒" style="font-size:1.25rem;" />
