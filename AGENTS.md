@@ -136,7 +136,7 @@ elderly:  demo_elderly（免登录）
   两个审计脚本已内置 dist 新鲜度闸：落后于源码直接红字退出。
 - 语义文字色**一律用亮/暗成对令牌**（`--ink-*`、`--st-*-ink`、`--primary-ink`、`--danger-solid`/`--success-ink`），
   **不要在内联样式里写死 hex**：写死色在暗色下不跟着换，`ui_audit` 会抓（第九轮抓到 6 处这类问题）。
-- **界面图形一律用 `<EIcon name="…"/>`，禁止 emoji 当图标**（2026-09-29 全站换掉 539 处）：
+- **界面图形一律用 `<EIcon name="…"/>`，禁止 emoji 当图标**（2026-09-29 全站换掉 557 处）：
   emoji 是各厂商字形（大小/配色/有无都不同），`ui_audit` 与 `mobile_audit` 都测不出"字形不确定"。
   图标在 `web/src/config/icons.js`（语义命名，不够就加一个）；写死的名字与配置里的 `icon: '…'`
   必须是表里真实存在的名字（写错只会静默显示成「更多」图标）→ `tests/test_no_emoji_ui.py` 会红。
@@ -175,7 +175,7 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 五十九 节**：依据面板 / 语义文字色令牌 / 对抗集扩样到 60 条）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 六十 节**：全站去 emoji，557 处 → 0，单色线性图标体系）|
 | `scripts/journey_check.py` | **首批八条浏览器旅程**（发布门槛，8 条 / 58 项）：页面真点击 + 接口 + 库内事实三处对账 |
 | `tests/test_report_idempotency.py` | 报修幂等门禁（含**真双线程并发**用例：同编号并发只建一张单）|
 | `utils/region.py` | **属地解析统一入口**：`Region`/`normalize_area`/`resolve_region`/`policy_region_boost` + 级别与权重常量（政策与 RAG 共用）|
@@ -208,7 +208,7 @@ elderly:  demo_elderly（免登录）
 - **提交前最后一批（2026-09-29 深夜，v4 第 2/3 批收尾）**：居民端政策问答**依据面板**（含决策元数据 + 门禁）·
   语义文字色一律换 `-ink` 成对令牌（`ui_audit` 抓到方案详情 2.31:1）· 对抗集 **21 → 60 条**（四类各 15，
   3 条未达标项登记在台账 §7.1，不调参掩盖）（见 dev-log **五十九** 节）
-- **全站去 emoji（539 处 → 0，单色线性图标体系）**：`web/src/config/icons.js`（约 70 个语义图标）+
+- **全站去 emoji（557 处 → 0，单色线性图标体系；首轮按码位扫 539，端到端复核又补出 ⏱️↩️▶️⏸️ 一类 18）**：`web/src/config/icons.js`（约 70 个语义图标）+
   `components/EIcon.vue` 全站通用 + `utils/weatherIcon.js`（天气图标改由文字选图标，后端数据没动）；
   门禁 `tests/test_no_emoji_ui.py`（0 emoji / 图标名必须存在 / 必须 currentColor 与 aria-hidden / 扫描器自检）
   （见 dev-log **六十** 节）
