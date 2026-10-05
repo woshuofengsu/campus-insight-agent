@@ -134,6 +134,7 @@ class ReportSubmitIn(BaseModel):
     scope: str = Field(default="", max_length=8)      # 室内 / 室外 / 空=按原话推断
     urgency: str = Field(default="", max_length=8)    # 一般 / 中等 / 紧急 / 空=按原话推断
     client_token: str = Field(default="", max_length=64)
+    mark_as_demo: bool = Field(default=False)         # 仅演示姿态生效（见提交端点注释）
 
 
 class MedicationCreate(BaseModel):
@@ -402,6 +403,24 @@ def web_elderly_report_draft_clear(request: Request):
     return _ok({"cleared": True}, "草稿已清除")
 
 
+def _demo_flag(mark: bool, uid=None) -> int:
+    """`mark_as_demo` → 落库用的 `is_demo`（**只在演示姿态生效**，v53）。
+
+    为什么要这道闸：这个标记的作用是"把自造样本从真实样本里剔除"。若生产环境也能随便标，
+    就等于开了一条"把真实工单伪装成演示数据（或反过来）"的路——统计口径会被调用方改写。
+    生产姿态下**忽略并告警**（绝不静默忽略一个与口径诚信相关的入参）。
+
+    抽成独立函数是为了能直接单测（只靠"读源码断言关键词"不算验证）。
+    """
+    if not mark:
+        return 0
+    import config as _cfg
+    if getattr(_cfg, "DEMO_MODE", True):
+        return 1
+    _log.warning("生产姿态下忽略 mark_as_demo（演示标记只在 DEMO_MODE 生效）：uid=%s", uid)
+    return 0
+
+
 @router.post("/report/submit")
 def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
     """老人报修 · 第二步：**校验必填 + 提交**（v3 卡1 的闸门）。
@@ -472,6 +491,8 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
     fields = r["fields"]
     category, urgency_llm = _llm_classify(req.text, "")
     urgency = fields["urgency"] or urgency_llm or "一般"
+    # v53 演示数据标记（闸门逻辑抽在 `_demo_flag` 里，便于单测）
+    is_demo = _demo_flag(req.mark_as_demo, uid)
     iid, hint = submit_issue(
         title=fields["title"], category=category, issue_type=fields["issue_type"],
         location=fields["location"], description=fields["description"],
@@ -484,6 +505,8 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         # `suggested_category` 存**系统当初的建议**（这里是 AI/关键词分类的结果），
         # 两者分开才能回答"系统建议得准不准、多少人被人工改过"。
         suggested_category=category,
+        # v53：演示数据标记（仅 DEMO_MODE 生效）
+        is_demo=is_demo,
     )
     if iid <= 0:
         if hint == "safety":

@@ -175,6 +175,10 @@ def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> 
       ② **样本不足要标**：有建议的条数 < 5 → 只作参考。
       ③ 这张表**不是模型训练数据**：不做回灌、不做调参，只是给人看的核查清单。
          （对外别写"用于训练模型"，本项目没有这条链路。）
+      ④ **演示数据必须分开报**（v53 `is_demo`）：为了凑样本用 `seed_*.py` 造过演示工单，
+         它们混进分母会把"自造数据"算成真实样本。所以这里分三个口径：
+         `total` / `demo_*`（已标记演示）/ `real_*`（**未标记**：真实部署中即真实来源）。
+         ⚠️ 不把"未标记"写成"真实居民"——演示库里未标记的同样来自演示/验证脚本。
     """
     since = (datetime.now() - timedelta(days=max(1, min(days, 1095)))).strftime("%Y-%m-%d %H:%M:%S")
     args: list = [since]
@@ -184,6 +188,10 @@ def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> 
         "corrected": 0, "agreed": 0, "coverage": 0.0, "agreement_rate": 0.0,
         "corrected_rate": 0.0, "pairs": [], "items": [], "unlogged_changes": 0,
         "sample_enough": False, "min_sample": MIN_SAMPLE,
+        "demo": {"total": 0, "with_suggestion": 0, "corrected": 0, "agreed": 0},
+        "real": {"total": 0, "with_suggestion": 0, "corrected": 0, "agreed": 0,
+                 "coverage": 0.0, "agreement_rate": 0.0},
+        "demo_note": "",
         "note": "缺少社区归属或没有样本，已按空返回",
         "disclaimer": "本清单仅供人工核查，不用于模型训练/调参。",
     }
@@ -194,7 +202,8 @@ def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> 
             f"SELECT COUNT(*) c FROM community_issues WHERE reported_at>=?{tc}",
             tuple(args)).fetchone()["c"]
         rows = conn.execute(
-            f"SELECT id, title, category, suggested_category FROM community_issues "
+            f"SELECT id, title, category, suggested_category, COALESCE(is_demo,0) AS is_demo "
+            f"FROM community_issues "
             f"WHERE reported_at>=?{tc} AND COALESCE(suggested_category,'')<>'' "
             f"ORDER BY id DESC LIMIT 2000", tuple(args)).fetchall()
         # 改动留痕：一次查全部，避免按行 N+1
@@ -210,10 +219,19 @@ def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> 
                 log_map.setdefault(int(a["target_id"]), dict(a))
 
     corrected, pairs, items, unlogged = 0, Counter(), [], 0
+    demo = {"total": 0, "with_suggestion": 0, "corrected": 0, "agreed": 0}
+    real = {"total": 0, "with_suggestion": 0, "corrected": 0, "agreed": 0}
     for r in rows:
         sug = str(r["suggested_category"] or "").strip()
         fin = str(r["category"] or "").strip()
         changed = sug != fin
+        is_demo = int(r["is_demo"] or 0) == 1
+        bucket = demo if is_demo else real
+        bucket["with_suggestion"] += 1
+        if changed:
+            bucket["corrected"] += 1
+        else:
+            bucket["agreed"] += 1
         log = log_map.get(int(r["id"]))
         if changed:
             corrected += 1
@@ -230,9 +248,33 @@ def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> 
                 "suggested": sug,
                 "final": fin,
                 "changed": changed,
+                "is_demo": is_demo,
                 "changed_by": (log or {}).get("actor") or "",
                 "changed_at": ((log or {}).get("created_at") or "")[:16],
             })
+    real["total"] = 0
+    # 「演示数据」总数要按**全部工单**数，不只是"有建议的"那些（否则分母对不上）
+    with get_db() as conn:
+        demo_total = conn.execute(
+            f"SELECT COUNT(*) c FROM community_issues WHERE reported_at>=?{tc} "
+            f"AND COALESCE(is_demo,0)=1", tuple(args)).fetchone()["c"]
+    demo["total"] = int(demo_total or 0)
+    real["total"] = max(0, int(total or 0) - demo["total"])
+    for b in (demo, real):
+        b["coverage"] = round(b["with_suggestion"] / b["total"] * 100, 1) if b["total"] else 0.0
+        b["agreement_rate"] = (round(b["agreed"] / b["with_suggestion"] * 100, 1)
+                               if b["with_suggestion"] else 0.0)
+    demo_note = ""
+    if demo["total"]:
+        # 免责声明**由数据驱动**：只要分母里有演示数据，就必须跟着这段话。
+        # ⚠️ 措辞刻意区分「已标记演示」与「未标记」，**不把未标记那部分叫"真实居民"**：
+        # 在演示库里，未标记的工单同样来自演示/验证脚本（journey_check、demo_flow_check 等），
+        # 把它们说成"真实来源"就是换一种方式编数字。真实试点开始后，未标记部分才是真实来源。
+        demo_note = (f"其中**已标记**演示数据 {demo['total']} 条（走真实链路造，但不是真实居民诉求）："
+                     "**不代表真实居民样本、不用于模型训练、不代表线上准确率**。"
+                     f"未标记 {real['total']} 单（真实部署中即真实来源；"
+                     f"本机演示库内这些工单同样由演示/验证脚本产生），"
+                     f"其中带系统建议 {real['with_suggestion']} 条（覆盖率 {real['coverage']}%）")
     with_sug = len(rows)
     total = int(total or 0)
     enough = with_sug >= MIN_SAMPLE
@@ -260,5 +302,8 @@ def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> 
         "items": items,
         "unlogged_changes": unlogged,
         "sample_enough": enough,
+        "demo": demo,
+        "real": real,
+        "demo_note": demo_note,
         "note": note,
     }

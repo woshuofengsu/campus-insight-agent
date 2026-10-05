@@ -274,8 +274,12 @@ async function clearAll() {
 .agent-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px;
   border-bottom: 1px solid var(--border); }
 .agent-history { padding: 8px 12px; border-bottom: 1px solid var(--border); max-height: 140px; overflow-y: auto; }
+/* 注意：颜色用 --primary-light-ink（浅蓝底专用深色）：原来用 --ink-info(#2563EB) 铺在
+   --primary-light(#E8EDFF) 上只有 4.43:1，低于 13.6px 文字要求的 4.5:1；
+   而这条提示**只在存在草稿时才渲染**，静态审计长期碰不到（数据相关的无障碍缺陷）。 */
 .agent-draft-hint { display: flex; align-items: center; gap: 8px; justify-content: space-between;
-  padding: 6px 12px; font-size: 0.85rem; background: var(--primary-light, #E8EDFF); color: var(--ink-info); }
+  padding: 6px 12px; font-size: 0.85rem; background: var(--primary-light, #E8EDFF);
+  color: var(--primary-light-ink, #1E40AF); }
 .agent-body { padding: 12px; overflow-y: auto; height: min(380px, 55vh);  /* 固定高度：对话增长不再撑高页面，避免"回复时页面往上跳" */
   display: flex; flex-direction: column;   /* 短对话贴底但不破坏滚动（勿用 justify-content:flex-end，会导致溢出内容滚不上去） */
   background: var(--bg, #f5f7f5); }

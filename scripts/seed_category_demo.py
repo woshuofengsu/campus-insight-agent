@@ -81,10 +81,62 @@ def _tok(role):
     return (r.get("data") or {}).get("token") or ""
 
 
+def _mark_existing_demo_rows() -> int:
+    """把**此前造过**的演示工单补上 `is_demo=1`（v53 之前造的没有标记）。
+
+    为什么需要：`is_demo` 是 v53 才加的列，之前那批演示工单会被当成真实样本混进分母。
+    可靠的联系方式是**幂等表**：每次提交都用固定 token（`seedcat…`），
+    而 `idempotency_keys.result_json` 里存着 `issue_id` —— 所以能精确定位，不靠标题猜。
+
+    ⚠️ 这是**演示数据维护**（不是业务功能）：只动演示库、只改 `is_demo` 这一列、
+    打印改了哪几条、可重复跑（已标的不会重复处理）。
+    """
+    import sqlite3
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import DB_PATH
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT result_json FROM idempotency_keys "
+            "WHERE scope='elderly_report' AND key LIKE 'seedcat%'").fetchall()
+        ids = []
+        for (rj,) in rows:
+            try:
+                iid = int((json.loads(rj or "{}") or {}).get("issue_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            if iid:
+                ids.append(iid)
+        if not ids:
+            print("  （没找到此前造的演示工单，无需补标）")
+            return 0
+        marks = ",".join("?" * len(ids))
+        changed = conn.execute(
+            f"UPDATE community_issues SET is_demo=1 WHERE id IN ({marks}) "
+            f"AND COALESCE(is_demo,0)=0", tuple(ids)).rowcount
+        conn.commit()
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM community_issues WHERE id IN ({marks}) AND is_demo=1",
+            tuple(ids)).fetchone()[0]
+        print(f"  [补标] 认定为演示数据 {total} 条（本次新标 {changed} 条，其余此前已标）")
+        return total
+    finally:
+        conn.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="只打印计划，不写库")
+    ap.add_argument("--mark-existing", action="store_true",
+                    help="只把此前造的演示工单补上 is_demo=1（演示数据维护，不动业务数据）")
     args = ap.parse_args()
+
+    if args.mark_existing:
+        if args.dry_run:
+            print("--dry-run：未写库（--mark-existing 会打印将补标的条数）")
+        else:
+            _mark_existing_demo_rows()
+        return 0
 
     print("=" * 74)
     print("为「人工修正对照清单」准备真实演示数据")
@@ -105,7 +157,11 @@ def main():
         # 固定 token：重复跑不会重复建单（服务端幂等）
         tok = "seedcat" + hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
         r = _post("/api/web/elderly/report/submit",
-                  {"text": text, "scope": scope, "client_token": tok}, token=elderly_tok)
+                  {"text": text, "scope": scope, "client_token": tok,
+                   # v53：**明确标记成演示数据**——它们会和真实工单进同一张统计表，
+                   # 不标记就等于把自造样本算成真实样本（面板会对演示部分固定显示免责说明）。
+                   # 该标记只在 DEMO_MODE 生效；生产姿态下服务端会告警并忽略。
+                   "mark_as_demo": True}, token=elderly_tok)
         if r.get("code") != 0:
             print(f"  [跳过] 提交失败：{r.get('message')}")
             continue

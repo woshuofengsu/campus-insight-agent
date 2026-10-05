@@ -168,7 +168,10 @@ async function loadProfile() {
 // 人工修正对照清单（第 7 阶段）：系统建议分类 vs 人工最终分类
 const corr = ref({ total: 0, with_suggestion: 0, no_suggestion: 0, corrected: 0, agreed: 0,
                    coverage: 0, agreement_rate: 0, corrected_rate: 0, pairs: [], items: [],
-                   unlogged_changes: 0, sample_enough: false, note: '', disclaimer: '', days: 180 })
+                   unlogged_changes: 0, sample_enough: false, note: '', disclaimer: '', days: 180,
+                   demo: { total: 0, with_suggestion: 0 }, real: { total: 0, with_suggestion: 0,
+                                                                  coverage: 0, agreement_rate: 0 },
+                   demo_note: '' })
 const corrLoading = ref(false)
 async function loadCorr() {
   corrLoading.value = true
@@ -382,6 +385,26 @@ async function kgSearch() {
               <div class="muted" style="font-size:0.8rem;">未留痕的改动（应为 0）</div></div>
           </div>
           <div v-if="corr.note" style="color:var(--ink-warning);margin-top:8px;font-size:0.85rem;" data-corr-note>{{ corr.note }}</div>
+          <!-- 演示数据免责：**由数据驱动**（只要分母里有演示数据就必须显示，且四条缺一不可） -->
+          <div v-if="corr.demo && corr.demo.total" data-corr-demo
+               style="margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--panel-lemon);font-size:0.85rem;">
+            <div style="font-weight:700;">
+              <EIcon name="info" :size="16" /> 已标记演示数据 {{ corr.demo.total }} 条
+            </div>
+            <div style="margin-top:3px;">
+              演示数据 · <b>不代表真实居民样本</b> · 不用于模型训练 · <b>不代表线上准确率</b>
+            </div>
+            <div class="muted" style="margin-top:3px;">
+              两部分请分开看：已标记演示 {{ corr.demo.total }} 单（带系统建议 {{ corr.demo.with_suggestion }} 单）；
+              未标记 {{ corr.real.total }} 单（带建议 {{ corr.real.with_suggestion }} 单，
+              覆盖率 {{ corr.real.coverage }}%、一致率 {{ corr.real.agreement_rate }}%）。
+              合在一起算会把自造样本算成真实样本。
+            </div>
+            <div class="muted" style="margin-top:3px;">
+              （演示数据是走真实接口造出来的，所以接口/分类/留痕都是真的；但诉求内容不是真实居民提的。
+              本机演示库里**未标记的那些**同样是演示/验证脚本产生的，不应当作真实居民数据引用。）
+            </div>
+          </div>
           <div v-if="corr.unlogged_changes" style="color:var(--ink-danger);margin-top:8px;font-size:0.85rem;" data-corr-anomaly>
             有 {{ corr.unlogged_changes }} 条分类变了但查不到留痕（说明存在绕过受控入口的写入路径，需要排查）
           </div>

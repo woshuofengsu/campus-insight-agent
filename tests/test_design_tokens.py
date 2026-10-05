@@ -146,3 +146,61 @@ def test_ink_gate_would_catch_the_old_style():
     assert not FIG.search(fixed), "自检失效：改成 ink 令牌后仍被判违规"
     assert _scan_figure_text_colors() == [], "扫描器在仓库里仍有命中（上面的用例应已失败）"
 
+
+# ---------------------------------------------------------------------------
+# 2026-09-29：浅蓝底上的文字专用深色（**数据相关的无障碍缺陷**）
+#
+# 实测：草稿恢复提示（`.agent-draft-hint`）用 `--ink-info`(#2563EB) 铺在
+# `--primary-light`(#E8EDFF) 上只有 **4.43:1**，低于 13.6px 文字要求的 4.5:1。
+# 这条提示**只在存在未提交草稿时才渲染**，所以静态 UI 审计长期碰不到它——
+# 属于"平时看不见、刚好有草稿时才违规"的那类。`--ink-info` 在白底上是对的，
+# 不能为了这条去改它（那会把别处改坏），所以单独给一个浅蓝底专用深色。
+# ---------------------------------------------------------------------------
+
+_PRIMARY_LIGHT_INK_PAIRS = [(":root", "#E8EDFF"), ("body.dark", "#1E3A8A")]
+
+
+def _rel_lum(hexcolor: str) -> float:
+    h = hexcolor.lstrip("#")
+    parts = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    f = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4  # noqa: E731
+    r, g, b = (f(c) for c in parts)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _ratio(a: str, b: str) -> float:
+    la, lb = _rel_lum(a), _rel_lum(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return round((hi + 0.05) / (lo + 0.05), 2)
+
+
+def test_primary_light_panel_text_meets_contrast_in_both_themes():
+    """浅蓝底（--primary-light）上的专用文字色，**亮/暗两侧都要 ≥4.5:1**。"""
+    css = io.open(CSS, encoding="utf-8").read()
+    for selector, bg in _PRIMARY_LIGHT_INK_PAIRS:
+        tokens = _css_block(css, selector)
+        ink = tokens.get("--primary-light-ink")
+        assert ink, f"{selector} 缺少 --primary-light-ink（浅蓝底上的文字专用色）"
+        r = _ratio(ink, bg)
+        assert r >= 4.5, (
+            f"{selector} 的 --primary-light-ink {ink} 铺在 {bg} 上只有 {r}:1，低于 4.5:1"
+            "（这条提示只在有草稿时出现，靠页面审计抓不到）")
+    # 反向自检：把旧写法（--ink-info 铺浅蓝底）算一遍，必须**不达标**，
+    # 否则说明这段对比度计算根本没在算（门禁退化成永远绿）。
+    assert _ratio("#2563EB", "#E8EDFF") < 4.5, "自检失效：历史缺陷组合竟然被判达标"
+
+
+def test_primary_light_panels_do_not_use_generic_info_ink():
+    """静态守：凡是 `background: var(--primary-light` 的规则，不得再配 `--ink-info` 文字色。"""
+    import glob
+    bad = []
+    for p in glob.glob(os.path.join(ROOT, "web", "src", "**", "*.vue"), recursive=True):
+        text = io.open(p, encoding="utf-8").read()
+        for m in re.finditer(r"background:\s*var\(--primary-light[^}]*?color:\s*var\((--[a-z0-9-]+)\)",
+                             text, re.S):
+            if m.group(1) == "--ink-info":
+                line = text[:m.start()].count("\n") + 1
+                rel = os.path.relpath(p, ROOT).replace("\\", "/")
+                bad.append(f"{rel}:{line} 浅蓝底配了 --ink-info（应用 --primary-light-ink）")
+    assert not bad, "\n  ".join(bad)
+

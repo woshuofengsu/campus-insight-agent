@@ -74,6 +74,11 @@
   --ink-purple: #7C3AED;
   --ink-warning: #B45309;
   --primary-ink: #2D5BFF;   /* 主色作为「文字」用时（暗色下 #2D5BFF 只有 3.4:1） */
+  /* 「浅蓝底（--primary-light）上的文字」专用深色：
+     `--ink-info`(#2563EB) 铺在 #E8EDFF 上只有 **4.43:1**，低于 13.6px 文字要求的 4.5:1。
+     这个组合只在**有草稿时**才渲染，所以静态审计长期碰不到——属于"数据相关"的无障碍缺陷。
+     单独给一个更深的值（7.47:1），不去改 `--ink-info`（它在白底上是对的数）。 */
+  --primary-light-ink: #1E40AF;
 }
 
 body.dark {
@@ -93,6 +98,8 @@ body.dark {
   --ink-purple: #C4B5FD;
   --ink-warning: #FCD34D;
   --primary-ink: #8FA8FF;
+  /* 暗色下 --primary-light 是深蓝底(#1E3A8A)，配亮字 8.49:1（与 :root 的深蓝字成对） */
+  --primary-light-ink: #DBEAFE;
   /* 暗色下浅绿卡片变深绿底 → 绿字改用亮绿，白字红底仍用 #DC2626（4.83:1） */
   --success-ink: #6EE7B7;
   --danger-solid: #DC2626;

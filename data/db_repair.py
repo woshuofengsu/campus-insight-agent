@@ -179,7 +179,8 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
                  draft_id: int | None = None,
                  allow_missing_phone: bool = False,
                  field_sources: dict | None = None,
-                 suggested_category: str = "") -> tuple[int, str]:
+                 suggested_category: str = "",
+                 is_demo: int = 0) -> tuple[int, str]:
     """提交报修。返回 (工单 ID, 提示语)。
 
     校验必填项、手机号格式；识别特殊情况；信息齐全生成工单（状态待审核）。
@@ -200,6 +201,10 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
     （2026-09-29 基线核对：285 条工单 `suggested_category` **全部为空**）。
     ⚠️ 只有**系统真的做过分类**时才传：居民自己在下拉框里选分类的那种，
       没有"系统建议"这回事，传空串才是诚实的（否则会把人工选择冒充成系统命中）。
+
+    `is_demo`（v53）：`1` = 演示数据（由 `scripts/seed_*.py` 走真实链路造），默认 `0` = 真实来源。
+    为什么要标：演示工单会和真实工单混进同一张统计表，不标记就会**把自造数据算成真实样本**。
+    标记之后对照清单能分开报分母，面板也能对演示部分固定显示免责说明。
     """
     title = scrub_field(title, "issue.title")
     location = scrub_field(location, "issue.location")
@@ -247,13 +252,13 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
             "description, urgency, status, reporter_id, reporter_name, reporter_phone, "
             "photo_before, is_agent_report, agent_name, agent_phone, agent_relation, "
             "is_violation, non_community_responsibility, "
-            "reporter_phone_enc, agent_phone_enc, field_sources, suggested_category) "
-            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)",
+            "reporter_phone_enc, agent_phone_enc, field_sources, suggested_category, is_demo) "
+            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)",
             (title, category, issue_type, location, description, urgency, reporter_id,
              reporter_name, photo_before, is_agent_report,
              agent_name, agent_relation, is_violation, non_resp,
              _enc_phone(reporter_phone), _enc_phone(agent_phone), sources_json,
-             (suggested_category or "").strip()[:40]),
+             (suggested_category or "").strip()[:40], 1 if is_demo else 0),
         )
         issue_id = cur.lastrowid
         # 多租户（v48）：写入侧必须落租户——报修人

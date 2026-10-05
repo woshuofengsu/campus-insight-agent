@@ -841,6 +841,30 @@ def _m52_issue_field_sources(conn):
         "ON community_issues(category, status)")
 
 
+def _m53_issue_is_demo(conn):
+    """v53：给工单加 `is_demo` 标记（**演示数据必须能被认出来**）。
+
+    为什么要这一列（外部复核 P2 的要求）：为了让"系统建议 vs 人工最终"的对照样本多一点，
+    我们用 `scripts/seed_category_demo.py` 走**真实链路**造了一批演示工单。
+    这些工单是真的（真实接口、真实分类、真实留痕），但**不是真实居民诉求**——
+    如果不做标记，它们会和真实工单混在一起被统计，于是"覆盖率/一致率"里就掺了演示数据，
+    而材料上不会写这件事。**那正是本项目最忌讳的"数字看着是真的、其实是自造的"。**
+
+    加一列的代价很小，换来的是三件事：
+      ① 对照清单能分开报"真实 / 演示"两个分母；
+      ② 面板能对演示部分**固定显示四条免责**（演示数据 · 不代表真实居民样本 ·
+         不用于模型训练 · 不代表线上准确率）；
+      ③ 将来真实试点开始后，演示数据可以一键排除。
+
+    口径：`1` = 演示数据（由 `seed_*` 脚本走真实链路造）；`0`（默认）= 真实来源。
+    **只允许演示链路写 1**，业务代码不得把真实工单标成演示（反过来也不行）。
+
+    ⚠️ 与 v46 的规矩一致：**运行时不许 ALTER**，加列只走迁移；幂等（`_add_column` 自己查 PRAGMA）。
+    """
+    from data.db_core import _add_column
+    _add_column(conn, "community_issues", "is_demo", "is_demo INTEGER DEFAULT 0")
+
+
 def _m48_tenant_isolation(conn):
     """v48：多租户真隔离（核心表）——加列 → 归一化 → 按归属人回填 → 索引。
 
@@ -1317,6 +1341,7 @@ def init_db(db_path: str):
         (50, "handoff_workbench", _m50_handoff_workbench),
         (51, "notification_outbox", _m51_notification_outbox),
         (52, "issue_field_sources", _m52_issue_field_sources),
+        (53, "issue_is_demo", _m53_issue_is_demo),
     ]
     for version, name, fn in post:
         if version <= current:

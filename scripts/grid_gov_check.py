@@ -221,6 +221,21 @@ def main():
                 # 留痕异常必须为 0（我们是通过受控入口改的）
                 check("⑧ 受控入口改的分类都能查到留痕（unlogged_changes=0）",
                       d["unlogged_changes"] == 0, str(d["unlogged_changes"]))
+            # 演示数据免责（外部复核 P2：必须显示四条，缺一不可）
+            if (d.get("demo") or {}).get("total"):
+                check("⑨ 有演示数据时页面上必须出现四条免责",
+                      page.locator("[data-corr-demo]").count() > 0, "免责块没渲染")
+                dtxt = page.locator("[data-corr-demo]").inner_text()
+                missing = [k for k in ("演示数据", "不代表真实居民样本", "不用于模型训练", "不代表线上准确率")
+                           if k not in dtxt]
+                check("⑨ 四条免责齐全（演示数据/不代表真实居民样本/不用于模型训练/不代表线上准确率）",
+                      not missing, f"缺：{missing}" if missing else dtxt.replace("\n", " ")[:90])
+                check("⑨ 免责块把「已标记演示」与「未标记」分开报（不混成一个分母）",
+                      "已标记" in dtxt and "未标记" in dtxt, dtxt.replace("\n", " ")[:90])
+            else:
+                check("⑨ 无演示数据时不该显示免责块（避免常驻噪音）",
+                      page.locator("[data-corr-demo]").count() == 0)
+
 
         br.close()
 

@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1107 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1112 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -19,7 +19,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ```
 
 - **主服务**：`uvicorn api_web:app --port 8000`（FastAPI）
-- **数据库**：SQLite（`data/community_insight.db`），schema **v52**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
+- **数据库**：SQLite（`data/community_insight.db`），schema **v53**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
 
 ## 多智能体核心（9 个声明式角色）
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1107 项：1106 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1112 项：1111 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -54,7 +54,11 @@ elderly:  demo_elderly（免登录）
 ## 数据库迁移约定
 
 - schema 版本在 `data/db_core.py`，迁移函数命名 `_m{N}_{name}`，注册进 `post` 列表（`(version, name, fn)`），幂等（`_add_column` 用 PRAGMA 检查）
-- **当前版本 v52**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
+- **当前版本 v53**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填；v52 = 工单字段来源与处置归类；
+  **v53 = `community_issues.is_demo` 演示数据标记**）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
+- **加迁移后要同步文档数字**：`python scripts/sync_schema_numbers.py`（把各份材料里的
+  `schema vN` / `N 个迁移` 一次改到当前值，**历史基线块内一字不动**）→ 再跑 `check_claims.py` 复核。
+  以前没有这个入口，每次加迁移都得手改十几处、漏一处只有门禁才报
 - 迁移脚本放 `scripts/`（照 `migrate_phone_encryption_v39.py` 模式：含 `_ensure_db()`、可回滚 `--rollback`、幂等）
 - **D12（评审建议）**：`data/db_policy.proposal/elderly_care/health_content/weather/notice` 各 800–1240 行，**比赛期不做大重构**；答辩后按 read/write 拆分（纯计算抽 `data/_*_logic.py` + 单测），其结构写入 WS11
 
@@ -70,7 +74,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1107 项测试**（1106 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1112 项测试**（1111 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -138,6 +142,10 @@ elderly:  demo_elderly（免登录）
   **不要在内联样式里写死 hex**：写死色在暗色下不跟着换，`ui_audit` 会抓（第九轮抓到 6 处这类问题）。
 - **界面图形一律用 `<EIcon name="…"/>`，禁止 emoji 当图标**（2026-09-29 全站换掉 557 处）：
   emoji 是各厂商字形（大小/配色/有无都不同），`ui_audit` 与 `mobile_audit` 都测不出"字形不确定"。
+  ⚠️ **连注释里也不行**：`tests/test_no_emoji_ui.py` 会扫 `web/src/**` 的 `.vue/.js/.ts` **逐行**，
+  注释里的 `⚠️` 一样报红（**这条我已经踩中两次**：`Dashboard.vue`、`AgentChat.vue`）——
+  在 `web/src` 里写注释请直接用中文（"注意："），唯一豁免是 `utils/weatherIcon.js`（它按 emoji 选图标，
+  是**输入匹配**而不是渲染）。
   图标在 `web/src/config/icons.js`（语义命名，不够就加一个）；写死的名字与配置里的 `icon: '…'`
   必须是表里真实存在的名字（写错只会静默显示成「更多」图标）→ `tests/test_no_emoji_ui.py` 会红。
   天气图标用 `utils/weatherIcon.js` 由**文字**选图标（后端仍返回 emoji 字段，但界面不再直接渲染它）。
@@ -168,14 +176,17 @@ elderly:  demo_elderly（免登录）
 | `agent/orchestrator.py` | 多 Agent 编排（黑板、协商、Verifier/Arbiter 接入、转人工）|
 | `agent/roles/business_agents.py` | 5 个业务角色（报修/提案/政策/健康/通知）|
 | `agent/roles/auto_agents.py` | 天气守护 + 网格助手 |
-| `data/db_core.py` | schema + 迁移注册（**v52**）|
+| `data/db_core.py` | schema + 迁移注册（**v53**）|
+| `scripts/sync_schema_numbers.py` | 加迁移后**一键同步**各份材料里的 `schema vN / N 个迁移`（历史基线块内不动）|
+| `scripts/seed_category_demo.py` | 对照清单的**演示数据**准备（走真实链路造 + `--mark-existing` 补 `is_demo`；脚本自称"是演示数据"）|
+| `web/public/device-check.html` | **真机自查页**：在真机上打开即测出浏览器/语音/播报/拨号能力并生成可粘贴报告（配合 `docs/eval/真机验证记录.md`）|
 | `web/src/views/{resident,grid,elderly}/` | 三端页面 |
 | `docs/mobile-deploy.md` | 移动端部署 + 发布检查清单 |
 | `scripts/serve_public.py` | **本机常开一键工具**：起服务（默认只绑 127.0.0.1）+ 公网 HTTPS 隧道 + 抓新域名 + 刷新扫码页（`--status` / `--stop` / `--lan` / `--autostart`）|
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 六十四 节**：外部复核三点核实 + 门禁盲区修复）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 六十五 节**：能做的全部收口 / 六十四：门禁盲区修复）|
 | `scripts/journey_check.py` | **首批八条浏览器旅程**（发布门槛，8 条 / 63 项）：页面真点击 + 接口 + 库内事实三处对账 |
 | `scripts/grid_gov_check.py` | **治理侧两项对账**（26 项）：情景模拟器 + 人工修正对照清单，页面/接口/库内三处同一个数 |
 | `data/db_governance_sim.py` | **治理情景模拟器**（只读）：样本量×增长率 → 工时 → 折算人手；**算不出来就明说**（不给人手数、不拿默认值硬算）|
@@ -228,5 +239,14 @@ elderly:  demo_elderly（免登录）
   **补 `suggested_category` 写入侧**（`category` 会被人工改、`suggested_category` 保留系统原值）·
   **人工修正对照清单**（`/issues/category-corrections`，**覆盖率必须与一致率一起看**，
   无留痕的改动要露头，明确「不用于模型训练」）（见 dev-log **六十三** 节）
+- **外部复核三点核实与门禁盲区修复（见 dev-log 六十四）**：判据从"只认 `HTTP 路由 N`"扩到
+  `N 条路由` / `N 张业务表`（**提交件用的正是后者**，原先漏检 4 处）；**pytest 不可用时 `check_claims` 直接失败**；
+  历史基线与当前值用 `<!-- baseline:historical -->` 分开写；`sync_test_count` 变历史感知（不再篡改历史）；
+  "覆盖率不得写成准确率"变成门禁
+- **"能做的"全部收口（见 dev-log 六十五）**：真实 DeepSeek 兼容 **3/3**、LLM 评分 **3/3**、语料指纹复核一致
+  （材料里"真实模型链路未跑"已改正）· 迁移 **v53 `is_demo`** 让**演示数据可辨认**（面板四条免责 +
+  已标记/未标记分开报）· `/device-check.html` **真机自查页** + `docs/eval/真机验证记录.md`（未开展）·
+  `docs/eval/社区试点方案-v1.md`（未开展）· `scripts/sync_schema_numbers.py`（加迁移后一键同步材料数字）·
+  修掉一处**数据相关**的对比度缺陷（草稿提示 4.43:1 → 新令牌 `--primary-light-ink`）
 
-详见 `docs/spec/dev-log.md`（最新 **六十四** 节）。
+详见 `docs/spec/dev-log.md`（最新 **六十五** 节）。

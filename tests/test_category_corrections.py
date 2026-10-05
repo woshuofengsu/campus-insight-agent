@@ -266,5 +266,75 @@ def test_route_limit_is_clamped(fresh_db):
         _submit(f"单{i}", suggested="设施维修", category="设施维修")
     r = issue_category_corrections(_req(GRID_A), days=180, limit=2)
     assert len(r["data"]["items"]) == 2
-    r2 = issue_category_corrections(_req(GRID_A), days=180, limit=9999)
+    r2 = issue_category_corrections(_req(GRID_A), days=180, limit=200)
     assert len(r2["data"]["items"]) == 6
+
+
+# --------------------------------------------------------------------------------
+# v53：**演示数据必须能被认出来**（外部复核 P2）
+#
+# 为了让对照样本多一点，我们用 seed 脚本走真实链路造过演示工单。它们是真的
+# （真实接口/真实分类/真实留痕）但**不是真实居民诉求**。不标记 → 会和真实工单混进同一个分母，
+# 于是"覆盖率/一致率"里掺了自造数据而材料上不写 —— 那正是本项目最忌讳的
+# "数字看着是真的、其实是自造的"。
+# --------------------------------------------------------------------------------
+
+def test_demo_flag_is_separated_from_real_data(fresh_db):
+    """演示数据与真实数据必须**分开报**（三个分母：total / real / demo）。"""
+    from data.db_issue_knowledge import category_corrections
+    from data.db_repair import submit_issue
+    # 3 条真实 + 2 条演示（演示的走同一个提交入口，只是带 is_demo=1）
+    for i in range(3):
+        _submit(f"真实单{i}", suggested="设施维修", category="设施维修")
+    for i in range(2):
+        # ⚠️ description 有"至少 5 个字"的校验（实测踩到：写成"演示数据"会被如实拦下）
+        iid, hint = submit_issue(
+            title=f"演示单{i}", category="环境卫生", issue_type="室外",
+            location="3号楼2单元", description="这是一条演示用的诉求描述", urgency="一般",
+            reporter_name="演示居民", reporter_phone="13800002222",
+            reporter_id=RESIDENT_A, suggested_category="环境卫生", is_demo=1)
+        assert iid > 0, f"演示单没建成：{hint}"
+        with db_core.get_db() as conn:
+            conn.execute("UPDATE community_issues SET tenant_id=? WHERE id=?", (A, iid))
+            conn.commit()
+    r = category_corrections(days=180, tenant=A)
+    assert r["total"] == 5
+    assert r["demo"]["total"] == 2, r["demo"]
+    assert r["real"]["total"] == 3, r["real"]
+    assert r["demo"]["with_suggestion"] == 2 and r["real"]["with_suggestion"] == 3
+    # 免责声明由数据驱动：分母里有演示数据就必须出现那三条
+    assert "不代表真实居民样本" in r["demo_note"]
+    assert "不用于模型训练" in r["demo_note"]
+    assert "不代表线上准确率" in r["demo_note"]
+    # ⚠️ 不许把"未标记"那部分叫成"真实居民数据"（演示库里那些同样来自演示/验证脚本）
+    assert "真实来源工单" not in r["demo_note"], r["demo_note"]
+    assert "未标记" in r["demo_note"], r["demo_note"]
+    # 明细也要标出哪条是演示，别让人自己猜
+    demo_items = [i for i in r["items"] if i["is_demo"]]
+    assert len(demo_items) == 2, r["items"]
+
+
+def test_demo_flag_defaults_off_and_demo_note_empty(fresh_db):
+    """默认不是演示数据；没有演示数据时免责声明为空（不能变成常驻噪音）。"""
+    from data.db_issue_knowledge import category_corrections
+    _submit("真实单", suggested="设施维修", category="设施维修")
+    r = category_corrections(days=180, tenant=A)
+    assert r["demo"]["total"] == 0 and r["real"]["total"] == 1
+    assert r["demo_note"] == "", r["demo_note"]
+
+
+def test_demo_flag_only_honoured_in_demo_mode(fresh_db, monkeypatch):
+    """**安全闸**：`mark_as_demo` 只在 `DEMO_MODE` 生效，生产姿态必须忽略。
+
+    为什么要这道闸：这个标记是"把自造样本从真实样本里剔除"的依据。
+    生产环境也能随便标，就等于开了一条"把真实工单伪装成演示数据（或反过来）"的路，
+    统计口径可以被调用方改写。所以这里直接调真函数验证两个姿态，而不是读源码猜。
+    """
+    import config as _cfg
+    from api_routes.elderly import _demo_flag
+    monkeypatch.setattr(_cfg, "DEMO_MODE", True, raising=False)
+    assert _demo_flag(True, 1) == 1, "演示姿态下标记应当生效"
+    assert _demo_flag(False, 1) == 0, "不传就不该标"
+    monkeypatch.setattr(_cfg, "DEMO_MODE", False, raising=False)
+    assert _demo_flag(True, 1) == 0, "生产姿态竟然允许把工单标成演示数据（口径可被改写）"
+    assert _demo_flag(False, 1) == 0
