@@ -153,10 +153,10 @@ async function exportNotices() {
       <div style="font-weight:700;margin-bottom:10px;"><EIcon name="plus" :size="18" /> 新建通知</div>
       <n-grid :cols="2" :x-gap="16">
         <n-form-item-gi label="标题">
-          <n-input v-model:value="form.title" maxlength="50" />
+          <n-input v-model:value="form.title" size="large" maxlength="50" />
         </n-form-item-gi>
         <n-form-item-gi label="类型">
-          <n-select v-model:value="form.notice_type" :options="TYPES.map(v=>({label:v,value:v}))" />
+          <n-select v-model:value="form.notice_type" size="large" :options="TYPES.map(v=>({label:v,value:v}))" />
         </n-form-item-gi>
       </n-grid>
       <n-form-item label="正文">
@@ -167,21 +167,21 @@ async function exportNotices() {
                   list-type="image-card" :default-upload="false" />
       </n-form-item>
       <n-form-item label="发布范围">
-        <n-select v-model:value="form.publish_scope" :options="['全体居民','指定小区','指定楼栋','仅老年端'].map(v=>({label:v,value:v}))" />
+        <n-select v-model:value="form.publish_scope" size="large" :options="['全体居民','指定小区','指定楼栋','仅老年端'].map(v=>({label:v,value:v}))" />
       </n-form-item>
       <n-form-item v-if="['指定小区', '指定楼栋'].includes(form.publish_scope)" label="目标（逗号分隔，多选）">
-        <n-input v-model:value="form.scope_targets" :placeholder="form.publish_scope === '指定小区' ? '如：幸福小区,阳光小区' : '如：3号楼2单元,5号楼1单元'" />
+        <n-input v-model:value="form.scope_targets" size="large" :placeholder="form.publish_scope === '指定小区' ? '如：幸福小区,阳光小区' : '如：3号楼2单元,5号楼1单元'" />
       </n-form-item>
       <n-checkbox v-model:checked="form.is_urgent"><EIcon name="siren" :size="18" /> 紧急通知（自动置顶 + 弹窗，需二次确认）</n-checkbox>
       <n-form-item v-if="form.is_urgent" label="老年端播报摘要（紧急必填，≤30字）">
-        <n-input v-model:value="form.elderly_summary" maxlength="30" placeholder="口语化一句话" />
+        <n-input v-model:value="form.elderly_summary" size="large" maxlength="30" placeholder="口语化一句话" />
       </n-form-item>
       <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
         <n-radio-group v-model:value="publishMode">
           <n-radio value="now">立即发布</n-radio>
           <n-radio value="schedule">定时发布</n-radio>
         </n-radio-group>
-        <n-input v-if="publishMode === 'schedule'" v-model:value="form.scheduled_at" placeholder="定时时间，如 2026-08-22 09:00" style="max-width:240px;" />
+        <n-input v-if="publishMode === 'schedule'" v-model:value="form.scheduled_at" size="large" placeholder="定时时间，如 2026-08-22 09:00" style="max-width:240px;" />
       </div>
       <div style="margin-top:10px;">
         <n-popconfirm v-if="form.is_urgent" @positive-click="create" :positive-button-props="{ type: 'error' }">
@@ -194,10 +194,13 @@ async function exportNotices() {
       </div>
     </div>
 
+    <!-- 手机上这些筛选控件默认只有 28px 高（手指点不准）→ 统一用 large 尺寸；
+         这条是 2026-09-29 手机端专项核对抓到的：`mobile_audit` 只量按钮/链接，
+         NaiveUI 的 n-select 不在它的选择器里，所以之前"全部通过"并不代表筛选栏能点。 -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-      <n-select v-model:value="typeFilter" :options="TYPES.map(v=>({label:v,value:v}))" style="width:150px;" />
-      <n-select v-model:value="statusFilter" :options="STATUS_OPTIONS.map(v=>({label:v,value:v}))" style="width:120px;" />
-      <n-button size="small" @click="exportNotices"><EIcon name="arrowDown" :size="18" /> 导出</n-button>
+      <n-select v-model:value="typeFilter" size="large" :options="TYPES.map(v=>({label:v,value:v}))" style="width:150px;" />
+      <n-select v-model:value="statusFilter" size="large" :options="STATUS_OPTIONS.map(v=>({label:v,value:v}))" style="width:130px;" />
+      <n-button @click="exportNotices"><EIcon name="arrowDown" :size="18" /> 导出</n-button>
       <span class="muted" style="font-size:0.8rem;">已发布 30 秒 / 紧急 10 秒自动刷新</span>
     </div>
 

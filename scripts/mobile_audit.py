@@ -162,6 +162,13 @@ PAGES = [
     ("grid-elderly-care", "grid", "/grid/elderly-care", (390, 844), False),
     # 卡11 / v3 卡7：人工待办工作台
     ("grid-handoffs", "grid", "/grid/handoffs", (390, 844), False),
+    # 2026-09-29 补：网格端"要出门在手机上办"的其余管理页，之前没被移动端审计覆盖
+    # （本轮新增的升级名单、同类处置画像就落在 weather / qa 两页上——不覆盖等于没审）
+    ("grid-weather", "grid", "/grid/weather", (390, 844), False),
+    ("grid-qa", "grid", "/grid/qa", (390, 844), False),
+    ("grid-notices", "grid", "/grid/notices", (390, 844), False),
+    ("grid-proposals", "grid", "/grid/proposals", (390, 844), False),
+    ("grid-health", "grid", "/grid/health", (390, 844), False),
     ("screen-mobile", "grid", "/screen", (390, 844), False),
     ("elderly-home", "elderly", "/elderly/home", (390, 844), True),
     ("elderly-agent", "elderly", "/elderly/agent", (390, 844), True),

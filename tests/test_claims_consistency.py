@@ -248,3 +248,52 @@ def test_current_status_docs_still_reference_ablation_smoke_scope():
     if "消融" in text:
         assert "冒烟" in text or "供数" in text, \
             "交付说明提到消融用例，应说明其性质（供数冒烟项 + 关键指标另有强断言）"
+
+
+# ---------------------------------------------------------------- 结构数字（2026-09-29 新增）
+
+def test_structure_numbers_in_docs_match_code():
+    """材料里的**结构数字**必须与代码一致：schema / HTTP 路由 / Agent 角色 / 业务表 /
+    迁移条数 / UI 审计视口数 / 移动审计页数。
+
+    为什么补这一条：实测发现 `技术实现报告.md` 与 `演示脚本.md` 里还写着
+    「schema v51 · HTTP 路由 135 · 业务表 51 · 54 页视口 · 21 页移动端审计」——
+    而代码早已是 v52 / 150 / 53 / 58 / 31。**测试数那条守卫很严（逐处核对），
+    结构数字却没人管**，于是静默漂移了好几轮。评委真去数一遍就是「材料与实际不符」。
+    """
+    struct = {"schema": C._schema_version(), "routes": C._route_count(),
+              "roles": C._role_count(), "tables": C._table_count(),
+              "migrations": C._migration_count(), **C._audit_counts()}
+    # 直接调用生产用的核对逻辑；返回 1 即说明有文档对不上
+    assert C._cross_check(0, struct) == 0, "材料里的结构数字与代码不一致（详见 check_claims 输出）"
+
+
+def test_structure_gate_would_catch_a_stale_number():
+    """**门禁自检**：给一个错的结构数字，核对逻辑必须报出来（证明它不是摆设）。"""
+    import tempfile
+
+    fake = os.path.join(tempfile.mkdtemp(prefix="claims_selfcheck_"), "doc.md")
+    io.open(fake, "w", encoding="utf-8").write(
+        "> schema **v1** · HTTP 路由 **3** · Agent 角色 **1** · 业务表 **2** · 5 个版本化迁移\n")
+    orig_docs, orig_exempt = C.CURRENT_DOCS, C.COUNT_EXEMPT
+    try:
+        rel = os.path.relpath(fake, PROJ)
+        C.CURRENT_DOCS = [rel]
+        C.COUNT_EXEMPT = set()
+        rc = C._cross_check(0, {"schema": 52, "routes": 150, "roles": 9, "tables": 53,
+                                "migrations": 51, "viewports": 58, "audit_routes": 37,
+                                "mobile_pages": 31})
+        assert rc == 1, "假文档里全是错数字，核对逻辑竟然放过了（门禁失效）"
+    finally:
+        C.CURRENT_DOCS, C.COUNT_EXEMPT = orig_docs, orig_exempt
+
+    # 反向：数字写对时不该报错
+    io.open(fake, "w", encoding="utf-8").write("> schema **v52** · HTTP 路由 **150**\n")
+    orig_docs = C.CURRENT_DOCS
+    try:
+        C.CURRENT_DOCS = [os.path.relpath(fake, PROJ)]
+        assert C._cross_check(0, {"schema": 52, "routes": 150, "roles": 9, "tables": 53,
+                                  "migrations": 51, "viewports": 58, "audit_routes": 37,
+                                  "mobile_pages": 31}) == 0, "数字写对却被判错（误报）"
+    finally:
+        C.CURRENT_DOCS = orig_docs

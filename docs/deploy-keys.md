@@ -84,7 +84,7 @@ python -c "import secrets,base64;print(base64.b64encode(secrets.token_bytes(32))
 
 | 泄漏项 | 立即处置 |
 |---|---|
-| `WEB_JWT_SECRET` | ① 立即轮换密钥；② 通知全部用户重新登录；③ 用 `trace_id`（schema v37）对可疑 `activity_log`/`agent_logs` 追溯；④ 若 token 被截图传输，检查是否 `Authorization` 头泄漏。 |
+| `WEB_JWT_SECRET` | ① 立即轮换密钥；② 通知全部用户重新登录；③ 用 `trace_id`（`agent_logs`/`activity_log` 都带）对可疑记录/`agent_logs` 追溯；④ 若 token 被截图传输，检查是否 `Authorization` 头泄漏。 |
 | `CRYPTO_KEY` | ① 立即换钥并走第 4 节全量重加密；② 对已泄漏窗口内的手机号排查是否被明文读取（`phone` 列应为空）。 |
 | `DEEPSEEK_API_KEY` / `SMTP_PASS` | ① 到对应平台重置；② 查 API 用量异常。 |
 | `.env` 文件被提交 | ① 立即从 git 历史清除（建议用 BFG/filter-repo）；② **轮换所有含密钥**；③ 确认 `.gitignore` 有 `.env`/`.env.bak`。 |

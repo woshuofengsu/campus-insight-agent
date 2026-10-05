@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1057 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1059 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1057 项：1056 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1059 项：1058 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1057 项测试**（1056 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1059 项测试**（1058 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -208,7 +208,7 @@ elderly:  demo_elderly（免登录）
 - **提交前最后一批（2026-09-29 深夜，v4 第 2/3 批收尾）**：居民端政策问答**依据面板**（含决策元数据 + 门禁）·
   语义文字色一律换 `-ink` 成对令牌（`ui_audit` 抓到方案详情 2.31:1）· 对抗集 **21 → 60 条**（四类各 15，
   3 条未达标项登记在台账 §7.1，不调参掩盖）（见 dev-log **五十九** 节）
-- **全站去 emoji（557 处 → 0，单色线性图标体系；首轮按码位扫 539，端到端复核又补出 ⏱️↩️▶️⏸️ 一类 18）**：`web/src/config/icons.js`（约 70 个语义图标）+
+- **全站去 emoji（557 处 → 0，单色线性图标体系；首轮按码位扫 539，端到端复核又补出 ⏱️↩️▶️⏸️ 一类 18）**：`web/src/config/icons.js`（122 个语义图标，含少量别名）+
   `components/EIcon.vue` 全站通用 + `utils/weatherIcon.js`（天气图标改由文字选图标，后端数据没动）；
   门禁 `tests/test_no_emoji_ui.py`（0 emoji / 图标名必须存在 / 必须 currentColor 与 aria-hidden / 扫描器自检）
   （见 dev-log **六十** 节）

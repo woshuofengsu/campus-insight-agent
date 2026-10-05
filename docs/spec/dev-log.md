@@ -2508,7 +2508,7 @@ emoji 是各厂商字形（大小、配色、有的干脆没有），而三端�
 
 ### 一、做法（一套东西，三端复用）
 
-- 新增 `web/src/config/icons.js`：**约 70 个单色线性图标**（24×24 视框、线宽 2、只有 `stroke`），
+- 新增 `web/src/config/icons.js`：**122 个单色线性图标（含少量语义别名）**（24×24 视框、线宽 2、只有 `stroke`），
   名字按**语义**取（`wrench`/`bell`/`siren`/`hospital`…），不按形状取；同一语义三端共用一个图形。
 - 新增 `web/src/utils/weatherIcon.js`：天气图标原来是**后端给的 emoji**（`emoji` 字段），现在改成
   **前端按天气文字选图标**（`晴/少云/多云/阴/雨/雪/沙雾霾/风` → `sun/cloud-sun/cloud/cloud-rain/cloud-snow/cloud-fog/wind`），

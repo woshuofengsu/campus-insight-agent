@@ -312,7 +312,7 @@ async function kgSearch() {
             样本不足会明确标注，不拿两三条记录当规律。
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <n-select v-model:value="profileCat" :options="profileOptions" style="width:170px;"
+            <n-select v-model:value="profileCat" :options="profileOptions" size="large" style="width:180px;"
                       @update:value="loadProfile" />
             <n-button type="primary" :loading="profileLoading" @click="loadProfile">查询</n-button>
             <span class="muted" style="font-size:0.82rem;align-self:center;">

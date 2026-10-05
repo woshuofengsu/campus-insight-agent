@@ -98,19 +98,47 @@ def _table_count() -> int:
         con.close()
 
 
+def _migration_count() -> int:
+    """版本化迁移条数 = db_core 的 post 注册表条数（不是 schema 版本号，两者差 1）。"""
+    import io as _io
+    import re as _re
+    src = _io.open(os.path.join(_PROJ, "data", "db_core.py"), encoding="utf-8").read()
+    post = src.split("post = [", 1)[1].split("\n    ]", 1)[0]
+    return len(_re.findall(r"\((\d+),\s*\"", post))
+
+
+def _audit_counts() -> dict:
+    """UI 审计的视口数/路由页数、移动审计的页数（材料里会写这些数）。"""
+    import scripts.mobile_audit as M
+    import scripts.ui_audit as U
+    specs = getattr(U, "PAGES", None) or getattr(U, "SPECS", None) or []
+    routes = set()
+    for s in specs:
+        try:
+            routes.add(s[2])
+        except (IndexError, TypeError):
+            continue
+    return {"viewports": len(specs), "audit_routes": len(routes), "mobile_pages": len(M.PAGES)}
+
+
 def main():
     runnable, total = _pytest_collection_count()
     # 明细不写死：按「可运行 = 通过 + 1 项需外部服务跳过」推导，避免总数变了明细没变
     passed = max(0, runnable - 1)
+    struct = {"schema": _schema_version(), "routes": _route_count(),
+              "roles": _role_count(), "tables": _table_count(),
+              "migrations": _migration_count(), **_audit_counts()}
     print("社区先知 CommunityInsight —— 当前代码库事实数字：")
     print(f"  pytest 可运行用例数  : {runnable}（= {passed} 通过 + 1 需外部服务默认跳过）")
     print(f"  pytest 收集总数      : {total}（含 {max(0, total - runnable)} 项按标记排除；对外报「可运行」口径）")
-    print(f"  schema 版本号        : {_schema_version()}")
-    print(f"  HTTP 路由数          : {_route_count()}")
-    print(f"  Agent 角色数         : {_role_count()}")
-    print(f"  业务表数量           : {_table_count()}")
+    print(f"  schema 版本号        : {struct['schema']}（版本化迁移 {struct['migrations']} 条）")
+    print(f"  HTTP 路由数          : {struct['routes']}")
+    print(f"  Agent 角色数         : {struct['roles']}")
+    print(f"  业务表数量           : {struct['tables']}")
+    print(f"  UI 审计覆盖面        : {struct['audit_routes']} 个路由页 / {struct['viewports']} 个视口"
+          f" · 移动审计 {struct['mobile_pages']} 页")
     print("\n对外材料的数字请以以上为准；下表为自动核对结果：")
-    return _cross_check(runnable)
+    return _cross_check(runnable, struct)
 
 
 # 「当前状态文档」——数字必须与代码一致；历史快照（docs/review/**、dev-log、
@@ -171,12 +199,14 @@ STRUCTURE_ONLY = [
 ]
 
 
-def _cross_check(collected: int) -> int:
-    """① 登录页 meta.js 的用例数必须等于 pytest 收集数；② 当前状态文档不得含过时表述。"""
+def _cross_check(collected: int, struct: dict | None = None) -> int:
+    """① 登录页 meta.js 的用例数必须等于 pytest 收集数；② 当前状态文档不得含过时表述；
+    ③ **结构数字**（schema / HTTP 路由 / Agent 角色 / 业务表）也必须与代码实际值一致。"""
     import io
     import re
 
     bad: list[str] = []
+    struct = struct or {}
 
     meta = os.path.join(_PROJ, "web", "src", "config", "meta.js")
     if os.path.exists(meta):
@@ -222,6 +252,42 @@ def _cross_check(collected: int) -> int:
                 if int(m.group(1)) != passed:
                     bad.append(f"{doc}:{i} 写「{m.group(1)} 通过」，实测应为 {passed}"
                                f"（跑 `python scripts/sync_test_count.py {collected}` 同步）")
+
+    # ---- ③ 结构数字核对（2026-09-29 新增）----
+    # 为什么补这一条：实测发现 `技术实现报告.md` / `演示脚本.md` 里还写着
+    # 「schema v51 · HTTP 路由 135 · 业务表 51」——代码早就到 v52 / 150 / 53 了。
+    # 测试数那条守卫很严（每个数字都核对），结构数字却**没人管**，于是静默漂移了几轮。
+    # 评委真去数一遍就是"材料与实际不符"，比少写一个功能更伤。
+    # 规则：文档里凡出现 `schema vN` / `HTTP 路由 N` / `Agent 角色 N` / `业务表 N`，都必须等于实测值。
+    if struct:
+        pats = {
+            "schema": (r"schema\s*\*{0,2}v(\d+)", struct.get("schema"), "schema 版本"),
+            "routes": (r"HTTP\s*路由\s*\*{0,2}(\d{2,})", struct.get("routes"), "HTTP 路由数"),
+            "roles": (r"Agent\s*角色\s*\*{0,2}(\d+)", struct.get("roles"), "Agent 角色数"),
+            "tables": (r"业务表\s*\*{0,2}(\d{2,})", struct.get("tables"), "业务表数量"),
+            # 2026-09-29 再补三条：迁移条数、UI 审计视口数、移动端审计页数
+            # （实测这三处也漂了：「54 页视口 + 21 页移动端审计」vs 实际 58 / 31）
+            "migrations": (r"(\d{2,})\s*个(?:版本化)?迁移", struct.get("migrations"), "迁移条数"),
+            "viewports": (r"(\d{2,})\s*(?:页|个)视口", struct.get("viewports"), "UI 审计视口数"),
+            "mobile_pages": (r"(\d{2,})\s*页移动(?:端)?审计", struct.get("mobile_pages"), "移动审计页数"),
+        }
+        for doc in CURRENT_DOCS:
+            if doc in COUNT_EXEMPT or doc in STRUCTURE_EXEMPT:
+                continue
+            p = os.path.join(_PROJ, doc)
+            if not os.path.exists(p):
+                continue
+            txt = io.open(p, encoding="utf-8").read()
+            for i, ln in enumerate(txt.splitlines(), 1):
+                if "check_claims" in ln or "sync_test_count" in ln:
+                    continue
+                for _k, (pat, actual, label) in pats.items():
+                    if actual in (None, 0):
+                        continue
+                    for m in re.finditer(pat, ln):
+                        if int(m.group(1)) != int(actual):
+                            bad.append(f"{doc}:{i} 写「{label} {m.group(1)}」，实测 {actual}"
+                                       f"（结构数字必须与代码一致：{ln.strip()[:60]}）")
 
     # 历史文档必须带「这是历史实现」标注
     for doc, banner in LEGACY_BANNER_DOCS.items():

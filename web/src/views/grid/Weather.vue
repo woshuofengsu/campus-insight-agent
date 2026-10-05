@@ -88,6 +88,13 @@ async function saveSenior() {
   }
 }
 
+/** 整行可点：手机上只点那个小方块太难点（行高 ≥44px，见 .senior-row 样式）。 */
+function toggleSenior(id) {
+  const i = seniorIds.value.indexOf(id)
+  if (i >= 0) seniorIds.value = seniorIds.value.filter((x) => x !== id)
+  else seniorIds.value = [...seniorIds.value, id]
+}
+
 async function submitConfirm() {
   const t = confirmTask.value
   if (!t) return
@@ -141,14 +148,18 @@ function remainingText(t) {
           <div v-if="seniorCandidates.length === 0" class="muted" style="font-size:0.85rem;">
             暂时读不到本社区负责人名单（可能是负责人未登记所属社区）。
           </div>
+          <!-- 手机端专项核对（2026-09-29）：n-checkbox 默认只有 22px 高，手指点不准
+               → 每个候选人做成一行、行高 ≥44px（含整行可点，不只是那个小方块） -->
           <n-checkbox-group v-else v-model:value="seniorIds" data-senior-managers>
-            <n-space>
-              <n-checkbox v-for="c in seniorCandidates" :key="c.id" :value="c.id"
+            <div v-for="c in seniorCandidates" :key="c.id" class="senior-row"
+                 @click="toggleSenior(c.id)">
+              <n-checkbox :value="c.id" :checked="seniorIds.includes(c.id)"
+                          @click.stop
                           :label="`${c.name || c.username || ('#' + c.id)}（${c.role || '负责人'}）`" />
-            </n-space>
+            </div>
           </n-checkbox-group>
           <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <n-button size="small" type="primary" :loading="savingSenior" @click="saveSenior">
+            <n-button type="primary" :loading="savingSenior" @click="saveSenior">
               <EIcon name="save" :size="18" /> 保存名单
             </n-button>
             <span class="muted" style="font-size:0.82rem;" data-senior-scope>
@@ -256,3 +267,13 @@ function remainingText(t) {
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+/* 升级名单：整行可点、行高 ≥44px（手指点得准；桌面端也更好点） */
+.senior-row {
+  display: flex; align-items: center;
+  min-height: 44px; padding: 4px 6px; border-radius: 8px;
+  cursor: pointer;
+}
+.senior-row:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+</style>
