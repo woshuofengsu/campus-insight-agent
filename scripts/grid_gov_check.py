@@ -200,6 +200,12 @@ def main():
             check("⑧ 口径写明「不用于模型训练」",
                   "不用于模型训练" in ctxt or "不用于模型训练" in str(d.get("disclaimer")),
                   str(d.get("disclaimer"))[:80])
+            # 四项必须**同时**出现（外部复核：绝不能只展示一致率；未留痕数也该常显，0 也显）
+            shown_unlogged = page.locator("[data-corr-unlogged]").inner_text().strip()
+            check("⑧ 四项并列显示：覆盖率 / 一致率 / 被改过 / 未留痕（0 也显）",
+                  all(k in ctxt for k in ("覆盖率", "一致率", "被人工改过", "未留痕"))
+                  and shown_unlogged == str(d["unlogged_changes"]),
+                  f"未留痕显示 {shown_unlogged} / 接口 {d['unlogged_changes']}")
             check("⑧ 空清单有解释（不是一句冷冰冰的 0）",
                   d["with_suggestion"] > 0 or "预期" in (d.get("note") or ""), d.get("note", ""))
             # 有"被改过"的条目时：配对行与明细表都要真的渲染出来（不能只是数字好看）

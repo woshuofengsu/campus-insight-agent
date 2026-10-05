@@ -26,11 +26,17 @@ except Exception:  # noqa: BLE001
 
 
 def _pytest_collection_count() -> tuple[int, int]:
-    """返回 (可运行用例数, 收集总数)。
+    """返回 (可运行用例数, 收集总数)；**拿不到就返回 -1，调用方必须据此失败**。
 
     pytest -q 的汇总行形如 `572/575 tests collected (3 deselected)`：
     - 总数 575 含被 `-m` 标记排除的 3 项；
     - **可运行 572 = 571 通过 + 1 需要外部服务默认跳过**（对外报数字用这个，与登录页 meta.js 一致）。
+
+    ⚠️ 2026-09-29 修掉一个门禁缺口（外部复核指出）：本函数拿不到数字时返回 -1，
+    而调用方原来写 `if collected <= 0: continue` —— **静默跳过全部测试数核对，最后照样返回 0（绿灯）**。
+    也就是说"环境里没有 pytest"这件事会伪装成"口径全部一致"。
+    现在改成：**无法收集 = 直接失败**（要绕过必须显式 `--allow-no-pytest` 并在输出里写明，
+    免得有人拿没装 pytest 的环境得出"全绿"结论）。
     """
     import re
     try:
@@ -123,20 +129,35 @@ def _audit_counts() -> dict:
 
 def main():
     runnable, total = _pytest_collection_count()
+    allow_no_pytest = "--allow-no-pytest" in sys.argv[1:]
     # 明细不写死：按「可运行 = 通过 + 1 项需外部服务跳过」推导，避免总数变了明细没变
     passed = max(0, runnable - 1)
     struct = {"schema": _schema_version(), "routes": _route_count(),
               "roles": _role_count(), "tables": _table_count(),
               "migrations": _migration_count(), **_audit_counts()}
     print("社区先知 CommunityInsight —— 当前代码库事实数字：")
-    print(f"  pytest 可运行用例数  : {runnable}（= {passed} 通过 + 1 需外部服务默认跳过）")
-    print(f"  pytest 收集总数      : {total}（含 {max(0, total - runnable)} 项按标记排除；对外报「可运行」口径）")
+    if runnable > 0:
+        print(f"  pytest 可运行用例数  : {runnable}（= {passed} 通过 + 1 需外部服务默认跳过）")
+        print(f"  pytest 收集总数      : {total}（含 {max(0, total - runnable)} 项按标记排除；对外报「可运行」口径）")
+    else:
+        # ⚠️ 门禁缺口修复（外部复核指出）：原来这里会静默跳过测试数核对、最后返回 0——
+        # "环境里没有 pytest"于是伪装成"口径全部一致"。现在**默认失败**。
+        print("  pytest 可运行用例数  : **无法收集**（本环境跑不了 pytest）")
+        print("  pytest 收集总数      : **无法收集**")
     print(f"  schema 版本号        : {struct['schema']}（版本化迁移 {struct['migrations']} 条）")
     print(f"  HTTP 路由数          : {struct['routes']}")
     print(f"  Agent 角色数         : {struct['roles']}")
     print(f"  业务表数量           : {struct['tables']}")
     print(f"  UI 审计覆盖面        : {struct['audit_routes']} 个路由页 / {struct['viewports']} 个视口"
           f" · 移动审计 {struct['mobile_pages']} 页")
+    if runnable <= 0 and not allow_no_pytest:
+        print("\n❌ 口径核对**无法完成**：本环境收集不到 pytest 用例数（缺 pytest / 装在别的解释器里）。")
+        print("   → 装好测试依赖后重跑；确实只做结构数字核对时，显式加 `--allow-no-pytest`，")
+        print("     但**那种情况下不得对外说「口径门禁全绿」**（测试数那一半根本没核对）。")
+        return 1
+    if runnable <= 0 and allow_no_pytest:
+        print("\n⚠️ 已按 --allow-no-pytest 继续：**测试数口径未核对**，"
+              "本次结果不能作为「口径全绿」的依据（只有结构数字被核对过）。")
     print("\n对外材料的数字请以以上为准；下表为自动核对结果：")
     return _cross_check(runnable, struct)
 
@@ -202,6 +223,55 @@ STRUCTURE_ONLY = [
     "50 张表", "46 个版本化迁移", "46 个迁移", "**46 个版本化迁移**",
 ]
 
+#: 「历史基线」块的起止标记：夹在中间的行**允许保留当时的数字**（改它等于篡改历史），
+#: 块外的行必须与当前代码一致。
+#:
+#: 为什么要有这个机制（2026-09-29 外部复核指出）：`基线冻结与验收清单.md` 记的是"冻结那一刻"的
+#: 结构数字（HTTP 路由 150 / 可运行 1057），但文件里**没有区分"当时"和"现在"**，
+#: 于是同一次发布里既有 150 又有 153，读的人分不清哪个是当前值。
+#: 外部复核的原话说得很准：**把历史基线和当前基线分开写**。
+#: 现在：标明块 = 历史快照（豁免），块外 = 当前状态（必须核对）。
+#:
+#: ⚠️ 标记的**权威定义在 `scripts/sync_test_count.py`**（那里也用它来避免自动同步改写历史）。
+#: 这里写成同一份字面量而不是 import：`check_claims` 顶部不能引 `sync_test_count`
+#: （实测踩到：模块级 `M.HIST_BEGIN` 会 NameError → 连 `tests/test_claims_consistency.py`
+#: 都 import 不进来 → 用例数从 1103 掉到 1086，一个常量把整个测试文件搞挂）。
+#: 两处必须字面一致，由 `tests/test_claims_consistency.py::test_history_markers_are_single_sourced` 守着。
+HIST_BEGIN = "<!-- baseline:historical:begin -->"
+HIST_END = "<!-- baseline:historical:end -->"
+
+
+def _current_lines(txt: str) -> list[str]:
+    """去掉「历史基线块」之后的行（保持行号不变，便于报错定位）。
+
+    未闭合的块 → **视为全部历史**并告警由调用方失败（宁可不核对，也不假装核对了）。
+    """
+    out, inside = [], False
+    for ln in txt.splitlines():
+        if HIST_BEGIN in ln:
+            inside = True
+            out.append("")            # 标记行本身不参与核对
+            continue
+        if HIST_END in ln:
+            inside = False
+            out.append("")
+            continue
+        out.append("" if inside else ln)
+    return out
+
+
+def _unclosed_hist_block(txt: str) -> bool:
+    """历史块必须成对（缺 END 会静默把后面所有行都豁免掉，那等于把门禁关掉）。"""
+    return txt.count(HIST_BEGIN) != txt.count(HIST_END)
+
+
+#: 「基线快照类」文档：它们**同时**记着"冻结那一刻"和"当前值"，所以必须用历史块标记分开。
+#: 这类文档也要被核对（否则就会像 `基线冻结与验收清单.md` 一样静默漂移）。
+SNAPSHOT_DOCS = [
+    "docs/spec/升级方案/基线冻结与验收清单.md",
+    "docs/spec/升级方案/执行台账.md",
+]
+
 
 def _cross_check(collected: int, struct: dict | None = None) -> int:
     """① 登录页 meta.js 的用例数必须等于 pytest 收集数；② 当前状态文档不得含过时表述；
@@ -223,13 +293,17 @@ def _cross_check(collected: int, struct: dict | None = None) -> int:
     else:
         bad.append("web/src/config/meta.js 不存在（登录页数字的唯一来源）")
 
-    for doc in CURRENT_DOCS:
+    for doc in CURRENT_DOCS + SNAPSHOT_DOCS:
         p = os.path.join(_PROJ, doc)
         if not os.path.exists(p):
             continue
         txt = io.open(p, encoding="utf-8").read()
+        if _unclosed_hist_block(txt):
+            bad.append(f"{doc} 的「历史基线块」标记不成对（{HIST_BEGIN} / {HIST_END}）→ "
+                       "会把块后所有内容都豁免掉，等于把门禁关掉。请补齐成对标记。")
+            continue
         struct_exempt = doc in STRUCTURE_EXEMPT
-        for i, ln in enumerate(txt.splitlines(), 1):
+        for i, ln in enumerate(_current_lines(txt), 1):
             for s in STALE:
                 if s in ln:
                     # 历史记录/交接快照允许保留"当时的结构数字"（改它等于篡改历史）
@@ -245,7 +319,7 @@ def _cross_check(collected: int, struct: dict | None = None) -> int:
         if doc in COUNT_EXEMPT:
             continue          # 历史快照/变更日志：按当时的真实数字记录，不该被改成今天的数字
         passed = max(0, collected - 1)
-        for i, ln in enumerate(txt.splitlines(), 1):
+        for i, ln in enumerate(_current_lines(txt), 1):
             if "scripts/sync_test_count" in ln or "check_claims" in ln:
                 continue          # 命令示例/提示行不参与核对
             for m in re.finditer(r"可运行(?:用例)?[\s|*]*(\d{3,})", ln):
@@ -267,22 +341,32 @@ def _cross_check(collected: int, struct: dict | None = None) -> int:
         pats = {
             "schema": (r"schema\s*\*{0,2}v(\d+)", struct.get("schema"), "schema 版本"),
             "routes": (r"HTTP\s*路由\s*\*{0,2}(\d{2,})", struct.get("routes"), "HTTP 路由数"),
+            # ⚠️ 2026-09-29 补（外部复核指出）：只认「HTTP 路由 N」会漏掉「N 条路由」这种写法，
+            # 而**提交件里写的正是后者** —— 实测 `PRODUCT.md` 与 `创意说明书-提交版.md`
+            # 都写着「150 条路由」（实际 153），门禁全绿。同一个数字的另一种说法必须一起管。
+            "routes_alt": (r"(\d{2,})\s*条路由", struct.get("routes"), "HTTP 路由数"),
+            # ⚠️ 负向断言是实测补的：`(\d{2,})\s*个路由` 会把「37 个路由**页**」（UI 审计覆盖面）
+            # 和「14 个路由**模块**」（api_routes/ 的模块数）一起误判成路由数 —— 那是**误报**，
+            # 误报比漏报更坏：它会让门禁失去可信度，然后有人去"改数字"把正确的改错。
+            "routes_alt2": (r"(\d{2,})\s*个路由(?!页|模块|文件|层)", struct.get("routes"), "HTTP 路由数"),
             "roles": (r"Agent\s*角色\s*\*{0,2}(\d+)", struct.get("roles"), "Agent 角色数"),
             "tables": (r"业务表\s*\*{0,2}(\d{2,})", struct.get("tables"), "业务表数量"),
+            # 「N 张业务表 / N 张表」同样是"业务表数量"的另一种说法
+            "tables_alt": (r"(\d{2,})\s*张(?:业务)?表", struct.get("tables"), "业务表数量"),
             # 2026-09-29 再补三条：迁移条数、UI 审计视口数、移动端审计页数
             # （实测这三处也漂了：「54 页视口 + 21 页移动端审计」vs 实际 58 / 31）
             "migrations": (r"(\d{2,})\s*个(?:版本化)?迁移", struct.get("migrations"), "迁移条数"),
             "viewports": (r"(\d{2,})\s*(?:页|个)视口", struct.get("viewports"), "UI 审计视口数"),
             "mobile_pages": (r"(\d{2,})\s*页移动(?:端)?审计", struct.get("mobile_pages"), "移动审计页数"),
         }
-        for doc in CURRENT_DOCS:
+        for doc in CURRENT_DOCS + SNAPSHOT_DOCS:
             if doc in COUNT_EXEMPT or doc in STRUCTURE_EXEMPT:
                 continue
             p = os.path.join(_PROJ, doc)
             if not os.path.exists(p):
                 continue
             txt = io.open(p, encoding="utf-8").read()
-            for i, ln in enumerate(txt.splitlines(), 1):
+            for i, ln in enumerate(_current_lines(txt), 1):
                 if "check_claims" in ln or "sync_test_count" in ln:
                     continue
                 for _k, (pat, actual, label) in pats.items():

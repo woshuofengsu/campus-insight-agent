@@ -38,8 +38,55 @@ DOCS = [
     "docs/competition/提交前清单-2026-09-29.md",
     # 复现指南同样写测试数（"应该看到：NNN passed"）——不加进来它就会静默漂移
     "docs/复现指南.md",
+    # 基线快照/台账：同时记"冻结时"与"当前值"，靠历史块标记区分（见下）
+    "docs/spec/升级方案/基线冻结与验收清单.md",
+    "docs/spec/升级方案/执行台账.md",
     "docs/scaling.md", "docs/mobile-deploy.md",
 ]
+
+# ---------------------------------------------------------------------------
+# 「历史基线」块标记（**权威定义在这里**，`check_claims` 从此处导入，避免两套常量漂开）
+#
+# 为什么需要它（2026-09-29 外部复核指出）：基线文档里同时写着"冻结那一刻"的数字
+# （HTTP 路由 150 / 可运行 1057）和"当前值"。两类混排的后果是**同一次发布里既有 150 又有 153**，
+# 读的人分不清哪个是当前值；更糟的是自动同步工具会把历史数字一并改掉，等于**篡改历史**。
+# 规则：
+#   · 标记块**内** = 历史快照 → 门禁豁免、同步工具**不许改**；
+#   · 标记块**外** = 当前值 → 必须与代码一致、同步工具正常改。
+# ---------------------------------------------------------------------------
+HIST_BEGIN = "<!-- baseline:historical:begin -->"
+HIST_END = "<!-- baseline:historical:end -->"
+
+
+def split_historical(text: str) -> list[tuple[bool, str]]:
+    """把文档切成 `[(是否历史块, 文本片段)]`，历史块内的内容一律原样保留。
+
+    末段是"块外"。未闭合的块按历史处理（由 `check_claims` 报红——宁可不改，也不改坏历史）。
+    """
+    parts: list[tuple[bool, str]] = []
+    buf: list[str] = []
+    inside = False
+    for ln in text.splitlines(keepends=True):
+        if HIST_BEGIN in ln:
+            parts.append((inside, "".join(buf)))
+            buf = [ln]
+            inside = True
+            continue
+        if HIST_END in ln:
+            buf.append(ln)
+            parts.append((inside, "".join(buf)))
+            buf = []
+            inside = False
+            continue
+        buf.append(ln)
+    parts.append((inside, "".join(buf)))
+    return [(hist, seg) for hist, seg in parts if seg]
+
+
+def rewrite_counts_doc(text: str, new: int) -> str:
+    """**历史感知**的整篇改写：块外按 `rewrite_counts` 改，块内一字不动。"""
+    return "".join(seg if hist else rewrite_counts(seg, new)
+                   for hist, seg in split_historical(text))
 
 
 def detect_runnable() -> int:
@@ -131,7 +178,13 @@ def rewrite_counts(text: str, new: int) -> str:
     """
     s = re.sub(r"\b\d{3,}(\s*项\s*自动化\s*测试|\s*项\s*测试|\s*测试|\s*项(?=\s*[（(]))",
                lambda m: f"{new}{m.group(1)}", text)
-    s = re.sub(r"(可运行\s*)\d{3,}", lambda m: f"{m.group(1)}{new}", s)
+    # 「可运行 **1100**」这种带加粗的写法也必须认：基线清单里就是这么写的，
+    # 原来的 `(可运行\s*)` 不允许中间有 `**` → 那一行**静默不同步**（实测踩到）。
+    s = re.sub(r"(可运行\s*\*{0,2})\d{3,}", lambda m: f"{m.group(1)}{new}", s)
+    # 「（收集 NNNN，3 项按标记排除）」里的收集总数也要跟着动，否则同一格里
+    # "可运行"是新的、"收集"是旧的，看起来自相矛盾。收集总数 = 可运行 + 排除数（当前固定 3）。
+    s = re.sub(r"(收集\s*\*{0,2})\d{3,}(\s*[，,]\s*3\s*项按标记排除)",
+               lambda m: f"{m.group(1)}{new + 3}{m.group(2)}", s)
     # 只覆盖上面两条会漏掉「NNN 项可运行」「可运行用例 NNN」「NNN = MMM 通过」三种写法，
     # 导致文档出现「622 项可运行（624 通过）」这种自相矛盾 → 补齐。
     s = re.sub(r"\b\d{3,}(\s*项\s*可运行)", lambda m: f"{new}{m.group(1)}", s)
@@ -185,7 +238,7 @@ def main() -> int:
         if not os.path.exists(p):
             continue
         s = orig = io.open(p, encoding="utf-8").read()
-        s = rewrite_counts(s, new)
+        s = rewrite_counts_doc(s, new)      # 历史块内不动（见 split_historical 的说明）
         if s != orig:
             io.open(p, "w", encoding="utf-8", newline="").write(s)
             print(f"  {doc} 已同步")

@@ -376,6 +376,10 @@ async function kgSearch() {
               <div class="muted" style="font-size:0.8rem;">被人工改过（{{ corr.corrected_rate }}%）</div></div>
             <div><div style="font-weight:800;font-size:1.2rem;" data-corr-nosug>{{ corr.no_suggestion }}</div>
               <div class="muted" style="font-size:0.8rem;">无系统建议（人工自选）</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;"
+                      :style="corr.unlogged_changes ? 'color:var(--ink-danger);' : ''"
+                      data-corr-unlogged>{{ corr.unlogged_changes }}</div>
+              <div class="muted" style="font-size:0.8rem;">未留痕的改动（应为 0）</div></div>
           </div>
           <div v-if="corr.note" style="color:var(--ink-warning);margin-top:8px;font-size:0.85rem;" data-corr-note>{{ corr.note }}</div>
           <div v-if="corr.unlogged_changes" style="color:var(--ink-danger);margin-top:8px;font-size:0.85rem;" data-corr-anomaly>

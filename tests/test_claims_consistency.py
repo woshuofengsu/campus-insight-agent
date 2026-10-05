@@ -342,6 +342,231 @@ def test_judge_facing_docs_declare_their_numbers_source():
             f"{doc} 没有说明数字怎么复算（应引用 check_claims 或写明可复算）"
 
 
+# ---------------------------------------------------------------------------
+# 2026-09-29（外部复核）：两个门禁缺口 —— "没装 pytest 也算全绿" 与 "旧数字换种说法就漏检"
+# ---------------------------------------------------------------------------
+
+def test_claims_gate_fails_when_pytest_is_unavailable():
+    """**门禁自检**：收集不到 pytest 用例数时，`check_claims` 必须**失败**而不是静默跳过。
+
+    外部复核实测：在没有 pytest 的环境里，`_pytest_collection_count()` 返回 `-1`，
+    而核对逻辑写的是 `if collected <= 0: continue` —— **所有测试数核对被跳过，脚本照样返回 0**。
+    后果是"环境里没有 pytest"被伪装成"口径全部一致"，属于最危险的一类门禁缺口
+    （它绿着，只是因为它没在检查）。
+    """
+    import contextlib
+
+    orig = C._pytest_collection_count
+    buf = io.StringIO()
+    try:
+        C._pytest_collection_count = lambda: (-1, -1)
+        with contextlib.redirect_stdout(buf):
+            rc = C.main()
+    finally:
+        C._pytest_collection_count = orig
+    out = buf.getvalue()
+    assert rc == 1, "pytest 不可用时 check_claims 竟然返回成功（门禁缺口）"
+    assert "无法收集" in out and "无法完成" in out, out[-400:]
+
+    # 显式豁免时必须**明说**测试数没核对，且不返回 0 之外的歧义
+    buf2 = io.StringIO()
+    try:
+        C._pytest_collection_count = lambda: (-1, -1)
+        import sys as _sys
+        old_argv = _sys.argv
+        _sys.argv = ["check_claims.py", "--allow-no-pytest"]
+        try:
+            with contextlib.redirect_stdout(buf2):
+                rc2 = C.main()
+        finally:
+            _sys.argv = old_argv
+    finally:
+        C._pytest_collection_count = orig
+    assert "测试数口径未核对" in buf2.getvalue(), buf2.getvalue()[-300:]
+    assert rc2 in (0, 1), rc2       # 结构数字仍然照常核对，只是不能再宣称"全绿"
+
+
+def test_route_count_phrasings_are_all_checked():
+    """**门禁自检**：路由数的**各种说法**都要被核对，不能只认「HTTP 路由 N」。
+
+    外部复核实测：`PRODUCT.md` 与 `创意说明书-提交版.md` 都写着「150 条路由」（实际 153），
+    而门禁全绿 —— 因为判据是 `HTTP\\s*路由\\s*(\\d+)`，**「N 条路由」这种写法直接漏检**，
+    偏偏提交件里用的就是后者。这条用例把几种常见说法逐个喂给核对逻辑，必须都能报出来。
+    """
+    import tempfile
+    struct = {"schema": 52, "routes": 153, "roles": 9, "tables": 53,
+              "migrations": 51, "viewports": 58, "audit_routes": 37, "mobile_pages": 31}
+    for phrase in ("HTTP 路由 **150**", "FastAPI，150 条路由", "**150 条路由**",
+                   "FastAPI（150 条路由）", "150 个路由"):
+        fake = os.path.join(tempfile.mkdtemp(prefix="claims_routes_"), "doc.md")
+        io.open(fake, "w", encoding="utf-8").write(f"- 后端：{phrase}\n")
+        orig_docs, orig_snap = C.CURRENT_DOCS, list(C.SNAPSHOT_DOCS)
+        try:
+            C.CURRENT_DOCS = [os.path.relpath(fake, PROJ)]
+            C.SNAPSHOT_DOCS = []
+            rc = C._cross_check(1100, struct)
+        finally:
+            C.CURRENT_DOCS, C.SNAPSHOT_DOCS = orig_docs, orig_snap
+        assert rc == 1, f"「{phrase}」写错了路由数（实际 153），核对逻辑竟然放过"
+
+
+def test_history_markers_are_single_sourced():
+    """历史块标记是**语义契约**：两处（`check_claims` 读、`sync_test_count` 写）必须字面一致。
+
+    如果不一致，后果是"门禁把某段当历史豁免了，而自动同步工具却照样去改它"——
+    也就是**悄悄篡改历史基线**，而且没有任何地方会报错。
+    （实测：曾想在 `check_claims` 里直接 `import` 对方的常量，模块级引用直接 NameError，
+    把一个测试文件整个搞挂、可运行用例数从 1103 掉到 1086——一个常量能造成这种级联。）
+    """
+    from scripts import sync_test_count as S
+    assert C.HIST_BEGIN == S.HIST_BEGIN, "历史块起始标记两处不一致"
+    assert C.HIST_END == S.HIST_END, "历史块结束标记两处不一致"
+    # 切分逻辑同口径：同一段文本两边判定的"历史/当前"必须一样
+    sample = f"当前\n{C.HIST_BEGIN}\n历史\n{C.HIST_END}\n当前2\n"
+    lines = C._current_lines(sample)
+    # 行号必须保持（报错要能指到原行）：0=当前 1=标记 2=历史(被吃掉) 3=标记 4=当前2
+    assert lines[0].strip() == "当前"
+    assert lines[2] == "", "块内必须被吃掉"
+    assert lines[4].strip() == "当前2", "块外内容不许被连带吃掉"
+    segs = S.split_historical(sample)
+    assert any(hist and "历史" in seg for hist, seg in segs), "sync 侧没把块内识别为历史"
+    assert any(not hist and "当前2" in seg for hist, seg in segs)
+    # sync 的整篇改写必须**放过**块内数字（否则就是篡改历史）
+    out = S.rewrite_counts_doc(f"可运行 1000\n{C.HIST_BEGIN}\n可运行 1000\n{C.HIST_END}\n", 1200)
+    assert out.count("1000") == 1, f"历史块内的数字被改写工具动了（等于篡改历史）：{out}"
+    assert "可运行 1200" in out, out
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-29（外部复核第 3 点）：**覆盖率不能包装成准确率**
+#
+# 实测口径：有系统建议 6 条 / 窗口期 306 单 → 覆盖率约 2%，一致率 83.3%，人工改过 1 条。
+# 这组数字能证明的是"**对照链路已经接上**"，**不能**证明"分类效果好"——
+# 6 条样本的一致率不是准确率，拿它当准确率是"用极小分母冒充结论"。
+# 而这条纪律此前**没有任何门禁守着**，全靠人记得。
+# ---------------------------------------------------------------------------
+
+#: 会把"一致率"说成"准确率"的写法（命中即红）
+ACCURACY_PHRASES = ("分类准确率", "分类的准确率", "自动分类准确率", "分类准确率 83", "准确率 83.3%")
+
+#: 涉及"系统建议 vs 人工最终"对照的材料（当前状态文档 + 台账/基线）
+#: ⚠️ 别把"老年观察方案"这类无关文档塞进来：范围定错会让门禁变成"到处都不让提某个词"，
+#: 最后没人看得懂它到底在守什么（实测踩到：把 elderly-user-study 放进来 → 报"没写不用于模型训练"）。
+CORRECTION_DOCS = [
+    "docs/spec/升级方案/执行台账.md",
+    "docs/spec/升级方案/基线冻结与验收清单.md",
+]
+
+#: 删除 markdown 删除线内容：`~~系统分类准确率 83.3%~~` 是**反面例子**，
+#: 不是"在宣称准确率"。不处理它 → 门禁会咬到自己写的纪律条款
+#: （本项目第二次踩这个坑，见 dev-log 四十五：禁止短语表把自己的注释判红）。
+_STRIKE_RE = re.compile(r"~~.+?~~", re.S)
+
+#: 「禁止态」标记：纪律条款需要**点名**被禁的说法（"不得写成「分类准确率」"）。
+#: 判定要求标记出现在短语**之前** —— 这样「不得写成 X」放行，
+#: 而「X 83.3%（不需要解释）」这种把宣称藏在句尾的写法仍然会被抓。
+_PROHIBIT_RE = re.compile(r"(不得|不许|不要|禁止|避免|不该)")
+
+
+def test_category_agreement_is_never_called_accuracy():
+    """**口径门禁**：对照清单的"一致率"不得被写成"准确率"。
+
+    为什么单独守这条：覆盖率约 2%（有建议 6 条 / 306 单）**不能**支撑"分类准不准"的结论。
+    一旦材料里出现"分类准确率 83.3%"，读者会以为系统在全体工单上准确率 83%——
+    而真实情况是"绝大多数工单根本没有系统建议"。
+
+    实现注意：先删掉 `~~…~~` 删除线（那是"不许这么说"的反面例子）。
+    """
+    docs = list(C.CURRENT_DOCS) + CORRECTION_DOCS + ["docs/spec/dev-log.md"]
+    bad = []
+    for rel in dict.fromkeys(docs):
+        p = os.path.join(PROJ, rel)
+        if not os.path.exists(p):
+            continue
+        txt = io.open(p, encoding="utf-8").read()
+        for i, ln in enumerate(C._current_lines(txt), 1):
+            plain = _STRIKE_RE.sub("", ln)      # 反面例子（删除线）不算宣称
+            for phrase in ACCURACY_PHRASES:
+                idx = plain.find(phrase)
+                if idx < 0:
+                    continue
+                # 短语前面出现禁止态标记 = 这是"在禁止"，不是"在宣称"
+                if _PROHIBIT_RE.search(plain[:idx]):
+                    continue
+                bad.append(f"{rel}:{i} 出现「{phrase}」→ {ln.strip()[:70]}")
+    assert not bad, (
+        "对照清单的一致率被写成了「准确率」（2% 覆盖率支撑不了准确率结论）：\n  " + "\n  ".join(bad))
+
+
+def test_accuracy_phrase_check_still_catches_a_plain_claim():
+    """**门禁自检**：删除线与"禁止态"两个例外不能把门禁变成永远绿。"""
+    assert ACCURACY_PHRASES, "判据表不能为空"
+    assert any(p in "系统分类准确率 83.3%" for p in ACCURACY_PHRASES), \
+        "自检失效：明文宣称竟然匹配不到任何判据"
+    assert not any(p in _STRIKE_RE.sub("", "~~分类准确率 83.3%~~") for p in ACCURACY_PHRASES), \
+        "删除线的反面例子应被忽略（否则门禁会咬自己的纪律条款）"
+
+    # 禁止态：标记在短语**之前** → 放行（纪律条款需要点名被禁说法）
+    assert _PROHIBIT_RE.search("不得把一致率写成「分类准确率」"[:6]), "禁止态识别失效"
+    # 把宣称藏在句尾（标记在短语之后）→ 仍然必须被抓
+    line = "系统分类准确率 83.3%（不需要额外解释）"
+    idx = line.find("分类准确率")
+    assert idx > 0 and not _PROHIBIT_RE.search(line[:idx]), \
+        "「宣称 + 句尾否定词」竟被当成禁止态放过了——例外开得太大"
+
+
+def test_agreement_rate_is_always_shown_with_coverage():
+    """凡引用了"一致率"，同一处必须同时给出**覆盖率**与**样本量**。
+
+    只给一致率 = 拿一小撮样本冒充全体（外部复核的原话：**绝不能只展示一致率**）。
+    """
+    bad = []
+    for rel in dict.fromkeys(C.CURRENT_DOCS + CORRECTION_DOCS + ["docs/spec/dev-log.md"]):
+        p = os.path.join(PROJ, rel)
+        if not os.path.exists(p):
+            continue
+        txt = io.open(p, encoding="utf-8").read()
+        lines = C._current_lines(txt)
+        for i, ln in enumerate(lines, 1):
+            if "一致率" not in ln:
+                continue
+            # 同一行或前后 6 行内必须出现覆盖率/建议条数（表格里常分行写）
+            window = "\n".join(lines[max(0, i - 7):i + 6])
+            has_cov = any(k in window for k in ("覆盖率", "覆盖率必须", "with_suggestion", "有系统建议"))
+            assert has_cov, (
+                f"{rel}:{i} 引用了「一致率」但附近没有「覆盖率/有系统建议条数」——"
+                f"只报一致率就是拿一小撮样本冒充全体：{ln.strip()[:70]}")
+    assert not bad, "\n".join(bad)
+
+
+def test_correction_list_disclaims_training_use():
+    """对照清单必须写明「不用于模型训练/调参」（本项目没有这条链路，不许对外那么说）。"""
+    for rel in CORRECTION_DOCS:
+        p = os.path.join(PROJ, rel)
+        if not os.path.exists(p):
+            continue
+        txt = io.open(p, encoding="utf-8").read()
+        assert "不用于模型训练" in txt, f"{rel} 没有写明对照清单不用于模型训练"
+
+    """历史基线块：**块内豁免、块外必须核对、标记必须成对**（缺 END 等于把门禁关掉）。"""
+    assert C.HIST_BEGIN != C.HIST_END, "起止标记不能相同"
+    txt = f"当前值 HTTP 路由 **153**\n{C.HIST_BEGIN}\n冻结时 HTTP 路由 **150**\n{C.HIST_END}\n"
+    lines = C._current_lines(txt)
+    assert any("153" in ln for ln in lines), "块外的当前值不该被吃掉"
+    assert not any("150" in ln for ln in lines), "块内的历史值必须被豁免"
+    assert C._unclosed_hist_block(txt) is False
+    assert C._unclosed_hist_block(f"{C.HIST_BEGIN}\n150\n") is True, "缺 END 必须被判定为不成对"
+
+    # 快照类文档真的用了标记（否则里面的历史数字会被当成当前值报红，或者更糟：被无视）
+    for doc in C.SNAPSHOT_DOCS:
+        p = os.path.join(PROJ, doc)
+        if os.path.exists(p):
+            t = io.open(p, encoding="utf-8").read()
+            assert C.HIST_BEGIN in t, (
+                f"{doc} 是「历史 + 当前」混排的快照文档，必须用 {C.HIST_BEGIN} 标出历史部分")
+            assert not C._unclosed_hist_block(t), f"{doc} 的历史基线块标记不成对"
+
+
 def test_every_doc_quoting_a_test_count_is_in_the_sync_list():
     """**门禁自检（本轮抓到的第二个漏网文件）**：写测试数的**当前状态文档**必须在
     `sync_test_count.DOCS` 里，否则一键同步会跳过它 → 数字静默漂移。
