@@ -150,6 +150,10 @@ CURRENT_DOCS = [
     "docs/competition/创意说明书-提交版.md", "docs/competition/最终版交付说明.md",
     "docs/competition/技术实现报告.md", "docs/competition/答辩问答手册.md",
     "docs/competition/演示脚本.md",
+    # ⚠️ 提交前清单原来**不在**这份名单里（2026-09-29 第 3–7 阶段发现）：它是交给评委看的文件，
+    # 却因为没进名单而**长期停在旧数字**（1003/1004 · schema v51）没人发现——
+    # "最该被核对的那份清单自己没人核对"。加进来后立刻由门禁盯着。
+    "docs/competition/提交前清单-2026-09-29.md",
 ]
 
 # 测试数「口径自检」的豁免名单：这两份是**历史记录**，里面的数字是当时的真实基线，

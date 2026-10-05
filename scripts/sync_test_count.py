@@ -34,6 +34,10 @@ DOCS = [
     "docs/competition/技术实现报告.md",
     "docs/competition/答辩问答手册.md",
     "docs/competition/演示脚本.md",
+    # 提交前清单也写测试数（曾因不在名单里而长期停在旧数字，见 check_claims 的注释）
+    "docs/competition/提交前清单-2026-09-29.md",
+    # 复现指南同样写测试数（"应该看到：NNN passed"）——不加进来它就会静默漂移
+    "docs/复现指南.md",
     "docs/scaling.md", "docs/mobile-deploy.md",
 ]
 
@@ -133,6 +137,9 @@ def rewrite_counts(text: str, new: int) -> str:
     s = re.sub(r"\b\d{3,}(\s*项\s*可运行)", lambda m: f"{new}{m.group(1)}", s)
     s = re.sub(r"(可运行用例[\s|*]*)\d{3,}", lambda m: f"{m.group(1)}{new}", s)
     s = re.sub(r"\b\d{3,}(\s*=\s*\d{3,}\s*通过)", lambda m: f"{new}{m.group(1)}", s)
+    # 「可运行总数 = NNN」：复现指南就是这么写的；不加这条它会**悄悄不同步**
+    # （实测：跑完同步后指南还停在旧值，因为上面几条正则都要求"可运行"紧跟数字）。
+    s = re.sub(r"(可运行总数\s*[=＝]\s*)\d{3,}", lambda m: f"{m.group(1)}{new}", s)
     s = re.sub(r"\b\d{3,}(\s*passed)", lambda m: f"{new - 1}{m.group(1)}", s)
     s = re.sub(r"\b\d{3,}(\s*通过)", lambda m: f"{new - 1}{m.group(1)}", s)
     return s
@@ -163,11 +170,13 @@ def main() -> int:
         print("✅ 已一致，无需修改（要强制重写正文数字可加 --force）")
 
     # 1) meta.js（唯一来源）
+    meta_changed = False
     src = io.open(META, encoding="utf-8").read()
     src2 = re.sub(r"(key:\s*'tests',\s*value:\s*)\d+", rf"\g<1>{new}", src)
     src2 = re.sub(r"（= \d+ 通过 \+ 1 需外部服务默认跳过）", f"（= {detail}）", src2)
     if src2 != src:
         io.open(META, "w", encoding="utf-8", newline="").write(src2)
+        meta_changed = True
         print(f"  meta.js → {new}")
 
     # 2) 文档：把「NNN 项测试 / NNN 测试 / NNN passed / NNN 通过」里的旧数字换成新值
@@ -183,6 +192,12 @@ def main() -> int:
 
     print("\n提示：同步后跑 `python scripts/check_claims.py` 与 "
           "`python -m pytest tests/test_claims_consistency.py -q` 复核。")
+    if meta_changed:
+        # ⚠️ 这条提醒是踩了四次才加的：`meta.js` 属 `web/src`，改了它 `web/dist` 立刻变旧，
+        # 于是 `ui_audit` / `mobile_audit` / `demo_preflight` **三个闸同时红**——
+        # 每次都以为是别的问题，实际就是"忘了重新构建"。
+        print("⚠️ `web/src/config/meta.js` 已改 → 审计/演示前**必须先重新构建**："
+              "`cd web && npm run build`（否则三个闸会报 dist 落后于源码）")
     return 0
 
 

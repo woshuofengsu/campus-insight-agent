@@ -480,6 +480,10 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         # v52：把"每个字段从哪来"一起落库（老人确认过的那份来源），
         # 否则刷新之后没人能回答"这条位置是老人说的还是我们替他填的"
         field_sources=r.get("sources") or {},
+        # 收敛方案第 6 阶段：`category` 是**当前生效分类**，会被网格员改；
+        # `suggested_category` 存**系统当初的建议**（这里是 AI/关键词分类的结果），
+        # 两者分开才能回答"系统建议得准不准、多少人被人工改过"。
+        suggested_category=category,
     )
     if iid <= 0:
         if hint == "safety":

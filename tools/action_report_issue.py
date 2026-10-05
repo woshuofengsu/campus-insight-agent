@@ -308,11 +308,13 @@ def report_issue(title: str, category: str = "", location: str = "",
 
     # 分类：category 和 urgency 都给了（比如安全网传的）就走快路径，
     #     否则用 LLM 分类，准确率高一点
+    system_suggested = ""      # 系统**真的做过分类**时才记（快路径下没有"系统建议"这回事）
     if category.strip() and urgency.strip():
         # 快路径：跳过 LLM，直接用传进来的值（下面会校验）
         pass
     elif not category.strip():
         category, urgency = _llm_classify(title, description)
+        system_suggested = category
     else:
         _, urgency = _llm_classify(title, description)
 
@@ -330,6 +332,8 @@ def report_issue(title: str, category: str = "", location: str = "",
         reporter_name=reporter_name.strip(),
         reporter_phone=reporter_phone.strip(),
         reporter_id=_resolve_reporter_id(),
+        # 收敛方案第 6 阶段：留下"系统建议的原始分类"，别让它被后续人工修改覆盖掉
+        suggested_category=system_suggested,
     )
 
     # 清网格员那边的缓存，新工单立刻能看见

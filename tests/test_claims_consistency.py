@@ -297,3 +297,80 @@ def test_structure_gate_would_catch_a_stale_number():
                                   "mobile_pages": 31}) == 0, "数字写对却被判错（误报）"
     finally:
         C.CURRENT_DOCS = orig_docs
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-29（收敛方案第 3–7 阶段）：**交给评委看的文件必须自己也在门禁里**
+# ---------------------------------------------------------------------------
+
+#: 面向评委/组委会的提交件——它们写的数字必须被门禁核对。
+#: 这份名单是**下限**：少一份就意味着那份材料可以静默漂移。
+JUDGE_FACING_DOCS = [
+    "docs/competition/创意说明书-提交版.md",
+    "docs/competition/技术实现报告.md",
+    "docs/competition/最终版交付说明.md",
+    "docs/competition/答辩问答手册.md",
+    "docs/competition/演示脚本.md",
+    "docs/competition/提交前清单-2026-09-29.md",
+]
+
+
+def test_judge_facing_docs_are_under_the_number_gate():
+    """**门禁自检**：每份交给评委的文件都必须被 `check_claims` 逐个核对数字。
+
+    为什么单列这条：`提交前清单-2026-09-29.md` **原来不在** `CURRENT_DOCS` 里，
+    于是它长期停在 `1003/1004 · schema v51` 没人发现——那份文件恰恰是"照着勾一遍"用的，
+    是评委最可能最后读的一份。**最该被核对的清单自己没人核对**，这就是本条要防的事。
+    """
+    from scripts import sync_test_count as S
+    missing = [d for d in JUDGE_FACING_DOCS if not os.path.exists(os.path.join(PROJ, d))]
+    assert not missing, f"提交件不存在（名单过期了？）：{missing}"
+    for doc in JUDGE_FACING_DOCS:
+        assert doc in C.CURRENT_DOCS, (
+            f"{doc} 不在 check_claims.CURRENT_DOCS 里 → 它写的数字没有任何门禁核对，"
+            "会静默漂移（提交前清单就出过这个事）")
+    # 会写「测试数」的文件同时必须在同步名单里，否则一键同步会漏掉它
+    for doc in JUDGE_FACING_DOCS:
+        assert doc in S.DOCS, f"{doc} 不在 sync_test_count.DOCS 里 → 测试数同步会漏掉它"
+
+
+def test_judge_facing_docs_declare_their_numbers_source():
+    """提交件必须写明数字口径从哪来（否则读者只能选择相信，无法复算）。"""
+    for doc in JUDGE_FACING_DOCS:
+        text = io.open(os.path.join(PROJ, doc), encoding="utf-8").read()
+        assert ("check_claims" in text or "可复算" in text or "复算" in text), \
+            f"{doc} 没有说明数字怎么复算（应引用 check_claims 或写明可复算）"
+
+
+def test_every_doc_quoting_a_test_count_is_in_the_sync_list():
+    """**门禁自检（本轮抓到的第二个漏网文件）**：写测试数的**当前状态文档**必须在
+    `sync_test_count.DOCS` 里，否则一键同步会跳过它 → 数字静默漂移。
+
+    实测两次栽在这上面：`提交前清单-2026-09-29.md` 与 `docs/复现指南.md` 都写着
+    "可运行 N / N passed" 却都不在同步名单里，跑完同步的人以为"已经全同步了"。
+    这条把"漏一个文件"从**靠人记得**变成**跑测试就知道**。
+
+    ⚠️ 范围刻意**只覆盖"当前状态文档"**（`check_claims.CURRENT_DOCS` + 复现指南）：
+    一开始我想"全仓库凡写测试数的都管"，结果扫出 60 多份**历史快照**
+    （`docs/review/**` 各轮评审报告、9/22 路演包、旧方案稿）——那些保留当时数字是**诚实**，
+    真去改反而是篡改历史。**门禁范围定得过宽，等于逼人写一长串豁免，最后没人看。**
+    """
+    from scripts import sync_test_count as S
+    pat = re.compile(r"\d{3,4}\s*(?:passed|通过|可运行|项测试|测试)")
+    candidates = [d for d in C.CURRENT_DOCS if d not in C.COUNT_EXEMPT]
+    # 复现指南是"给别人照着跑"的当前文档，同样必须被同步覆盖（它不在数字核对名单里，
+    # 因为它写的是"应该看到什么"，但同样会漂）
+    candidates.append("docs/复现指南.md")
+    must_sync = []
+    for d in candidates:
+        p = os.path.join(PROJ, d)
+        if os.path.exists(p) and pat.search(io.open(p, encoding="utf-8", errors="replace").read()):
+            must_sync.append(d)      # 只要求**真的写了测试数**的那些进同步名单
+    missing = [d for d in must_sync if d not in S.DOCS]
+    assert not missing, (
+        "以下当前状态文档写了测试数但不在 sync_test_count.DOCS 里 → 一键同步会跳过它们，"
+        "数字会静默漂移：\n  " + "\n  ".join(missing)
+        + "\n（加进 DOCS；若确属历史记录，请登记进 COUNT_EXEMPT 并写明理由）")
+    # 名单里不许有僵尸条目（文件已删/已改名 → 同步在对着空气做功）
+    stale = [d for d in S.DOCS if not os.path.exists(os.path.join(PROJ, d))]
+    assert not stale, f"sync_test_count.DOCS 里有不存在的文件（僵尸条目）：{stale}"

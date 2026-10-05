@@ -316,6 +316,61 @@ def agent_governance_metrics(request: Request, days: int = 30):
     return _ok(get_governance_metrics(days=max(1, min(days, 365)), tenant=_tenant(request)))
 
 
+@router.get("/governance-simulation")
+def agent_governance_simulation(request: Request, days: int = 30, growth_pct: float = 0.0):
+    """治理情景模拟器（v4 收敛方案第 5 阶段）：**诉求量涨 X% 要多少工时、折算几个人**。
+
+    为什么做它：网格员现场最常问的是"人还是这么几个人，量涨上来怎么办"。
+    这一版把口算过程固化成公式（页面上原样写出来），并且**只用真实数字**：
+    样本量 = 窗口期内本社区工单数，平均处理时长 = 已办结工单的**实测均值**
+    （配置项优先），增长率是**调用方给的情景假设**。
+
+    三条纪律（口径见 `data/db_governance_sim` 模块头）：
+      ① **只读**——不写业务表、不改工单状态；
+      ② 样本 < 5 条标「样本不足」；
+      ③ 没有已办结工单 → 实测时长拿不到 → 工时/人手**不给数字**；
+         「人均可用工时」未配置 → 明确返回"人均可用工时未配置，无法折算人手"，
+         **绝不**用默认值硬算。结果一律标「情景估算」，不是预测、不是承诺。
+    """
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_governance_sim import simulate_governance
+    return _ok(simulate_governance(days=max(1, min(days, 365)), growth_pct=growth_pct,
+                                   tenant=_tenant(request)))
+
+
+class SimSettings(BaseModel):
+    """情景参数（至少填一项；不填的项保持原值不动）。"""
+    available_hours: float | None = None
+    avg_minutes: float | None = None
+
+
+@router.post("/governance-simulation/settings")
+def agent_governance_simulation_settings(req: SimSettings, request: Request):
+    """配置情景参数：人均可用工时（小时/人/窗口期）、平均处理时长（分钟）。
+
+    多租户：**只对本社区生效**（`键@社区`）。理由很实在——人均可用工时是
+    "我们社区有几个人、每人能投多少时间"，跨社区共用一个值就是串味
+    （海淀的值会被算到朝阳头上）。写入即留痕，留痕里不含个人信息。
+    """
+    from data.db_governance_sim import set_sim_settings
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    tenant = _tenant(request)
+    if not tenant:
+        # fail-closed：拿不到社区就**不让写**，否则会落进全局键、影响所有社区
+        return _fail(1003, "无法确定您所在的社区，不能保存情景参数")
+    if req.available_hours is None and req.avg_minutes is None:
+        return _fail(1003, "没有要保存的内容（人均可用工时 / 平均处理时长至少填一项）")
+    try:
+        cfg = set_sim_settings(available_hours=req.available_hours,
+                              avg_minutes=req.avg_minutes,
+                              actor=_user(request).get("name") or "负责人", tenant=tenant)
+    except ValueError as e:
+        return _fail(1003, str(e))
+    return _ok(cfg, "已保存（只对您所在社区生效）")
+
+
 @router.get("/care-metrics")
 def agent_care_metrics(request: Request, days: int = 7):
     """关怀量化（U4）：情绪识别 / 关怀触达率 / 情绪→转人工率 / 场景分布（grid 专属）。
@@ -339,7 +394,6 @@ def agent_kb_health(request: Request, days: int = 7, top_n: int = 10):
         return _require_role(request, "grid")
     from data.db_kb_metrics import get_kb_health
     return _ok(get_kb_health(days=days, top_n=top_n, tenant=_tenant(request)))
-    return _ok(get_kb_health(days=days, top_n=top_n))
 
 
 @router.get("/traces/{trace_id}")

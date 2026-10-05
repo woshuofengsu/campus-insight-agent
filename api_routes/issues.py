@@ -176,8 +176,28 @@ def issue_safety_reminders(request: Request, limit: int = 100):
     return _ok(get_safety_reminders(limit=limit))
 
 
-# ---- 工单知识（v52 沉淀：字段来源 + 同类处置画像）----
-# 必须注册在 `/{issue_id}` 之前，否则 `/knowledge` 会被动态路由当成 issue_id 吃掉。
+# ---- 工单知识（v52 沉淀：字段来源 + 同类处置画像；第 7 阶段：人工修正对照）----
+# ⚠️ 下面这几条**字面路径**必须注册在 `/{issue_id}` 之前，
+# 否则 `/knowledge`、`/category-corrections` 会被动态路由当成 issue_id 吃掉。
+
+@router.get("/category-corrections")
+def issue_category_corrections(request: Request, days: int = 180, limit: int = 50):
+    """**「系统建议分类 vs 人工最终分类」对照清单**（收敛方案第 7 阶段，grid 专属、只算本社区）。
+
+    回答"自动分类准不准、被人工改过多少"。三条口径纪律（材料照抄）：
+      ① **覆盖率必须一起显示**——`suggested_category` 是第 6 阶段才补的写入侧，
+         v52 之前的历史单该字段为空，所以覆盖率会明显小于 100%；
+         只报"一致率"不报覆盖率，就是拿一小撮样本冒充全体。
+      ② 有建议的条数 < 5 → 标「样本不足」，只作参考。
+      ③ 这张表**不用于模型训练/调参**（本项目没有这条链路，别对外这么写）。
+    """
+    if _require_role(request, "grid"):
+        return _require_role(request, "grid")
+    from data.db_issue_knowledge import category_corrections
+    return _ok(category_corrections(days=max(1, min(days, 1095)),
+                                    tenant=_tenant(request),
+                                    limit=max(1, min(limit, 200))))
+
 
 @router.get("/knowledge")
 def issue_knowledge(request: Request, category: str = "", days: int = 180):

@@ -178,7 +178,8 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
                  agent_name: str = "", agent_phone: str = "", agent_relation: str = "",
                  draft_id: int | None = None,
                  allow_missing_phone: bool = False,
-                 field_sources: dict | None = None) -> tuple[int, str]:
+                 field_sources: dict | None = None,
+                 suggested_category: str = "") -> tuple[int, str]:
     """提交报修。返回 (工单 ID, 提示语)。
 
     校验必填项、手机号格式；识别特殊情况；信息齐全生成工单（状态待审核）。
@@ -192,6 +193,13 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
     来自 `utils/elderly_report` 的 `sources`。**落库**而不是只显示一次——
     否则事后无法回答"这条位置是老人自己说的，还是我们替他填的"（见 `_m52_issue_field_sources`）。
     只允许白名单里的来源值，多余键值一律丢掉（不让脏数据进这张要审计的表）。
+
+    `suggested_category`（收敛方案第 6 阶段）：**系统建议的原始分类**，与 `category`（当前生效分类）分开存。
+    为什么要分开：`category` 会被网格员改（`update_issue_category`），改过之后就再也查不到
+    "系统当初建议的是什么"——于是"系统建议 vs 人工最终"这张对照表永远只有右半边
+    （2026-09-29 基线核对：285 条工单 `suggested_category` **全部为空**）。
+    ⚠️ 只有**系统真的做过分类**时才传：居民自己在下拉框里选分类的那种，
+      没有"系统建议"这回事，传空串才是诚实的（否则会把人工选择冒充成系统命中）。
     """
     title = scrub_field(title, "issue.title")
     location = scrub_field(location, "issue.location")
@@ -239,12 +247,13 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
             "description, urgency, status, reporter_id, reporter_name, reporter_phone, "
             "photo_before, is_agent_report, agent_name, agent_phone, agent_relation, "
             "is_violation, non_community_responsibility, "
-            "reporter_phone_enc, agent_phone_enc, field_sources) "
-            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?)",
+            "reporter_phone_enc, agent_phone_enc, field_sources, suggested_category) "
+            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)",
             (title, category, issue_type, location, description, urgency, reporter_id,
              reporter_name, photo_before, is_agent_report,
              agent_name, agent_relation, is_violation, non_resp,
-             _enc_phone(reporter_phone), _enc_phone(agent_phone), sources_json),
+             _enc_phone(reporter_phone), _enc_phone(agent_phone), sources_json,
+             (suggested_category or "").strip()[:40]),
         )
         issue_id = cur.lastrowid
         # 多租户（v48）：写入侧必须落租户——报修人

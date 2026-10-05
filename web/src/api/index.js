@@ -61,6 +61,8 @@ export const issues = {
   safetyReminders: (params) => api.get('/issues/safety-reminders', { params }),
   // 工单知识（v52 沉淀）：同类处置画像 + 单条工单的字段来源
   knowledge: (params) => api.get('/issues/knowledge', { params }),
+  // 人工修正对照清单（第 7 阶段）：系统建议分类 vs 人工最终分类（含覆盖率）
+  categoryCorrections: (params) => api.get('/issues/category-corrections', { params }),
   fieldSources: (id) => api.get(`/issues/${id}/field-sources`),
 }
 
@@ -230,6 +232,9 @@ export const agent = {
   llmUsage: (params) => api.get('/agent/llm-usage', { params }),
   selfResolution: (params) => api.get('/agent/self-resolution', { params }),
   governanceMetrics: (params) => api.get('/agent/governance-metrics', { params }),
+  // 治理情景模拟器（v4 收敛方案第 5 阶段）：诉求量涨 X% 要多少工时、折算几个人（只读）
+  governanceSimulation: (params) => api.get('/agent/governance-simulation', { params }),
+  saveSimSettings: (data) => api.post('/agent/governance-simulation/settings', data),
   kbHealth: (params) => api.get('/agent/kb-health', { params }),
   careMetrics: (params) => api.get('/agent/care-metrics', { params }),
   kgEntity: (name, params) => api.get('/agent/kg/entity', { params: { name, ...(params || {}) } }),

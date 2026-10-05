@@ -47,6 +47,24 @@ def test_rewrite_counts_is_idempotent():
     assert once == twice == "可运行 1000 项（999 通过）"
 
 
+def test_rewrite_counts_covers_repro_guide_phrasing():
+    """**「可运行总数 = N」这种写法也必须被同步覆盖**（复现指南就是这么写的）。
+
+    实测踩到：`docs/复现指南.md` 里写的是「可运行总数 = 1098」，
+    而旧正则要求"可运行"后面**紧跟**数字，于是跑完同步它**没被改**，
+    只剩 `test_repro_guide.py` 报红——那是"工具没覆盖到"，不是文档写错了。
+    """
+    from scripts.sync_test_count import rewrite_counts
+    out = rewrite_counts("可运行总数 = 1098，与登录页 meta.js 一致", 1099)
+    assert "1099" in out and "1098" not in out, out
+    # 全角等号也要认（中文文档里很常见）
+    out2 = rewrite_counts("可运行总数＝1098", 1099)
+    assert "1099" in out2, out2
+    # 同句里的 passed 仍按「可运行 − 1」走
+    out3 = rewrite_counts("可运行总数 = 1098（1097 passed）", 1099)
+    assert "1099" in out3 and "1098 passed" in out3, out3
+
+
 def test_gate_selfcheck_old_regex_really_corrupts():
     """**门禁自检**：用旧的固定三位写法跑同一输入，必须复现"10000"这个错误。
 

@@ -156,3 +156,109 @@ def category_profile(category: str = "", days: int = 180, tenant: str = "") -> d
         "categories": [{"category": c["category"], "count": int(c["c"] or 0)} for c in cats],
         "note": "" if total >= MIN_SAMPLE else f"样本不足（{total} 条 < {MIN_SAMPLE} 条）：只作参考，别当规律",
     }
+
+
+def category_corrections(days: int = 180, tenant: str = "", limit: int = 50) -> dict:
+    """**「系统建议分类 vs 人工最终分类」对照清单**（收敛方案第 7 阶段）。
+
+    回答的问题是："这套自动分类到底准不准，有多少条被网格员改过？"
+    数据来源全部是库内真实字段：
+      · `suggested_category` = **系统当初的建议**（提交时写死，之后不随人工修改而变）；
+      · `category`           = **当前生效分类**（网格员可以用 `update_category` 改）；
+      · 改动的人与时间从 `activity_log`（action 含"修改工单分类"）取。
+
+    ⚠️ 三条口径纪律，**材料里必须一起写**：
+      ① **覆盖率必须显示**：`suggested_category` 是第 6 阶段才补的写入侧，
+         v52 之前的历史工单该字段为空 —— 所以"覆盖率"会明显小于 100%。
+         只报"一致率"而不报覆盖率，等于拿一小撮样本冒充全体（这就是口径造假）。
+         空建议的工单单独计数（`no_suggestion`），**不算**成"系统建议正确"。
+      ② **样本不足要标**：有建议的条数 < 5 → 只作参考。
+      ③ 这张表**不是模型训练数据**：不做回灌、不做调参，只是给人看的核查清单。
+         （对外别写"用于训练模型"，本项目没有这条链路。）
+    """
+    since = (datetime.now() - timedelta(days=max(1, min(days, 1095)))).strftime("%Y-%m-%d %H:%M:%S")
+    args: list = [since]
+    tc = tenant_clause(tenant, args)
+    empty = {
+        "days": days, "total": 0, "with_suggestion": 0, "no_suggestion": 0,
+        "corrected": 0, "agreed": 0, "coverage": 0.0, "agreement_rate": 0.0,
+        "corrected_rate": 0.0, "pairs": [], "items": [], "unlogged_changes": 0,
+        "sample_enough": False, "min_sample": MIN_SAMPLE,
+        "note": "缺少社区归属或没有样本，已按空返回",
+        "disclaimer": "本清单仅供人工核查，不用于模型训练/调参。",
+    }
+    if tc is None:
+        return empty
+    with get_db() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) c FROM community_issues WHERE reported_at>=?{tc}",
+            tuple(args)).fetchone()["c"]
+        rows = conn.execute(
+            f"SELECT id, title, category, suggested_category FROM community_issues "
+            f"WHERE reported_at>=?{tc} AND COALESCE(suggested_category,'')<>'' "
+            f"ORDER BY id DESC LIMIT 2000", tuple(args)).fetchall()
+        # 改动留痕：一次查全部，避免按行 N+1
+        ids = [int(r["id"]) for r in rows]
+        log_map: dict[int, dict] = {}
+        if ids:
+            qmarks = ",".join("?" * len(ids))
+            for a in conn.execute(
+                    f"SELECT target_id, actor, created_at, before_value, after_value "
+                    f"FROM activity_log WHERE target_type='issue' AND target_id IN ({qmarks}) "
+                    f"AND action LIKE '%修改工单分类%' ORDER BY id", tuple(ids)).fetchall():
+                # 取**最早一次**改动（那就是"人工第一次不认同系统建议"的那一刻）
+                log_map.setdefault(int(a["target_id"]), dict(a))
+
+    corrected, pairs, items, unlogged = 0, Counter(), [], 0
+    for r in rows:
+        sug = str(r["suggested_category"] or "").strip()
+        fin = str(r["category"] or "").strip()
+        changed = sug != fin
+        log = log_map.get(int(r["id"]))
+        if changed:
+            corrected += 1
+            pairs[(sug, fin)] += 1
+            if log is None:
+                # 分类变了却没有留痕 → 说明有绕过 `update_issue_category` 的写入路径，
+                # 这是真问题，要报出来而不是装作没看见
+                unlogged += 1
+        if len(items) < limit:
+            clean, _n = scrub_text(r["title"] or "")
+            items.append({
+                "issue_id": int(r["id"]),
+                "title": clean[:24],
+                "suggested": sug,
+                "final": fin,
+                "changed": changed,
+                "changed_by": (log or {}).get("actor") or "",
+                "changed_at": ((log or {}).get("created_at") or "")[:16],
+            })
+    with_sug = len(rows)
+    total = int(total or 0)
+    enough = with_sug >= MIN_SAMPLE
+    if enough:
+        note = ""
+    elif with_sug == 0:
+        note = ("窗口期内没有带系统建议的工单：**清单为空是预期的**——"
+                "建议写入侧是第 6 阶段才补的，此前的历史工单该字段为空")
+    else:
+        note = (f"样本不足（有系统建议的只有 {with_sug} 条 < {MIN_SAMPLE} 条）："
+                "只作参考，别当准确率讲")
+    return {
+        **empty,
+        "days": days,
+        "total": total,
+        "with_suggestion": with_sug,
+        "no_suggestion": max(0, total - with_sug),
+        "corrected": corrected,
+        "agreed": with_sug - corrected,
+        "coverage": round(with_sug / total * 100, 1) if total else 0.0,
+        "agreement_rate": round((with_sug - corrected) / with_sug * 100, 1) if with_sug else 0.0,
+        "corrected_rate": round(corrected / with_sug * 100, 1) if with_sug else 0.0,
+        "pairs": [{"suggested": s, "final": f, "count": c}
+                  for (s, f), c in pairs.most_common(10)],
+        "items": items,
+        "unlogged_changes": unlogged,
+        "sample_enough": enough,
+        "note": note,
+    }

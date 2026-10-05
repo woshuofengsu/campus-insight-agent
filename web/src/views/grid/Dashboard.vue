@@ -20,6 +20,51 @@ const board = ref({ red_board: { satisfied_issues: [], good_workers: [], done_pr
 // 治理指标（v4 §5 壁垒层四）：重复报修率 + 转人工原因分布（后端只算本社区）
 const gov = ref({ repeat: { rate: 0, total: 0, repeat_groups: 0, top: [] },
                   transfer: { total: 0, by_reason: {}, by_source: {} } })
+// 治理情景模拟器（v4 第 5 阶段）：只读估算——诉求量涨 X% 要多少工时、折算几个人
+const sim = ref({ label: '', disclaimer: '', formulas: [], sample: {}, scenario: {},
+                  avg_minutes: {}, available_hours: {}, projected: {}, workload: {}, notes: [] })
+// 注意：窗口与增长率**不用 `n-input-number`**：它内部的 +/- 小按钮只有 18px 宽，
+// 会踩手机端 44px 热区下限（`mobile_audit` 实测抓到 4 处，dev-log 五十三 记过同一个坑）。
+// 窗口改成下拉预设（选项本身就是大热区），增长率用普通输入框 + 数字键盘。
+const SIM_DAYS = [7, 30, 90, 180, 365].map((d) => ({ label: `近 ${d} 天`, value: d }))
+const simGrowth = ref('20')
+const simDays = ref(30)
+const simBusy = ref(false)
+const simCfg = ref({ available_hours: null, avg_minutes: null })
+const simCfgOpen = ref(false)
+
+function _num(v) {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+async function runSim() {
+  simBusy.value = true
+  try {
+    sim.value = (await agent.governanceSimulation({
+      days: _num(simDays.value) || 30, growth_pct: _num(simGrowth.value),
+    })) || sim.value
+    simCfg.value = { available_hours: sim.value.available_hours?.value ?? null,
+                     avg_minutes: sim.value.avg_minutes?.value ?? null }
+  } catch (e) { message.error(e.message) } finally { simBusy.value = false }
+}
+
+async function saveSimCfg() {
+  try {
+    const body = {}
+    if (simCfg.value.available_hours !== null && simCfg.value.available_hours !== '') {
+      body.available_hours = _num(simCfg.value.available_hours)
+    }
+    if (simCfg.value.avg_minutes !== null && simCfg.value.avg_minutes !== '') {
+      body.avg_minutes = _num(simCfg.value.avg_minutes)
+    }
+    await agent.saveSimSettings(body)
+    message.success('已保存（只对您所在社区生效）')
+    simCfgOpen.value = false
+    await runSim()
+  } catch (e) { message.error(e.message) }
+}
+
 const drillOpen = ref(false)
 const drill = ref({ summary: { satisfied: 0, dissatisfied: 0, total: 0, rate: 0 }, items: [] })
 const drillTitle = ref('')
@@ -36,6 +81,7 @@ onMounted(async () => {
   try {
     gov.value = (await agent.governanceMetrics({ days: 30 })) || gov.value
   } catch { /* 指标失败不阻塞工作台 */ }
+  await runSim()
   try {
     const all = (await issues.list()) || []
     stats.value = {
@@ -230,6 +276,102 @@ const cards = computed(() => [
       </div>
     </div>
 
+    <!-- 治理情景模拟器（v4 第 5 阶段）：**只读**估算——人还是这么几个人，量涨上来怎么办 -->
+    <div class="card" data-gov-sim style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:700;"><EIcon name="chart-line" :size="18" /> 治理情景模拟器
+          <span class="muted" style="font-weight:400;font-size:0.82rem;">（{{ sim.label || '情景估算' }} · 仅本社区）</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <n-select v-model:value="simDays" :options="SIM_DAYS" size="small" style="width:132px;"
+                    data-sim-days />
+          <span class="muted" style="font-size:0.82rem;">诉求量增长 %</span>
+          <n-input v-model:value="simGrowth" size="small" inputmode="numeric" placeholder="如 20"
+                   style="width:96px;" data-sim-growth />
+          <n-button size="small" type="primary" :loading="simBusy" @click="runSim"
+                    data-sim-run>计算</n-button>
+          <n-button size="small" @click="simCfgOpen = true" data-sim-config>参数</n-button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px;">
+        <div class="card" style="margin:0;">
+          <div style="font-size:1.5rem;font-weight:800;" data-sim-sample>{{ sim.sample.issues ?? 0 }}</div>
+          <div class="muted" style="font-size:0.82rem;">
+            样本量 · 近 {{ sim.days || simDays }} 天本社区工单
+            <template v-if="sim.sample.resolved">（已办结 {{ sim.sample.resolved }} 单）</template>
+          </div>
+        </div>
+        <div class="card" style="margin:0;">
+          <div style="font-size:1.5rem;font-weight:800;" data-sim-new>
+            {{ sim.projected.new >= 0 ? '+' : '' }}{{ sim.projected.new ?? 0 }}
+          </div>
+          <div class="muted" style="font-size:0.82rem;">
+            预计新增 · 假设增长 {{ sim.scenario.growth_pct ?? 0 }}%（不是预测值）
+          </div>
+        </div>
+        <div class="card" style="margin:0;">
+          <div style="font-size:1.5rem;font-weight:800;" data-sim-total>{{ sim.projected.total ?? 0 }}</div>
+          <div class="muted" style="font-size:0.82rem;">预计总量 · 样本量 + 预计新增</div>
+        </div>
+        <div class="card" style="margin:0;">
+          <div style="font-size:1.5rem;font-weight:800;" data-sim-hours>
+            {{ sim.workload.total_hours === null || sim.workload.total_hours === undefined ? '—' : sim.workload.total_hours + ' 小时' }}
+          </div>
+          <div class="muted" style="font-size:0.82rem;">
+            预计总工时 · 平均处理时长
+            {{ sim.avg_minutes.value ? sim.avg_minutes.value + ' 分钟' : '未取得' }}
+            <template v-if="sim.avg_minutes.source">（{{ sim.avg_minutes.source }}）</template>
+          </div>
+        </div>
+        <div class="card" style="margin:0;">
+          <div style="font-size:1.5rem;font-weight:800;" data-sim-staffing>
+            {{ sim.workload.staffing === null || sim.workload.staffing === undefined ? '—' : sim.workload.staffing + ' 人' }}
+          </div>
+          <div class="muted" style="font-size:0.82rem;">
+            折算人手 · 预计总工时 ÷ 人均可用工时
+            <template v-if="sim.available_hours.value">（{{ sim.available_hours.value }} 小时/人）</template>
+          </div>
+        </div>
+      </div>
+
+      <!-- 「算不出来」的地方必须说清楚原因：不许拿默认值硬算出一个像样的人手数 -->
+      <div v-if="sim.notes && sim.notes.length" class="sim-notes" data-sim-notes>
+        <div v-for="(n, i) in sim.notes" :key="'sn' + i">
+          <EIcon name="info" :size="16" /> {{ n }}
+        </div>
+      </div>
+
+      <!-- 公式**默认展开**：这是"可现场复算"的凭证，藏起来就等于黑箱 -->
+      <details class="sim-formulas" data-sim-formulas open>
+        <summary>公式（结果按下面四条算出来，可现场复算）</summary>
+        <div v-for="(f, i) in (sim.formulas || [])" :key="'sf' + i" style="margin-top:4px;">{{ i + 1 }}. {{ f }}</div>
+        <div class="muted" style="margin-top:6px;font-size:0.8rem;">{{ sim.disclaimer }}</div>
+      </details>
+    </div>
+
+    <n-drawer v-model:show="simCfgOpen" placement="right" :width="360">
+      <n-drawer-content title="情景参数（只对您所在社区生效）" :native-scrollbar="false">
+        <div class="muted" style="font-size:0.85rem;margin-bottom:12px;">
+          这两项都是"算账用的参数"，不是业务数据：人均可用工时是"我们社区有几个人、每人能投多少时间"，
+          所以按社区分开配，不跨社区共用。
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:0.9rem;margin-bottom:4px;">人均可用工时（小时/人/窗口期）</div>
+          <n-input v-model:value="simCfg.available_hours" inputmode="decimal" placeholder="如 8"
+                   data-sim-cfg-hours />
+          <div class="muted" style="font-size:0.78rem;margin-top:2px;">不填 → 折算人手不给数字（会明确写"未配置"）</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:0.9rem;margin-bottom:4px;">平均处理时长（分钟 · 每条诉求占用的人工时长）</div>
+          <n-input v-model:value="simCfg.avg_minutes" inputmode="numeric" placeholder="如 40"
+                   data-sim-cfg-minutes />
+          <div class="muted" style="font-size:0.78rem;margin-top:2px;">不填 → 用已办结工单的办结耗时（含等待，会高估工时，页面上会提醒）</div>
+        </div>
+        <n-button type="primary" @click="saveSimCfg" data-sim-cfg-save>保存</n-button>
+      </n-drawer-content>
+    </n-drawer>
+
     <n-empty v-if="!urgent.length && !pendingProps.length" description="暂无待办，社区运转良好！" />
 
     <n-drawer v-model:show="drillOpen" placement="right" :width="360">
@@ -275,4 +417,8 @@ const cards = computed(() => [
 .todo-content b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .todo-content .muted { font-size:0.8rem; }
 @media (max-width: 720px) { .todo-head { align-items:flex-start; flex-direction:column; } .todo-row { gap:6px; } }
+/* 情景模拟器：「算不出来」的原因与公式都要看得见（只读估算，不能是黑箱） */
+.sim-notes { margin-top:12px; padding:10px 12px; border-radius:8px; background:var(--panel-lemon); font-size:0.85rem; display:flex; flex-direction:column; gap:5px; }
+.sim-formulas { margin-top:12px; font-size:0.85rem; }
+.sim-formulas summary { cursor:pointer; color:var(--ink-info); }
 </style>

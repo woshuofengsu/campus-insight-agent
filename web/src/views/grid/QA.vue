@@ -37,6 +37,7 @@ onMounted(async () => {
     if (t && t.threshold != null) threshold.value = Number(t.threshold)
   } catch { /* 忽略 */ }
   await loadProfile()   // 同类处置画像：进页面就给一份"全部"的口径
+  await loadCorr()      // 人工修正对照清单：进页面就给一份本社区的口径
 })
 
 async function transfer(q) {
@@ -164,6 +165,22 @@ async function loadProfile() {
     profileLoading.value = false
   }
 }
+// 人工修正对照清单（第 7 阶段）：系统建议分类 vs 人工最终分类
+const corr = ref({ total: 0, with_suggestion: 0, no_suggestion: 0, corrected: 0, agreed: 0,
+                   coverage: 0, agreement_rate: 0, corrected_rate: 0, pairs: [], items: [],
+                   unlogged_changes: 0, sample_enough: false, note: '', disclaimer: '', days: 180 })
+const corrLoading = ref(false)
+async function loadCorr() {
+  corrLoading.value = true
+  try {
+    corr.value = { ...corr.value, ...((await issues.categoryCorrections({ days: 180, limit: 50 })) || {}) }
+  } catch (e) {
+    message.error(e.message)
+  } finally {
+    corrLoading.value = false
+  }
+}
+
 async function kgSearch() {
   const q = kgQuery.value.trim()
   if (!q) return message.warning('请输入实体，如「3号楼」「电梯」「加装电梯」')
@@ -334,6 +351,66 @@ async function kgSearch() {
             </div>
             <div v-if="profile.note" style="color:var(--ink-warning);margin-top:4px;">{{ profile.note }}</div>
           </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;" data-cat-corrections>
+          <div style="font-weight:700;margin-bottom:6px;"><EIcon name="checkCircle" :size="18" /> 人工修正对照清单</div>
+          <div class="muted" style="font-size:0.85rem;margin-bottom:10px;">
+            把「系统当初建议的分类」和「网格员最终用的分类」放在一起对账。
+            <b>覆盖率必须和一致率一起看</b>：系统建议是 2026-09-29 之后才落库的，
+            更早的工单没有建议值，只报一致率就是拿一小撮样本冒充全体。
+            这张表只供人工核查，<b>不用于模型训练或调参</b>。
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <n-button type="primary" :loading="corrLoading" @click="loadCorr" data-corr-load>刷新</n-button>
+            <span class="muted" style="font-size:0.82rem;">
+              近 {{ corr.days }} 天 · 共 {{ corr.total }} 单
+            </span>
+          </div>
+          <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+            <div><div style="font-weight:800;font-size:1.2rem;" data-corr-coverage>{{ corr.coverage }}%</div>
+              <div class="muted" style="font-size:0.8rem;">建议覆盖率（{{ corr.with_suggestion }}/{{ corr.total }}）</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;" data-corr-agreement>{{ corr.agreement_rate }}%</div>
+              <div class="muted" style="font-size:0.8rem;">一致率（未被人改）</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;" data-corr-corrected>{{ corr.corrected }}</div>
+              <div class="muted" style="font-size:0.8rem;">被人工改过（{{ corr.corrected_rate }}%）</div></div>
+            <div><div style="font-weight:800;font-size:1.2rem;" data-corr-nosug>{{ corr.no_suggestion }}</div>
+              <div class="muted" style="font-size:0.8rem;">无系统建议（人工自选）</div></div>
+          </div>
+          <div v-if="corr.note" style="color:var(--ink-warning);margin-top:8px;font-size:0.85rem;" data-corr-note>{{ corr.note }}</div>
+          <div v-if="corr.unlogged_changes" style="color:var(--ink-danger);margin-top:8px;font-size:0.85rem;" data-corr-anomaly>
+            有 {{ corr.unlogged_changes }} 条分类变了但查不到留痕（说明存在绕过受控入口的写入路径，需要排查）
+          </div>
+          <div v-if="corr.pairs.length" style="margin-top:8px;font-size:0.85rem;" data-corr-pairs>
+            常见改动：<b v-for="p in corr.pairs" :key="p.suggested + '>' + p.final" style="margin-right:12px;">
+              {{ p.suggested }} → {{ p.final }}（{{ p.count }}）
+            </b>
+          </div>
+          <div v-if="corr.items.length" style="margin-top:10px;overflow-x:auto;">
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
+              <thead><tr class="muted" style="text-align:left;">
+                <th style="padding:4px;">工单</th><th style="padding:4px;">摘要</th>
+                <th style="padding:4px;">系统建议</th><th style="padding:4px;">最终分类</th>
+                <th style="padding:4px;">改动人</th><th style="padding:4px;">改动时间</th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="it in corr.items" :key="it.issue_id" style="border-top:1px solid var(--border);">
+                  <td style="padding:4px;">#{{ it.issue_id }}</td>
+                  <td style="padding:4px;">{{ it.title || '—' }}</td>
+                  <td style="padding:4px;">{{ it.suggested }}</td>
+                  <td style="padding:4px;" :style="it.changed ? 'color:var(--ink-danger);font-weight:700;' : ''">
+                    {{ it.final }}
+                  </td>
+                  <td style="padding:4px;">{{ it.changed_by || '—' }}</td>
+                  <td style="padding:4px;">{{ it.changed_at || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="muted" style="margin-top:8px;font-size:0.85rem;">
+            近 180 天没有带系统建议的工单（清单为空是预期的：建议写入侧是 2026-09-29 才补的）
+          </div>
+          <div class="muted" style="margin-top:6px;font-size:0.8rem;">{{ corr.disclaimer }}</div>
         </div>
 
         <div class="card" style="margin-bottom:12px;">

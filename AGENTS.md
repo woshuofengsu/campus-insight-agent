@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1065 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1100 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1065 项：1064 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1100 项：1099 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1065 项测试**（1064 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1100 项测试**（1099 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -175,8 +175,13 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 六十二 节**：基线冻结 / 统一叙事 / 老年端确认卡片）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 六十三 节**：冻结观察版 / 治理模拟器 / 建议分类对照）|
 | `scripts/journey_check.py` | **首批八条浏览器旅程**（发布门槛，8 条 / 63 项）：页面真点击 + 接口 + 库内事实三处对账 |
+| `scripts/grid_gov_check.py` | **治理侧两项对账**（25 项）：情景模拟器 + 人工修正对照清单，页面/接口/库内三处同一个数 |
+| `data/db_governance_sim.py` | **治理情景模拟器**（只读）：样本量×增长率 → 工时 → 折算人手；**算不出来就明说**（不给人手数、不拿默认值硬算）|
+| `tests/test_governance_sim.py` | 模拟器门禁（19 例）：只读 / 租户 fail-closed / 配置按社区分键 / 样本不足 / **标签必须是「情景估算」** |
+| `tests/test_category_corrections.py` | **系统建议 vs 人工最终**门禁（12 例）：两列语义必须分开 / 覆盖率必报 / 无留痕的改动要露头 |
+| `docs/eval/elderly-user-study-v1.md` | 真实老人观察**方案与空表**（执行只能由人做；文首写明"尚未开展"）|
 | `tests/test_report_idempotency.py` | 报修幂等门禁（含**真双线程并发**用例：同编号并发只建一张单）|
 | `utils/region.py` | **属地解析统一入口**：`Region`/`normalize_area`/`resolve_region`/`policy_region_boost` + 级别与权重常量（政策与 RAG 共用）|
 | `docs/spec/地区识别落地方案.md` | 属地化方案 **v2 定稿**（含 v1 的 7 处偏差记录，勿照 v1 实施）|
@@ -217,5 +222,11 @@ elderly:  demo_elderly（免登录）
   编号不合规要告警，别静默不幂等）· **重复报修率 + 转人工原因分布**（`/agent/governance-metrics`，
   工作台"治理指标"卡）· **字段来源落库 + 同类处置画像**（迁移 **v52**、`/issues/{id}/field-sources`、
   `/issues/knowledge`；样本 <5 标注"样本不足"）（见 dev-log **六十一** 节）
+- **收敛方案第 3–7 阶段（2026-09-29）**：冻结观察版 `elderly-observation-v1`（先跑绿再冻）·
+  真实老人观察**准备件**（`docs/eval/` 四份，全是空表 + 「尚未开展」）·
+  **治理情景模拟器**（只读，公式透明，**算不出来就明说**：未配置人均可用工时 → 不给人手数）·
+  **补 `suggested_category` 写入侧**（`category` 会被人工改、`suggested_category` 保留系统原值）·
+  **人工修正对照清单**（`/issues/category-corrections`，**覆盖率必须与一致率一起看**，
+  无留痕的改动要露头，明确「不用于模型训练」）（见 dev-log **六十三** 节）
 
-详见 `docs/spec/dev-log.md`（最新 **六十一** 节）。
+详见 `docs/spec/dev-log.md`（最新 **六十三** 节）。
