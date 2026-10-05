@@ -15,8 +15,8 @@ const lastSpoken = ref('')
 const ttsOk = ref(!!(typeof window !== 'undefined' && window.speechSynthesis))
 
 const items = [
-  { to: '/elderly/agent', icon: 'robot', label: '社区小助手', desc: '按住说话，什么都能问' },
-  { to: '/elderly/qa', icon: 'book', label: '政策问答', desc: '医保、养老、住房怎么办' },
+  { to: '/elderly/agent', icon: 'robot', label: '问一问（小助手）', desc: '按住说话，什么都能问' },
+  { to: '/elderly/qa', icon: 'book', label: '问一问（政策）', desc: '医保、养老、住房怎么办' },
   { to: '/elderly/medication', icon: 'pill', label: '用药提醒', desc: '到点提醒吃药' },
   { to: '/elderly/health', icon: 'medical', label: '我的健康', desc: '记血压、看趋势' },
   { to: '/elderly/notices', icon: 'bell', label: '听通知', desc: '社区的通知念给您听' },

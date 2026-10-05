@@ -67,7 +67,7 @@ async function act(id, data, okMsg) {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title"><EIcon name="clipboard" :size="18" /> 我的报修</div>
+    <div class="elderly-title"><EIcon name="clipboard" :size="18" /> 看看进度</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">现在到哪一步、下一步谁来做，都写在这里</p>
 
     <div v-if="lastSpoken && !ttsOk" data-speech-fallback class="card muted" style="font-size:1.2rem;">

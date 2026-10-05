@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
 
 // 首页保留的"首页特有"快捷入口（高频的报修/进度/联系人/通知已由顶部导航承担，不再重复）
 const quick = [
-  { to: '/elderly/report', icon: 'speak', label: '我要报修' },
+  { to: '/elderly/report', icon: 'speak', label: '反映问题' },
   { to: '/elderly/orders', icon: 'clipboard', label: '看看进度' },
   { to: '/elderly/more', icon: 'toolbox', label: '更多服务' },
 ]
@@ -111,7 +111,7 @@ function playWeather() {
 }
 
 function voiceHelp() {
-  speak('您好，我是社区智能助手。最上面有首页、我要报修、看进度、联系家人、今日提醒、更多服务；红色的紧急求助按钮长按三秒就能找社区。', vol.value, rate.value)
+  speak('您好，我是社区智能助手。最上面有首页、反映问题、看看进度、联系家人、今日提醒、更多服务；红色的紧急求助按钮长按三秒就能找社区。', vol.value, rate.value)
 }
 
 function callCommunity() {

@@ -101,15 +101,28 @@ const banner = computed(() => reasonText(blockReason.value || 'unsupported'))
 const ttsOk = ref(cap.hasTTS)
 const lastSpoken = ref('')
 
+// 字段来源的五种中文说法（v52 落库的白名单值，与 `data/db_repair.ALLOWED_FIELD_SOURCES` 对应）。
+// 注意：不许笼统写"系统记录"：「您自己说的」和「我们按登记资料替您填的」可信度完全不同，
+// 含糊写就等于把最该讲清的那句糊掉了（这是本页最要紧的一句口径）。
 const SOURCE_LABEL = {
   text: '来自您说的话',
   user: '您确认的',
   profile: '来自您的登记资料',
-  suggestion: '系统建议（还没确认）',
+  suggestion: '系统建议（您已确认）',
   default: '默认值',
+  form: '表单直接填写',
+  agent: '代办人填写',
   none: '暂缺',
 }
 const srcTip = (k) => SOURCE_LABEL[k] || ''
+/** 确认卡片用：来源 + 一句"这是谁说的"，缺失时如实写"暂缺"。
+ *  字段名有两套口径（契约里"责任范围"叫 issue_type，落库/展示叫 scope）→ 两套都认，
+ *  否则会出现"其实有来源、却显示暂缺"的假缺失。 */
+const srcLine = (o, k) => {
+  const s = (o && o.sources) || {}
+  const v = s[k] || (k === 'scope' ? s.issue_type : '') || (k === 'title' ? s.description : '') || ''
+  return v ? `（${SOURCE_LABEL[v] || v}）` : '（暂缺）'
+}
 
 /** 统一播报入口：返回是否真的响了；失败就把 降级成"请看大字"的说明。 */
 async function say(text) {
@@ -334,7 +347,7 @@ async function checkSubmitted() {
 
 <template>
   <div class="elderly-page">
-    <div class="elderly-title"><EIcon name="speak" :size="18" /> 一句话报修</div>
+    <div class="elderly-title"><EIcon name="speak" :size="18" /> 反映问题（一句话就行）</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">说一句或打几个字，我帮您整理成工单</p>
 
     <!-- 页面提示也做成"点一下听"（不在挂载时自动播：iOS 需要用户手势，否则静默不响） -->
@@ -497,21 +510,53 @@ async function checkSubmitted() {
       </div>
     </div>
 
-    <!-- 提交结果：原话 / 系统建议 / 您确认的 / 入库值 四段分开展示（不混成一句"已纠正"） -->
-    <div v-if="submitted" class="card" :data-result-via="resultVia || 'submit'"
+    <!-- 提交结果＝**确认卡片**（收敛方案第 2 阶段）：让老人看见"系统到底记住了什么"，并且**逐条标明来源**。
+         口径纪律（不许含糊）：来源有五种，各自中文说法见 SOURCE_LABEL ——
+         「您确认的 / 来自您说的话 / 来自您的登记资料 / 系统建议（您已确认） / 默认值」，
+         位置没确认时写「位置待人工确认」，绝不写成像已确认的样子。 -->
+    <div v-if="submitted" class="card" data-confirm-card :data-result-via="resultVia || 'submit'"
          style="background:#ecfdf5;font-size:1.2rem;">
-      <b><EIcon name="checkCircle" :size="18" /> 已上报（工单号 {{ submitted.issue_id }}）</b>
+      <b><EIcon name="checkCircle" :size="18" /> 已经报上去了（工单号 {{ submitted.issue_id }}）</b>
       <!-- 结果是从"核对"来的就说清楚：老人/家属才知道这条不是当时服务端回的 -->
       <div v-if="resultVia === 'verify'" style="margin-top:6px;font-weight:700;color:var(--ink-info);">
-        <EIcon name="signal" :size="18" /> 刚才网络没回话，工单号是按提交编号**核对**到的真实结果（没有重复上报）
+        <EIcon name="signal" :size="18" /> 刚才网络没回话，工单号是按提交编号核对到的真实结果（没有重复上报）
       </div>
-      <div style="margin-top:8px;"><EIcon name="speak" :size="18" /> 您说的：{{ submitted.original_text }}</div>
-      <div style="margin-top:4px;"><EIcon name="pin" :size="18" /> 最终记录的位置：{{ submitted.confirmed.location }}</div>
-      <div style="margin-top:4px;"><EIcon name="home" :size="18" /> 责任范围：
-        {{ submitted.confirmed.issue_type === '室内' ? '您家里' : '公共地方' }}</div>
-      <div style="margin-top:4px;"><EIcon name="clock" :size="18" />  紧急程度：{{ submitted.confirmed.urgency }}</div>
-      <div class="muted" style="margin-top:6px;font-size:1rem;">
-        位置来源：{{ srcTip(submitted.sources.location) }}（系统不会把您没确认的内容写成事实）
+
+      <div style="margin-top:10px;font-weight:800;">您刚才反映的是：</div>
+      <div style="margin-top:4px;">{{ submitted.confirmed.title || submitted.original_text }}</div>
+
+      <div style="margin-top:10px;font-weight:800;">系统记录：</div>
+      <div style="margin-top:4px;" data-src-location>
+        <EIcon name="pin" :size="18" /> 位置：{{ submitted.confirmed.location || '位置待人工确认' }}
+        <span class="muted" style="font-size:1rem;">{{ srcLine(submitted, 'location') }}</span>
+        <span v-if="!submitted.confirmed.location" class="muted" style="font-size:1rem;">
+          —— 我们没听清地点，已交人工帮您确认，不会随便填一个
+        </span>
+      </div>
+      <div style="margin-top:4px;" data-src-scope>
+        <EIcon name="home" :size="18" /> 责任范围：
+        {{ submitted.confirmed.issue_type === '室内' ? '您家里' : '公共地方' }}
+        <span class="muted" style="font-size:1rem;">{{ srcLine(submitted, 'scope') }}</span>
+      </div>
+      <div style="margin-top:4px;" data-src-urgency>
+        <EIcon name="clock" :size="18" /> 紧急程度：{{ submitted.confirmed.urgency }}
+        <span class="muted" style="font-size:1rem;">{{ srcLine(submitted, 'urgency') }}</span>
+      </div>
+      <div style="margin-top:4px;">
+        <EIcon name="megaphone" :size="18" /> 所属社区：{{ submitted.community || '账号所属社区' }}
+        <span class="muted" style="font-size:1rem;">（账号所属社区，不采集手机定位）</span>
+      </div>
+      <div style="margin-top:4px;">
+        <EIcon name="clock" :size="18" /> 提交时间：{{ submitted.submitted_at || '刚刚' }}
+        <span class="muted" style="font-size:1rem;">（系统记录）</span>
+      </div>
+      <div style="margin-top:6px;">
+        <EIcon name="signal" :size="18" /> 当前状态：<b>已提交，等待网格员处理</b>
+        <span class="muted" style="font-size:1rem;">（进度可以在「看看进度」里随时看）</span>
+      </div>
+      <div class="muted" style="margin-top:8px;font-size:1rem;">
+        括号里写的是每条信息**从哪来的**：您说的、您确认的、还是我们按登记资料填的。
+        系统不会把您没确认的内容写成事实。
       </div>
     </div>
 

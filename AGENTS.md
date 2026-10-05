@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1059 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1065 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1059 项：1058 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1065 项：1064 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -70,7 +70,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1059 项测试**（1058 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1065 项测试**（1064 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -175,8 +175,8 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 六十 节**：全站去 emoji，557 处 → 0，单色线性图标体系）|
-| `scripts/journey_check.py` | **首批八条浏览器旅程**（发布门槛，8 条 / 58 项）：页面真点击 + 接口 + 库内事实三处对账 |
+| `docs/spec/dev-log.md` | 开发日志（**最新 六十二 节**：基线冻结 / 统一叙事 / 老年端确认卡片）|
+| `scripts/journey_check.py` | **首批八条浏览器旅程**（发布门槛，8 条 / 63 项）：页面真点击 + 接口 + 库内事实三处对账 |
 | `tests/test_report_idempotency.py` | 报修幂等门禁（含**真双线程并发**用例：同编号并发只建一张单）|
 | `utils/region.py` | **属地解析统一入口**：`Region`/`normalize_area`/`resolve_region`/`policy_region_boost` + 级别与权重常量（政策与 RAG 共用）|
 | `docs/spec/地区识别落地方案.md` | 属地化方案 **v2 定稿**（含 v1 的 7 处偏差记录，勿照 v1 实施）|
@@ -202,7 +202,7 @@ elderly:  demo_elderly（免登录）
 - **多租户真隔离 → 配置隔离（B5–B7）**：租户键=社区名；写入侧盖章 / 读取侧 fail-closed /
   按-id 闸门 / 配置按社区分键 / Agent 工具用请求级租户上下文；收件人统一走 `managers_of(tenant)`
   （通知类**不做** fail-closed，理由见 dev-log 五十五～五十七节）
-- **首批八条浏览器旅程（卡12）**：新增 `scripts/journey_check.py`（8 条旅程 / 58 项检查），
+- **首批八条浏览器旅程（卡12）**：新增 `scripts/journey_check.py`（8 条旅程 / 63 项检查），
   每条同时验**页面真点击 / 接口返回 / 库内事实**；当场抓到两个真 bug（老人缺位置补充后**提交不了**、
   连点两下**建出两张工单**）并各自补了回归测试（见 dev-log 五十八节）
 - **提交前最后一批（2026-09-29 深夜，v4 第 2/3 批收尾）**：居民端政策问答**依据面板**（含决策元数据 + 门禁）·

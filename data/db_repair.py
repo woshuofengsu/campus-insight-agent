@@ -82,10 +82,15 @@ def _validate_phone(phone: str) -> bool:
 ALLOWED_FIELD_SOURCES = ("user", "text", "profile", "suggestion", "default", "form", "agent")
 #: 允许记住来源的字段（工单的四个结构化字段，与提交契约一一对应）
 FIELD_SOURCE_KEYS = ("title", "location", "scope", "urgency")
+#: 提交契约与落库口径的**字段别名**：`utils/elderly_report` 把"责任范围"叫 `issue_type`，
+#: 落库/展示口径叫 `scope`；`description` 与 `title` 是同一件事的长短两种写法。
+#: 这里做一次归一——否则会出现「页面上那条来源显示（暂缺），其实值是有的」这种
+#: 最容易被抓的**假缺失**（本轮实测踩到：位置有来源、"责任范围"却显示暂缺）。
+FIELD_SOURCE_ALIASES = {"issue_type": "scope", "description": "title", "desc": "title"}
 
 
 def _clean_field_sources(sources: dict | None) -> str:
-    """把"字段 → 来源"清洗成可入库的 JSON（超长/未知来源/未知字段一律丢弃）。
+    """把"字段 → 来源"清洗成可入库的 JSON（别名归一 / 未知来源 / 未知字段一律丢弃）。
 
     ⚠️ 只存**来源标签**，不存字段值本身——字段值已经在工单行里了，
     再存一份等于多一处会不同步的副本（本项目反复踩过这个坑）。
@@ -94,9 +99,9 @@ def _clean_field_sources(sources: dict | None) -> str:
         return ""
     out: dict[str, str] = {}
     for k, v in sources.items():
-        key = str(k or "").strip()
+        key = FIELD_SOURCE_ALIASES.get(str(k or "").strip(), str(k or "").strip())
         val = str(v or "").strip()
-        if key in FIELD_SOURCE_KEYS and val in ALLOWED_FIELD_SOURCES:
+        if key in FIELD_SOURCE_KEYS and val in ALLOWED_FIELD_SOURCES and key not in out:
             out[key] = val
     if not out:
         return ""

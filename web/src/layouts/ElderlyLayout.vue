@@ -33,8 +33,8 @@ const sosHint = computed(() => route.path === '/elderly/home')
 // 文字一个字没改（`mobile_flow_check` 按文字找按钮：'更多服务' 等仍在），只是把图形换成跟着文字色走的线性图标。
 const navs = [
   { key: '/elderly/home', label: '首页', icon: 'home' },
-  { key: '/elderly/report', label: '我要报修', icon: 'speak' },
-  { key: '/elderly/orders', label: '看进度', icon: 'list' },
+  { key: '/elderly/report', label: '反映问题', icon: 'speak' },
+  { key: '/elderly/orders', label: '看看进度', icon: 'list' },
   { key: '/elderly/contacts', label: '联系家人', icon: 'family' },
   { key: '/elderly/notices', label: '今日提醒', icon: 'bell' },
   { key: '/elderly/more', label: '更多服务', icon: 'more' },

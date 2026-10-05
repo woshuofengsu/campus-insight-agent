@@ -263,6 +263,19 @@ def _elderly_profile(uid) -> dict:
         return {}
 
 
+def _issue_submitted_at(issue_id: int) -> str:
+    """工单真实落库时间（确认卡片显示"提交时间"用它，不用前端时钟——前端时钟可能不准）。"""
+    try:
+        from data.db_core import get_db
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT reported_at FROM community_issues WHERE id=?", (issue_id,)).fetchone()
+        return (row["reported_at"] if row else "") or ""
+    except Exception as e:  # noqa: BLE001
+        _log.warning("读取工单落库时间失败 id=%s：%s", issue_id, e)
+        return ""
+
+
 def _report_draft_payload(text: str, profile: dict, answer_location: str = "",
                           answer_scope: str = "", answer_urgency: str = "") -> dict:
     """生成报修确认摘要（v3 卡1）：结构化字段 + 缺失项 + 追问话术 + **每个字段的来源**。
@@ -488,6 +501,10 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         "sources": r["sources"],
         "category": category,
         "client_token": req.client_token,
+        # 确认卡片（收敛方案第 2 阶段）：把"这条归哪个社区、什么时候提交的"也如实给出来，
+        # 社区取自**服务端身份**（不采集定位），时间取自工单真实落库时间（不是前端时钟）
+        "community": _tenant(request) or profile.get("community") or "",
+        "submitted_at": _issue_submitted_at(iid),
     }
     if req.client_token:
         remember("elderly_report", req.client_token, uid, payload)

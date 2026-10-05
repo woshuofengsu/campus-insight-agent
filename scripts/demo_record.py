@@ -141,7 +141,7 @@ def scene_chat(ctx, page, still):
     _login(page, "resident")
     page.wait_for_timeout(1500)
     try:
-        page.get_by_text("社区小助手", exact=False).first.click(timeout=5000)
+        page.get_by_text("小助手", exact=False).first.click(timeout=5000)
         page.wait_for_timeout(1200)
         inp = page.locator("textarea, input[type=text]").last
         inp.click()

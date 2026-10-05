@@ -146,6 +146,39 @@ def test_submit_creates_issue_with_real_location(fresh_db):
     assert rows[0]["issue_type"] == "室外"
 
 
+def test_submit_payload_feeds_the_confirmation_card(fresh_db):
+    """**确认卡片**（收敛方案第 2 阶段）要有料：社区 + 提交时间 + 每种字段的来源。
+
+    为什么单列：卡片上写"位置：（您确认的）"这类字样，如果接口不给 `community`/`submitted_at`，
+    页面就只能编一个或空着 —— 那就是"看着可信、其实含糊"。所以把"卡片需要什么"钉在接口上：
+      · `community` 必须来自**服务端身份**（不采集定位）；
+      · `submitted_at` 必须是**工单真实落库时间**（不是前端时钟）；
+      · `sources` 里四个字段都要有来源，且**责任范围（契约里叫 issue_type）要能被卡片读到**。
+    """
+    from api_routes.elderly import ReportSubmitIn, web_elderly_report_submit
+    from data.db_core import get_db
+    res = web_elderly_report_submit(
+        ReportSubmitIn(text="五号楼二层楼道灯坏了", location="5号楼2层楼道",
+                       scope="室外", urgency="中等"), _req(ELDER_A))
+    assert not _denied(res), _err(res)
+    d = res["data"]
+    assert d["community"] == A, f"社区必须来自服务端身份：{d.get('community')}"
+    assert d["submitted_at"], "确认卡片要显示提交时间，接口必须给真实落库时间"
+    with get_db() as conn:
+        row = conn.execute("SELECT reported_at FROM community_issues WHERE id=?",
+                           (d["issue_id"],)).fetchone()
+    assert d["submitted_at"] == row["reported_at"], "提交时间必须等于库里的 reported_at（不是前端时钟）"
+    # 卡片读"责任范围"用的是 scope，而契约给的是 issue_type → 两边都要能拿到
+    assert d["sources"].get("issue_type") or d["sources"].get("scope"), \
+        f"责任范围的来源缺失（卡片会显示『暂缺』）：{d['sources']}"
+    # v52：来源要真的落库（不只是返回体里有）
+    with get_db() as conn:
+        raw = conn.execute("SELECT field_sources FROM community_issues WHERE id=?",
+                           (d["issue_id"],)).fetchone()["field_sources"]
+    assert raw and "scope" in raw, f"字段来源没有按 scope 口径落库：{raw}"
+
+
+
 def test_submit_user_confirmed_value_beats_auto_suggestion(fresh_db):
     """`不是三号楼，是五号楼`：入库值 = 老人确认的值（自动建议里的三号楼不得进库）。"""
     from api_routes.elderly import ReportSubmitIn, web_elderly_report_submit

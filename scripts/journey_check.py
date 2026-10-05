@@ -398,6 +398,23 @@ def journey_2(page, base):
     check("④c 页面上如实给出工单号",
           bool(row.get("id")) and wait_text(page, f"工单号 {row.get('id')}"),
           f"工单 #{row.get('id')}")
+    # ④d–④h：**确认卡片**（收敛方案第 2 阶段）——让老人看见"系统记住了什么"，且每条标明来源。
+    # 三处对账：页面文字 ↔ 接口返回 ↔ 库内事实（field_sources / reported_at）。
+    card_ok = page.locator("[data-confirm-card]").count() > 0
+    check("④d 提交后出现确认卡片（原话 + 系统记录 + 当前状态）", card_ok)
+    if card_ok:
+        card = page.locator("[data-confirm-card]").first.inner_text()
+        check("④e 卡片三块齐全", all(k in card for k in ("您刚才反映的是", "系统记录", "已提交，等待网格员处理")),
+              card.replace("\n", " | ")[:120])
+        check("④f 每条信息带来源标注（不是笼统写「系统记录」就完事）",
+              any(k in card for k in ("您确认的", "来自您说的话", "来自您的登记资料",
+                                     "系统建议（您已确认）", "默认值", "暂缺")),
+              card.replace("\n", " | ")[:160])
+        check("④g 卡片不漏内部术语与手机号",
+              not any(w in card for w in ("Agent", "RAG", "Verifier", "Arbiter", "1380", "1390")))
+    fs = row.get("field_sources") or ""
+    check("④h 字段来源真的落库了（v52，不是只在页面上闪一下）",
+          "location" in fs or "scope" in fs, fs[:80])
 
 
 # --------------------------------------------------------------------------- 旅程 3
