@@ -2,6 +2,9 @@
 .env.bak
 .env.demo
 .env.demo.bak
+# 部署机密：生产环境变量（含 JWT/加密密钥）**绝不进仓库**
+.env.production
+deploy/.env.production
 __pycache__/
 .pytest_cache/
 *.pyc
@@ -23,6 +26,11 @@ docs/superpowers/
 uploads/
 web/dist/
 web/node_modules/
+
+# 数据库备份（scripts/backup_db.py 的产物）：**绝不进仓库**。
+# 实测差点踩到：一个备份就有 22 MB 的库文件，且里面是**真实/演示业务数据**，
+# 提交它等于把整个库塞进 git 历史（既膨胀又泄露）。备份要单独留存与传输。
+backups/
 
 # 部署机密：HTTPS 证书/密钥放入 nginx/certs/（勿提交），详见 docs/deploy-https.md
 

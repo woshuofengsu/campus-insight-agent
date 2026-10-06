@@ -23,6 +23,14 @@ import sys
 import urllib.error
 import urllib.request
 
+# Windows 中文控制台默认 GBK：打印 ⚠ 会抛 UnicodeEncodeError，而且是在**跑到那一步时**才崩。
+# 与 check_claims 等脚本统一：强制 UTF-8，编不出的字符降级替换而不是崩。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001  —— pytest 捕获 stdout 时没有 reconfigure，忽略即可
+    pass
+
 BASE = os.environ.get("CI_BASE", "http://127.0.0.1:8000")
 
 #: 老人原话（要覆盖"系统判对"和"系统判错被人工纠正"两种情形）

@@ -1,0 +1,60 @@
+# 反向代理：HTTPS + 安全响应头 + 访问日志
+#
+# 为什么用 Caddy：证书自动申请与续期（Let's Encrypt）**零配置**。
+# 试点阶段最怕的不是性能，而是"三个月后证书过期没人知道"——Caddy 自己管。
+#
+# ⚠️ 换域名只需改 .env.production 的 SITE_ADDRESS；Caddy 会自动为新域名重签证书。
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# ---- 访问日志（试点要能回答"昨天谁在什么时候调了什么"）
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 20mb
+			roll_keep 10
+		}
+		format json
+	}
+
+	# ---- 安全响应头（与应用层重复也无害；这里兜住静态资源与错误页）
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# ---- 健康检查直通（不记日志，避免刷屏）
+	@health path /api/web/health
+	handle @health {
+		reverse_proxy app:8000
+	}
+
+	# ---- WebSocket（实时通知）：必须显式放行 Upgrade
+	@ws path /ws/*
+	handle @ws {
+		reverse_proxy app:8000 {
+			header_up Upgrade {http.request.header.Upgrade}
+			header_up Connection {http.request.header.Connection}
+		}
+	}
+
+	# ---- 静态资源缓存（Vite 产物带 hash，可以长缓存）
+	@assets path /assets/* /icons/* *.png *.ico *.webmanifest
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# ---- 其余全部转给应用（含 /resident /elderly /grid /service-desk /device-check.html）
+	reverse_proxy app:8000 {
+		# 让应用拿到真实客户端 IP（限流/审计要用）
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# ---- 请求体上限（附件上传）：调大要对齐应用层限制
+	request_body {
+		max_size 20MB
+	}
+}

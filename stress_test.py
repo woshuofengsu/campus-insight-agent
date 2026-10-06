@@ -8,6 +8,14 @@ import threading
 import time
 import urllib.request
 
+# Windows 中文控制台默认 GBK：打印 ✅/❌ 会抛 UnicodeEncodeError，而且是在**跑到那一步时**才崩
+# —— 可能把"压测通过"报成"脚本失败"。与 check_claims 等脚本统一：强制 UTF-8。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001  —— pytest 捕获 stdout 时没有 reconfigure，忽略即可
+    pass
+
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 CONC = int(sys.argv[2]) if len(sys.argv) > 2 else 20
 ROUNDS = int(sys.argv[3]) if len(sys.argv) > 3 else 3

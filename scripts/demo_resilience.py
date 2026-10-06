@@ -14,6 +14,16 @@
 import os
 import sys
 
+# Windows 中文控制台默认 GBK：脚本里打印 ✅/❌/⚠ 会抛 UnicodeEncodeError，
+# 而且是**在执行到那一步时**才崩 —— 可能把"检验通过"报成"脚本失败"（实测踩到过）。
+# 与 check_claims / demo_flow_check 等脚本统一：强制 UTF-8，编不出的字符降级替换而不是崩。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001  —— pytest 捕获 stdout 时没有 reconfigure，忽略即可
+    pass
+
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 

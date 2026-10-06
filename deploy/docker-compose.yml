@@ -1,0 +1,140 @@
+# 生产/试点部署 · Docker Compose（模块化单体，**不上 Kubernetes、不拆微服务**）
+#
+# 设计目标：一条命令起一个能对外服务的实例，且**默认就是安全姿态**。
+#   · 三层：反向代理（HTTPS/日志/安全头）→ 应用（FastAPI + Vue 构建产物）→ 数据库
+#   · 备份是**独立容器里的定时任务**，不是"写在文档里让人记得跑"
+#   · 所有密钥从 `.env.production` 读，**不进镜像、不进仓库**
+#
+# 用法（在服务器上）：
+#   cp deploy/.env.production.example deploy/.env.production   # 然后逐项填
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env.production up -d
+#   docker compose -f deploy/docker-compose.yml logs -f app
+#
+# ⚠️ 本机（开发机）没有 Docker —— 这份编排**尚未在真实 Docker 上验证过**，
+#    首次上服务器时按 `docs/deploy/生产部署手册.md` 的"首次部署"清单逐项走一遍再宣布可用。
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: community-insight:${APP_TAG:-pilot}
+    restart: unless-stopped
+    environment:
+      # ---- 姿态：生产必须 DEMO_MODE=false（缺密钥会**拒绝启动**，这是有意的 fail-closed）
+      DEMO_MODE: "false"
+      DB_BACKEND: "${DB_BACKEND:-sqlite}"
+      # ---- 数据位置（sqlite 用卷；postgres 走下面的 DATABASE_URL）
+      DB_PATH: /data/community_insight.db
+      DATABASE_URL: "${DATABASE_URL:-}"
+      # ---- 密钥：由 .env.production 提供，镜像里没有默认值可用
+      WEB_JWT_SECRET: "${WEB_JWT_SECRET:?必须在 .env.production 里设置}"
+      CRYPTO_KEY: "${CRYPTO_KEY:?必须在 .env.production 里设置}"
+      # ---- 外部服务（可留空，留空即降级为规则路径）
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY:-}"
+      QWEATHER_KEY: "${QWEATHER_KEY:-}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - app_data:/data
+      - uploads:/app/uploads
+    expose:
+      - "8000"
+    healthcheck:
+      # 健康检查用**登录页**：它依赖 SPA 产物 + 数据库可用，最能代表"能不能对外服务"
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/login', timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: "${SITE_ADDRESS:?必须设置域名（如 insight.example.org）}"
+    volumes:
+      - ../deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - proxy_logs:/var/log/caddy
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  # 数据库（可选）：DB_BACKEND=postgres 时才需要。
+  # ⚠️ 若用 Postgres，务必同时把 app 的 DB_BACKEND 改成 postgres 并设置 DATABASE_URL，
+  #    且**生产库必须空库初始化**（见 docs/deploy/生产部署手册.md §4），绝不迁移演示库。
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: "${PG_DB:-community}"
+      POSTGRES_USER: "${PG_USER:-community}"
+      POSTGRES_PASSWORD: "${PG_PASSWORD:?使用 postgres 时必须设置}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-community} -d ${PG_DB:-community}"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  # 备份：**独立容器里的定时任务**——比"写在文档里记得跑"可靠得多。
+  # 保留周期 = BACKUP_KEEP（默认 14 份）；每天 03:10 跑一次。
+  backup:
+    image: community-insight:${APP_TAG:-pilot}
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[backup] 定时任务启动：每天 03:10（TZ=$$TZ），保留最近 $${BACKUP_KEEP} 份"
+        while true; do
+          now=$$(date +%H:%M)
+          if [ "$$now" = "03:10" ]; then
+            python scripts/backup_db.py --keep "$${BACKUP_KEEP}" --include-uploads \
+              || echo "[backup] 备份失败，退出码非 0（请检查 app 日志与磁盘）"
+            sleep 60
+          fi
+          sleep 20
+        done
+    environment:
+      DB_BACKEND: "${DB_BACKEND:-sqlite}"
+      DB_PATH: /data/community_insight.db
+      DATABASE_URL: "${DATABASE_URL:-}"
+      CRYPTO_KEY: "${CRYPTO_KEY:?}"
+      BACKUP_KEEP: "${BACKUP_KEEP:-14}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - app_data:/data
+      - uploads:/app/uploads
+      - backups:/app/backups
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  app_data:
+  uploads:
+  backups:
+  caddy_data:
+  caddy_config:
+  proxy_logs:
+  pg_data:

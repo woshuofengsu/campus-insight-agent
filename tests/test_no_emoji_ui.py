@@ -141,3 +141,61 @@ def test_scanner_self_check():
     # 现在真的没有 emoji 了（否则第 1 条用例应已失败）
     leftovers = [(rel, EMOJI.findall(t)) for rel, t in _sources() if rel not in ALLOW and EMOJI.search(t)]
     assert not leftovers, f"仓库里仍有 emoji：{leftovers}"
+
+
+# ---------------------------------------------------------------- 5. 脚本的控制台输出
+#
+# 2026-09-29 新增（实测踩到，第三次最坑）：
+# `scripts/*.py` 里 `print` emoji，在 **Windows 中文控制台（cp936/GBK）** 上会抛
+# `UnicodeEncodeError`。前两次只是难看；第三次出现在 `restore_drill.py`：
+# **六项校验全部通过之后**，打印"通过"那一刻崩掉 → 退出码 1 →
+# **一次成功的恢复演练被报成失败**。这比乱码严重得多：它会让 CI 和别人误判结论。
+#
+# ⚠️ 判据不是"脚本不许有 emoji"——查过之后发现**仓库早就有正确做法**：
+# 会打 emoji 的脚本都调了 `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`
+# （`check_claims` / `audit_phone_encryption` / `demo_flow_check` … 十来处）。
+# 所以规则是：**要么不打，要么显式设编码**。改成"一律禁止"会让那十来个
+# 本来正常的脚本被迫返工，而且丢掉一个已经验证可行的模式。
+
+_ENC_FIX = re.compile(r"reconfigure\s*\([^)]*encoding|TextIOWrapper\([^)]*encoding"
+                      r"|PYTHONIOENCODING|setdefaultencoding")
+
+
+def _script_sources() -> list[tuple[str, str]]:
+    out = []
+    for d in ("scripts", "."):
+        base = os.path.join(ROOT, d)
+        if not os.path.isdir(base):
+            continue
+        for fn in sorted(os.listdir(base)):
+            if not fn.endswith(".py"):
+                continue
+            p = os.path.join(base, fn)
+            if not os.path.isfile(p):
+                continue
+            rel = os.path.relpath(p, ROOT).replace("\\", "/")
+            out.append((rel, io.open(p, encoding="utf-8").read()))
+    return out
+
+
+def test_scripts_printing_emoji_set_stdout_encoding():
+    """脚本**打印** emoji 时，必须显式设 stdout 编码；否则管道/中文控制台下会崩。"""
+    bad = []
+    for rel, text in _script_sources():
+        if _ENC_FIX.search(text):
+            continue                     # 已按仓库既有模式设了编码 → 放行
+        for i, line in enumerate(text.splitlines(), 1):
+            if not EMOJI.search(line):
+                continue
+            s = line.strip()
+            if s.startswith("#"):
+                continue                 # 纯注释不打印
+            if ("print(" in line or "_log." in line or "logging." in line
+                    or "sys.stderr" in line or "sys.stdout" in line):
+                bad.append(f"{rel}:{i} → {s[:88]}")
+    assert not bad, (
+        "以下脚本会往控制台打 emoji，但**没有**设置 stdout 编码"
+        "（Windows 中文控制台下 UnicodeEncodeError，实测会把「演练通过」报成失败）：\n  "
+        + "\n  ".join(bad)
+        + "\n（两种修法任选：改成纯文本标记如 [通过]/[失败]，或在脚本开头加 "
+          "`sys.stdout.reconfigure(encoding=\"utf-8\", errors=\"replace\")`）")

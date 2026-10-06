@@ -20,6 +20,14 @@ from scripts.check_claims import (COUNT_EXEMPT, CURRENT_DOCS, SNAPSHOT_DOCS,
                                   STRUCTURE_EXEMPT, _current_lines, _unclosed_hist_block)
 from scripts.sync_test_count import split_historical
 
+# Windows 中文控制台默认 GBK：打印 ✅ 会抛 UnicodeEncodeError，而且是在**跑到那一步时**才崩。
+# 与 check_claims 等脚本统一：强制 UTF-8，编不出的字符降级替换而不是崩。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001  —— pytest 捕获 stdout 时没有 reconfigure，忽略即可
+    pass
+
 EXTRA = ["docs/复现指南.md", "docs/scaling.md"]
 #: 豁免名单：这些是**历史记录**（变更日志/交接快照），里面的版本号是"当时是什么样"，
 #: 改它等于篡改历史。实测踩到：第一版脚本把 `CHANGELOG.md` 也改了，只能 git 撤销。

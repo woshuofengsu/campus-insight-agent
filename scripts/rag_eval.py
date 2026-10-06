@@ -22,6 +22,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Windows 中文控制台默认 GBK：打印 ✓/✗ 会抛 UnicodeEncodeError，而且是在**跑到那一步时**才崩
+# —— 可能把"评测通过"报成"脚本失败"。与 check_claims 等脚本统一：强制 UTF-8，编不出就替换。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001  —— pytest 捕获 stdout 时没有 reconfigure，忽略即可
+    pass
+
 GOLDEN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "tests", "llm_eval", "rag_golden.jsonl")
 # 「无证据不许编」评测集（v2 §11.4）：refuse=库里确实没依据（不许编），answer=控制组（必须能答）
