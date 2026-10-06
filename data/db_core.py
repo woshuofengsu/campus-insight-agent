@@ -865,6 +865,54 @@ def _m53_issue_is_demo(conn):
     _add_column(conn, "community_issues", "is_demo", "is_demo INTEGER DEFAULT 0")
 
 
+def _m54_issue_channel_and_code(conn):
+    """v54：服务台落地所需的四件事 —— **渠道**、**双身份**、**服务点**、**对外事项编号**。
+
+    为什么这四件事必须一起加（阶段 2 的地基）：
+
+    ① **渠道 `submission_channel`**：真实社区里老人不会都用手机——服务站平板、家属代办、
+       网格员代录、电话人工都会发生。不记渠道，"哪个入口有效 / 谁在替谁办"永远答不上来。
+
+    ② **双身份 `operator_user_id` / `operator_role`**：最容易被忽略、后果最严重的一条。
+       `reporter_id` 是"**问题属于谁**"，operator 是"**谁动了系统**"。
+       共享平板场景下，张大爷是 reporter、社区工作人员王老师是 operator——
+       只记一个身份的话，"老人首次完成率"会把**工作人员代操作算成老人完成了**，
+       试点第一个核心指标当场变成假的。
+
+    ③ **服务点 `station_id`**：一台平板 = 一个服务点。没有它，出问题无法定位设备，
+       也做不了"按设备清理会话 / 按服务点看数据"。
+
+    ④ **对外事项编号 `issue_code`**：老人不必记住编号，但**工作人员必须能查**
+       （姓名 / 手机后四位 / 楼栋 / 提交时间 / 编号，五选一）。
+       编号**必须是对外编号**：直接暴露数据库自增 `id` 会让人数出"你们一共多少单"，
+       也便于被枚举。这里用 `A` + 年月 + 4 位当月序号（如 `A26090001`）。
+
+    再加 `consent_status`：平板/代录场景里，"老人是否知情同意"必须可查，
+    否则"工作人员替老人提交"这件事没有授权依据。
+
+    ⚠️ 与 v46 的规矩一致：**运行时不许 ALTER**，加列只走迁移；幂等（`_add_column` 自己查 PRAGMA）。
+    """
+    from data.db_core import _add_column
+    _add_column(conn, "community_issues", "submission_channel", "submission_channel TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "operator_user_id", "operator_user_id INTEGER DEFAULT 0")
+    _add_column(conn, "community_issues", "operator_role", "operator_role TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "station_id", "station_id TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "consent_status", "consent_status TEXT DEFAULT ''")
+    _add_column(conn, "community_issues", "issue_code", "issue_code TEXT DEFAULT ''")
+    # 号段表：按「年月」各自一个计数器，分配时原子自增（跨年月不会串号）
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS issue_code_seq ("
+        "  period TEXT PRIMARY KEY,"
+        "  seq INTEGER NOT NULL DEFAULT 0,"
+        "  updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+    # 对外编号必须唯一（重号 = 工作人员查到错单）
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_issues_code "
+        "ON community_issues(issue_code) WHERE issue_code <> ''")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_issues_channel ON community_issues(submission_channel)")
+
+
 def _m48_tenant_isolation(conn):
     """v48：多租户真隔离（核心表）——加列 → 归一化 → 按归属人回填 → 索引。
 
@@ -1342,6 +1390,7 @@ def init_db(db_path: str):
         (51, "notification_outbox", _m51_notification_outbox),
         (52, "issue_field_sources", _m52_issue_field_sources),
         (53, "issue_is_demo", _m53_issue_is_demo),
+        (54, "issue_channel_and_code", _m54_issue_channel_and_code),
     ]
     for version, name, fn in post:
         if version <= current:

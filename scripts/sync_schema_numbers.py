@@ -34,7 +34,7 @@ EXTRA = ["docs/复现指南.md", "docs/scaling.md"]
 EXEMPT = set(COUNT_EXEMPT) | set(STRUCTURE_EXEMPT)
 
 
-def _rewrite(text: str, schema: int, migrations: int) -> str:
+def _rewrite(text: str, schema: int, migrations: int, tables: int | None = None) -> str:
     """只改块外内容（split_historical 给出的 'not hist' 段）。"""
     out = []
     for hist, seg in split_historical(text):
@@ -47,13 +47,20 @@ def _rewrite(text: str, schema: int, migrations: int) -> str:
         s = re.sub(r"(SQLite\s+v)\d+", rf"\g<1>{schema}", s)
         # 迁移条数：「51 个版本化迁移 / 51 个迁移」
         s = re.sub(r"\b\d+(\s*个(?:版本化)?迁移)", rf"{migrations}\g<1>", s)
+        if tables:
+            # 业务表数量：三种写法都要覆盖（「53 张业务表 / 53 张表 / 业务表 53」）
+            # ⚠️ 加这条是因为 v54 新建了号段表 `issue_code_seq`，表数 53 → 54，
+            # 而当时同步工具不管表数，于是 10 处文档又是靠门禁报红才被发现。
+            s = re.sub(r"\b\d+(\s*张(?:业务)?表)", rf"{tables}\g<1>", s)
+            s = re.sub(r"(业务表\s*\*{0,2})\d+", rf"\g<1>{tables}", s)
         out.append(s)
     return "".join(out)
 
 
 def main() -> int:
-    schema = int(sys.argv[1]) if len(sys.argv) > 1 else 53
-    migrations = int(sys.argv[2]) if len(sys.argv) > 2 else 52
+    schema = int(sys.argv[1]) if len(sys.argv) > 1 else 54
+    migrations = int(sys.argv[2]) if len(sys.argv) > 2 else 53
+    tables = int(sys.argv[3]) if len(sys.argv) > 3 else None
     docs = list(dict.fromkeys(CURRENT_DOCS + SNAPSHOT_DOCS + EXTRA))
     changed = []
     for doc in docs:
@@ -64,15 +71,16 @@ def main() -> int:
             continue
         orig = io.open(p, encoding="utf-8").read()
         if _unclosed_hist_block(orig):
-            print(f"  ⚠️ 跳过 {doc}：历史块标记不成对（先修标记，别让脚本乱改）")
+            print(f"  [跳过] {doc}：历史块标记不成对（先修标记，别让脚本乱改）")
             continue
-        new = _rewrite(orig, schema, migrations)
+        new = _rewrite(orig, schema, migrations, tables)
         if new != orig:
             io.open(p, "w", encoding="utf-8", newline="").write(new)
             n = sum(1 for a, b in zip(_current_lines(orig), _current_lines(new)) if a != b)
             changed.append(f"{doc}（{n} 行）")
     if changed:
-        print(f"已同步 schema v{schema} / {migrations} 个迁移：")
+        tail = f" / {tables} 张业务表" if tables else ""
+        print(f"已同步 schema v{schema} / {migrations} 个迁移{tail}：")
         for c in changed:
             print("  -", c)
     else:

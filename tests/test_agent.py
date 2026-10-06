@@ -124,7 +124,12 @@ def test_repair_flow(client):
     out, _ = _chat(client, "紧急")
     assert out["status"] == "需确认" and "确认报修信息" in out["reply"]
     out, _ = _chat(client, "确认提交")
-    assert out["status"] == "成功" and out["related_id"] and "工单号" in out["reply"]
+    # v54：对外提示改成**事项编号**（A+年月+序号），不再把内部自增 id 拼成 `WO00000012`——
+    # 那种写法数字就是主键，能被数出总量、也能被顺藤摸瓜枚举。所以这里同时断言**没暴露主键**。
+    assert out["status"] == "成功" and out["related_id"], out
+    assert "事项编号" in out["reply"], out["reply"]
+    assert f"WO{out['related_id']:08d}" not in out["reply"], \
+        f"回执里出现了内部主键形式的编号：{out['reply']}"
     # 执行链含报修调度员与审计员
     assert any(c["agent"] == "repair_dispatch" for c in out["execution_chain"])
 

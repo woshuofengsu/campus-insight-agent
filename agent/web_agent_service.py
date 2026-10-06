@@ -125,10 +125,24 @@ def _exec_report(uid: int, name: str, data: dict) -> tuple[str, str, int | None]
         urgency=r["fields"]["urgency"],
         reporter_name=name or "居民", reporter_phone=phone,
         reporter_id=uid,
+        # v54：本链路是"老人在对话里自己说" → 自助渠道
+        channel="elderly_self",
     )
     if iid <= 0:
         return f"提交失败：{hint}", "失败", None
-    return f"已为您提交报修，工单号：WO{iid:08d}，负责人会尽快联系您。", "成功", iid
+    # 提示语里给**对外事项编号**（v54），不再把内部自增 id 拼成 `WO00000012` 给用户看：
+    # 那种写法数字就是主键，能被数出总量、也能被顺藤摸瓜枚举。
+    from data.db_issue_code import ensure_issue_code
+    from data.db_core import get_db
+    try:
+        with get_db() as _c:
+            code = ensure_issue_code(_c, iid)
+    except Exception as e:  # noqa: BLE001 — 编号拿不到不影响建单，退回用 id 提示
+        _log.warning("读取对外编号失败（退回内部 id 提示）：issue=%s %s", iid, e)
+        code = ""
+    tip = f"已为您提交报修，事项编号：{code}，负责人会尽快联系您。" if code \
+        else f"已为您提交报修，工单号：WO{iid:08d}，负责人会尽快联系您。"
+    return tip, "成功", iid
 
 
 def _exec_proposal(uid: int, name: str, data: dict) -> tuple[str, str, int | None]:

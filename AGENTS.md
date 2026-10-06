@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1113 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1130 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -19,7 +19,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ```
 
 - **主服务**：`uvicorn api_web:app --port 8000`（FastAPI）
-- **数据库**：SQLite（`data/community_insight.db`），schema **v53**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
+- **数据库**：SQLite（`data/community_insight.db`），schema **v54**（WAL 模式），可演进 PostgreSQL（见 `docs/scaling.md`）
 
 ## 多智能体核心（9 个声明式角色）
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1113 项：1112 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1130 项：1129 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -54,8 +54,11 @@ elderly:  demo_elderly（免登录）
 ## 数据库迁移约定
 
 - schema 版本在 `data/db_core.py`，迁移函数命名 `_m{N}_{name}`，注册进 `post` 列表（`(version, name, fn)`），幂等（`_add_column` 用 PRAGMA 检查）
-- **当前版本 v53**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填；v52 = 工单字段来源与处置归类；
-  **v53 = `community_issues.is_demo` 演示数据标记**）。加列/索引/新表都走这个机制，**禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
+- **当前版本 v54**（v47 = 老年健康记录 `elderly_vitals` + 历史血压回填；v52 = 工单字段来源与处置归类；
+  **v53 = `community_issues.is_demo` 演示数据标记**；**v54 = 服务台地基** —
+  `submission_channel` / `operator_user_id` / `operator_role` / `station_id` / `consent_status` /
+  `issue_code` + 号段表 `issue_code_seq`）。加列/索引/新表都走这个机制，
+  **禁止**在业务代码里运行时 ALTER（v46 已把历史遗留的运行时补列全部收回迁移链）
 - **加迁移后要同步文档数字**：`python scripts/sync_schema_numbers.py`（把各份材料里的
   `schema vN` / `N 个迁移` 一次改到当前值，**历史基线块内一字不动**）→ 再跑 `check_claims.py` 复核。
   以前没有这个入口，每次加迁移都得手改十几处、漏一处只有门禁才报
@@ -74,7 +77,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1113 项测试**（1112 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1130 项测试**（1129 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -176,7 +179,8 @@ elderly:  demo_elderly（免登录）
 | `agent/orchestrator.py` | 多 Agent 编排（黑板、协商、Verifier/Arbiter 接入、转人工）|
 | `agent/roles/business_agents.py` | 5 个业务角色（报修/提案/政策/健康/通知）|
 | `agent/roles/auto_agents.py` | 天气守护 + 网格助手 |
-| `data/db_core.py` | schema + 迁移注册（**v53**）|
+| `data/db_core.py` | schema + 迁移注册（**v54**）|
+| `data/db_issue_code.py` | **对外事项编号 + 工作人员查询**（编号与内部 id 解耦；姓名/手机后四位/楼栋/时间/编号五路查；结果脱敏）|
 | `scripts/sync_schema_numbers.py` | 加迁移后**一键同步**各份材料里的 `schema vN / N 个迁移`（历史基线块内不动）|
 | `scripts/seed_category_demo.py` | 对照清单的**演示数据**准备（走真实链路造 + `--mark-existing` 补 `is_demo`；脚本自称"是演示数据"）|
 | `web/public/device-check.html` | **真机自查页**：在真机上打开即测出浏览器/语音/播报/拨号能力并生成可粘贴报告（配合 `docs/eval/真机验证记录.md`）|

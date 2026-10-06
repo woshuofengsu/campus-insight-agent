@@ -94,9 +94,9 @@ elderly:  demo_elderly（免登录）
 | 后端 | FastAPI（`api_web.py`，:8000），JWT 鉴权 + WebSocket + 安全响应头 |
 | 多智能体 | 9 个声明式 Agent + 黑板消息队列 + 仲裁器/校验器（`agent/`）|
 | 模型 | DeepSeek（deepseek-chat），默认规则优先（降本），**单次均价 ¥0.0002**（2026-09-14 快照：57 次调用合计 ¥0.0139） |
-| 数据库 | SQLite（**schema v53**，WAL），版本化迁移（`_mN_` 注册表），可演进 PostgreSQL |
+| 数据库 | SQLite（**schema v54**，WAL），版本化迁移（`_mN_` 注册表），可演进 PostgreSQL |
 | 知识检索 | 词法（同义/方言扩展）+ 语义向量（text-embedding-v3, 1024 维）混合检索 + RRF 融合 |
-| 质量门禁 | 1113 项测试 / ruff 0 / 58 页视口 UI 客观审计（全站 37 个路由页）/ 9 项演示前自检 / 检索评测（CI 门禁）|
+| 质量门禁 | 1130 项测试 / ruff 0 / 58 页视口 UI 客观审计（全站 37 个路由页）/ 9 项演示前自检 / 检索评测（CI 门禁）|
 | 移动端 | 响应式/安全区/老年大字/语音（PWA 可选）|
 
 ## 📁 项目结构
@@ -106,7 +106,7 @@ campus-insight-agent/
 ├── api_web.py              # FastAPI 主服务（JWT 中间件+安全头+WebSocket+SPA）
 ├── api_routes/             # 14 个业务路由模块（auth/agent/issues/proposals/…）+ 共享依赖
 ├── agent/                  # 多智能体（9 角色 + 黑板 + 编排 + 校验/仲裁）
-├── data/                   # 数据库层（db_core.py 含 schema v53 + 迁移注册）
+├── data/                   # 数据库层（db_core.py 含 schema v54 + 迁移注册）
 ├── web/                    # Vue3 前端（src/views/{resident,grid,elderly}/）
 ├── scripts/                # 迁移 / 压测 / 演示 / 录屏 / UI 审计 / 数字一致性
 ├── tests/                  # pytest（用例数以 `python scripts/check_claims.py` 为准）
@@ -119,7 +119,7 @@ campus-insight-agent/
 
 | 验证项 | 命令 | 实测 |
 |---|---|---|
-| 功能与回归 | `python -m pytest tests/ -q` | **1112 passed / 1 skipped**（可运行 1113） |
+| 功能与回归 | `python -m pytest tests/ -q` | **1129 passed / 1 skipped**（可运行 1130） |
 | **端到端验收（真实服务）** | `python scripts/demo_acceptance.py` | **12/12 通过**（三角色登录、AI 对话、政策命中、老年天气、工作台指标、图谱反查、留痕、属地化两社区对比） |
 | 演示前一键自检 | `python scripts/demo_preflight.py` | **9/9 通过**（schema、手机号加密覆盖、演示账号、服务身份…） |
 | UI 无障碍/一致性 | `python scripts/ui_audit.py` | **58 页/视口 × 9 类检查 0 违规**（**覆盖全部 37 个路由页**：三端 + 大屏 + 详情/表单页 + 暗色 + 320/390/1366/1440/1920 档） |

@@ -180,7 +180,12 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
                  allow_missing_phone: bool = False,
                  field_sources: dict | None = None,
                  suggested_category: str = "",
-                 is_demo: int = 0) -> tuple[int, str]:
+                 is_demo: int = 0,
+                 channel: str = "",
+                 operator_id: int | None = None,
+                 operator_role: str = "",
+                 station_id: str = "",
+                 consent_status: str = "") -> tuple[int, str]:
     """提交报修。返回 (工单 ID, 提示语)。
 
     校验必填项、手机号格式；识别特殊情况；信息齐全生成工单（状态待审核）。
@@ -205,6 +210,14 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
     `is_demo`（v53）：`1` = 演示数据（由 `scripts/seed_*.py` 走真实链路造），默认 `0` = 真实来源。
     为什么要标：演示工单会和真实工单混进同一张统计表，不标记就会**把自造数据算成真实样本**。
     标记之后对照清单能分开报分母，面板也能对演示部分固定显示免责说明。
+
+    `channel` / `operator_id` / `operator_role` / `station_id` / `consent_status`（v54，服务台线）：
+    真实社区里老人不会都自己用手机——服务站平板、家属代办、网格员代录、电话人工都会发生。
+    - `channel` 取 `data.db_issue_code.CHANNELS` 里的值；
+    - **`operator_id` 是"谁动了系统"，与 `reporter_id`（问题属于谁）必须分开**：
+      共享平板下张大爷是 reporter、工作人员王老师是 operator。只记一个身份的话，
+      "老人首次完成率"会把工作人员代操作算成老人完成了——试点核心指标直接失真；
+    - `station_id` 一台平板一个服务点；`consent_status` 记录老人是否知情同意。
     """
     title = scrub_field(title, "issue.title")
     location = scrub_field(location, "issue.location")
@@ -252,17 +265,30 @@ def submit_issue(title: str, category: str, issue_type: str, location: str,
             "description, urgency, status, reporter_id, reporter_name, reporter_phone, "
             "photo_before, is_agent_report, agent_name, agent_phone, agent_relation, "
             "is_violation, non_community_responsibility, "
-            "reporter_phone_enc, agent_phone_enc, field_sources, suggested_category, is_demo) "
-            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)",
+            "reporter_phone_enc, agent_phone_enc, field_sources, suggested_category, is_demo, "
+            "submission_channel, operator_user_id, operator_role, station_id, consent_status) "
+            "VALUES (?, ?, ?, ?, ?, ?, '待审核', ?, ?, '', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, "
+            "?, ?, ?, ?, ?)",
             (title, category, issue_type, location, description, urgency, reporter_id,
              reporter_name, photo_before, is_agent_report,
              agent_name, agent_relation, is_violation, non_resp,
              _enc_phone(reporter_phone), _enc_phone(agent_phone), sources_json,
-             (suggested_category or "").strip()[:40], 1 if is_demo else 0),
+             (suggested_category or "").strip()[:40], 1 if is_demo else 0,
+             (channel or "").strip()[:32], int(operator_id or 0),
+             (operator_role or "").strip()[:16], (station_id or "").strip()[:32],
+             (consent_status or "").strip()[:16]),
         )
         issue_id = cur.lastrowid
         # 多租户（v48）：写入侧必须落租户——报修人
         stamp_tenant(conn, "community_issues", issue_id, reporter_id)
+        # v54：分配**对外事项编号**（A+年月+序号，与内部 id 解耦）。
+        # 失败不阻断建单：编号只是"方便工作人员查"，不能因为它拿不到就不让老人提交。
+        try:
+            from data.db_issue_code import ensure_issue_code
+            ensure_issue_code(conn, issue_id)
+        except Exception as e:  # noqa: BLE001
+            _log.warning("工单 #%s 分配对外编号失败（不影响建单，工作人员可改用姓名/楼栋查）：%s",
+                         issue_id, e)
         if draft_id:
             conn.execute("DELETE FROM issue_drafts WHERE id=?", (draft_id,))
         conn.commit()

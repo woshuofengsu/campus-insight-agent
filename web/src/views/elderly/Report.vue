@@ -279,8 +279,12 @@ async function submit() {
     unknownToken.value = ''
     submitting.value = false      // 同上：结果已经拿到，播报不该让按钮继续转圈
     if (d.issue_id > 0) {
-      message.success(`已上报，工单号 ${d.issue_id}（待审核）`)
-      await say(`已经帮您报上去了，工单号 ${d.issue_id}，请等负责人联系您`)
+      // v54：给老人看的是**对外事项编号**（A+年月+序号），不再报内部 id。
+      // 内部 id 报出来等于把主键给了外人（能被数出总量、能被枚举）。
+      const code = d.issue_code || ''
+      message.success(code ? `已上报，事项编号 ${code}（待审核）` : '已上报（待审核）')
+      await say(code ? `已经帮您报上去了，事项编号 ${code}，请等负责人联系您`
+                     : '已经帮您报上去了，请等负责人联系您')
     } else {
       // 例：安全隐患只记提醒不建单 —— 如实告诉老人，不假装建了工单
       message.success('已记录为安全提醒，负责人会看到')
@@ -315,7 +319,7 @@ async function submit() {
   }
 }
 
-/** 按幂等编号查真实结果：已经报上了就报工单号，没报上就明说可以重试。 */
+/** 按幂等编号查真实结果：已经报上了就报**事项编号**，没报上就明说可以重试。 */
 async function checkSubmitted() {
   if (!unknownToken.value) return
   try {
@@ -329,8 +333,10 @@ async function checkSubmitted() {
       draft.value = null
       text.value = ''
       await clearDraft()
-      message.success(`核对到了：已经提交成功，工单号 ${s.issue_id}`)
-      await say(`核对到了，已经提交成功，工单号 ${s.issue_id}`)
+      message.success(s.issue_code ? `核对到了：已经提交成功，事项编号 ${s.issue_code}`
+                                  : '核对到了：已经提交成功')
+      await say(s.issue_code ? `核对到了，已经提交成功，事项编号 ${s.issue_code}`
+                             : '核对到了，已经提交成功')
     } else if (s && s.in_flight) {
       // 另一个请求正在建单：**不能说"没成功、可以再点一次"**（那一下就会建出第二张单）
       message.info('这次提交还在处理中，请等几秒再点一次核对')
@@ -516,10 +522,15 @@ async function checkSubmitted() {
          位置没确认时写「位置待人工确认」，绝不写成像已确认的样子。 -->
     <div v-if="submitted" class="card" data-confirm-card :data-result-via="resultVia || 'submit'"
          style="background:#ecfdf5;font-size:1.2rem;">
-      <b><EIcon name="checkCircle" :size="18" /> 已经报上去了（工单号 {{ submitted.issue_id }}）</b>
+      <b><EIcon name="checkCircle" :size="18" /> 已经报上去了<template v-if="submitted.issue_code">（事项编号 {{ submitted.issue_code }}）</template></b>
+      <!-- v54：编号是给**工作人员**查的，不要求老人记住。所以紧跟一句"工作人员能怎么查"——
+           否则老人会以为必须背下这串号（那是反适老设计）。 -->
+      <div v-if="submitted.issue_code" class="muted" style="font-size:0.95rem;margin-top:4px;" data-code-hint>
+        编号不用您记：工作人员可以按您的姓名、楼栋或时间来查。
+      </div>
       <!-- 结果是从"核对"来的就说清楚：老人/家属才知道这条不是当时服务端回的 -->
       <div v-if="resultVia === 'verify'" style="margin-top:6px;font-weight:700;color:var(--ink-info);">
-        <EIcon name="signal" :size="18" /> 刚才网络没回话，工单号是按提交编号核对到的真实结果（没有重复上报）
+        <EIcon name="signal" :size="18" /> 刚才网络没回话，编号是按提交编号核对到的真实结果（没有重复上报）
       </div>
 
       <div style="margin-top:10px;font-weight:800;">您刚才反映的是：</div>

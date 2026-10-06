@@ -334,6 +334,11 @@ def report_issue(title: str, category: str = "", location: str = "",
         reporter_id=_resolve_reporter_id(),
         # 收敛方案第 6 阶段：留下"系统建议的原始分类"，别让它被后续人工修改覆盖掉
         suggested_category=system_suggested,
+        # v54：渠道 = 居民自助（Agent 对话里自己说的）。
+        # 说明：**这个工具不开放 channel 入参**——渠道是"事实记录"，不该交给模型或前端填
+        # （否则会出现"把代录标成居民自助"这种口径失真）。服务站平板 / 网格员代录走各自的
+        # 入口直接调 `submit_issue(channel=…)`，见 api_routes/service_desk.py。
+        channel="resident_self",
     )
 
     # 清网格员那边的缓存，新工单立刻能看见

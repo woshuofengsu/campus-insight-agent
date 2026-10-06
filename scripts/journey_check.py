@@ -292,8 +292,14 @@ def journey_1(page, base):
           bool(row) and row.get("issue_type") == "室内" and "厨房" in (row.get("location") or ""),
           f"类型 {row.get('issue_type')} · 位置 {row.get('location')}")
     iid = row.get("id")
-    check("③c 居民答复里带回工单号，且与库里那条一致",
-          bool(iid) and f"WO{iid:08d}" in r3, r3.replace("\n", " ")[:80])
+    # ③c 守的是"**答复里的标识必须与库里那条对得上**"（防编造），标识本身换了形态：
+    # v54 起给居民看的是**对外事项编号**（A+年月+序号），不再把内部自增 id 拼成 `WO00000012`
+    # —— 那种写法数字就是主键，能被数出总量、也能被枚举。所以这里改成更强的断言：
+    # 答复里出现的编号必须能**在库里查到同一行**（页面 ↔ 库内事实对账）。
+    code = (row.get("issue_code") or "")
+    check("③c 居民答复里带回**对外事项编号**，且该编号在库里指向同一行",
+          bool(code) and code in r3 and f"WO{iid:08d}" not in r3,
+          f"库内编号 {code or '（空）'} · 答复：{r3.replace(chr(10), ' ')[:80]}")
     if not iid:
         return
 
@@ -395,9 +401,11 @@ def journey_2(page, base):
           (row.get("location") or "").startswith(good), f"入库位置「{row.get('location')}」")
     check("④b 责任范围按原话判为公共区域（室外）", row.get("issue_type") == "室外",
           f"类型 {row.get('issue_type')}")
-    check("④c 页面上如实给出工单号",
-          bool(row.get("id")) and wait_text(page, f"工单号 {row.get('id')}"),
-          f"工单 #{row.get('id')}")
+    # v54：页面上给的是**对外事项编号**（不是内部 id），所以这里等编号出现在页面上。
+    code = (row.get("issue_code") or "")
+    check("④c 页面上如实给出**对外事项编号**（且不是内部 id）",
+          bool(code) and wait_text(page, f"事项编号 {code}"),
+          f"编号 {code or '（空）'} · 内部 id {row.get('id')}")
     # ④d–④h：**确认卡片**（收敛方案第 2 阶段）——让老人看见"系统记住了什么"，且每条标明来源。
     # 三处对账：页面文字 ↔ 接口返回 ↔ 库内事实（field_sources / reported_at）。
     card_ok = page.locator("[data-confirm-card]").count() > 0
@@ -484,9 +492,9 @@ def journey_4(page, base):
     check("② 连点两下：库里**只有一张单**（界面挡不住时由服务端幂等兜住）",
           issue_count(mark) == 1,
           f"浏览器发出 {n_post} 次提交请求（界面层挡住多少次、服务端挡住多少次都算合格），库里 {issue_count(mark)} 条")
-    check("②b 页面上只出现一个结果卡、且工单号与库里那条一致",
-          bool(row.get("id")) and wait_text(page, f"工单号 {row.get('id')}"),
-          f"工单 #{row.get('id')}")
+    check("②b 页面上只出现一个结果卡、且事项编号与库里那条一致",
+          bool(row.get("issue_code")) and wait_text(page, f"事项编号 {row.get('issue_code')}"),
+          f"编号 {row.get('issue_code')} · 内部 id {row.get('id')}")
 
     # 服务端层：同一个幂等编号并发提交两次（网络重试的真实形态）
     token = uuid.uuid4().hex
@@ -532,7 +540,7 @@ def journey_5(page, base):
     page.wait_for_timeout(4500)
     body = page.inner_text("body")
     check("①［请求没出去］页面**不谎报成功**（没有「已上报」结果卡）",
-          "已上报（工单号" not in body and page.locator("[data-result-via]").count() == 0,
+          "已上报" not in body and page.locator("[data-result-via]").count() == 0,
           "网络超时 ≠ 提交成功")
     check("②［请求没出去］库里也确实没有建单，并给出「查一下」的出口",
           issue_count(mark_a) == 0 and btn(page, "查一下是否已经提交了").count() > 0,
@@ -567,10 +575,12 @@ def journey_5(page, base):
           issue_count(mark_b) == 1, f"匹配工单数 {issue_count(mark_b)}")
     check("④［响应丢了］页面把结果标成**核对到的**（不是「服务端回的」，也不许含糊）",
           got and "核对" in body,
-          "结果卡上写明「网络没回话，工单号是按提交编号核对到的」")
-    check("⑤［响应丢了］核对出的工单号 = 库里那条（没有重复建单）",
-          bool(row.get("id")) and f"工单号 {row.get('id')}" in body and issue_count(mark_b) == 1,
-          f"工单 #{row.get('id')}")
+          "结果卡上写明「网络没回话，编号是按提交编号核对到的」")
+    # v54：核对出来的标识是**对外事项编号**（页面 ↔ 库内对账，防编造）
+    check("⑤［响应丢了］核对出的事项编号 = 库里那条（没有重复建单）",
+          bool(row.get("issue_code")) and f"事项编号 {row.get('issue_code')}" in body
+          and issue_count(mark_b) == 1,
+          f"编号 {row.get('issue_code')} · 内部 id {row.get('id')}")
     page.unroute("**/api/web/elderly/report/submit")
 
 

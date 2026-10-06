@@ -264,17 +264,31 @@ def _elderly_profile(uid) -> dict:
         return {}
 
 
-def _issue_submitted_at(issue_id: int) -> str:
-    """工单真实落库时间（确认卡片显示"提交时间"用它，不用前端时钟——前端时钟可能不准）。"""
+def _issue_public_meta(issue_id: int) -> dict:
+    """工单对外的两项元信息：**落库时间** + **对外事项编号**。
+
+    - 提交时间用**库内真实时间**（`reported_at`），不用前端时钟——前端时钟可能不准；
+    - 编号是 v54 的**对外事项编号**（A+年月+序号）。老人在页面上看到的应该是它，
+      **不是内部自增 id**：`工单号 12` 会让人数出"你们一共多少单"，也便于被枚举。
+    """
+    out = {"submitted_at": "", "issue_code": ""}
     try:
         from data.db_core import get_db
+        from data.db_issue_code import ensure_issue_code
         with get_db() as conn:
             row = conn.execute(
-                "SELECT reported_at FROM community_issues WHERE id=?", (issue_id,)).fetchone()
-        return (row["reported_at"] if row else "") or ""
+                "SELECT reported_at, COALESCE(issue_code,'') AS issue_code "
+                "FROM community_issues WHERE id=?", (issue_id,)).fetchone()
+            if row is None:
+                return out
+            out["submitted_at"] = (row["reported_at"] or "")
+            out["issue_code"] = (row["issue_code"] or "")
+            if not out["issue_code"]:
+                # 历史工单没有编号 → 补一个（幂等），否则老人看到的是空白
+                out["issue_code"] = ensure_issue_code(conn, issue_id)
     except Exception as e:  # noqa: BLE001
-        _log.warning("读取工单落库时间失败 id=%s：%s", issue_id, e)
-        return ""
+        _log.warning("读取工单对外元信息失败 id=%s：%s", issue_id, e)
+    return out
 
 
 def _report_draft_payload(text: str, profile: dict, answer_location: str = "",
@@ -507,6 +521,10 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         suggested_category=category,
         # v53：演示数据标记（仅 DEMO_MODE 生效）
         is_demo=is_demo,
+        # v54：渠道 = 老人自助。**这一条决定了"老人完成率"的分母**——
+        # 服务站平板 / 家属代办 / 网格员代录走别的入口与别的渠道值，
+        # 混在一起算就会把"工作人员代操作"算成"老人自己完成了"。
+        channel="elderly_self",
     )
     if iid <= 0:
         if hint == "safety":
@@ -520,6 +538,7 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
             # 没建成 → 放掉占位，否则老人用同一个编号重试会被判成"正在提交中"
             release("elderly_report", req.client_token, uid)
         return _fail(2001, hint or "上报失败")
+    _meta = _issue_public_meta(iid)
     payload = {
         "issue_id": iid,
         "original_text": req.text,
@@ -531,7 +550,10 @@ def web_elderly_report_submit(req: ReportSubmitIn, request: Request):
         # 确认卡片（收敛方案第 2 阶段）：把"这条归哪个社区、什么时候提交的"也如实给出来，
         # 社区取自**服务端身份**（不采集定位），时间取自工单真实落库时间（不是前端时钟）
         "community": _tenant(request) or profile.get("community") or "",
-        "submitted_at": _issue_submitted_at(iid),
+        "submitted_at": _meta["submitted_at"],
+        # v54：老人端显示**对外事项编号**（不是内部 id）。编号是给工作人员查的，
+        # 老人不必记住——所以卡片上同时写一句"工作人员可以按姓名/时间/楼栋查"。
+        "issue_code": _meta["issue_code"],
     }
     if req.client_token:
         remember("elderly_report", req.client_token, uid, payload)
@@ -563,8 +585,12 @@ def web_elderly_report_status(request: Request, token: str = ""):
     if prev is None:
         return _ok({"submitted": False, "issue_id": 0, "known": False},
                    "这次没有查到已提交的记录，可以重新提交")
+    # v54：核对出来的结果里带的是**对外事项编号**（`prev` 是提交时记住的整份 payload）。
+    # 文案跟着换——老人看到的标识必须与提交成功时一致，否则"核对"这件事本身让人困惑。
+    _code = (prev.get("issue_code") or "") if isinstance(prev, dict) else ""
     return _ok({"submitted": True, "known": True, **prev},
-               f"已经提交过了，工单号 {prev.get('issue_id')}")
+               f"已经提交过了，事项编号 {_code}" if _code
+               else "已经提交过了（编号待生成）")
 
 
 @router.post("/voice-report")
