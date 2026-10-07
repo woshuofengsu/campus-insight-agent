@@ -124,7 +124,7 @@
     box.innerHTML = '';
     var isMobile = /iPhone|iPad|iPod|Android/i.test(ua());
     row(box, '移动端（tel: 才能拉起拨号盘）', isMobile ? '是' : '否', isMobile ? 'ok' : 'warn');
-    row(box, '口径提醒', '网页只能打开拨号盘，**没有"已接通"状态**；不会自动拨出', 'warn');
+    row(box, '口径提醒', '网页只能打开拨号盘，「已接通」这种状态网页拿不到；不会自动拨出', 'warn');
   }
 
   function consumeGestureNote() {

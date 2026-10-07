@@ -25,6 +25,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web", "src")
+PUBLIC = os.path.join(ROOT, "web", "public")
 ICONS = os.path.join(WEB, "config", "icons.js")
 
 # 真 emoji（不含排版箭头 → ↩ ⬇；它们在文本里是标点不是图标）。
@@ -51,6 +52,12 @@ def _icon_names() -> set[str]:
 
 
 def _sources() -> list[tuple[str, str]]:
+    """扫两处：`web/src`（Vue/JS/TS）+ `web/public`（静态页/脚本/清单）。
+
+    ⚠️ 2026-10-06 补 `web/public`：第一版只扫 `web/src`，而静态资源同样是"界面"——
+    `device-check.html`（真机自查页，要塞给主试看的）、`manifest.json`（装到桌面后显示的名字）
+    都不在里面。**目录盲区**比漏一个文件更危险：同一个毛病换个目录就永远红不了。
+    """
     out = []
     for dirpath, _dirs, files in os.walk(WEB):
         for fn in sorted(files):
@@ -59,6 +66,13 @@ def _sources() -> list[tuple[str, str]]:
             p = os.path.join(dirpath, fn)
             rel = os.path.relpath(p, WEB).replace("\\", "/")
             out.append((rel, io.open(p, encoding="utf-8").read()))
+    if os.path.isdir(PUBLIC):
+        for fn in sorted(os.listdir(PUBLIC)):
+            if not fn.endswith((".html", ".js", ".json")):
+                continue
+            p = os.path.join(PUBLIC, fn)
+            if os.path.isfile(p):
+                out.append((f"public/{fn}", io.open(p, encoding="utf-8").read()))
     return out
 
 

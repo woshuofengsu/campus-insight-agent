@@ -30,9 +30,24 @@ DEMO_MODE = _secret("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 # 想演示"持续活跃"就 .env 设 DEMO_LIVE_DATA=true。
 DEMO_LIVE_DATA = _secret("DEMO_LIVE_DATA", "").lower() in ("1", "true", "yes")
 
-# 演示闭环机器人，默认开：新工单自动走「处理中→已解决→通知居民」，「办」字闭环真的转起来。
-# 生产/真实运营环境设 DEMO_AUTO_WORKER=false 关掉，回到人工流程。
-DEMO_AUTO_WORKER = _secret("DEMO_AUTO_WORKER", "true").lower() in ("1", "true", "yes")
+# 演示闭环机器人：新工单自动走「处理中→已解决→通知居民」，「办」字闭环真的转起来。
+# ⚠️ 默认值**跟随 DEMO_MODE**（2026-10-06 与 SEED_DEMO_DATA 同批改）：原来默认恒为 true，
+# 于是"生产忘设 DEMO_AUTO_WORKER=false"就会让系统在真实社区里**自动替网格员推进工单**——
+# 这与"演示数据/演示行为不进生产"是同一条红线。演示姿态照旧一键开；生产姿态默认关，回到人工流程。
+DEMO_AUTO_WORKER = _secret(
+    "DEMO_AUTO_WORKER", "true" if DEMO_MODE else "false"
+).lower() in ("1", "true", "yes")
+
+# 是否灌**演示数据种子**（demo_resident / demo_grid 这类账号 + 虚构工单/提案/知识库）。
+# ⚠️ 2026-10-06 新增，起因是一次真实的**空库初始化演练**（`scripts/empty_db_drill.py`）：
+# 原来服务启动时**无条件**调 `data.seed.seed_all()`，于是一套"生产空库"在第一次启动后
+# 就自动长出了 6 个演示账号（其中 2 个密码是 `demo123`）和整套虚构工单——
+# 而部署手册写的红线是"生产空库初始化、绝不放演示数据/演示账号"。**文档与代码当时是矛盾的**。
+# 现在：默认跟随 `DEMO_MODE`（演示姿态照旧一键灌数据，生产姿态不灌），
+# 也可以用 `SEED_DEMO_DATA=true` 在非演示姿态下显式开启（例如预发环境想看演示数据）。
+SEED_DEMO_DATA = _secret(
+    "SEED_DEMO_DATA", "true" if DEMO_MODE else "false"
+).lower() in ("1", "true", "yes")
 
 DEEPSEEK_API_KEY = _secret("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = _secret("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
@@ -124,4 +139,9 @@ SMTP_TO = _secret("SMTP_TO", "")          # 默认收件人；留空则发给自
 COMMUNITY_API_KEY = _secret("COMMUNITY_API_KEY", "") or _secret("CAMPUS_API_KEY", "")
 
 # 路径
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "community_insight.db")
+# ⚠️ 支持用 `COMMUNITY_DB_PATH` 覆盖（2026-10-06 加）：部署手册要求 **staging 与生产各自独立的库**，
+# 但路径原来是硬编码在仓库里的 —— 那就意味着"同一份镜像跑两套环境"必须改代码或重建镜像，
+# 分层实际上落不了地；空库初始化演练也没法在不碰演示库的前提下真跑。
+# 默认值与历史完全一致（仓库内 data/community_insight.db），所以本机演示与测试行为不变。
+DB_PATH = os.getenv("COMMUNITY_DB_PATH") or os.path.join(
+    os.path.dirname(__file__), "data", "community_insight.db")

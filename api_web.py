@@ -60,19 +60,35 @@ _db_path_seeded: str | None = None
 
 
 def _ensure_db():
-    """确保当前 config.DB_PATH 已建表 + 灌种子数据。
+    """确保当前 config.DB_PATH 已建表（跑迁移），并按姿态决定是否灌**演示种子**。
 
     按 DB 路径维度记忆（而非布尔），避免多库/测试隔离时漏灌种子：
     每个独立 DB_PATH 最多初始化一次；换库会重新初始化。
+
+    ⚠️ 2026-10-06 修的一个**生产安全洞**（由 `scripts/empty_db_drill.py` 空库演练抓出来）：
+    原来这里**无条件**调 `data.seed.seed_all()`，而 `seed_all` 对**空库**会灌整套比赛演示数据。
+    后果：一套 `DEMO_MODE=false` 的生产空库，第一次启动后就自动长出
+    **6 个演示账号（2 个密码是 demo123）+ 38 条虚构工单 + 19 条提案 + 17 条知识库**——
+    而部署手册的红线写的是"生产空库初始化、绝不放演示数据/演示账号"，**文档和代码当时是矛盾的**。
+    现在按 `config.SEED_DEMO_DATA`（默认跟随 `DEMO_MODE`）判断：
+    演示姿态照旧一键灌数据；生产姿态只建表结构，首个负责人账号用
+    `python scripts/bootstrap_admin.py` 显式创建。
     """
     global _db_path_seeded
-    from config import DB_PATH
+    from config import DB_PATH, SEED_DEMO_DATA
     if _db_path_seeded == DB_PATH:
         return
     from data.db_core import init_db
-    from data.seed import seed_all
     init_db(DB_PATH)
-    seed_all(DB_PATH)
+    if SEED_DEMO_DATA:
+        from data.seed import seed_all
+        seed_all(DB_PATH)
+    else:
+        _log.warning(
+            "非演示姿态（DEMO_MODE=false 且未显式 SEED_DEMO_DATA=true）：**跳过演示数据种子**，"
+            "库内只有表结构（空库，符合生产红线）。首个社区负责人账号请执行 "
+            "`python scripts/bootstrap_admin.py --username <账号> --name <姓名> "
+            "--community <社区名> --generate-password`。")
     _db_path_seeded = DB_PATH
 
 

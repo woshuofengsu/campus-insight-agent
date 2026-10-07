@@ -22,6 +22,7 @@ import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "web", "src")
+PUBLIC = os.path.join(ROOT, "web", "public")
 
 #: 粗体标记：两个星号 + 至少一个非星号字符 + 两个星号。
 #: ⚠️ 故意写成 `[^*\n]+`：手机号掩码 `'****'`（`Profile.vue`）与 `idempotency **` 之类的
@@ -35,6 +36,13 @@ ALLOW: dict[str, str] = {}
 
 
 def _sources() -> list[tuple[str, str]]:
+    """两处来源：`web/src`（Vue/JS/TS）+ `web/public`（静态页与脚本）。
+
+    ⚠️ 2026-10-06 补 `web/public`：第一版只扫 `web/src`，而**同一个毛病在静态页里也有一份**——
+    `web/public/device-check.html` 正文写着 `它能**客观记录**…`、`device-check.js` 往页面上塞
+    `'…**没有"已接通"状态**…'`（走 `textContent`，所以 `<b>` 都用不上）。真机自查页正是
+    要给主试看的那一页，**偏偏它没被门禁覆盖** —— 门禁的目录盲区比漏一个文件更危险。
+    """
     out = []
     for dirpath, _dirs, files in os.walk(WEB):
         for fn in sorted(files):
@@ -43,6 +51,16 @@ def _sources() -> list[tuple[str, str]]:
             p = os.path.join(dirpath, fn)
             rel = os.path.relpath(p, WEB).replace("\\", "/")
             out.append((rel, io.open(p, encoding="utf-8").read()))
+    if os.path.isdir(PUBLIC):
+        for fn in sorted(os.listdir(PUBLIC)):
+            if not fn.endswith((".html", ".js")):
+                continue
+            p = os.path.join(PUBLIC, fn)
+            if os.path.isfile(p):
+                out.append((f"public/{fn}", io.open(p, encoding="utf-8").read()))
+    shell = os.path.join(os.path.dirname(WEB), "index.html")     # SPA 外壳
+    if os.path.isfile(shell):
+        out.append(("index.html", io.open(shell, encoding="utf-8").read()))
     return out
 
 
@@ -74,10 +92,22 @@ def _strip_html_comments(text: str) -> str:
     return re.sub(r"<!--.*?-->", _repl, text, flags=re.S)
 
 
+def _strip_code_blocks(text: str) -> str:
+    """剥掉 `<script>…</script>` 与 `<style>…</style>`（那是代码，不是文案；同样保留行号）。"""
+    def _repl(m: re.Match) -> str:
+        return "\n" * m.group(0).count("\n")
+
+    text = re.sub(r"<script\b.*?</script>", _repl, text, flags=re.S | re.I)
+    return re.sub(r"<style\b.*?</style>", _repl, text, flags=re.S | re.I)
+
+
 def _rendered_text(rel: str, text: str) -> str:
     """返回"可能会显示给用户"的那部分文本（行号按原文件算，所以这里保留换行结构）。"""
     if rel.endswith(".vue"):
         return _strip_html_comments(_template_body(text))
+    if rel.endswith(".html"):
+        # 静态页：整篇都是文案，但要先去掉注释与内联 script/style
+        return _strip_code_blocks(_strip_html_comments(text))
     # .js / .ts：逐行剔除注释行，其余保留（行号不会错位）
     kept = []
     for line in text.split("\n"):
@@ -106,14 +136,16 @@ def test_no_markdown_bold_in_rendered_text():
     assert not bad, (
         "界面文案里出现了 Markdown 粗体标记 `**…**`（页面上会把星号**原样显示**出来的）：\n  "
         + "\n  ".join(bad)
-        + "\n（改法：模板文本节点里用 `<b>…</b>`；注释里怎么写都行，本门禁不查注释）")
+        + "\n（改法：模板/静态页文本里用 `<b>…</b>`；写进 JS 字符串再塞进 textContent 的，"
+          "改用「」引号；注释里怎么写都行，本门禁不查注释）")
 
 
 def test_allowlist_is_documented():
     """豁免必须写明理由（现在是空的；一旦有人加，就必须写清为什么非写星号不可）。"""
     for rel, why in ALLOW.items():
         assert len(why) >= 8, f"{rel} 的豁免理由太短（等于没写）"
-        assert os.path.isfile(os.path.join(WEB, rel)), f"豁免的文件不存在：{rel}"
+        cand = [os.path.join(WEB, rel), os.path.join(PUBLIC, rel)]
+        assert any(os.path.isfile(c) for c in cand), f"豁免的文件不存在：{rel}"
 
 
 def test_scanner_self_check():
@@ -126,10 +158,19 @@ def test_scanner_self_check():
         "自检失效：没剥掉 HTML 注释"
     assert not BOLD.search(_rendered_text("a.js", "// 说明：**这只是注释**\nconst x = 1")), \
         "自检失效：没跳过 js 行注释"
+    # 静态页：正文里要抓、内联 script/style 与注释里不抓
+    assert BOLD.search(_rendered_text("public/a.html", "<p>**要点**</p>")), \
+        "自检失效：静态页正文没被扫到"
+    assert not BOLD.search(_rendered_text(
+        "public/a.html", "<style>/* ** */</style>\n<script>var s = '**'</script>\n<!-- ** -->")), \
+        "自检失效：把内联 style/script/注释当成文案"
     # 反过来：模板文本节点里的必须留下
     assert BOLD.search(_rendered_text("a.vue", "<template>\n<div>**要点**</div>\n</template>")), \
         "自检失效：模板文本没被扫到"
     # 真实文件必须至少扫到过一次模板内容（否则说明 `<template>` 提取坏了，门禁静默失效）
     vue = [(rel, t) for rel, t in _sources() if rel.endswith(".vue")]
     assert len(vue) >= 20, f"扫到的 .vue 文件太少（{len(vue)} 个），目录是不是不对？"
+    # 静态页也必须在扫描范围里（2026-10-06 补的目录盲区：真机自查页曾经完全没被覆盖）
+    pub = [rel for rel, _t in _sources() if rel.startswith("public/")]
+    assert len(pub) >= 2, f"扫到的 web/public 文件太少（{pub}）——目录盲区又回来了？"
     assert any("<div" in _template_body(t) for _rel, t in vue), "自检失效：一个模板块都没取到"
