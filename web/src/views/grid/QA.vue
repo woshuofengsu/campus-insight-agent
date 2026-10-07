@@ -402,7 +402,7 @@ async function kgSearch() {
             </div>
             <div class="muted" style="margin-top:3px;">
               （演示数据是走真实接口造出来的，所以接口/分类/留痕都是真的；但诉求内容不是真实居民提的。
-              本机演示库里**未标记的那些**同样是演示/验证脚本产生的，不应当作真实居民数据引用。）
+              本机演示库里<b>未标记的那些</b>同样是演示/验证脚本产生的，不应当作真实居民数据引用。）
             </div>
           </div>
           <div v-if="corr.unlogged_changes" style="color:var(--ink-danger);margin-top:8px;font-size:0.85rem;" data-corr-anomaly>

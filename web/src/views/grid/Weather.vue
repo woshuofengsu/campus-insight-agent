@@ -143,7 +143,7 @@ function remainingText(t) {
           <div style="font-weight:700;margin-bottom:8px;"><EIcon name="users" :size="18" /> 超时升级通知名单（第 2 层）</div>
           <div class="muted" style="font-size:0.85rem;margin-bottom:8px;">
             检查任务 3 小时未确认时，先通知本社区负责人；仍无人处理时再通知这里的名单。
-            名单**按本社区保存**，候选人只列本社区负责人（跨社区的 id 会被拒绝）。
+            名单<b>按本社区保存</b>，候选人只列本社区负责人（跨社区的 id 会被拒绝）。
           </div>
           <div v-if="seniorCandidates.length === 0" class="muted" style="font-size:0.85rem;">
             暂时读不到本社区负责人名单（可能是负责人未登记所属社区）。

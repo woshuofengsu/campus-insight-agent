@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1130 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1145 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1130 项：1129 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1145 项：1144 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -77,7 +77,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1130 项测试**（1129 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 37 个路由页 / 58 个页面视口 UI 客观审计）。
+- **不要破坏这 1145 项测试**（1144 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 38 个路由页 / 62 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -156,6 +156,11 @@ elderly:  demo_elderly（免登录）
   尤其**绝不能"吞掉异常后返回成功"**（`tests/test_silent_exceptions.py` 会红）。
   分诊工具：`python scripts/audit_silent_exceptions.py`（HIGH/MID 基线只减不增）；
   安全/隐私类校验（敏感词、脱敏、权限）一律 **fail-closed**——组件坏了要拒绝，不许放行。
+- **新增写路由要能被卡 7 闸门认出来**（`tests/test_write_route_gate.py`，实测踩到）：
+  它对 `POST/PUT/PATCH/DELETE` 一律按"写操作"审，要求**角色 + 范围**检查痕迹，否则要登记理由。
+  ⚠️ **纯计算却用 POST 的路由**（例：服务台的 `/extract` 要把一整段原话放进请求体）
+  会**误判成裸写接口** → 正确做法是登记进它的 `_EXTRA_ALLOWED` **并写明"不落库"的理由**，
+  **不要**套 `@write_route`（那等于谎称自己在写库），也不要为了躲门禁把接口改成 GET。
 - **属地化（地区识别）统一口径**：所有"按地区"的能力都必须走 `utils/region.py`（`resolve_region` /
   `policy_region_boost` / `normalize_area`），**不要各写一份**。三条硬规则：
   ① **属地只影响"选谁"，绝不影响"能不能自动回答"**（政策阈值永远只看 `base_score`；选答规则 =
@@ -175,12 +180,16 @@ elderly:  demo_elderly（免登录）
 | 文件 | 作用 |
 |---|---|
 | `api_web.py` | FastAPI 主服务：App 装配 + JWT 中间件 + 安全头 + WebSocket + SPA 托管 |
-| `api_routes/` | 14 个业务路由模块 + 共享依赖（auth/agent/issues/proposals/notices/health/...）|
+| `api_routes/` | 15 个业务路由模块 + 共享依赖（auth/agent/issues/proposals/notices/health/service_desk/...）|
 | `agent/orchestrator.py` | 多 Agent 编排（黑板、协商、Verifier/Arbiter 接入、转人工）|
 | `agent/roles/business_agents.py` | 5 个业务角色（报修/提案/政策/健康/通知）|
 | `agent/roles/auto_agents.py` | 天气守护 + 网格助手 |
 | `data/db_core.py` | schema + 迁移注册（**v54**）|
 | `data/db_issue_code.py` | **对外事项编号 + 工作人员查询**（编号与内部 id 解耦；姓名/手机后四位/楼栋/时间/编号五路查；结果脱敏）|
+| `api_routes/service_desk.py` | **服务台模式**（阶段 2）：共享设备代录——操作人/当事人**分开落库**、授权依据必填、跨社区拒绝、走查居民按操作人社区补章 |
+| `web/src/views/ServiceDesk.vue` | 服务台四步页（办理方式+授权 → 当事人 → 内容 → 完成），**独立入口 `/service-desk`**，不进老年端导航 |
+| `deploy/` | 部署骨架：compose（app + Caddy + 可选 PG + 独立备份容器）· 两阶段 Dockerfile（镜像内构建前端）· `docs/deploy/生产部署手册.md` |
+| `scripts/backup_db.py` · `scripts/restore_drill.py` | 备份（快照 + sha256/表行数清单）与**恢复演练**（恢复到临时目录后 6 项校验；实测 0.02 秒） |
 | `scripts/sync_schema_numbers.py` | 加迁移后**一键同步**各份材料里的 `schema vN / N 个迁移`（历史基线块内不动）|
 | `scripts/seed_category_demo.py` | 对照清单的**演示数据**准备（走真实链路造 + `--mark-existing` 补 `is_demo`；脚本自称"是演示数据"）|
 | `web/public/device-check.html` | **真机自查页**：在真机上打开即测出浏览器/语音/播报/拨号能力并生成可粘贴报告（配合 `docs/eval/真机验证记录.md`）|
@@ -190,9 +199,9 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 六十五 节**：能做的全部收口 / 六十四：门禁盲区修复）|
-| `scripts/journey_check.py` | **首批八条浏览器旅程**（发布门槛，8 条 / 63 项）：页面真点击 + 接口 + 库内事实三处对账 |
-| `scripts/grid_gov_check.py` | **治理侧两项对账**（26 项）：情景模拟器 + 人工修正对照清单，页面/接口/库内三处同一个数 |
+| `docs/spec/dev-log.md` | 开发日志（**最新 六十七 节**：服务台接上页面 + 旅程第 9 条 + 界面文案门禁 / 六十六：阶段 1A + 服务台地基）|
+| `scripts/journey_check.py` | **浏览器旅程**（发布门槛，9 条 / 89 项：v2 §14 八条 + 服务台代录一条）：页面真点击 + 接口 + 库内事实三处对账 |
+| `scripts/grid_gov_check.py` | **治理侧两项对账**（29 项）：情景模拟器 + 人工修正对照清单，页面/接口/库内三处同一个数 |
 | `data/db_governance_sim.py` | **治理情景模拟器**（只读）：样本量×增长率 → 工时 → 折算人手；**算不出来就明说**（不给人手数、不拿默认值硬算）|
 | `tests/test_governance_sim.py` | 模拟器门禁（19 例）：只读 / 租户 fail-closed / 配置按社区分键 / 样本不足 / **标签必须是「情景估算」** |
 | `tests/test_category_corrections.py` | **系统建议 vs 人工最终**门禁（12 例）：两列语义必须分开 / 覆盖率必报 / 无留痕的改动要露头 |
@@ -202,6 +211,7 @@ elderly:  demo_elderly（免登录）
 | `docs/spec/地区识别落地方案.md` | 属地化方案 **v2 定稿**（含 v1 的 7 处偏差记录，勿照 v1 实施）|
 | `tests/test_silent_exceptions.py` | 静默吞异常门禁：「静默假成功」必须为 0 + HIGH/MID 基线只减不增（工具 `scripts/audit_silent_exceptions.py`）|
 | `tests/test_claims_consistency.py` | 材料口径门禁：过时表述 / 测试数口径 / **PWA 只能宣称"可安装"、不得宣称离线能力** / 消融供数冒烟项白名单 |
+| `tests/test_no_markdown_bold_in_ui.py` | **界面文案门禁**：Vue 模板里（注释除外）不许出现 Markdown 粗体 `**…**`——它会被**原样显示**，而 `ui_audit`/`mobile_audit` 都测不出 |
 | `tests/test_creative_proposal_template.py` | **提交件模板门禁**：`创意说明书-提交版.md` 必须守住官方模板 28 个标题、三.3/三.4 模板要点、项目概述 ≤300 字（中文字与去空白字符两种口径）、五.2 四项自评勾选、附件 1–5 条、参赛方向只勾基层治理 |
 
 ## 已完成的大改动（截至最终版）
@@ -211,7 +221,7 @@ elderly:  demo_elderly（免登录）
 - **竞品对标升级 U1–U7**：混合检索（词法+语义 RRF）/ 真实政策语料 40 条 / 知识库健康度观测 / 关怀量化 / 演示前自检 /
   轻量知识图谱 / 数据层演进路径（见 dev-log 二十七～三十四节）
 - **视觉系统 v2 + 客观 UI 审计**：设计令牌重建、三端差异化、暗色达标、无障碍达标，
-  `scripts/ui_audit.py` **全站 37 个路由页 / 58 个页面视口 × 9 类检查 0 违规**（见 dev-log 三十五～三十六、四十三节）
+  `scripts/ui_audit.py` **全站 38 个路由页 / 62 个页面视口 × 9 类检查 0 违规**（见 dev-log 三十五～三十六、四十三节）
 - **第七轮复审收口**：v46 手机号加密全量补齐（提案/草稿/user_profile 残留）/ 运行时裸 ALTER 收回迁移链 /
   utcnow 弃用清理 / 异常文案脱敏 / 录屏素材（见 dev-log 三十七～三十八节）
 
@@ -222,7 +232,8 @@ elderly:  demo_elderly（免登录）
 - **多租户真隔离 → 配置隔离（B5–B7）**：租户键=社区名；写入侧盖章 / 读取侧 fail-closed /
   按-id 闸门 / 配置按社区分键 / Agent 工具用请求级租户上下文；收件人统一走 `managers_of(tenant)`
   （通知类**不做** fail-closed，理由见 dev-log 五十五～五十七节）
-- **首批八条浏览器旅程（卡12）**：新增 `scripts/journey_check.py`（8 条旅程 / 63 项检查），
+- **首批八条浏览器旅程（卡12）**：新增 `scripts/journey_check.py`（**现 9 条旅程 / 89 项检查**；
+  交付时 8 条 / 58 项 → 63 项 → 阶段 2 加服务台代录一条后 89 项），
   每条同时验**页面真点击 / 接口返回 / 库内事实**；当场抓到两个真 bug（老人缺位置补充后**提交不了**、
   连点两下**建出两张工单**）并各自补了回归测试（见 dev-log 五十八节）
 - **提交前最后一批（2026-09-29 深夜，v4 第 2/3 批收尾）**：居民端政策问答**依据面板**（含决策元数据 + 门禁）·
@@ -253,4 +264,10 @@ elderly:  demo_elderly（免登录）
   `docs/eval/社区试点方案-v1.md`（未开展）· `scripts/sync_schema_numbers.py`（加迁移后一键同步材料数字）·
   修掉一处**数据相关**的对比度缺陷（草稿提示 4.43:1 → 新令牌 `--primary-light-ink`）
 
-详见 `docs/spec/dev-log.md`（最新 **六十五** 节）。
+- **服务台线收口（阶段 1A + 2，见 dev-log 六十六～六十七）**：`deploy/`（Compose + Caddy + 独立备份容器 +
+  生产部署手册，**Compose 未真实构建运行**）· 备份/恢复演练**真跑通过**（恢复 0.02 秒）· 迁移 **v54**
+  （渠道 / 操作人-当事人分离 / 服务点 / 授权依据 / **对外事项编号** + 号段表）·
+  `data/db_issue_code.py`（五路查 + 脱敏 + 只认后四位）· `/service-desk` **独立四步页**（共享设备收尾、抽取只给建议）·
+  浏览器旅程 **第 9 条**（63 → 89 项，顺手修掉旅程 8 的空断言）· 新门禁 `tests/test_no_markdown_bold_in_ui.py`
+
+详见 `docs/spec/dev-log.md`（最新 **六十七** 节）。

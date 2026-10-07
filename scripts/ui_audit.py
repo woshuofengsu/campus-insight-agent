@@ -251,6 +251,12 @@ PAGES = [
     ("screen", "grid", "/screen", (1920, 1080), False, False, False),
     ("screen-1366", "grid", "/screen", (1366, 768), False, False, False),
     ("stability", "grid", "/stability", (1440, 900), False, False, False),
+    # 服务台（阶段 2）：共享平板是真机最容易出事的地方（手上有水、戴老花镜、站着点），
+    # 所以桌面 + 平板横竖屏 + 暗色四种都进审计。
+    ("service-desk", "grid", "/service-desk", (1440, 900), False, False, False),
+    ("service-desk-tablet", "grid", "/service-desk", (1024, 768), False, True, False),
+    ("service-desk-tablet-portrait", "grid", "/service-desk", (768, 1024), False, True, False),
+    ("service-desk-dark", "grid", "/service-desk", (1440, 900), False, False, True),
     ("grid-dashboard", "grid", "/grid/dashboard", (1440, 900), False, False, False),
     ("grid-dashboard-1366", "grid", "/grid/dashboard", (1366, 768), False, False, False),
     ("grid-workorders", "grid", "/grid/work-orders", (1440, 900), False, False, False),

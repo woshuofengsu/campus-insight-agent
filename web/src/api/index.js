@@ -215,6 +215,17 @@ export const upload = (files, folder = 'web') => {
   return api.post(`/upload?folder=${folder}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
 
+// 服务台模式（阶段 2）：**独立入口**，只有社区工作人员（grid）能用。
+// 社区一律由服务端按登录身份判定，这里不传 community。
+export const serviceDesk = {
+  context: () => api.get('/service-desk/context'),
+  extract: (text) => api.post('/service-desk/extract', { text }),
+  submit: (data) => api.post('/service-desk/submit', data),
+  search: (params) => api.get('/service-desk/search', { params }),
+  // 结束本次办理：清服务端草稿（浏览器侧的 sessionStorage 由页面自己清）
+  reset: (data) => api.post('/service-desk/reset', data),
+}
+
 // Agent 统一入口
 export const agent = {
   chat: (data) => api.post('/agent/chat', data),

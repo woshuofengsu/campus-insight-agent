@@ -10,6 +10,9 @@ const routes = [
   // 居民访问也会被弹（他们没有这些指标），统一为路由层拦截，行为可预期。
   { path: '/screen', name: 'screen', component: () => import('../views/Screen.vue'), meta: { title: '治理大屏', role: 'grid' } },
   { path: '/stability', name: 'stability', component: () => import('../views/Stability.vue'), meta: { title: '系统稳定性演示' } },
+  // 服务台模式（阶段 2）：**独立入口**，不进老年端导航 —— 老人用不到的按钮放上去就是干扰。
+  // 社区/权限全在服务端按登录身份判定；路由层只作角色拦截（grid = 社区工作人员）。
+  { path: '/service-desk', name: 'service-desk', component: () => import('../views/ServiceDesk.vue'), meta: { title: '服务台', role: 'grid' } },
 
   // 居民端
   {

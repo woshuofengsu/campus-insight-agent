@@ -227,6 +227,7 @@ from api_routes import notices as _notices_routes
 from api_routes import opinions as _opinions_routes
 from api_routes import policy as _policy_routes
 from api_routes import proposals as _proposals_routes
+from api_routes import service_desk as _service_desk_routes
 from api_routes import upload as _upload_routes
 from api_routes import weather as _weather_routes
 
@@ -244,6 +245,8 @@ app.include_router(_opinions_routes.router)
 app.include_router(_policy_routes.router)
 app.include_router(_policy_routes.knowledge_router)
 app.include_router(_proposals_routes.router)
+# 服务台模式（阶段 2）：**独立入口**，不进老年端导航（老人用不到的按钮放上去就是干扰）
+app.include_router(_service_desk_routes.router)
 app.include_router(_upload_routes.router)
 app.include_router(_weather_routes.router)
 

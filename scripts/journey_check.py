@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""首批八条浏览器旅程（v2 方案 §14「首批八条浏览器旅程」= 发布门槛）。
+"""首批八条浏览器旅程 + 服务台代录一条（v2 方案 §14「首批八条浏览器旅程」= 发布门槛）。
 
 **为什么单独一个脚本**：`demo_flow_check.py` 验的是"演示场景里的关键按钮能不能点通"，
 `mobile_flow_check.py` 验的是手机端手指路径；而方案 §14 要求的是**八条端到端旅程**——
@@ -9,7 +9,7 @@
   ② 服务端返回了什么（页面里的 fetch，带当前登录身份）；
   ③ **库里到底是什么**（只读 SQLite 查询，复核"页面说的"与"存下来的"是否同一件事）。
 
-八条（顺序即 v2 方案的顺序）：
+九条（前八条顺序即 v2 方案的顺序；第 9 条是阶段 2 新增的服务台线）：
   1. 居民正常报修 → 网格办理 → 居民反馈
   2. 缺位置 → 必要追问 → 更正 → 确认提交
   3. 中途取消 → 新建另一诉求，不恢复旧草稿
@@ -18,15 +18,16 @@
   6. 无法确认诉求 → 真实交接包 → 网格领取回复
   7. 同社区他人和跨社区用户尝试访问 → 拒绝且界面可理解
   8. 网格处置权限正确，居民端仅出现本人授权消息
+  9. 服务台代录（共享设备）：独立入口 → 系统抽取 → 代录建单 → 五路可查 → 收尾清场 → 跨社区拒绝
 
 用法：
-    python scripts/journey_check.py                 # 全部八条（**会写演示库**，见下）
+    python scripts/journey_check.py                 # 全部九条（**会写演示库**，见下）
     python scripts/journey_check.py --only 2,4,5    # 只跑指定的几条
     python scripts/journey_check.py --no-backup     # 不先备份数据库
 
-⚠️ **会改数据**：旅程 1/2/3/4/5/6 会真的建工单、走流程、领取处理包（这正是"旅程"的意思）。
+⚠️ **会改数据**：旅程 1/2/3/4/5/6/9 会真的建工单、走流程、领取处理包（这正是"旅程"的意思）。
 默认先做一次数据库备份到 `.shots/db-backup-before-journeys.db`；造出来的数据都带
-`[彩排J1]`…`[彩排J6]` 标记，方便一眼认出、必要时按标记清理。
+`[彩排J1]`…`[彩排J9]` 标记，方便一眼认出、必要时按标记清理。
 """
 import argparse
 import json
@@ -37,6 +38,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -721,11 +723,33 @@ def journey_8(page, base):
     mid = mine["id"]
     before_status = mine.get("status")
 
+    # 处置类按钮的**真实文案**（全站去 emoji 之后按钮里不再有字形，标签必须写纯文本）。
+    # ⚠️ 2026-10-06 实测踩到：这里原先是 `"✅ 审核通过"` / `"🔧 派单"` 这种带 emoji 的写法，
+    # 全站换图标之后**永远命中 0 个**，于是①变成"无论对错都通过"的空断言（假绿）。
+    # 修法不只是把字改对，还要补一个**正向对照**（下面①a）：先在网格端确认这些标签真能命中，
+    # 命中不了就报红——否则下次改文案又会静默退化成空断言。
+    grid_only = ["审核通过", "退回补充", "派单", "开始处理", "提交处理结果"]
+
+    desc = (mine.get("description") or "")[:12]
+    login_card(page, base, "网格员", "**/grid/**")
+    page.goto(f"{base}/grid/work-orders", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    page.get_by_placeholder("搜索标题/地址/描述/报修人").fill(desc)
+    page.wait_for_timeout(1500)
+    gcard = page.locator("div.card").filter(has_text=desc).first
+    if gcard.count():
+        gcard.locator("text=展开 ▼").first.click()
+        page.wait_for_timeout(700)
+    grid_shown = [b for b in grid_only
+                  if gcard.count() and gcard.get_by_role("button", name=b, exact=True).count() > 0]
+    check(f"①a 正向对照：网格端工单 #{mid}（{mine.get('status')}）上**确实**有处置按钮"
+          "（证明标签名是可命中的，①不是空断言）",
+          bool(grid_shown), f"网格端出现：{grid_shown or '一个都没有（标签名写错了？）'}")
+
     login_card(page, base, "居民", "**/resident/**")
     page.goto(f"{base}/resident/work-orders/{mid}", wait_until="networkidle")
     page.wait_for_timeout(2000)
     body = page.inner_text("body")
-    grid_only = ["✅ 审核通过", "🔧 派单", "🔨 开始处理", "✅ 提交处理结果", "🚫 关闭工单"]
     shown = [b for b in grid_only if btn(page, b).count() > 0]
     check(f"① 居民端工单 #{mid} 上**没有**处置类按钮（界面不引导越权）", not shown,
           f"出现的处置按钮：{shown}" if shown else "只有居民自己的操作（反馈/补充/撤回…）")
@@ -758,6 +782,186 @@ def journey_8(page, base):
               f"该消息 is_read 仍为 {after.get('is_read')}")
 
 
+# --------------------------------------------------------------------------- 旅程 9
+
+def journey_9(page, base):
+    """服务台代录（共享设备）：独立入口 → 系统抽取 → 代录建单 → 按姓名/编号查 → 收尾清场 → 跨社区拒绝。
+
+    这一条守的是**阶段 2 的服务台线**：真实社区里老人不会都用手机，服务站平板、家属代办、
+    网格员代录都会发生。它比普通报修多两条硬要求，所以必须单独成一条旅程、用浏览器真点：
+      · **操作人 ≠ 当事人**（`operator_id` 与 `reporter_id` 分开落库，否则"老人完成率"会把代操作算成老人完成）；
+      · **设备是共享的**（办完必须把上一位老人的痕迹清掉）。
+    """
+    mark = f"[彩排J9 {RUN}]"
+    who = f"走查老人{RUN}"
+    tel = "13900000009"
+    station = f"STATION-{RUN}"
+    raw = f"3号楼2单元楼道灯不亮，晚上看不见 {mark}"
+
+    login_card(page, base, "网格员", "**/grid/**")
+    page.goto(f"{base}/service-desk", wait_until="networkidle")
+    page.wait_for_timeout(2200)
+    body = page.inner_text("body")
+    check("① 服务台是**独立入口**（工作人员直接打开 /service-desk，不塞进老年端导航）",
+          "/service-desk" in page.url and page.locator("[data-shared-banner]").count() > 0, page.url)
+    comm = ""
+    if page.locator("[data-desk-community]").count():
+        comm = page.locator("[data-desk-community]").inner_text().strip()
+    check("①b 社区取自**登录身份**并显示在横幅上（前端不能选社区）",
+          bool(comm) and comm != "读取中…", f"横幅显示社区「{comm}」")
+    check("①c 页面上就写明这是共享设备、办完要收尾",
+          "共享设备" in body and "结束本次办理" in body)
+    check("①d 进度用一句话说清第几步（不用低对比度的 n-steps）",
+          "第 1 步 / 共 4 步" in body)
+
+    # ---- 第 1 步：办理方式 + 授权情况（代录必须留依据）----
+    page.locator('[data-channel="grid_recorded"]').click()
+    page.locator('[data-consent="口头同意"]').click()
+    page.locator("[data-station] input").fill(station)
+    page.wait_for_timeout(200)
+    page.locator("[data-desk-next1]").click()
+    page.wait_for_timeout(700)
+    check("② 办理方式与授权情况能选中并进入下一步", page.locator("[data-desk-step2]").count() > 0,
+          page.locator("[data-desk-progress]").inner_text()[:30])
+
+    # ---- 第 2 步：当事人（走查居民：没有账号的老人）----
+    page.locator("[data-walkin-toggle]").click()
+    page.wait_for_timeout(400)
+    next2 = page.locator("[data-desk-next2]")
+    check("③ 走查居民入口存在，且**姓名/手机没填时不给下一步**（fail-closed）",
+          next2.count() > 0 and next2.is_disabled(),
+          "网格员联系不上的单等于废单，所以这里必须拦住")
+    page.locator("[data-walkin-name] input").fill(who)
+    page.locator("[data-walkin-phone] input").fill(tel)
+    page.wait_for_timeout(300)
+    check("③b 填上姓名与手机后可以继续", not next2.is_disabled())
+    next2.click()
+    page.wait_for_timeout(600)
+
+    # ---- 第 3 步：内容（系统帮我抽取 → 只给建议，仍要人确认）----
+    page.locator("[data-desk-text] textarea").fill(raw)
+    page.locator("[data-desk-extract]").click()
+    page.wait_for_timeout(2600)
+    title_v = page.locator("[data-f-title] input").input_value()
+    loc_v = page.locator("[data-f-location] input").input_value()
+    check("④「系统帮我抽取」真的把标题与位置补上了，并标出**来源**",
+          bool(title_v) and bool(loc_v) and page.locator("[data-extract-src]").count() > 0,
+          f"标题「{title_v}」· 位置「{loc_v}」")
+    check("④b 抽取结果只是建议：字段仍可编辑（不是「抽完就锁死」）",
+          page.locator("[data-f-title] input").is_editable()
+          and page.locator("[data-f-location] input").is_editable())
+    # 抽取没补上的字段由人工补齐（这正是服务台的意义：系统抽不全，人补）
+    if not title_v:
+        page.locator("[data-f-title] input").fill("楼道灯不亮")
+    if not loc_v:
+        page.locator("[data-f-location] input").fill("3号楼2单元")
+    if mark not in page.locator("[data-f-desc] textarea").input_value():
+        page.locator("[data-f-desc] textarea").fill(raw)
+
+    page.locator("[data-desk-submit]").click()
+    page.wait_for_timeout(3200)
+    body = page.inner_text("body")
+    check("⑤ 提交后给出**对外事项编号**，并明确「编号不用他记」",
+          page.locator("[data-desk-done]").count() > 0 and "编号不用他记" in body,
+          body.replace("\n", " ")[:90])
+
+    row = one("SELECT id, issue_code, submission_channel, operator_user_id, operator_role, "
+              "station_id, consent_status, tenant_id, reporter_id, reporter_name, "
+              "reporter_phone, reporter_phone_enc FROM community_issues "
+              "WHERE description LIKE ? ORDER BY id DESC LIMIT 1", (f"%{mark}%",))
+    check("⑤b 库里真的建了这张代录单（页面说了不算，查库）", bool(row),
+          f"库内工单 #{row.get('id')}" if row else "库里没找到带标记的代录单")
+    if not row:
+        return
+    code = row.get("issue_code") or ""
+    check("⑤c 页面上的编号 = 库里那条（页面 ↔ 库内对账）",
+          bool(code) and code in body, f"库内编号 {code}")
+    check("⑤d 库内记下「谁在替谁办」：渠道 / 操作人 / 授权依据 / 服务点",
+          row.get("submission_channel") == "grid_recorded"
+          and row.get("operator_role") == "grid"
+          and int(row.get("operator_user_id") or 0) > 0
+          and row.get("consent_status") == "口头同意"
+          and row.get("station_id") == station,
+          f"channel={row.get('submission_channel')} operator={row.get('operator_user_id')}"
+          f"/{row.get('operator_role')} consent={row.get('consent_status')} station={row.get('station_id')}")
+    check("⑤e 走查居民没有账号（reporter_id=0），但租户**落在操作人社区**"
+          "（否则网格端读取侧 fail-closed，自己社区反而看不见）",
+          int(row.get("reporter_id") or 0) == 0 and row.get("tenant_id") == comm,
+          f"reporter_id={row.get('reporter_id')} tenant={row.get('tenant_id')}（操作人社区 {comm}）")
+    check("⑤f 手机号明文列写空、密文列有值（v46 口径：新入口同样不许留明文）",
+          (row.get("reporter_phone") or "") == "" and bool(row.get("reporter_phone_enc")),
+          f"明文 {len(row.get('reporter_phone') or '')} 字符 · 密文 {len(row.get('reporter_phone_enc') or '')} 字符")
+
+    # ---- 工作人员查询：老人记不住编号，所以要能用姓名/手机后四位/编号查到 ----
+    q_name = fetch_json(page, "GET", f"/api/web/service-desk/search?name={quote(who)}")
+    items = ((q_name.get("data") or {}).get("items")) or []
+    check("⑥ 工作人员按**姓名**就能查到（不要求老人记编号）",
+          any(i.get("issue_code") == code for i in items), f"命中 {len(items)} 条")
+    q_tail = fetch_json(page, "GET", "/api/web/service-desk/search?phone_tail=0009")
+    tail_items = ((q_tail.get("data") or {}).get("items")) or []
+    check("⑥b 按**手机后四位**也能查到，且结果里的手机号是**脱敏**的",
+          any(i.get("issue_code") == code for i in tail_items)
+          and all("*" in (i.get("reporter_phone_masked") or "") for i in tail_items),
+          f"命中 {len(tail_items)} 条，掩码示例 "
+          f"{(tail_items[0].get('reporter_phone_masked') if tail_items else '—')}")
+    q_bad = fetch_json(page, "GET", "/api/web/service-desk/search?phone_tail=13900000009")
+    check("⑥c 传**完整**手机号来查 → 明确拒绝（手机号不能变成查询凭据）",
+          "后四位" in str((q_bad.get("data") or {}).get("note") or ""),
+          str((q_bad.get("data") or {}).get("note"))[:48])
+    q_code = fetch_json(page, "GET", f"/api/web/service-desk/search?code={code}")
+    check("⑥d 按**事项编号**能精确查到同一条",
+          any(i.get("issue_code") == code for i in (((q_code.get("data") or {}).get("items")) or [])))
+
+    # ---- 页面上的查询 + 共享设备收尾 ----
+    page.locator("[data-desk-new]").click()
+    page.wait_for_timeout(500)
+    page.locator('[data-consent="口头同意"]').click()
+    page.locator("[data-desk-next1]").click()
+    page.wait_for_timeout(600)
+    page.locator("[data-q-name] input").fill(who)
+    page.locator("[data-q-run]").click()
+    page.wait_for_timeout(1500)
+    check("⑦ 页面上按姓名查得到刚代录的那条，并显示事项编号",
+          page.locator("[data-q-results]").count() > 0
+          and code in page.locator("[data-q-results]").inner_text(),
+          f"页面上查到编号 {code}")
+    station_before = page.evaluate("() => sessionStorage.getItem('ci_desk_station')")
+    check("⑧ 收尾前，服务点确实记在**本机会话**里（说明有痕迹需要清）",
+          bool(station_before), str(station_before))
+    page.locator("[data-end-session]").click()
+    page.wait_for_timeout(1600)
+    station_after = page.evaluate("() => sessionStorage.getItem('ci_desk_station')")
+    check("⑧b 「结束本次办理」真的清掉了本机痕迹，并回到第 1 步（共享设备：下一位看不到上一位）",
+          not station_after and "第 1 步 / 共 4 步" in page.inner_text("body")
+          and page.locator("[data-q-results]").count() == 0,
+          "sessionStorage 已清 + 表单已复位")
+
+    # ---- 跨社区代录：不能替隔壁社区建单 ----
+    xmark = f"[彩排J9X {RUN}]"
+    url = login_form(page, base, "demo_grid_cy", "demo123")
+    check("⑨ 第二社区网格员能登录（跨社区场景必须有真实账号才验得了）", "/grid" in url, url)
+    if "/grid" not in url:
+        return
+    target = one("SELECT id FROM user_profile WHERE COALESCE(community,'')='海淀小区' "
+                 "AND role='resident' ORDER BY id LIMIT 1")
+    if not target:
+        check("⑨b 找到可用于跨社区代录测试的海淀居民", False, "库里没有海淀居民账号")
+        return
+    cross = fetch_json(page, "POST", "/api/web/service-desk/submit", {
+        "channel": "grid_recorded", "consent_status": "口头同意", "station_id": station,
+        "reporter_id": target["id"], "title": "跨社区代录尝试",
+        "description": f"这条不该被建出来 {xmark}", "location": "1号楼", "scope": "室外",
+    })
+    check("⑨b 跨社区代录被拒（不能替别的社区的人建单）",
+          cross.get("success") is False and "不在您所在社区" in str(cross.get("error") or ""),
+          str(cross.get("error"))[:52])
+    leaked = one("SELECT COUNT(*) AS n FROM community_issues WHERE description LIKE ?",
+                 (f"%{xmark}%",))
+    check("⑨c 库里确实**没有**建出这条（拒绝不是「界面上说说」）",
+          not leaked or int(leaked.get("n") or 0) == 0,
+          f"带标记的跨社区工单数 {0 if not leaked else leaked.get('n')}")
+
+
 # --------------------------------------------------------------------------- 主人
 
 JOURNEYS = [
@@ -769,6 +973,7 @@ JOURNEYS = [
     (6, "无法确认诉求 → 真实交接包 → 网格领取回复", journey_6),
     (7, "同社区他人和跨社区用户尝试访问 → 拒绝且界面可理解", journey_7),
     (8, "网格处置权限正确，居民端仅出现本人授权消息", journey_8),
+    (9, "服务台代录：独立入口 → 抽取 → 建单 → 可查 → 收尾清场 → 跨社区拒绝", journey_9),
 ]
 
 
@@ -783,7 +988,7 @@ def main() -> int:
     todo = [j for j in JOURNEYS if want is None or j[0] in want]
 
     print("=" * 78)
-    print(f"首批八条浏览器旅程 · {base} · 1440x900 · **会写演示库**")
+    print(f"浏览器旅程（八条 + 服务台代录一条） · {base} · 1440x900 · **会写演示库**")
     print("=" * 78)
     if not args.no_backup:
         b = backup_db()

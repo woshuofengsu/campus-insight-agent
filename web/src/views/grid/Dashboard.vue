@@ -249,7 +249,7 @@ const cards = computed(() => [
     <div class="card" data-gov-metrics style="margin-top:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-weight:700;"><EIcon name="chart-line" :size="18" /> 治理指标（近 30 天 · 仅本社区）</div>
-        <span class="muted" style="font-size:0.8rem;">重复报修＝同一人同一分类**跨天**再报（同一分钟连点不算）</span>
+        <span class="muted" style="font-size:0.8rem;">重复报修＝同一人同一分类<b>跨天</b>再报（同一分钟连点不算）</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px;">
         <div>

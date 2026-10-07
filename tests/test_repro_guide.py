@@ -42,14 +42,19 @@ def test_journey_checker_covers_the_eight_journeys():
 
     同时钉住"编号连续、一条不少"——少一条就等于门槛漏了一层，
     而漏掉的那条恰恰可能是有问题的那条（本项目实测：第 2、4 条都抓到过真 bug）。
+
+    2026-10-06 起本脚本多了**第 9 条**（阶段 2 的服务台代录：共享设备 + 操作人/当事人分离）。
+    所以判据写成两段：**v2 §14 的 1–8 必须存在**（这是当初的合同，不许少），
+    而且**整份清单必须从 1 连续编号**（新增的旅程不许跳号、也不许把老的挤掉）。
     """
     path = os.path.join(ROOT, "scripts", "journey_check.py")
     assert os.path.isfile(path), "缺少 scripts/journey_check.py（首批八条浏览器旅程）"
     src = io.open(path, encoding="utf-8").read()
     nums = [int(m) for m in re.findall(r"^\s*\((\d+),\s*\"", src, re.M)]
-    assert nums == list(range(1, 9)), f"旅程编号不是完整的 1–8：{nums}"
+    assert nums[:8] == list(range(1, 9)), f"v2 §14 的八条旅程编号不是完整的 1–8：{nums}"
+    assert nums == list(range(1, len(nums) + 1)), f"旅程编号必须从 1 连续（不许跳号/重复）：{nums}"
     for fn in ("journey_1", "journey_2", "journey_3", "journey_4",
-               "journey_5", "journey_6", "journey_7", "journey_8"):
+               "journey_5", "journey_6", "journey_7", "journey_8", "journey_9"):
         assert f"def {fn}(" in src, f"缺少旅程实现：{fn}"
     # 标记要**每次运行独立**，否则上一轮的数据会让"这次没建单"这类断言假失败
     assert "RUN = time.strftime" in src, "旅程标记必须按运行时间区分"

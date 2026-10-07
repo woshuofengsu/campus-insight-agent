@@ -169,6 +169,10 @@ PAGES = [
     ("grid-notices", "grid", "/grid/notices", (390, 844), False),
     ("grid-proposals", "grid", "/grid/proposals", (390, 844), False),
     ("grid-health", "grid", "/grid/health", (390, 844), False),
+    # 服务台（阶段 2）：这页**天生就是触摸场景**（服务站平板，工作人员站着点、老人戴老花镜），
+    # 热区与字号必须过移动审计。768×1024 是常见平板竖屏。
+    ("service-desk", "grid", "/service-desk", (390, 844), False),
+    ("service-desk-tablet", "grid", "/service-desk", (768, 1024), False),
     ("screen-mobile", "grid", "/screen", (390, 844), False),
     ("elderly-home", "elderly", "/elderly/home", (390, 844), True),
     ("elderly-agent", "elderly", "/elderly/agent", (390, 844), True),

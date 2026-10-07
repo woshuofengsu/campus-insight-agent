@@ -56,6 +56,13 @@ _EXTRA_ALLOWED = {
     ("issues.py", "issue_action"): "工单状态机：角色按 action 分派（负责人管理 / 居民只能动自己的单），"
                                    "居民侧校验 reporter_id、负责人侧过 _same_tenant；"
                                    "装饰器无法表达 action 维度的角色矩阵，故保留手写检查",
+    # 2026-10-06 新增（本闸门抓到的：服务台 `/extract` 被判"写路由没声明授权"）
+    ("service_desk.py", "service_desk_extract"): "**纯计算**路由：把工作人员听到的原话解析成"
+                                                 "位置/责任范围/紧急程度几个字段返回，**不落库、不读他人数据**"
+                                                 "（真正的写入在 `/submit`，那条有角色 + 范围检查）。"
+                                                 "用 POST 只是因为要把一整段原话放进请求体（放 query 会很长），"
+                                                 "不是写操作；角色校验即完整授权，故登记豁免而不是套 `@write_route`"
+                                                 "（套上去等于谎称自己在写库）",
 }
 
 _SQL_WRITE_RE = re.compile(

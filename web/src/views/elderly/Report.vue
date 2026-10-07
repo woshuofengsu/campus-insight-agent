@@ -566,7 +566,7 @@ async function checkSubmitted() {
         <span class="muted" style="font-size:1rem;">（进度可以在「看看进度」里随时看）</span>
       </div>
       <div class="muted" style="margin-top:8px;font-size:1rem;">
-        括号里写的是每条信息**从哪来的**：您说的、您确认的、还是我们按登记资料填的。
+        括号里写的是每条信息<b>从哪来的</b>：您说的、您确认的、还是我们按登记资料填的。
         系统不会把您没确认的内容写成事实。
       </div>
     </div>
