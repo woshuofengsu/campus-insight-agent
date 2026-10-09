@@ -94,10 +94,10 @@ async function markCancelled() {
       <div style="margin-top:8px;">
         请在手机上按绿色按钮拨给 <b>{{ calling.name }}</b>（{{ calling.phone }}）。
       </div>
-      <div class="muted" style="margin-top:8px;font-size:1.1rem;">
+      <div class="muted" style="margin-top:8px;font-size:1.25rem;">
         手机是否接通，这个页面看不到，所以我们不会替您记成"已通话"。
       </div>
-      <n-button block size="large" style="margin-top:12px;min-height:60px;font-size:1.2rem;"
+      <n-button block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;"
                 @click="markCancelled">我没拨出去 / 取消了</n-button>
     </div>
 

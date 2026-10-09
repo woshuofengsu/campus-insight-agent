@@ -311,6 +311,10 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
 }
 /* 老年端说明性小字也要 ≥20px（此前 0.9~1.05rem 只有 14~17px，未达自己声明的适老下限） */
 .elderly-page .muted { font-size: 1.25rem; }
+/* 分区小标题同理：`.section-title` 是居民/网格端的字号（1.02rem=16.3px），
+   老年端用它会被 `ui_audit` 的 20px 下限判红（v3 重设计里我给老年端加了几个分组标题，
+   实测就是这样被抓到的）。这里按"老年端容器"统一放大。 */
+.elderly-page .section-title { font-size: 1.3rem; }
 /* Naive 组件自带字号（按钮 15px / 标签 14px / 输入 14px）也要提到适老下限：
    逐页加内联 style 容易漏，这里按「老年端容器」统一兜底（内联写了更大值的仍以更大值为准） */
 .elderly-page .n-button__content { font-size: 1.25rem; }

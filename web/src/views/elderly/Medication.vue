@@ -120,7 +120,7 @@ async function saveEdit() {
       <n-button v-else type="primary" block size="large" style="margin-top:12px;min-height:60px;font-size:1.25rem;" @click="add"><EIcon name="mail" :size="18" /> 提交（待审核）</n-button>
     </div>
     <div v-if="showForm" style="margin-top:10px;">
-      <n-button block size="large" style="min-height:56px;font-size:1.2rem;" @click="showForm = false; editTarget = null">取消</n-button>
+      <n-button block size="large" style="min-height:56px;font-size:1.25rem;" @click="showForm = false; editTarget = null">取消</n-button>
     </div>
   </div>
 </template>
@@ -130,7 +130,7 @@ async function saveEdit() {
    实际只有约 15px 字号 / 44px 高，不符合长辈版「字号 ≥20px、触控 ≥48px」的口径
    （真机手指点击验证 scripts/mobile_flow_check.py 抓到）。这里统一放大。 */
 .elder-act {
-  font-size: 1.2rem !important;
+  font-size: 1.25rem !important;
   min-height: 52px !important;
   padding-left: 16px !important;
   padding-right: 16px !important;

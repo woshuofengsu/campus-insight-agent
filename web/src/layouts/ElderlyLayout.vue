@@ -43,14 +43,15 @@ const navs = [
 
 <template>
   <div style="min-height:100vh;background:var(--bg);">
-    <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));background:linear-gradient(135deg,#2D5BFF 0%,#6A8DFF 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-bottom:14px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div style="font-size:1.3rem;font-weight:800;display:flex;align-items:center;gap:8px;">
         <EIcon name="community" :size="30" />社区服务
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <!-- 独立紧急求助：任何页面都能一键到达（长按 3 秒仍然防误触） -->
+        <!-- 独立紧急求助：任何页面都能一键到达（长按 3 秒仍然防误触）
+             v3：静态深红 + 足够大，不再用呼吸光圈动画引人注意 -->
         <n-button size="large" type="error" data-longpress
-                  style="color:#fff;font-size:1.3rem;min-height:56px;font-weight:800;background:linear-gradient(135deg,#DC2626,#B91C1C);"
+                  style="color:#fff;font-size:1.3rem;min-height:56px;font-weight:800;background:var(--danger-solid);border-color:var(--danger-solid);"
                   @pointerdown="sos.pressStart" @pointerup="sos.pressCancel" @pointerleave="sos.pressCancel"
                   @touchstart.prevent="sos.pressStart" @touchend="sos.pressCancel">
           <EIcon name="alert" :size="28" />紧急求助
@@ -58,10 +59,10 @@ const navs = [
         <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:48px;" @click="store.logout(); router.replace('/login')">退出</n-button>
       </div>
     </div>
-    <div class="elderly-nav" style="display:flex;gap:10px;padding:12px 14px;background:var(--primary-light,#E8EDFF);flex-wrap:wrap;">
-      <n-button v-for="n in navs" :key="n.key" size="large" round
+    <div class="elderly-nav" style="display:flex;gap:10px;padding:12px 14px;background:var(--primary-light);flex-wrap:wrap;">
+      <n-button v-for="n in navs" :key="n.key" size="large"
                 :type="route.path.startsWith(n.key) ? 'primary' : 'default'"
-                @click="router.push(n.key)" style="min-height:64px;font-size:1.25rem;font-weight:700;padding:0 22px;">
+                @click="router.push(n.key)" style="min-height:64px;font-size:1.25rem;font-weight:700;padding:0 20px;border-radius:var(--r-card);">
         <span style="display:inline-flex;align-items:center;gap:10px;">
           <EIcon :name="n.icon" :size="28" /><span>{{ n.label }}</span>
         </span>
@@ -80,7 +81,7 @@ const navs = [
         <div style="text-align:center;font-size:2.1rem;font-weight:800;color:var(--ink-danger);margin-top:8px;">
           {{ sos.sosCountdown.value }} 秒后自动取消
         </div>
-        <div v-if="!sosHint" class="muted" style="text-align:center;margin-top:8px;font-size:1.1rem;">
+        <div v-if="!sosHint" class="muted" style="text-align:center;margin-top:8px;font-size:1.25rem;">
           需要打 120 请回到首页（那里有红色「拨打 120」按钮）
         </div>
       </template>

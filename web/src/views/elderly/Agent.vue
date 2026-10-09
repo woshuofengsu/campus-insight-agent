@@ -135,7 +135,7 @@ function sendOption(o) {
     <div v-if="lastSpoken && !ttsOk" class="card muted" style="font-size:1.15rem;margin:8px 0;">
       <EIcon name="speaker-off" :size="18" /> 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
     </div>
-    <n-button v-else-if="lastSpoken" block size="large" style="margin:8px 0;min-height:56px;font-size:1.2rem;"
+    <n-button v-else-if="lastSpoken" block size="large" style="margin:8px 0;min-height:56px;font-size:1.25rem;"
               @click="say(lastSpoken)"><EIcon name="speaker" :size="18" /> 再听一遍</n-button>
 
     <!-- 语音按钮（至少 80px 高） -->

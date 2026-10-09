@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 // 老年端：我的报修工单进度 + 满意度反馈
 //
 // v3 复核 §6-I9（老人订单缺少可理解的完整进度）：进度**由服务端算好**（`/elderly/orders`），
@@ -70,13 +70,15 @@ async function act(id, data, okMsg) {
     <div class="elderly-title"><EIcon name="clipboard" :size="18" /> 看看进度</div>
     <p style="text-align:center;color:var(--muted);font-size:1.25rem;">现在到哪一步、下一步谁来做，都写在这里</p>
 
-    <div v-if="lastSpoken && !ttsOk" data-speech-fallback class="card muted" style="font-size:1.2rem;">
+    <div v-if="lastSpoken && !ttsOk" data-speech-fallback class="card muted" style="font-size:1.25rem;">
       <EIcon name="speaker-off" :size="18" /> 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
     </div>
 
     <div v-for="i in list" :key="i.id" class="card" style="font-size:1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <b>#{{ i.id }} {{ i.title }}</b>
+        <!-- v3：给老人看的是**对外事项编号**（A+年月+序号），不再显示内部自增 id
+             —— 内部 id 会被数出总量、也能被顺序枚举（编号口径的统一见 dev-log 六十七） -->
+        <b>{{ i.issue_code ? '编号 ' + i.issue_code + '：' : '' }}{{ i.title }}</b>
       </div>
 
       <!-- 五步进度：已走过的高亮（注意：老年端字号一律 ≥20px，1.05rem=16.8px 会被 ui_audit 判不合格） -->
@@ -107,7 +109,7 @@ async function act(id, data, okMsg) {
       </div>
       <div v-if="i.resolve_note" style="margin-top:6px;"><EIcon name="clipboard" :size="18" /> {{ i.resolve_note }}</div>
 
-      <n-button block size="large" style="margin-top:10px;min-height:60px;font-size:1.2rem;"
+      <n-button block size="large" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
                 @click="speakProgress(i)"><EIcon name="speaker" :size="18" /> 听一遍这条进度</n-button>
 
       <!-- 满意度反馈 -->
@@ -116,16 +118,24 @@ async function act(id, data, okMsg) {
         <n-input v-model:value="fbReason[i.id]" placeholder="不满意原因（可选）" size="large"
                  style="margin-top:8px;font-size:1.25rem;" />
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-          <n-button type="success" size="large" style="min-height:56px;font-size:1.2rem;"
+          <n-button type="success" size="large" style="min-height:56px;font-size:1.25rem;"
                     @click="act(i.id, { action: 'feedback', satisfied: true }, '已结单')"><EIcon name="checkCircle" :size="18" /> 满意，结单</n-button>
-          <n-button type="warning" size="large" style="min-height:56px;font-size:1.2rem;"
+          <n-button type="warning" size="large" style="min-height:56px;font-size:1.25rem;"
                     @click="act(i.id, { action: 'feedback', satisfied: false, reason: fbReason[i.id] || '还需处理' }, '已反馈，将重新处理')">
             <EIcon name="face-sad" :size="18" /> 不满意
           </n-button>
         </div>
       </div>
     </div>
-    <n-empty v-if="!loading && !loadError && list.length === 0" description="还没有报修记录" style="font-size:1.25rem;" />
+    <!-- 空状态：不只说"没有"，还要给出**下一步能做什么**（任务书 §九：空状态必须有下一步动作） -->
+    <div v-if="!loading && !loadError && list.length === 0" class="card" style="text-align:center;font-size:1.25rem;">
+      <div><EIcon name="clipboard" :size="22" /> 您最近没有在办的事。</div>
+      <div class="muted" style="margin-top:6px;">家里有什么问题，说一句就有人管。</div>
+      <n-button block size="large" type="primary" style="margin-top:12px;min-height:64px;font-size:1.25rem;"
+                @click="$router.push('/elderly/report')">
+        <EIcon name="speak" :size="22" /> 去反映问题
+      </n-button>
+    </div>
 
     <!-- 查不到 ≠ 没有记录：明确说清是"没查到"，并给一次重试 -->
     <div v-if="loadError" class="panel-warm" data-load-error

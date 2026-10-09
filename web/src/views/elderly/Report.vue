@@ -358,11 +358,11 @@ async function checkSubmitted() {
 
     <!-- 页面提示也做成"点一下听"（不在挂载时自动播：iOS 需要用户手势，否则静默不响） -->
     <n-button v-if="ttsOk && !lastSpoken" block size="large"
-              style="margin-bottom:10px;min-height:60px;font-size:1.2rem;"
+              style="margin-bottom:10px;min-height:60px;font-size:1.25rem;"
               @click="say('说一句或打几个字，我帮您整理成工单。位置要说清楚是哪个楼、哪一层。')">
       <EIcon name="speaker" :size="18" /> 听一遍怎么用
     </n-button>
-    <div v-else-if="!ttsOk" class="card muted" style="font-size:1.1rem;">
+    <div v-else-if="!ttsOk" class="card muted" style="font-size:1.25rem;">
       <EIcon name="speaker-off" :size="18" /> 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
     </div>
 
@@ -379,9 +379,9 @@ async function checkSubmitted() {
       <b><EIcon name="edit" :size="18" /> 上次有一条没填完的报修</b>
       <div style="margin-top:6px;">{{ resumeOffer.summary }}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <n-button type="primary" size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
+        <n-button type="primary" size="large" style="flex:1;min-height:60px;font-size:1.25rem;"
                   @click="resumeDraft"><EIcon name="arrowRight" :size="18" />  接着填</n-button>
-        <n-button size="large" style="flex:1;min-height:60px;font-size:1.2rem;"
+        <n-button size="large" style="flex:1;min-height:60px;font-size:1.25rem;"
                   @click="dropLocalDraft"><EIcon name="trash" :size="18" /> 重新开始</n-button>
       </div>
     </div>
@@ -425,10 +425,10 @@ async function checkSubmitted() {
       </n-button>
       <!-- v3 §7.3：允许重听、暂停与停止 —— 念到一半不想听了要能停（不能只能等它念完） -->
       <n-button v-if="speaking" block size="large" data-hush
-                style="margin-top:8px;min-height:56px;font-size:1.2rem;" @click="hush">
+                style="margin-top:8px;min-height:56px;font-size:1.25rem;" @click="hush">
         <EIcon name="stop" :size="18" /> 别念了
       </n-button>
-      <div v-else-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
+      <div v-else-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.25rem;">
         <EIcon name="speaker-off" :size="18" /> 这台手机的语音播不出来，请看屏幕上的大字（内容是一样的）
       </div>
 
@@ -447,7 +447,7 @@ async function checkSubmitted() {
         <EIcon name="pin" :size="18" /> 位置：
         <b v-if="draft.fields.location">{{ draft.fields.location }}</b>
         <span v-else style="color:var(--danger,#c00);">还缺，请在下面补充</span>
-        <span class="muted" style="font-size:1rem;">（{{ srcTip(draft.sources.location) }}）</span>
+        <span class="muted" style="font-size:1.25rem;">（{{ srcTip(draft.sources.location) }}）</span>
       </div>
       <div style="margin-top:6px;">
         <EIcon name="home" :size="18" /> 责任范围：
@@ -472,12 +472,12 @@ async function checkSubmitted() {
           <EIcon name="checkCircle" :size="18" /> 就是这里：{{ draft.suggestion.location }}
         </n-button>
         <n-input v-model:value="answer.location" placeholder="或者告诉我别的：比如 5号楼二层楼道"
-                 size="large" style="font-size:1.2rem;margin-top:8px;" />
+                 size="large" style="font-size:1.25rem;margin-top:8px;" />
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <n-button size="large" style="flex:1;min-height:56px;font-size:1.2rem;"
+          <n-button size="large" style="flex:1;min-height:56px;font-size:1.25rem;"
                     :type="answer.scope === '室内' ? 'primary' : 'default'"
                     @click="answer.scope = '室内'"><EIcon name="home" :size="18" /> 是我家里</n-button>
-          <n-button size="large" style="flex:1;min-height:56px;font-size:1.2rem;"
+          <n-button size="large" style="flex:1;min-height:56px;font-size:1.25rem;"
                     :type="answer.scope === '室外' ? 'primary' : 'default'"
                     @click="answer.scope = '室外'"><EIcon name="building" :size="18" /> 是公共地方</n-button>
         </div>
@@ -490,7 +490,7 @@ async function checkSubmitted() {
           <div class="muted" style="font-size:1.05rem;">紧急程度可以改（不急就选「一般」）：</div>
           <div style="display:flex;gap:8px;margin-top:6px;">
             <n-button v-for="u in ['一般', '中等', '紧急']" :key="u" size="large"
-                      style="flex:1;min-height:56px;font-size:1.2rem;"
+                      style="flex:1;min-height:56px;font-size:1.25rem;"
                       :type="answer.urgency === u ? 'primary' : 'default'"
                       @click="answer.urgency = u">{{ u }}</n-button>
           </div>
@@ -500,7 +500,7 @@ async function checkSubmitted() {
         <!-- 结果未知的出口（§6-I5）：不诱导老人重复点提交，而是帮他查清楚 -->
         <n-button v-if="unknownToken" block size="large" style="margin-top:10px;min-height:60px;font-size:1.25rem;"
                   @click="checkSubmitted"><EIcon name="search" :size="18" /> 查一下是否已经提交了</n-button>
-        <div class="muted" style="margin-top:6px;font-size:1rem;">
+        <div class="muted" style="margin-top:6px;font-size:1.25rem;">
           上报后工单进入待审核，负责人会在「我的报修」里回复您。
         </div>
       </template>
@@ -509,66 +509,106 @@ async function checkSubmitted() {
            放在**摘要卡内部紧挨着内容**，不在页面最底部——老人看到哪就得能在哪改，
            翻到页面底下才找到"重新说"等于没有这个入口（实测：手机上一屏根本看不到）。 -->
       <div style="display:flex;gap:8px;margin-top:14px;">
-        <n-button size="large" data-restart style="flex:1;min-height:60px;font-size:1.2rem;"
+        <n-button size="large" data-restart style="flex:1;min-height:60px;font-size:1.25rem;"
                   @click="restart"><EIcon name="refresh" :size="18" /> 说错了，重新说</n-button>
-        <n-button size="large" data-giveup style="flex:1;min-height:60px;font-size:1.2rem;"
+        <n-button size="large" data-giveup style="flex:1;min-height:60px;font-size:1.25rem;"
                   @click="giveUp"><EIcon name="x" :size="18" /> 先不报修了</n-button>
       </div>
     </div>
 
-    <!-- 提交结果＝**确认卡片**（收敛方案第 2 阶段）：让老人看见"系统到底记住了什么"，并且**逐条标明来源**。
+    <!-- 提交结果＝**确认卡片**。
+         v3 重设计（任务书 §四.3）：老人先看到"这件事办到哪一步、下一步谁做"，
+         技术细节（系统分类/判断依据/提交编号等）折进「查看详细记录」——
+         不是删掉，是不占老人第一眼的注意力。
          口径纪律（不许含糊）：来源有五种，各自中文说法见 SOURCE_LABEL ——
          「您确认的 / 来自您说的话 / 来自您的登记资料 / 系统建议（您已确认） / 默认值」，
-         位置没确认时写「位置待人工确认」，绝不写成像已确认的样子。 -->
+         位置没确认时写「位置待人工确认」，绝不写成像已确认的样子。
+         （技术词一律不出现：卡片里不写 Agent / Verifier 这类字眼，`journey_check` ④g 也守着） -->
     <div v-if="submitted" class="card" data-confirm-card :data-result-via="resultVia || 'submit'"
-         style="background:#ecfdf5;font-size:1.2rem;">
-      <b><EIcon name="checkCircle" :size="18" /> 已经报上去了<template v-if="submitted.issue_code">（事项编号 {{ submitted.issue_code }}）</template></b>
-      <!-- v54：编号是给**工作人员**查的，不要求老人记住。所以紧跟一句"工作人员能怎么查"——
-           否则老人会以为必须背下这串号（那是反适老设计）。 -->
-      <div v-if="submitted.issue_code" class="muted" style="font-size:0.95rem;margin-top:4px;" data-code-hint>
-        编号不用您记：工作人员可以按您的姓名、楼栋或时间来查。
-      </div>
+         style="background:var(--teal-light);font-size:1.25rem;">
+      <b style="font-size:1.35rem;"><EIcon name="checkCircle" :size="22" /> 已经报上去了</b>
       <!-- 结果是从"核对"来的就说清楚：老人/家属才知道这条不是当时服务端回的 -->
       <div v-if="resultVia === 'verify'" style="margin-top:6px;font-weight:700;color:var(--ink-info);">
         <EIcon name="signal" :size="18" /> 刚才网络没回话，编号是按提交编号核对到的真实结果（没有重复上报）
       </div>
 
+      <!-- ① 您反映的问题 -->
       <div style="margin-top:10px;font-weight:800;">您刚才反映的是：</div>
       <div style="margin-top:4px;">{{ submitted.confirmed.title || submitted.original_text }}</div>
 
-      <div style="margin-top:10px;font-weight:800;">系统记录：</div>
+      <!-- ② 所在位置 -->
+      <div style="margin-top:10px;font-weight:800;">在哪儿：</div>
       <div style="margin-top:4px;" data-src-location>
-        <EIcon name="pin" :size="18" /> 位置：{{ submitted.confirmed.location || '位置待人工确认' }}
-        <span class="muted" style="font-size:1rem;">{{ srcLine(submitted, 'location') }}</span>
-        <span v-if="!submitted.confirmed.location" class="muted" style="font-size:1rem;">
-          —— 我们没听清地点，已交人工帮您确认，不会随便填一个
-        </span>
+        <EIcon name="pin" :size="18" /> {{ submitted.confirmed.location || '位置待人工确认' }}
+        <span class="muted" style="font-size:1.25rem;">{{ srcLine(submitted, 'location') }}</span>
+        <div v-if="!submitted.confirmed.location" class="muted" style="font-size:1.25rem;">
+          我们没听清地点，已交人工帮您确认，不会随便填一个
+        </div>
       </div>
+
+      <!-- ③ 当前状态 -->
+      <div style="margin-top:10px;font-weight:800;">现在到哪一步：</div>
+      <div style="margin-top:4px;">
+        <EIcon name="signal" :size="18" /> <b>已提交，等待网格员处理</b>
+      </div>
+
+      <!-- ④ 下一步由谁处理 -->
+      <div style="margin-top:6px;">
+        <EIcon name="user-worker" :size="18" /> 下一步由<b>社区工作人员</b>处理：先核实您说的情况，再安排上门或电话联系。
+      </div>
+
+      <!-- ⑤ 事项编号（给工作人员查用；编号不用老人记） -->
+      <div style="margin-top:6px;" data-code-hint>
+        <EIcon name="clipboard" :size="18" /> 事项编号：<b>{{ submitted.issue_code || '（待补）' }}</b>
+        <div class="muted" style="font-size:1.25rem;">
+          编号不用您记：工作人员可以按您的姓名、楼栋或时间来查。
+        </div>
+      </div>
+
+      <!-- ⑥ 预计下一步动作（只说流程，不编时间：具体时间以工作人员联系为准） -->
+      <div style="margin-top:6px;">
+        <EIcon name="clock" :size="18" /> 接下来：社区工作人员会尽快核实处理，
+        <b>进度随时可以在「看看进度」里看</b>，有进展也会通知您。
+      </div>
+
+      <!-- 系统记录（只放老人看得懂的字段，每行都带来源标注） -->
+      <div style="margin-top:10px;font-weight:800;">系统记录：</div>
       <div style="margin-top:4px;" data-src-scope>
         <EIcon name="home" :size="18" /> 责任范围：
         {{ submitted.confirmed.issue_type === '室内' ? '您家里' : '公共地方' }}
-        <span class="muted" style="font-size:1rem;">{{ srcLine(submitted, 'scope') }}</span>
+        <span class="muted" style="font-size:1.25rem;">{{ srcLine(submitted, 'scope') }}</span>
       </div>
       <div style="margin-top:4px;" data-src-urgency>
         <EIcon name="clock" :size="18" /> 紧急程度：{{ submitted.confirmed.urgency }}
-        <span class="muted" style="font-size:1rem;">{{ srcLine(submitted, 'urgency') }}</span>
+        <span class="muted" style="font-size:1.25rem;">{{ srcLine(submitted, 'urgency') }}</span>
       </div>
-      <div style="margin-top:4px;">
-        <EIcon name="megaphone" :size="18" /> 所属社区：{{ submitted.community || '账号所属社区' }}
-        <span class="muted" style="font-size:1rem;">（账号所属社区，不采集手机定位）</span>
-      </div>
-      <div style="margin-top:4px;">
-        <EIcon name="clock" :size="18" /> 提交时间：{{ submitted.submitted_at || '刚刚' }}
-        <span class="muted" style="font-size:1rem;">（系统记录）</span>
-      </div>
-      <div style="margin-top:6px;">
-        <EIcon name="signal" :size="18" /> 当前状态：<b>已提交，等待网格员处理</b>
-        <span class="muted" style="font-size:1rem;">（进度可以在「看看进度」里随时看）</span>
-      </div>
-      <div class="muted" style="margin-top:8px;font-size:1rem;">
+
+      <div class="muted" style="margin-top:8px;font-size:1.25rem;">
         括号里写的是每条信息<b>从哪来的</b>：您说的、您确认的、还是我们按登记资料填的。
         系统不会把您没确认的内容写成事实。
       </div>
+
+      <!-- 技术细节默认折叠：需要追溯时再展开（老人第一眼不用看这些） -->
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer;min-height:56px;display:flex;align-items:center;font-weight:700;">
+          <EIcon name="clipboard" :size="20" /> 查看详细记录（分类、判断依据、提交编号）
+        </summary>
+        <div style="margin-top:6px;font-size:1.25rem;">
+          <div v-if="submitted.category">系统分类：{{ submitted.category }}</div>
+          <div style="margin-top:4px;">所属社区：{{ submitted.community || '账号所属社区' }}
+            <span class="muted">（账号所属社区，不采集手机定位）</span>
+          </div>
+          <div style="margin-top:4px;">提交时间：{{ submitted.submitted_at || '刚刚' }}
+            <span class="muted">（系统记录）</span>
+          </div>
+          <ul v-if="submitted.sources" style="margin:6px 0 0;padding-left:1.2em;">
+            <li v-for="(v, k) in submitted.sources" :key="k">{{ k }}：{{ v }}</li>
+          </ul>
+          <div v-if="submitted.client_token" style="margin-top:4px;">
+            本次提交编号（核对用）：{{ submitted.client_token }}
+          </div>
+        </div>
+      </details>
     </div>
 
     <n-button size="large" block style="margin-top:12px;min-height:56px;" @click="router.push('/elderly/home')"><EIcon name="home" :size="18" /> 返回首页</n-button>

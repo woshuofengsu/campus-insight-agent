@@ -145,10 +145,10 @@ async function doTransfer() {
         <EIcon name="mic" :size="18" /> {{ listening ? '正在聆听…（松开结束，最多 60 秒）' : '按住说话提问' }}
       </n-button>
       <!-- 播报失败必须可见（v3 复核 B3）：不能假装老人听到了 -->
-      <div v-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.1rem;">
+      <div v-if="lastSpoken && !ttsOk" class="muted" style="margin-top:8px;font-size:1.25rem;">
         <EIcon name="speaker-off" :size="18" /> 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
       </div>
-      <n-button v-else-if="lastSpoken" block size="large" style="margin-top:8px;min-height:56px;font-size:1.2rem;"
+      <n-button v-else-if="lastSpoken" block size="large" style="margin-top:8px;min-height:56px;font-size:1.25rem;"
                 @click="say(lastSpoken)"><EIcon name="speaker" :size="18" /> 再听一遍</n-button>
 
       <!-- 转写确认（对，提交 / 重新说） -->
@@ -178,7 +178,7 @@ async function doTransfer() {
         <div v-if="result.knowledge" class="elderly-evidence" data-evidence-card>
           <div style="font-weight:700;color:var(--primary-ink);"><EIcon name="search" :size="18" /> 这条回答依据</div>
           <div style="margin-top:5px;">{{ result.knowledge.title }}</div>
-          <div style="margin-top:5px;color:var(--muted);font-size:1rem;line-height:1.6;">
+          <div style="margin-top:5px;color:var(--muted);font-size:1.25rem;line-height:1.6;">
             <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }} </span>
             <span v-if="result.knowledge.effective_date">生效：{{ result.knowledge.effective_date }} </span>
             <span v-if="result.knowledge.version">版本：V{{ result.knowledge.version }}</span>
@@ -204,7 +204,7 @@ async function doTransfer() {
           <b>{{ h.summary }}</b>
           <n-tag size="large" :type="h.status === '已自动回答' ? 'success' : h.status === '已回复' ? 'success' : 'warning'">{{ h.status }}</n-tag>
         </div>
-        <div v-if="h.auto_answer" class="muted" style="font-size:1rem;margin-top:4px;">{{ h.auto_answer }}</div>
+        <div v-if="h.auto_answer" class="muted" style="font-size:1.25rem;margin-top:4px;">{{ h.auto_answer }}</div>
         <div v-if="h.reply" style="margin-top:4px;color:#2E7D32;"><EIcon name="chat-dots" :size="18" /> {{ h.reply }}</div>
       </div>
     </div>
@@ -220,5 +220,5 @@ async function doTransfer() {
 
 <style scoped>
 .elderly-evidence { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-left:4px solid var(--primary); border-radius:10px; background:var(--card-bg); }
-.elderly-evidence-muted { color:var(--muted); font-size:1rem; }
+.elderly-evidence-muted { color:var(--muted); font-size:1.25rem; }
 </style>
