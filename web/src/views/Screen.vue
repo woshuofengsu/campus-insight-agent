@@ -3,7 +3,6 @@
 // 数据逻辑与 v1 完全一致（同 8 项接口、30 秒自动刷新）
 import { ref, onMounted, onUnmounted } from 'vue'
 import { issues, proposals, weather, agent } from '../api'
-import CountUp from '../components/CountUp.vue'
 import EIcon from '../components/EIcon.vue'
 
 const data = ref({
@@ -61,10 +60,10 @@ const cards = [
 </script>
 
 <template>
-  <div style="min-height:100vh;background:radial-gradient(ellipse at top,#0d3b2e 0%,#071f18 60%,#04120d 100%);color:#fff;padding:40px;display:flex;flex-direction:column;position:relative;overflow:hidden;">
+  <div style="min-height:100vh;background:#0B100E;color:#fff;padding:40px;display:flex;flex-direction:column;position:relative;overflow:hidden;">
     <!-- 移动端降级（P1-G3）：治理大屏是桌面/投屏场景，手机上 8 卡会被压扁，
          这里明确告知而不是渲染挤压布局。仅 <900px 显示，桌面/大屏完全不受影响。 -->
-    <div v-if="!forceShow" class="screen-mobile-only" style="position:absolute;inset:0;z-index:20;background:rgba(4,18,13,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;">
+    <div v-if="!forceShow" class="screen-mobile-only" style="position:absolute;inset:0;z-index:20;background:#0B100E;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;">
       <div style="display:flex;justify-content:center;"><EIcon name="monitor" :size="56" :weight="1.6" /></div>
       <div style="font-size:1.4rem;font-weight:800;margin-top:12px;">治理大屏请在电脑或投屏上查看</div>
       <div style="color:#9fd8c4;margin-top:10px;line-height:1.9;max-width:22rem;">
@@ -77,27 +76,26 @@ const cards = [
       </div>
     </div>
 
-    <!-- 背景呼吸光环（沉浸感） -->
-    <div class="breathe" style="position:absolute;width:900px;height:900px;border-radius:50%;left:-220px;top:-320px;background:radial-gradient(circle,rgba(129,199,132,0.20) 0%,transparent 62%);pointer-events:none;"></div>
-    <div class="breathe" style="position:absolute;width:760px;height:760px;border-radius:50%;right:-200px;bottom:-300px;background:radial-gradient(circle,rgba(79,195,247,0.16) 0%,transparent 62%);animation-delay:4s;pointer-events:none;"></div>
+    <!-- v3：删掉背景呼吸光环、标题流光、数字滚动、悬停辉光与整屏渐变。
+         大屏是"把这些数看清楚"的地方，不是炫技的地方（任务书 §三.1）。 -->
 
     <!-- 顶栏 -->
-    <div class="fade-up" style="text-align:center;margin-bottom:26px;position:relative;">
-      <div class="title-sheen" style="font-size:2.7rem;font-weight:900;letter-spacing:0.1em;">
+    <div style="text-align:center;margin-bottom:26px;position:relative;">
+      <div style="font-size:2.7rem;font-weight:900;letter-spacing:0.08em;">
         <EIcon name="community" :size="18" /> 社区先知 · 治理大屏
       </div>
-      <div style="color:#7fbfa8;font-size:1rem;margin-top:10px;letter-spacing:0.04em;">
+      <div style="color:#9fd8c4;font-size:1rem;margin-top:10px;letter-spacing:0.04em;">
         CommunityInsight · 社区治理多智能体平台
       </div>
     </div>
 
-    <!-- 核心指标（波浪入场 + 数字滚动 + 悬停辉光） -->
-    <div class="wave" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:18px;flex:1;align-content:center;position:relative;">
+    <!-- 核心指标（静态数值：大屏要的是"现在的数"，不跳数） -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:18px;flex:1;align-content:center;position:relative;">
       <div v-for="c in cards" :key="c.label" class="screen-card"
-           style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:28px 16px;text-align:center;backdrop-filter:blur(4px);">
+           style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:var(--r-card);padding:26px 16px;text-align:center;">
         <div style="display:flex;justify-content:center;"><EIcon :name="c.icon" :size="40" :weight="1.6" /></div>
-        <div style="font-size:2.9rem;font-weight:900;margin-top:8px;letter-spacing:-0.01em;" :style="{ color: c.color, textShadow: '0 0 22px ' + c.color + '55' }">
-          <template v-if="ready"><CountUp :value="c.v()" :suffix="c.suffix" :duration="1500" /></template>
+        <div style="font-size:2.9rem;font-weight:900;margin-top:8px;letter-spacing:-0.01em;" :style="{ color: c.color }">
+          <template v-if="ready">{{ c.v() }}{{ c.suffix || '' }}</template>
           <template v-else>--</template>
         </div>
         <div style="color:#9ab8ab;font-size:1.06rem;margin-top:6px;">{{ c.label }}</div>
@@ -105,10 +103,10 @@ const cards = [
     </div>
 
     <!-- 天气 + 刷新状态 -->
-    <div class="fade-up-d3" style="display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding:16px 22px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:16px;font-size:1.06rem;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding:16px 22px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:var(--r-card);font-size:1.06rem;position:relative;">
       <div><EIcon name="thermometer" :size="18" /> 当前温度：<b style="color:#ffb74d;">{{ data.temp }}°C</b></div>
       <div style="color:#9ab8ab;">
-        <span class="dot-breathe" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:6px;"></span>
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:6px;"></span>
         数据每 30 秒自动刷新
       </div>
     </div>

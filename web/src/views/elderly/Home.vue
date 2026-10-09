@@ -216,8 +216,11 @@ function cancelCall() {
       <EIcon name="speaker-off" :size="18" /> 这台手机不能自动念出来，页面上的字都放大了，点按钮一样能办事
     </div>
 
-    <!-- 三个主要动作（反映问题 / 看看进度 / 问一问） -->
-    <div class="elderly-grid-3" style="margin-bottom:8px;">
+    <!-- 三个主要动作（反映问题 / 看看进度 / 问一问）
+         data-quick-actions：给基线脚本一个**精确锚点**——页面上还有另外两处三列栅格
+         （第三层入口、联系家人），按 `.elderly-grid-3` 数会把它们一起数进来，
+         "快捷动作 3 个不变"就变成了假数字（实测：重设计后那样数出来是 7 个）。 -->
+    <div class="elderly-grid-3" data-quick-actions style="margin-bottom:8px;">
       <n-button v-for="q in quick" :key="q.to" size="large" type="primary" ghost class="elderly-btn"
                 @click="router.push(q.to)">
         <EIcon :name="q.icon" :size="30" />{{ q.label }}

@@ -179,7 +179,11 @@ async function batchClose() {
               <div style="display:flex;align-items:center;gap:8px;">
                 <n-checkbox :checked="selected.includes(i.id)" @update:checked="(v) => { if (v) selected.push(i.id); else selected = selected.filter((x) => x !== i.id) }" @click.stop />
                 <div>
-                  <b>#{{ i.id }} {{ i.title }}</b>
+                  <!-- v3：网格端同时给出**内部号**与**对外事项编号**。
+                       内部号是工作人员日常叫法（#572），对外编号是居民/服务台那侧能查到的号
+                       （居民报事、电话问进度都报它）——两个都摆出来，免得两头对不上。
+                       注意：内部号 `#id` 必须保留——三条端到端旅程按它定位卡片。 -->
+                  <b>#{{ i.id }} <span v-if="i.issue_code" class="muted" style="font-weight:400;">{{ i.issue_code }}</span> {{ i.title }}</b>
                   <!-- 状态色文字全部改用「跟随主题」的令牌（值与原写死色在亮色下完全相同，暗色下自动换亮变体）：
                        处理结束 #047857→var(--ink-success)、已关闭/已撤回 #5B6B80→var(--muted)、
                        超时 #b91c1c→var(--ink-danger)、待审核 #4f46e5→var(--ink-info)。
@@ -206,11 +210,28 @@ async function batchClose() {
               <span v-if="i.is_agent_report && i.agent_name"> · <EIcon name="hand" :size="18" /> 代报：{{ i.agent_name }}（{{ i.agent_relation }}）</span>
             </div>
 
+            <!-- v3：展开后是**左信息 / 右操作**两栏（任务书 §六）。
+                 为什么还保留"就地展开"而不是换成左右分栏页面：三条端到端旅程
+                 （journey 1/4/8 与 demo_flow_check）都是"展开这张卡 → 点卡里的按钮"，
+                 改成独立详情页会连带改三套验收脚本；**同屏两栏**已经达到"信息在左、操作在右"的
+                 目的，而且少一次跳转、少一次出错。 -->
             <div v-if="expanded[i.id]" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
-              <div class="muted" style="font-size:0.9rem;"><EIcon name="edit" :size="18" /> {{ i.description }}</div>
-              <div v-if="i.resolve_note" class="muted" style="font-size:0.85rem;margin-top:6px;"><EIcon name="clipboard" :size="18" /> 处理结果：{{ i.resolve_note }}</div>
+              <div class="issue-expand">
+                <div class="issue-expand-info">
+                  <div class="muted" style="font-size:0.9rem;"><EIcon name="edit" :size="18" /> {{ i.description }}</div>
+                  <div v-if="i.resolve_note" class="muted" style="font-size:0.88rem;margin-top:6px;"><EIcon name="clipboard" :size="18" /> 处理结果：{{ i.resolve_note }}</div>
+                  <!-- 技术细节折叠：需要追溯时再展开（Agent / 校验 / 仲裁留痕都在这里） -->
+                  <details class="issue-tech">
+                    <summary><EIcon name="info" :size="16" /> 分析详情（系统研判与留痕）</summary>
+                    <div class="muted" style="font-size:0.85rem;margin-top:6px;">
+                      <div>字段来源：见详情抽屉「字段来源（谁说的）」——位置、责任范围、紧急程度各自是谁给的。</div>
+                      <div v-if="i.is_agent_report">代报：{{ i.agent_name || '—' }}（{{ i.agent_relation || '—' }}）</div>
+                      <div>traceId：{{ i.trace_id || '—' }}（用于对齐 agent_logs 里的研判与仲裁记录）</div>
+                    </div>
+                  </details>
+                </div>
 
-              <div style="margin-top:12px;">
+                <div class="issue-expand-ops" style="margin-top:0;">
                 <!-- 审核 -->
                 <template v-if="['待审核', '退回补充信息'].includes(i.status)">
                   <n-input v-model:value="opOf(i).opinion" placeholder="审核意见（退回必填）" size="small" style="margin-bottom:8px;" />
@@ -266,6 +287,7 @@ async function batchClose() {
                     <n-button size="small" quaternary type="error" @click="requireValue(i, 'reason', '请填写关闭原因') && act(i, { action: 'close', reason: opOf(i).reason }, '已关闭')"><EIcon name="ban" :size="18" /> 关闭</n-button>
                   </div>
                 </template>
+                </div>
               </div>
             </div>
           </div>
@@ -325,4 +347,22 @@ async function batchClose() {
 .detail-grid { display:grid; grid-template-columns:90px 1fr; gap:9px 12px; padding:12px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
 .detail-grid span, .detail-block .muted { color:var(--muted); font-size:0.85rem; }
 .detail-block { padding:12px 0; line-height:1.65; }
+
+/* v3：展开区两栏 —— 左「信息」右「操作」。窄屏（平板竖屏/手机）自动落成一栏，
+   因为网格员在手机上处理时，两栏各一半反而都看不清。 */
+.issue-expand { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,320px); gap:16px; align-items:start; }
+.issue-expand-info { min-width:0; }
+.issue-expand-ops { min-width:0; border-left:1px solid var(--border); padding-left:14px; }
+/* 长工单往下滚时，操作区跟着停在视野里（网格员不用来回滚找按钮） */
+@media (min-width: 901px) { .issue-expand-ops { position:sticky; top:12px; } }
+@media (max-width: 900px) {
+  .issue-expand { grid-template-columns:1fr; gap:10px; }
+  .issue-expand-ops { border-left:0; border-top:1px solid var(--border); padding-left:0; padding-top:10px; }
+}
+/* 技术细节默认折叠（Agent 研判 / 校验 / 仲裁留痕这类，需要追溯时再展开） */
+.issue-tech { margin-top:8px; }
+.issue-tech > summary {
+  cursor:pointer; min-height:32px; display:flex; align-items:center; gap:6px;
+  color:var(--muted); font-size:0.88rem;
+}
 </style>

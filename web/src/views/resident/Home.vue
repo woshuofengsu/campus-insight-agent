@@ -17,6 +17,13 @@ const noticeList = ref([])
 const urgentModal = ref(null) // 紧急通知弹窗
 const agentOpen = ref(true)   // 社区小助手默认展开可收起
 
+// v3 第一层：居民最常做的三件事（任务书 §五：首页突出"我要办事 / 查看我的进度 / 问社区问题"）
+const primaryActions = [
+  { to: '/resident/work-orders/new', icon: 'send', label: '我要办事', desc: '报修、反映问题' },
+  { to: '/resident/work-orders', icon: 'clipboard', label: '查看我的进度', desc: '办到哪一步了' },
+  { to: '/resident/qa', icon: 'book', label: '问社区问题', desc: '政策怎么办、找谁办' },
+]
+
 onMounted(async () => {
   try { w.value = await weather.current() } catch { /* 天气失败不阻塞 */ }
   try { noticeList.value = (await notices.list()) || [] } catch { /* 忽略 */ }
@@ -91,33 +98,39 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
       <n-button size="small" type="success" ghost>查看 ›</n-button>
     </div>
 
-    <!-- 社区小助手（v3：纯品牌色表头，白字 6.4:1；不再渐变/呼吸） -->
+    <!-- ═══ v3：第一层就是"我要办什么"（任务书 §五：居民端强调快速办事）═══ -->
+    <div class="section-title">我要办事</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+      <n-button v-for="a in primaryActions" :key="a.to" size="large" type="primary" ghost
+                style="min-height:88px;font-size:1.05rem;border-radius:var(--r-card);display:flex;flex-direction:column;gap:4px;"
+                @click="router.push(a.to)">
+        <EIcon :name="a.icon" :size="26" />
+        <b>{{ a.label }}</b>
+        <span style="font-size:0.84rem;font-weight:400;color:var(--muted);">{{ a.desc }}</span>
+      </n-button>
+    </div>
+
+    <!-- 社区小助手（v3：纯品牌色表头；不再渐变/呼吸） -->
     <div class="card hero-card" style="padding:0;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--primary);color:#fff;">
         <b style="display:flex;align-items:center;gap:8px;">
           <span style="display:inline-flex;width:26px;height:26px;border-radius:var(--r-xs);background:rgba(255,255,255,0.18);align-items:center;justify-content:center;"><EIcon name="robot" :size="18" /> </span>
-          社区小助手
+          有事直接说（社区小助手）
         </b>
         <n-button size="tiny" text style="color:#fff;" @click="agentOpen = !agentOpen">{{ agentOpen ? '收起 ▲' : '展开 ▼' }}</n-button>
       </div>
       <AgentChat v-if="agentOpen" role="resident" />
     </div>
 
-    <!-- 快捷入口 6 宫格（v3：去掉波浪入场与图标弹跳，只保留边框反馈） -->
-    <div class="section-title">常用服务</div>
+    <!-- 其它服务入口（次级区域：不抢"我要办事"的位置） -->
+    <div class="section-title">其它服务</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;">
       <div v-for="e in entries" :key="e.to" class="entry-tile card"
-           style="margin:0;text-align:center;padding:18px 12px;border-radius:var(--r-card);"
+           style="margin:0;text-align:center;padding:16px 12px;border-radius:var(--r-card);"
            @click="router.push(e.to)">
-        <div class="entry-icon" style="display:flex;justify-content:center;"><EIcon :name="e.icon" :size="30" /></div>
+        <div class="entry-icon" style="display:flex;justify-content:center;"><EIcon :name="e.icon" :size="28" /></div>
         <div style="font-weight:700;margin-top:8px;font-size:1.02rem;">{{ e.label }}</div>
-        <div style="font-size:0.76rem;color:var(--muted);margin-top:2px;">{{ e.desc }}</div>
-        <!-- 无障碍修正：原先用 e.color 作文字色（彩色浅底上仅 2.1~3.65:1，低于 AA 4.5:1），
-             改为「同色淡底 + 正文色文字」，亮/暗两种模式都稳定达标 -->
-        <div :style="{ background: e.bg }"
-             style="display:inline-block;margin-top:9px;padding:2px 10px;border-radius:999px;font-size:0.76rem;font-weight:600;color:var(--text);">
-          进入 ›
-        </div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-top:2px;">{{ e.desc }}</div>
       </div>
     </div>
 

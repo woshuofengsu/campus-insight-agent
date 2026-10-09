@@ -100,38 +100,50 @@ async function delQuestion(q) {
 
         <div v-if="result" class="card">
           <template v-if="result.matched">
-            <div style="font-weight:700;color:#2E7D32;"><EIcon name="checkCircle" :size="18" /> 已自动回答</div>
-            <div v-if="result.rag" class="muted" style="font-size:0.8rem;margin-top:2px;"><EIcon name="robot" :size="18" /> AI 依据知识库生成 · 已校验引用</div>
+            <div style="font-weight:700;color:var(--success-ink);"><EIcon name="checkCircle" :size="18" /> 已自动回答</div>
+            <!-- v3：不摆内部术语（原来写「AI 依据知识库生成 · 已校验引用」）——
+                 居民要看的是"这条答案有没有出处"，不是系统里用了什么组件 -->
+            <div v-if="result.rag" class="muted" style="font-size:0.86rem;margin-top:2px;">
+              <EIcon name="book" :size="18" /> 依据社区知识库整理，引用已核对
+            </div>
+            <!-- 结论优先：先给答案，依据细节收进「查看依据」折叠面板（任务书 §五） -->
+            <div style="margin-top:8px;white-space:pre-wrap;font-size:1.02rem;">{{ result.answer }}</div>
             <!-- 属地可解释性：让居民看见"这条政策是按哪个属地选的"（属地只影响选谁，不影响能否自动回答） -->
-            <div v-if="result.applicable_area" style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <n-tag size="small" type="info" round><EIcon name="pin" :size="18" /> 适用地区：{{ result.applicable_area }}</n-tag>
-              <span v-if="result.region_label" class="muted" style="font-size:0.78rem;">按您的社区「{{ result.region_label }}」优先</span>
+            <div v-if="result.applicable_area" style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <n-tag size="small" type="info"><EIcon name="pin" :size="18" /> 适用地区：{{ result.applicable_area }}</n-tag>
+              <span v-if="result.region_label" class="muted" style="font-size:0.86rem;">按您的社区「{{ result.region_label }}」优先</span>
             </div>
-            <div v-if="result.knowledge" class="evidence-card" data-evidence-card>
-              <div class="evidence-title"><EIcon name="search" :size="18" /> 这条回答依据</div>
-              <div class="evidence-main">{{ result.knowledge.title }}</div>
-              <div class="evidence-meta">
-                <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }}</span>
-                <span v-if="result.knowledge.publisher">发布：{{ result.knowledge.publisher }}</span>
-                <span v-if="result.knowledge.effective_date">生效：{{ result.knowledge.effective_date }}</span>
-                <span v-if="result.knowledge.version">版本：V{{ result.knowledge.version }}</span>
+            <details class="evidence-details" data-evidence-card>
+              <summary><EIcon name="search" :size="18" /> 查看依据（哪份政策、什么时候生效、怎么匹配的）</summary>
+              <div v-if="result.knowledge" class="evidence-card">
+                <div class="evidence-title"><EIcon name="search" :size="18" /> 这条回答依据</div>
+                <div class="evidence-main">{{ result.knowledge.title }}</div>
+                <div class="evidence-meta">
+                  <span v-if="result.knowledge.source">来源：{{ result.knowledge.source }}</span>
+                  <span v-if="result.knowledge.publisher">发布：{{ result.knowledge.publisher }}</span>
+                  <span v-if="result.knowledge.effective_date">生效：{{ result.knowledge.effective_date }}</span>
+                  <span v-if="result.knowledge.version">版本：V{{ result.knowledge.version }}</span>
+                </div>
+                <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener">查看政策原文 ↗</a>
               </div>
-              <a v-if="result.knowledge.attachment" :href="result.knowledge.attachment" target="_blank" rel="noopener">查看政策原文 ↗</a>
-            </div>
-            <div style="margin-top:8px;white-space:pre-wrap;">{{ result.answer }}</div>
-            <!-- 判定过程也摆出来：分数/检索姿态/属地级别 —— 让"凭什么答这一条"看得见 -->
-            <div class="evidence-meta" style="margin-top:8px;">
-              <span v-if="result.score != null">匹配度：{{ Number(result.score).toFixed(2) }}</span>
-              <span v-if="result.knowledge && result.knowledge.retrieval">检索方式：{{ result.knowledge.retrieval === 'hybrid' ? '词法+语义混合' : '词法' }}</span>
-              <span v-if="result.region_level === 'other'"><EIcon name="alert" :size="18" /> 该依据适用地区与您所在社区不同</span>
-            </div>
+              <!-- 判定过程也摆出来：分数/检索姿态/属地级别 —— 让"凭什么答这一条"看得见 -->
+              <div class="evidence-meta" style="margin-top:8px;">
+                <span v-if="result.score != null">匹配度：{{ Number(result.score).toFixed(2) }}</span>
+                <span v-if="result.knowledge && result.knowledge.retrieval">检索方式：{{ result.knowledge.retrieval === 'hybrid' ? '词法+语义混合' : '词法' }}</span>
+                <span v-if="result.region_level === 'other'"><EIcon name="alert" :size="18" /> 该依据适用地区与您所在社区不同</span>
+              </div>
+            </details>
           </template>
           <template v-else>
-            <div style="font-weight:700;color:#d97706;">暂未找到答案</div>
+            <!-- 没有依据时**明确说"暂时无法确认"**，并给人工咨询入口（不硬答、也不含糊） -->
+            <div style="font-weight:700;color:var(--ink-warning);"><EIcon name="info" :size="18" /> 暂时无法确认</div>
             <div class="muted" style="margin-top:6px;">{{ result.manual_text }}</div>
-            <div v-if="result.reason" class="muted evidence-reason">系统状态：{{ result.reason === 'weak_evidence' ? '依据不够直接，已转人工核对' : result.reason === 'manual' ? '涉及需要人工判断的内容' : '暂未找到匹配依据' }}</div>
+            <div v-if="result.reason" class="muted evidence-reason">
+              原因：{{ result.reason === 'weak_evidence' ? '找到的依据不够直接，不敢替您下结论' : result.reason === 'manual' ? '这件事需要工作人员判断' : '知识库里暂时没有对应的政策' }}
+            </div>
             <div v-if="result.expired_hint" class="muted">{{ result.expired_hint }}</div>
-            <n-button size="small" type="primary" ghost style="margin-top:10px;" @click="transfer"><EIcon name="hand" :size="18" /> 转人工咨询</n-button>
+            <div class="muted" style="margin-top:8px;">您可以提交人工咨询，社区工作人员会回复您。</div>
+            <n-button size="small" type="primary" style="margin-top:10px;" @click="transfer"><EIcon name="hand" :size="18" /> 提交人工咨询</n-button>
           </template>
         </div>
       </n-tab-pane>
@@ -207,10 +219,16 @@ async function delQuestion(q) {
 </template>
 
 <style scoped>
-.evidence-card { margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-left:4px solid var(--primary); border-radius:10px; background:var(--card-bg); }
-.evidence-title { font-weight:700; color:var(--primary-ink); font-size:0.9rem; }
+/* v3：依据收进折叠面板（默认只给结论），折叠头本身要够大够好点 */
+.evidence-details { margin-top:10px; }
+.evidence-details > summary {
+  cursor:pointer; min-height:44px; display:flex; align-items:center; gap:6px;
+  color:var(--primary-ink); font-weight:600; font-size:0.95rem;
+}
+.evidence-card { margin-top:6px; padding:10px 12px; border:1px solid var(--border); border-left:3px solid var(--primary); border-radius:var(--r-xs); background:var(--card-bg); }
+.evidence-title { font-weight:700; color:var(--primary-ink); font-size:0.95rem; }
 .evidence-main { margin-top:4px; font-weight:600; }
-.evidence-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:5px; color:var(--muted); font-size:0.78rem; }
-.evidence-card a { display:inline-block; margin-top:6px; color:var(--primary-ink); font-size:0.82rem; }
-.evidence-reason { margin-top:8px; font-size:0.82rem; }
+.evidence-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:5px; color:var(--muted); font-size:0.84rem; }
+.evidence-card a { display:inline-block; margin-top:6px; color:var(--primary-ink); font-size:0.88rem; }
+.evidence-reason { margin-top:8px; font-size:0.88rem; }
 </style>

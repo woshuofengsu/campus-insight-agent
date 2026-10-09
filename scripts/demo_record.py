@@ -34,9 +34,9 @@ ROLE_BTN = {"resident": "居民", "elderly": "老年", "grid": "网格员"}
 
 # ---------------------------------------------------------------- 场景定义
 def scene_login(ctx, page, still):
-    """登录页：星光粒子 + 数字滚动 + 按钮流光 + 角色卡 → 进居民端。"""
+    """登录页：服务站说明 + 角色卡 → 进居民端（v3 起没有粒子/数字滚动/按钮流光，等的是页面稳定）。"""
     page.goto(f"{BASE}/login", wait_until="networkidle")
-    page.wait_for_timeout(2800)          # 粒子上升 + CountUp 1600ms 走完
+    page.wait_for_timeout(2800)          # 等数据与字体落定（v3 已无动效可等）
     still("01-登录-数字滚动")
     box = page.get_by_text("登 录", exact=False).first.bounding_box()
     if box:
@@ -82,7 +82,7 @@ def scene_resident(ctx, page, still):
 def scene_grid(ctx, page, still):
     """网格员工作台：真实统计数字滚动 + 红黑榜悬停 + 满意度下钻抽屉。"""
     _login(page, "grid")
-    page.wait_for_timeout(2600)          # 4 张统计卡 CountUp 900ms
+    page.wait_for_timeout(2600)          # 等四张待办卡的接口数据回来（v3 已无数字滚动）
     still("01-工作台-统计卡")
     page.mouse.wheel(0, 520)
     page.wait_for_timeout(1000)
@@ -129,9 +129,9 @@ def scene_screen(ctx, page, still):
     """治理大屏：8 张卡数字差值滚动 + 背景呼吸 + 标题扫光。"""
     _login(page, "grid")
     page.goto(f"{BASE}/screen", wait_until="networkidle")
-    page.wait_for_timeout(2600)          # CountUp 1500ms
+    page.wait_for_timeout(2600)          # 等 8 张卡的数据（v3 已无数字滚动）
     still("01-大屏-八卡")
-    page.wait_for_timeout(2400)          # 呼吸光环 / 扫光 / 刷新点
+    page.wait_for_timeout(2400)          # 等 30 秒自动刷新的一轮（v3 已无呼吸光环/扫光）
     still("02-大屏-呼吸与扫光")
     page.wait_for_timeout(1800)          # 收尾（总长约 17s，作为开场素材）
 

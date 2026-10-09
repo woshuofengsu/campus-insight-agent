@@ -730,21 +730,30 @@ def journey_8(page, base):
     # 命中不了就报红——否则下次改文案又会静默退化成空断言。
     grid_only = ["审核通过", "退回补充", "派单", "开始处理", "提交处理结果"]
 
+    # 定位卡片用**内部号 `#id`**，不用描述前 12 字：
+    # ⚠️ 2026-10-06 实测踩到（这次是**我自己写的正向对照**报红，查下去发现是判据的问题）：
+    # 演示库里有几十条"我家厨房水龙头一直滴水，关不紧 …"，描述前 12 字**完全一样**，
+    # `filter(has_text=desc[:12]).first` 抓到的是**另一张卡**（状态是"处理结束"，当然没有处置按钮）。
+    # 报错信息也没说清是"没找到卡"还是"标签不对"，白查一轮。现在：按 `#id` 精确定位 + 分别报错。
     desc = (mine.get("description") or "")[:12]
     login_card(page, base, "网格员", "**/grid/**")
     page.goto(f"{base}/grid/work-orders", wait_until="networkidle")
     page.wait_for_timeout(2000)
     page.get_by_placeholder("搜索标题/地址/描述/报修人").fill(desc)
     page.wait_for_timeout(1500)
-    gcard = page.locator("div.card").filter(has_text=desc).first
-    if gcard.count():
+    gcard = page.locator("div.card").filter(has_text=f"#{mid}").first
+    if not gcard.count():
+        check(f"①a 正向对照：网格端工单 #{mid}（{mine.get('status')}）上**确实**有处置按钮",
+              False, f"网格端列表里没找到 #{mid} 这张卡（搜索词「{desc}」，"
+                     f"命中 {page.locator('div.card').filter(has_text=desc).count()} 张）")
+    else:
         gcard.locator("text=展开 ▼").first.click()
         page.wait_for_timeout(700)
-    grid_shown = [b for b in grid_only
-                  if gcard.count() and gcard.get_by_role("button", name=b, exact=True).count() > 0]
-    check(f"①a 正向对照：网格端工单 #{mid}（{mine.get('status')}）上**确实**有处置按钮"
-          "（证明标签名是可命中的，①不是空断言）",
-          bool(grid_shown), f"网格端出现：{grid_shown or '一个都没有（标签名写错了？）'}")
+        grid_shown = [b for b in grid_only
+                      if gcard.get_by_role("button", name=b, exact=True).count() > 0]
+        check(f"①a 正向对照：网格端工单 #{mid}（{mine.get('status')}）上**确实**有处置按钮"
+              "（证明标签名是可命中的，①不是空断言）",
+              bool(grid_shown), f"网格端出现：{grid_shown or '一个都没有（按钮文案改了？）'}")
 
     login_card(page, base, "居民", "**/resident/**")
     page.goto(f"{base}/resident/work-orders/{mid}", wait_until="networkidle")

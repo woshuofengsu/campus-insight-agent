@@ -245,7 +245,7 @@ def capture(base: str, only: str, allow_write: bool) -> int:
                 .map(e => (e.innerText || '').replace(/\\s+/g, ' ').trim())
                 .filter(Boolean)""")
             quick = page.evaluate("""() => Array.from(
-                document.querySelectorAll('.elderly-grid-3 button'))
+                document.querySelectorAll('[data-quick-actions] button'))
                 .map(e => (e.innerText || '').replace(/\\s+/g, ' ').trim()).filter(Boolean)""")
             sos = page.evaluate("""() => Array.from(
                 document.querySelectorAll('[data-longpress]'))
@@ -311,11 +311,17 @@ def main() -> int:
     ap.add_argument("--only", default="all")
     ap.add_argument("--no-write", action="store_true", help="不提交任何数据（跳过确认卡截图）")
     ap.add_argument("--diff", action="store_true")
+    ap.add_argument("--out", default="", help="产物目录（默认 .shots/pilot-ui-baseline；"
+                                              "重设计后拍对照图用 .shots/pilot-ui-after）")
     ap.add_argument("--keep-server", action="store_true",
                     help="脚本自己起的服务在结束时保留（默认收掉）")
     a = ap.parse_args()
     if a.diff:
         return diff_labels()
+    if a.out:
+        global OUT, INVENTORY
+        OUT = os.path.join(ROOT, a.out)
+        INVENTORY = os.path.join(OUT, "inventory.json")
     base = a.base.rstrip("/")
     os.makedirs(OUT, exist_ok=True)
     print("=" * 74)

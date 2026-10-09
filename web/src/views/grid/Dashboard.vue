@@ -4,7 +4,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { issues, proposals, agent } from '../../api'
-import CountUp from '../../components/CountUp.vue'
+// v3：不再用 CountUp（工作台要的是"现在几个"，数字跳动只是噪音）
 import EIcon from '../../components/EIcon.vue'
 
 const router = useRouter()
@@ -89,6 +89,14 @@ onMounted(async () => {
       pending: all.filter((i) => i.status === '待审核' || i.status === '已审核待派单').length,
       processing: all.filter((i) => i.status === '处理中' || i.status === '已派单').length,
       resolved: all.filter((i) => i.status === '处理结束').length,
+      // v3：任务书 §六 要求工作台第一层固定为「待研判 / 待处理 / 待回访 / 已完成」——
+      // 这四个数**从同一份工单列表算出来**（不新增接口、不编数字），口径写在标签下面：
+      //   待研判 = 等我审核判断（含退回补充）· 待处理 = 已通过、等派单/处理中
+      //   待回访 = 已处理完、等居民反馈 · 已完成 = 处理结束/已关闭
+      triage: all.filter((i) => ['待审核', '退回补充信息'].includes(i.status)).length,
+      todo: all.filter((i) => ['已审核待派单', '已派单', '处理中', '待协商'].includes(i.status)).length,
+      revisit: all.filter((i) => i.status === '待居民反馈').length,
+      done: all.filter((i) => ['处理结束', '已关闭'].includes(i.status)).length,
     }
     urgent.value = all.filter((i) => i.urgency === '紧急' && !['处理结束', '已关闭', '已撤回'].includes(i.status)).slice(0, 5)
     const active = all.filter((i) => !['处理结束', '已关闭', '已撤回'].includes(i.status))
@@ -116,11 +124,13 @@ onMounted(async () => {
 
 // 注意：必须是 computed —— 普通数组在 setup 期求值，会永久锁死在初始的 0，
 // 导致四个统计卡恒显示 0（数据在 onMounted 才回来）。
+// v3：任务书 §六 要求工作台第一层固定为「待研判 / 待处理 / 待回访 / 已完成」四格，
+// 每格下面写一句口径（工作台不能让人猜"这个数字是什么"）。
 const cards = computed(() => [
-  { label: '待处理工单', value: stats.value.pending, color: '#f59e0b', icon: 'inbox' },
-  { label: '处理中', value: stats.value.processing, color: '#059669', icon: 'wrench' },
-  { label: '待审核提案', value: pendingProps.value.length, color: '#2563eb', icon: 'bulb' },
-  { label: '已结工单', value: stats.value.resolved, color: '#64748b', icon: 'checkCircle' },
+  { label: '待研判', value: stats.value.triage, hint: '等我审核判断', icon: 'inbox', to: '/grid/work-orders' },
+  { label: '待处理', value: stats.value.todo, hint: '已通过，等派单/处理', icon: 'wrench', to: '/grid/work-orders' },
+  { label: '待回访', value: stats.value.revisit, hint: '等居民反馈', icon: 'hand', to: '/grid/work-orders' },
+  { label: '已完成', value: stats.value.done, hint: '处理结束/已关闭', icon: 'checkCircle', to: '/grid/work-orders' },
 ])
 </script>
 
@@ -129,27 +139,31 @@ const cards = computed(() => [
     <h2 class="page-title"><EIcon name="chart" :size="18" /> 工作台</h2>
     <p class="page-sub">社区治理 · 今日待办概览</p>
 
+    <!-- 第一层：待研判 / 待处理 / 待回访 / 已完成（任务书 §六）。数字**静态显示**：
+         工作台要的是"现在几个"，不该"跳数"（v2 的 CountUp 已移除）。 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-      <div v-for="c in cards" :key="c.label" class="card fade-up"
-           style="text-align:center;margin:0;position:relative;overflow:hidden;border-radius:16px;">
-        <div :style="{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: c.color, opacity: 0.85 }"></div>
-        <div class="entry-icon" style="display:flex;justify-content:center;opacity:0.8;margin-bottom:2px;"><EIcon :name="c.icon" :size="22" /></div>
-        <div style="font-size:2rem;font-weight:800;line-height:1.15;">
-          <CountUp :value="c.value" :duration="900" />
-        </div>
-        <div class="muted" style="font-size:0.85rem;">{{ c.label }}</div>
+      <div v-for="c in cards" :key="c.label" class="card entry-tile"
+           style="text-align:center;margin:0;border-radius:var(--r-card);padding:14px 10px;"
+           @click="router.push(c.to)">
+        <div class="entry-icon" style="display:flex;justify-content:center;color:var(--muted);margin-bottom:2px;"><EIcon :name="c.icon" :size="22" /></div>
+        <div style="font-size:2rem;font-weight:800;line-height:1.15;color:var(--text);">{{ c.value }}</div>
+        <div style="font-weight:700;font-size:0.95rem;">{{ c.label }}</div>
+        <div class="muted" style="font-size:0.82rem;margin-top:2px;">{{ c.hint }}</div>
       </div>
     </div>
 
     <div class="card todo-panel" v-if="todo.length">
       <div class="todo-head">
-        <div><div class="todo-title"><EIcon name="inbox" :size="18" /> 今日待办</div><div class="muted todo-sub">先处理超时和紧急事项，再处理普通工单</div></div>
+        <div>
+          <div class="todo-title"><EIcon name="inbox" :size="18" /> 先处理这些</div>
+          <div class="muted todo-sub">按「超时 → 紧急 → 一般」排好序：超时和紧急的排在最前面，最近的变动也在这一列</div>
+        </div>
         <n-button size="small" type="primary" ghost @click="router.push('/grid/work-orders')">进入工单台</n-button>
       </div>
       <div class="todo-list">
         <button v-for="i in todo" :key="i.id" class="todo-row" @click="router.push('/grid/work-orders')">
           <span class="todo-priority" :class="{ danger: i.overdue || i.urgency === '紧急' }">{{ i.overdue ? '超时' : i.urgency || '一般' }}</span>
-          <span class="todo-content"><b>#{{ i.id }} {{ i.title }}</b><span class="muted">{{ i.location || '未标位置' }} · {{ i.status }}</span></span>
+          <span class="todo-content"><b>{{ i.issue_code ? i.issue_code : ('#' + i.id) }} {{ i.title }}</b><span class="muted">{{ i.location || '未标位置' }} · {{ i.status }}</span></span>
           <span class="muted">查看 ›</span>
         </button>
       </div>
