@@ -410,15 +410,17 @@ const cards = computed(() => [
 .todo-sub { font-size:0.8rem; margin-top:2px; }
 .todo-list { border-top:1px solid var(--border); }
 .todo-row { width:100%; display:flex; align-items:center; gap:10px; padding:10px 0; border:0; border-bottom:1px solid var(--border); background:transparent; color:inherit; text-align:left; cursor:pointer; }
-.todo-row:hover { background:var(--hover-bg); }
-.todo-priority { min-width:42px; padding:3px 5px; border-radius:6px; background:var(--panel-blue); color:var(--ink-info); font-size:0.75rem; text-align:center; }
+.todo-row:hover { background:var(--primary-light); }
+.todo-priority { min-width:42px; padding:3px 5px; border-radius:6px; background:var(--primary-light); color:var(--primary-light-ink); font-size:0.78rem; text-align:center; }
 .todo-priority.danger { background:color-mix(in srgb, var(--st-danger) 14%, transparent); color:var(--ink-danger); }
 .todo-content { display:flex; flex:1; flex-direction:column; gap:3px; min-width:0; }
 .todo-content b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .todo-content .muted { font-size:0.8rem; }
 @media (max-width: 720px) { .todo-head { align-items:flex-start; flex-direction:column; } .todo-row { gap:6px; } }
-/* 情景模拟器：「算不出来」的原因与公式都要看得见（只读估算，不能是黑箱） */
-.sim-notes { margin-top:12px; padding:10px 12px; border-radius:8px; background:var(--panel-lemon); font-size:0.85rem; display:flex; flex-direction:column; gap:5px; }
+/* 情景模拟器：「算不出来」的原因与公式都要看得见（只读估算，不能是黑箱）
+   注意：原来写 `background:var(--panel-lemon)`（变量不存在）→ 提示块一直没底色；
+   2026-10-06 由 ui_style_audit 的"未定义变量"判据抓出，改用令牌。 */
+.sim-notes { margin-top:12px; padding:10px 12px; border-radius:var(--r-xs); background:var(--accent-light); font-size:0.86rem; display:flex; flex-direction:column; gap:5px; }
 .sim-formulas { margin-top:12px; font-size:0.85rem; }
 .sim-formulas summary { cursor:pointer; color:var(--ink-info); }
 </style>

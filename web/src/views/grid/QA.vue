@@ -385,9 +385,11 @@ async function kgSearch() {
               <div class="muted" style="font-size:0.8rem;">未留痕的改动（应为 0）</div></div>
           </div>
           <div v-if="corr.note" style="color:var(--ink-warning);margin-top:8px;font-size:0.85rem;" data-corr-note>{{ corr.note }}</div>
-          <!-- 演示数据免责：**由数据驱动**（只要分母里有演示数据就必须显示，且四条缺一不可） -->
-          <div v-if="corr.demo && corr.demo.total" data-corr-demo
-               style="margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--panel-lemon);font-size:0.85rem;">
+          <!-- 演示数据免责：**由数据驱动**（只要分母里有演示数据就必须显示，且四条缺一不可）
+               注意：原来写 `background:var(--panel-lemon)`（变量不存在，一直没底色）；
+               2026-10-06 由 ui_style_audit 的"未定义变量"判据抓出 → 改用 .panel-lemon class -->
+          <div v-if="corr.demo && corr.demo.total" data-corr-demo class="panel-lemon"
+               style="margin-top:10px;padding:10px 12px;border-radius:var(--r-xs);font-size:0.88rem;">
             <div style="font-weight:700;">
               <EIcon name="info" :size="16" /> 已标记演示数据 {{ corr.demo.total }} 条
             </div>

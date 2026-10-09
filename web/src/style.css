@@ -1,111 +1,113 @@
 /* ============================================================
-   社区先知 CommunityInsight · 视觉系统 v2（最终版）
+   社区先知 CommunityInsight · 视觉系统 v3「社区服务站」
    ————————————————————————————————————————————————
-   设计语言：可信赖的社区蓝 × 温暖橙点缀 · 轻盈留白 · 微动效
-   · 保留全部既有类名（.page/.card/.status-pill/.stat-card/.elderly-*），
-     老页面零改动即可获得全面观感提升
-   · 夜间模式完整保留（body.dark）
-   · 纯视觉层：不改动任何业务逻辑
+   设计语言：**温和 · 可信 · 清楚 · 安静 · 有秩序**
+   · 纯色优先：不用渐变做装饰、不用发光描边、不用循环动效
+   · 颜色只服务信息层级：绿=已完成/可继续 · 黄=需要注意 · 红=真正紧急 · 灰=辅助
+   · 同一个"卡片"在三端长一个样；不靠彩色区分卡片，靠**标题与层级**
+   · 保留全部既有类名（.page/.card/.status-pill/.stat-card/.elderly-*…），
+     老页面零改动即可换上新观感；夜间模式完整保留（body.dark）
+   · 纯视觉层：不改动任何业务逻辑、路由与接口
+
+   v2 → v3 的取舍（为什么删、为什么留）：
+     删：品牌渐变/流光大字/星光粒子/呼吸光环/毛玻璃/卡片波浪入场/渐变流动/图标弹跳
+         —— 这些是"AI 展示页"的信号，与"能用十年的社区服务站"相反
+     留：轻量过渡（hover/active 的 border/shadow/opacity）、状态色、图标、真实数据
+     收紧：圆角 12px 封顶、阴影只用低透明度层级、间距统一到 8 的倍数
    ============================================================ */
 
 :root {
-  /* —— 品牌主色（社区蓝） —— */
-  --primary: #2D5BFF;
-  --primary-deep: #1E3A8A;
-  --primary-light: #E8EDFF;
-  --primary-gradient: linear-gradient(135deg, #2D5BFF 0%, #6A8DFF 100%);
-  --primary-gradient-2: linear-gradient(135deg, #1E3A8A 0%, #2D5BFF 55%, #6A8DFF 100%);
-  /* —— 辅助色 —— */
-  --accent: #FF8C42;
-  --accent-light: #FFF4E8;
-  --accent-deep: #D96B1A;
-  --teal: #14B8A6;
-  --teal-light: #E6FFFA;
+  /* —— 品牌主色（稳重蓝绿：既是"社区服务"的色，也能当文字色用）——
+     #1B6B5A 与白字对比 6.4:1、当白底文字也是 6.4:1，一个色两个用途都达标。 */
+  --primary: #1B6B5A;
+  --primary-deep: #12503F;
+  --primary-light: #E7F1EE;
+  /* —— 辅助色（温暖但不刺眼的陶土色，只用在"需要注意"）—— */
+  --accent: #B4622A;
+  --accent-light: #FAF0E7;
+  --accent-deep: #8F4A12;
+  --teal: #2A7F6E;
+  --teal-light: #E8F3F0;
   /* —— 中性色 —— */
-  --bg: #F6F8FB;
+  --bg: #F4F6F5;          /* 温和灰白（略带绿灰，不再是冷蓝白） */
   --card-bg: #FFFFFF;
-  --text: #16233B;
-  --muted: #5B6B80;   /* 对比度 ≥5.2:1 on #fff（原 #64748B 只有 4.48:1，刚好卡在 WCAG AA 线下） */
-  --disabled: #8A93A3;
-  --border: #E7ECF3;
-  --dark-bg: #1E293B;
-  /* —— 状态色 —— */
-  --st-pending: #F59E0B;
-  --st-doing: #2D5BFF;
-  --st-feedback: #FF8C42;
-  --st-done: #9CA3AF;
-  --st-danger: #EF4444;
-  --st-info: #2D5BFF;
-  --st-success: #10B981;
-  /* —— 状态色「当文字用」的达标变体（第九轮全站审计新增）——
-     --st-pending/--st-feedback 是给 10% 淡底标签配的亮色，直接当大字色在白底上只有 2.15/2.31:1。
-     这两个令牌专门给「文字/大数字」用，暗色下自动换回亮色（深底上亮色才够）。 */
-  --st-pending-ink: #B45309;
-  --st-feedback-ink: #B85C10;
-  /* —— 无障碍补充：白字/深字必须达 AA 4.5:1 的两个专用色 ——
-     · --danger-solid：红底白字的**实心**徽标（#EF4444 只有 3.76:1，#DC2626 为 4.83:1）
-     · --success-ink：浅绿底上的**绿色文字**（#10B981 在 #f0fdf4 上只有 2.42:1，
-       #047857 为 5.30:1；暗色主题下换成亮绿 #6EE7B7 以适配深色卡片） */
-  --danger-solid: #DC2626;
-  --success-ink: #047857;
-  /* —— 字体 —— */
+  --text: #1E2A32;        /* 深蓝灰 */
+  --muted: #5C6B73;       /* 中灰：白底 5.6:1，达 AA */
+  --disabled: #8A949A;
+  --border: #E2E7E5;      /* 浅灰边框（卡片的分界靠它，不靠阴影） */
+  --dark-bg: #1A2320;
+  /* —— 状态色（低饱和；只表示含义，不做装饰）—— */
+  --st-pending: #C98A16;
+  --st-doing: #2C6E8F;
+  --st-feedback: #C2703A;
+  --st-done: #8A949A;
+  --st-danger: #B4392F;
+  --st-info: #2C6E8F;
+  --st-success: #3E8E72;
+  /* —— 状态色「当文字用」的达标变体 ——
+     淡底标签上必须用深色文字（亮色直接当字色只有 2.0–2.3:1）。 */
+  --st-pending-ink: #8A5A00;
+  --st-feedback-ink: #8F4A12;
+  /* —— 无障碍：白字/深字必须达 AA 4.5:1 的两个专用色 ——
+     · --danger-solid：红底白字的**实心**徽标（5.9:1）
+     · --success-ink：浅绿底上的**绿色文字**（6.6:1；暗色换成亮绿） */
+  --danger-solid: #B4392F;
+  --success-ink: #0F6B4F;
+  /* —— 字体（系统字体优先：老人机上不要下载字体）—— */
   --font: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei",
           "Inter", "Roboto", -apple-system, "Segoe UI", sans-serif;
-  /* —— 圆角 —— */
-  --r-xs: 8px;
+  /* —— 圆角（任务书 §三.3：普通页面 8—12px，不做过度圆润的胶囊卡片）—— */
+  --r-xs: 6px;
   --r-btn: 10px;
-  --r-card: 16px;
-  --r-card-lg: 22px;
-  --r-modal: 20px;
+  --r-card: 12px;
+  --r-card-lg: 12px;
+  --r-modal: 12px;
   --r-input: 10px;
-  --r-tag: 999px;
-  /* —— 阴影 —— */
-  --shadow-1: 0 1px 3px rgba(18, 35, 59, 0.05);
-  --shadow-2: 0 6px 16px rgba(18, 35, 59, 0.08);
-  --shadow-3: 0 16px 40px rgba(18, 35, 59, 0.14);
-  --shadow-danger: 0 6px 20px rgba(239, 68, 68, 0.25);
-  --shadow-primary: 0 6px 18px rgba(45, 91, 255, 0.28);
+  --r-tag: 6px;
+  /* —— 阴影：只用低透明度、小模糊的三级层次（没有彩色辉光）—— */
+  --shadow-1: 0 1px 2px rgba(24, 42, 38, 0.05);
+  --shadow-2: 0 2px 8px rgba(24, 42, 38, 0.07);
+  --shadow-3: 0 8px 24px rgba(24, 42, 38, 0.10);
+  --shadow-danger: 0 1px 2px rgba(24, 42, 38, 0.06);
+  --shadow-primary: 0 1px 2px rgba(24, 42, 38, 0.06);
   /* —— 语义文字色（亮/暗成对）——
-     内联写死 #047857 / #b91c1c 这类颜色在暗底上只有 2.3~2.7:1，是「内联色不跟主题走」的根因；
+     内联写死 #047857 / #b91c1c 这类颜色在暗底上只有 2.3~2.7:1，
      统一用这些令牌，暗色自动换成亮色变体。 */
-  --ink-success: #047857;
-  --ink-danger: #B91C1C;
-  --ink-info: #2563EB;
-  --ink-purple: #7C3AED;
-  --ink-warning: #B45309;
-  --primary-ink: #2D5BFF;   /* 主色作为「文字」用时（暗色下 #2D5BFF 只有 3.4:1） */
-  /* 「浅蓝底（--primary-light）上的文字」专用深色：
-     `--ink-info`(#2563EB) 铺在 #E8EDFF 上只有 **4.43:1**，低于 13.6px 文字要求的 4.5:1。
-     这个组合只在**有草稿时**才渲染，所以静态审计长期碰不到——属于"数据相关"的无障碍缺陷。
-     单独给一个更深的值（7.47:1），不去改 `--ink-info`（它在白底上是对的数）。 */
-  --primary-light-ink: #1E40AF;
+  --ink-success: #0F6B4F;
+  --ink-danger: #9E2B23;
+  --ink-info: #1F5F7A;
+  --ink-purple: #5A4A8C;
+  --ink-warning: #8A5A00;
+  --primary-ink: #1B6B5A;   /* 主色作为「文字」用时（与白底 6.4:1） */
+  /* 「浅绿底（--primary-light）上的文字」专用深色（9.0:1）。
+     这个组合只在**有草稿时**才渲染，静态审计长期碰不到——属"数据相关"的无障碍缺陷。 */
+  --primary-light-ink: #0E4938;
 }
 
 body.dark {
-  --bg: #0F172A;
-  --card-bg: #1E293B;
-  --text: #E2E8F0;
-  --muted: #94A3B8;
-  --disabled: #64748B;
-  --border: #334155;
-  --primary-light: #1E3A8A;
-  --accent-light: #2A2410;
-  --teal-light: #123B33;
-  --dark-bg: #0B1120;
-  --ink-success: #6EE7B7;
-  --ink-danger: #FCA5A5;
-  --ink-info: #93B4FF;
-  --ink-purple: #C4B5FD;
-  --ink-warning: #FCD34D;
-  --primary-ink: #8FA8FF;
-  /* 暗色下 --primary-light 是深蓝底(#1E3A8A)，配亮字 8.49:1（与 :root 的深蓝字成对） */
-  --primary-light-ink: #DBEAFE;
-  /* 暗色下浅绿卡片变深绿底 → 绿字改用亮绿，白字红底仍用 #DC2626（4.83:1） */
-  --success-ink: #6EE7B7;
-  --danger-solid: #DC2626;
+  --bg: #101614;
+  --card-bg: #1A2320;
+  --text: #E6EBE8;
+  --muted: #9DAAA5;
+  --disabled: #7A8681;
+  --border: #2C3833;
+  --primary-light: #123B31;
+  --accent-light: #2A231A;
+  --teal-light: #123B31;
+  --dark-bg: #0B100E;
+  --ink-success: #7FD3B4;
+  --ink-danger: #F0A6A0;
+  --ink-info: #9CC6D8;
+  --ink-purple: #C0B4E2;
+  --ink-warning: #E8C88A;
+  --primary-ink: #8FD3BE;
+  /* 暗色下 --primary-light 是深绿底(#123B31)，配亮字 9.7:1（与 :root 的深绿字成对） */
+  --primary-light-ink: #C9E9DE;
+  --success-ink: #7FD3B4;
+  --danger-solid: #B4392F;
   /* 深底上亮色才够：与 :root 的深色变体成对（审计两侧都量过） */
-  --st-pending-ink: #F59E0B;
-  --st-feedback-ink: #FF8C42;
+  --st-pending-ink: #E8C88A;
+  --st-feedback-ink: #E5A97B;
 }
 
 * { box-sizing: border-box; }
@@ -115,29 +117,31 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;              /* 居民/网格正文 14–16px（任务书 §三.3） */
   line-height: 1.6;
-  transition: background 0.25s, color 0.25s;
+  transition: background 0.2s, color 0.2s;
 }
 
-/* —— 精致细节：选中色 / 滚动条 / 焦点环 —— */
-::selection { background: rgba(45, 91, 255, 0.18); }
+/* —— 细节：选中色 / 滚动条 / 焦点环（保留，都是"可用性"而不是装饰）—— */
+::selection { background: rgba(27, 107, 90, 0.18); }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.28); border-radius: 8px; }
-*::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.45); }
+*::-webkit-scrollbar-thumb { background: rgba(92, 107, 115, 0.28); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(92, 107, 115, 0.45); }
 *::-webkit-scrollbar-track { background: transparent; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 
 /* ---------------- 布局 ---------------- */
-.page { padding: 24px; max-width: 1080px; margin: 0 auto; animation: fade-up 0.35s ease both; }
+.page { padding: 24px; max-width: 1080px; margin: 0 auto; }
 .page-title {
   font-size: 1.45rem; font-weight: 800; color: var(--text); margin: 0 0 4px;
   letter-spacing: 0.01em; display: flex; align-items: center; gap: 8px;
 }
-.page-sub { color: var(--muted); font-size: 0.86rem; margin-bottom: 18px; }
+.page-sub { color: var(--muted); font-size: 0.87rem; margin-bottom: 18px; }
 .muted { color: var(--muted); }
 
-/* ---------------- 卡片 ---------------- */
+/* ---------------- 卡片 ----------------
+   一个卡片长一个样：白底 + 浅灰边 + 极淡阴影。
+   可点的卡片用**边框变深 + 阴影一级**表示 hover，不做位移与缩放。 */
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -145,31 +149,27 @@ body {
   padding: 18px;
   box-shadow: var(--shadow-1);
   margin-bottom: 14px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .card[style*="cursor:pointer"], .card.clickable { cursor: pointer; }
 .card:hover[style*="cursor:pointer"], .card.clickable:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-2);
-  border-color: rgba(45, 91, 255, 0.28);
+  border-color: rgba(27, 107, 90, 0.35);
 }
 
-/* —— 强调卡（品牌渐变头 + 白身） —— */
+/* —— 强调卡（需要稍微"站起来"的那一张：只用阴影一级 + 左侧主色细线）—— */
 .hero-card {
   background: var(--card-bg);
-  border: none;
-  border-radius: var(--r-card-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
   box-shadow: var(--shadow-2);
   overflow: hidden;
   position: relative;
 }
-.hero-card::before {
-  content: "";
-  position: absolute; inset: 0 0 auto 0; height: 4px;
-  background: var(--primary-gradient);
-}
 
-/* ---------------- 状态胶囊 ---------------- */
+/* ---------------- 状态胶囊 ----------------
+   v3：圆角 6px（不是胶囊），文字用 -ink 深色，底色是同色 12% 淡底。
+   颜色含义固定：黄=需要注意 · 蓝灰=在办 · 陶土=等反馈 · 灰=结束 · 红=紧急 · 绿=办结。 */
 .status-pill {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 10px; border-radius: var(--r-tag);
@@ -179,22 +179,24 @@ body {
   content: ""; width: 6px; height: 6px; border-radius: 50%;
   background: currentColor; flex-shrink: 0;
 }
-/* 文字色一律用 `-ink` 成对令牌：亮色 `--st-*` 是给 10% 淡底画的**图形**色，
+/* 文字色一律用 `-ink` 成对令牌：亮色 `--st-*` 是给淡底画的**图形**色，
    直接当文字色在白底上只有 2.0–2.3:1（ui_audit 在提案详情页抓到过 2.31:1）。
    由 tests/test_design_tokens.py::test_semantic_text_colors_use_ink_tokens 静态守着。 */
-.st-pending  { background: rgba(245, 158, 11, 0.10);  color: var(--st-pending-ink); }
-.st-doing    { background: rgba(45, 91, 255, 0.10);   color: var(--primary-ink); }
-.st-feedback { background: rgba(255, 140, 66, 0.10);  color: var(--st-feedback-ink); }
-.st-done     { background: rgba(156, 163, 175, 0.12); color: var(--muted); }
-.st-danger   { background: rgba(239, 68, 68, 0.10);   color: var(--ink-danger); }
-.st-info     { background: rgba(45, 91, 255, 0.10);   color: var(--ink-info); }
-.st-success  { background: rgba(16, 185, 129, 0.10);  color: var(--success-ink); }
+.st-pending  { background: rgba(201, 138, 22, 0.12); color: var(--st-pending-ink); }
+.st-doing    { background: rgba(44, 110, 143, 0.12); color: var(--ink-info); }
+.st-feedback { background: rgba(194, 112, 58, 0.12); color: var(--st-feedback-ink); }
+.st-done     { background: rgba(138, 148, 154, 0.14); color: var(--muted); }
+.st-danger   { background: rgba(180, 57, 47, 0.12);  color: var(--ink-danger); }
+.st-info     { background: rgba(44, 110, 143, 0.12); color: var(--ink-info); }
+.st-success  { background: rgba(62, 142, 114, 0.12); color: var(--success-ink); }
 
-/* ---------------- 紧急橙提醒 ---------------- */
+/* ---------------- 需要注意（暖色，不刺眼） ---------------- */
 .urgent { color: var(--st-feedback-ink); font-weight: 700; }
-.urgent-bg { background: var(--accent-light); border: 1px solid rgba(255, 140, 66, 0.5); border-radius: 10px; }
+.urgent-bg { background: var(--accent-light); border: 1px solid rgba(180, 98, 42, 0.35); border-radius: var(--r-xs); }
 
-/* ---------------- 数字统计卡 ---------------- */
+/* ---------------- 数字统计卡 ----------------
+   数字是给**工作人员**看的（居民端不用大数字撑场面）；
+   网格端四张待办卡靠数字与标签说话，不靠颜色。 */
 .stat-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -202,11 +204,11 @@ body {
   padding: 16px;
   box-shadow: var(--shadow-1);
   text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.stat-card:hover { box-shadow: var(--shadow-2); }
 .stat-card .num { font-size: 1.9rem; font-weight: 800; line-height: 1.2; }
-.stat-card .lbl { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+.stat-card .lbl { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
 
 /* ---------------- 区块标题 ---------------- */
 .section-title {
@@ -214,89 +216,45 @@ body {
   font-size: 1.02rem; font-weight: 800; margin: 18px 0 10px;
 }
 .section-title::before {
-  content: ""; width: 4px; height: 16px; border-radius: 4px;
-  background: var(--primary-gradient);
+  content: ""; width: 3px; height: 16px; border-radius: 2px;
+  background: var(--primary);
 }
 
-/* ---------------- 动效 ---------------- */
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes float-slow {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-14px) rotate(3deg); }
-}
-@keyframes pulse-soft {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.35); }
-  60% { box-shadow: 0 0 0 10px rgba(45, 91, 255, 0); }
-}
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+/* ---------------- 过渡（只有路由级淡入，没有页面入场动画） ---------------- */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.18s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-.fade-up { animation: fade-up 0.4s ease both; }
-.fade-up-d1 { animation: fade-up 0.4s ease 0.06s both; }
-.fade-up-d2 { animation: fade-up 0.4s ease 0.12s both; }
-.fade-up-d3 { animation: fade-up 0.4s ease 0.18s both; }
-.fade-up-d4 { animation: fade-up 0.4s ease 0.24s both; }
+/* v2 的入场动画类名保留成 no-op：46 个页面里都在用，删类名会牵动一堆模板；
+   但**不再有任何动画**（页面一进来就是最终状态，不"飘"）。 */
+.fade-up, .fade-up-d1, .fade-up-d2, .fade-up-d3, .fade-up-d4 { animation: none; }
 
-/* ---------------- 渐变文字 / 品牌字 ---------------- */
-.grad-text {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text; background-clip: text;
-  color: transparent;
-}
+/* ---------------- 品牌字 ---------------- */
+.grad-text { color: var(--primary-ink); }          /* 不再做渐变文字（文字色必须走 -ink 令牌） */
 .brand-dot {
-  width: 34px; height: 34px; border-radius: 10px;
-  background: var(--primary-gradient);
+  width: 34px; height: 34px; border-radius: var(--r-btn);
+  background: var(--primary);
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 1.1rem; color: #fff;
-  box-shadow: var(--shadow-primary);
 }
 
-/* ---------------- 登录页网格背景 ---------------- */
-.mesh-bg {
-  position: fixed; inset: 0; z-index: 0; overflow: hidden;
-  background:
-    radial-gradient(52rem 52rem at 12% -8%, rgba(106, 141, 255, 0.35) 0%, transparent 55%),
-    radial-gradient(44rem 44rem at 105% 8%, rgba(20, 184, 166, 0.28) 0%, transparent 52%),
-    radial-gradient(40rem 40rem at 85% 105%, rgba(255, 140, 66, 0.20) 0%, transparent 55%),
-    linear-gradient(160deg, #EEF3FF 0%, #F6F8FB 45%, #EAF4F3 100%);
-}
-body.dark .mesh-bg {
-  background:
-    radial-gradient(52rem 52rem at 12% -8%, rgba(45, 91, 255, 0.22) 0%, transparent 55%),
-    radial-gradient(44rem 44rem at 105% 8%, rgba(20, 184, 166, 0.16) 0%, transparent 52%),
-    radial-gradient(40rem 40rem at 85% 105%, rgba(255, 140, 66, 0.12) 0%, transparent 55%),
-    linear-gradient(160deg, #0B1120 0%, #0F172A 60%, #0B1F1C 100%);
-}
-.mesh-orb {
-  position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55;
-  animation: float-slow 12s ease-in-out infinite;
-}
+/* ---------------- 登录页背景（v2 的星光/光斑已删） ----------------
+   .mesh-bg / .mesh-orb / .mesh-particles 三个类名保留成 no-op：
+   模板里还在用，但背景就是纯色，不再有粒子与光斑。 */
+.mesh-bg { position: fixed; inset: 0; z-index: 0; background: var(--bg); }
+.mesh-orb, .mesh-particles, .mesh-particles i { display: none; }
 
-/* ---------------- 玻璃卡片 ---------------- */
+/* ---------------- 实心卡片（v2 的毛玻璃已删：低端安卓上很贵，视觉收益小） ---------------- */
 .glass {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: var(--shadow-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
 }
-body.dark .glass {
-  background: rgba(30, 41, 59, 0.82);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
+body.dark .glass { background: var(--card-bg); border: 1px solid var(--border); }
 
 /* ---------------- 暗色模式：内联浅色块补丁（**必须按 DOM 规范化形式匹配**） ----------------
-   ⚠ 本轮踩坑记录（重要）：原先这里写的是 `[style*="background:#fef2f2"]`，即 hex 源码形式。
+   ⚠ 历史踩坑记录（重要）：原先这里写的是 `[style*="background:#fef2f2"]`，即 hex 源码形式。
    但 Vue 渲染时会把 style 经 CSSOM 规范化，实际 DOM 上是
        style="background: rgb(254, 242, 242); color: var(--ink-danger); margin-left: 8px;"
-   —— 属性选择器匹配的是**规范化后的属性值**，所以整套补丁**从未命中过任何元素**：
-   暗色模式下浅色块一直是刺眼亮块（实测 grid 工作台暗色 5 处不达标、老年端面板 1.16:1）。
+   —— 属性选择器匹配的是**规范化后的属性值**，所以整套补丁**从未命中过任何元素**。
    现在按 rgb() 规范化形式匹配；并且 tests/test_frontend_style_hygiene.py 强制校验
    「每个在用内联浅色块都有对应暗色规则」，这类静默失效以后会被测试拦住。 */
 body.dark [style*="rgb(254, 242, 242)"] { background: #3D1F1F !important; border-color: #7F1D1D !important; color: #FECACA !important; }
@@ -314,26 +272,29 @@ body.dark [style*="rgb(245, 245, 245)"] { background: var(--card-bg) !important;
 body.dark [style*="rgb(255, 255, 255)"] { background: var(--card-bg) !important; }
 body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 26, 26)"] { color: var(--text) !important; }
 
-/* ---------------- 老年端适老化（WCAG AA：字号≥20px、按钮≥60px、行距1.8） ---------------- */
-.elderly-page { padding: 20px; max-width: 720px; margin: 0 auto; font-size: 1.25rem; line-height: 1.8; animation: fade-up 0.35s ease both; }
+/* ---------------- 老年端适老化（WCAG AA：字号≥20px、按钮≥56px、行距 1.7） ----------------
+   v3 只调整"观感"，**不动适老下限**：字号/热区/对比度这些是硬指标，
+   `mobile_audit` 与 `ui_audit` 会逐页量。 */
+.elderly-page { padding: 20px; max-width: 720px; margin: 0 auto; font-size: 1.25rem; line-height: 1.7; }
 .elderly-title {
-  font-size: 1.9rem; font-weight: 800; text-align: center; color: var(--text);
-  margin-bottom: 14px; letter-spacing: 0.02em;
+  font-size: 1.9rem; font-weight: 800; text-align: left; color: var(--text);
+  margin-bottom: 6px; letter-spacing: 0.01em;
 }
 .elderly-btn {
   min-height: 72px !important;
   font-size: 1.35rem !important;
   font-weight: 700 !important;
-  border-radius: 18px !important;
-  transition: transform 0.15s, box-shadow 0.15s;
+  border-radius: var(--r-card) !important;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   /* 实测修复：Naive 按钮内容默认 white-space:nowrap，导致 3 列栅格的 min-content 撑破容器
      （390px 视口横向溢出 153px、第三列跑到屏幕外）。这里允许换行 + 允许收缩。 */
   min-width: 0 !important;
   max-width: 100%;
   white-space: normal !important;
 }
-.elderly-btn .n-button__content { white-space: normal; line-height: 1.3; text-align: center; }
-.elderly-btn:active { transform: scale(0.97); }
+.elderly-btn .n-button__content { white-space: normal; line-height: 1.35; text-align: center; }
+/* 按下反馈：只用底色变深一点（不做缩放，避免"图标乱跳"的观感） */
+.elderly-btn:active { filter: brightness(0.96); }
 
 /* 老年端 3 列栅格：用 minmax(0,1fr) 而非 1fr（1fr = minmax(auto,1fr)，会被内容顶破） */
 .elderly-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -342,7 +303,7 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
 .elderly-grid-3 .n-badge { height: 100%; }
 .elderly-grid-3 .elderly-btn { height: 100%; width: 100%; padding: 10px 4px !important; }
 .elderly-grid-3 .elderly-btn .n-button__content {
-  flex-direction: column; gap: 2px; line-height: 1.25; text-align: center;
+  flex-direction: column; gap: 2px; line-height: 1.3; text-align: center;
 }
 .elderly-grid-3 .elderly-btn .n-button__content > span:first-child { font-size: 1.6rem !important; }
 @media (max-width: 359px) {
@@ -374,43 +335,25 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
 }
 
 /* ============================================================
-   动效层（视觉系统 v2 · 每个特效都有信息意义，非纯装饰）
-   —— 全部仅用 transform / opacity（GPU 合成，不触发重排）
+   v3 说明：v2 的"动效层"（粒子/流光/呼吸环/波浪入场/渐变流动/图标弹跳，
+   共 11 条无限动画 + 17 组 keyframes）**已整体移除**。
+   下面这些类名仍然保留（模板里在用），但都是**静态外观**，
+   以免"删一个类名 → 某个页面结构塌掉"。
    ============================================================ */
-
-/* 1) 上升星光粒子（登录页：社区星光隐喻，12 颗纯 CSS） */
-@keyframes rise {
-  0%   { transform: translateY(0) scale(0.8); opacity: 0; }
-  12%  { opacity: 0.85; }
-  85%  { opacity: 0.35; }
-  100% { transform: translateY(-108vh) scale(1.15); opacity: 0; }
-}
-.mesh-particles { position: absolute; inset: 0; overflow: hidden; }
-.mesh-particles i {
-  position: absolute; bottom: -12px; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
-  animation: rise linear infinite;
-}
-
-/* 2) 主按钮流光扫过（指引主行动：登录按钮，每 3.2s 一次） */
-@keyframes shimmer {
-  0%   { transform: translateX(-130%) skewX(-18deg); }
-  55%  { transform: translateX(230%) skewX(-18deg); }
-  100% { transform: translateX(230%) skewX(-18deg); }
-}
-.btn-shimmer { position: relative; overflow: hidden; }
-.btn-shimmer::after {
-  content: ""; position: absolute; top: 0; bottom: 0; width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
-  animation: shimmer 3.2s ease-in-out infinite; pointer-events: none;
-}
-
-/* 3) 呼吸光环（危险/在办状态可感知：未读红点、紧急求助、超时） */
-@keyframes glow-ring {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
-  60%      { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
-}
-.pulse-danger { animation: glow-ring 2s ease-out infinite; }
+.mesh-particles i { animation: none; }
+.btn-shimmer::after { content: none; }          /* 流光扫过：删除 */
+.pulse-danger, .pulse-primary { animation: none; }
+.dot-breathe { animation: none; }
+.breathe { animation: none; }
+.title-sheen { color: inherit; background: none; -webkit-background-clip: initial; }
+.wave > * { animation: none; }
+.bob { animation: none; }
+.tilt-hover:hover { animation: none; }
+.grad-flow { background-size: auto; animation: none; }
+.tab-pop { animation: none; }
+/* 紧急求助：v2 用"呼吸光圈"引人注意；v3 改成**静态深红 + 加粗文字 + 足够大**，
+   不再无限动画（任务书：不要用动画掩盖信息层级问题；紧急靠颜色与尺寸就够清楚）。 */
+.sos-breathe { animation: none; }
 
 /* 老年端弹窗（紧急通知 / 确认框）：Naive 弹窗会 teleport 到 body，
    所以用 ElderlyLayout 在 body 上加的 .role-elderly 类来命中；
@@ -420,163 +363,71 @@ body.role-elderly .n-dialog__content { font-size: 1.25rem; line-height: 1.7; }
 body.role-elderly .n-dialog .n-button { min-height: 56px; }
 body.role-elderly .n-dialog .n-button .n-button__content { font-size: 1.25rem; }
 
-/* 无障碍：Naive 的 success 幽灵/文字按钮用亮绿 #10B981 作文字色，
-   在浅色（白底 2.42:1、淡绿底 #f0fdf4 2.42:1）下不达 AA 4.5:1。
-   改成令牌 --success-ink（亮色 #047857 = 5.3:1，暗色 #6EE7B7 = 9.5:1），
-   实心 success 按钮不受影响（走 Button.colorSuccess=#047857 + 白字）。 */
+/* 无障碍：Naive 的 success 幽灵/文字按钮用亮绿作文字色，浅底上不达 AA 4.5:1。
+   改成令牌 --success-ink（亮色 6.6:1，暗色 9.5:1），实心 success 按钮不受影响。 */
 .n-button.n-button--success-type.n-button--ghost,
 .n-button.n-button--success-type.n-button--text { color: var(--success-ink); }
 .n-button.n-button--success-type.n-button--ghost:hover,
 .n-button.n-button--success-type.n-button--text:hover { color: var(--success-ink); filter: brightness(0.92); }
 
-/* Naive 输入框的字数统计用 .85em：正文 14px 时只有 11.9px，低于 12px 下限
-   （全站审计在「提交提案」页实测 11.9px < 12px）。用 max() 保底：随上下文放大但不低于 12px。
-   多带一个 body 提升优先级——Naive 的样式是运行时注入的，同优先级会盖掉我们。 */
+/* Naive 输入框的字数统计用 .85em：正文 14px 时只有 11.9px，低于 12px 下限。
+   用 max() 保底：随上下文放大但不低于 12px。多带一个 body 提升优先级
+   （Naive 的样式是运行时注入的，同优先级会盖掉我们）。 */
 body .n-input .n-input-word-count { font-size: max(12px, 0.85em); }
 body.role-elderly .n-input .n-input-word-count { font-size: 20px; }
-@keyframes glow-ring-primary {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 91, 255, 0.40); }
-  60%      { box-shadow: 0 0 0 12px rgba(45, 91, 255, 0); }
-}
-.pulse-primary { animation: glow-ring-primary 2.4s ease-out infinite; }
-@keyframes dot-breathe {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.45; transform: scale(0.82); }
-}
-.dot-breathe { animation: dot-breathe 1.6s ease-in-out infinite; }
 
-/* 4) 大屏：背景呼吸 + 卡片辉光 + 标题流光 */
-@keyframes breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50%      { opacity: 0.95; transform: scale(1.06); }
-}
-.breathe { animation: breathe 12s ease-in-out infinite; }
-.screen-card {
-  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
-}
+/* 大屏（/screen）：v3 只保留静态边框反馈，辉光与光斑都删掉 */
+.screen-card { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 .screen-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(129, 199, 132, 0.55) !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(129, 199, 132, 0.25) inset;
-}
-@keyframes sheen {
-  0%   { background-position: -220% 0; }
-  60%  { background-position: 220% 0; }
-  100% { background-position: 220% 0; }
-}
-.title-sheen {
-  background: linear-gradient(90deg, #81c784 0%, #4fc3f7 35%, #e8fff4 50%, #4fc3f7 65%, #81c784 100%);
-  background-size: 220% 100%;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: sheen 8s ease-in-out infinite;
+  border-color: rgba(42, 127, 110, 0.45) !important;
+  box-shadow: var(--shadow-2);
 }
 
-/* 5) 卡片波浪入场（阵列节奏：给容器加 .wave，子项依次淡入上浮） */
-@keyframes wave-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.wave > * { animation: wave-in 0.5s cubic-bezier(0.22, 0.68, 0.36, 1) both; }
-.wave > *:nth-child(1) { animation-delay: 0.00s; }
-.wave > *:nth-child(2) { animation-delay: 0.06s; }
-.wave > *:nth-child(3) { animation-delay: 0.12s; }
-.wave > *:nth-child(4) { animation-delay: 0.18s; }
-.wave > *:nth-child(5) { animation-delay: 0.24s; }
-.wave > *:nth-child(6) { animation-delay: 0.30s; }
-.wave > *:nth-child(7) { animation-delay: 0.36s; }
-.wave > *:nth-child(8) { animation-delay: 0.42s; }
-.wave > *:nth-child(n+9) { animation-delay: 0.48s; }
-
-/* 6) 悬浮/漂浮（天气图标、品牌图标） */
-@keyframes bob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
-.bob { animation: bob 3.5s ease-in-out infinite; }
-@keyframes tilt {
-  0%, 100% { transform: rotate(0deg); }
-  35%      { transform: rotate(-7deg); }
-  70%      { transform: rotate(4deg); }
-}
-.tilt-hover:hover { animation: tilt 0.5s ease-in-out; }
-
-/* 7) 渐变流动（欢迎横幅、AI 卡片头部：让重点区域"活"起来） */
-@keyframes gradient-flow {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.grad-flow {
-  background-size: 220% 220%;
-  animation: gradient-flow 9s ease-in-out infinite;
-}
-
-/* 8) 入口卡 hover（居民首页 6 宫格：图标弹跳 + 卡片上浮） */
-.entry-tile {
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
-  cursor: pointer;
-}
-.entry-tile:hover { transform: translateY(-5px); box-shadow: var(--shadow-2); }
-.entry-tile:hover .entry-icon { transform: translateY(-6px) scale(1.18); }
-.entry-icon { transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); display: inline-block; }
-
-/* 9) 底部标签激活弹跳（导航位置反馈） */
-@keyframes tab-pop {
-  0%   { transform: scale(1); }
-  45%  { transform: scale(1.28); }
-  100% { transform: scale(1); }
-}
-.tab-pop { animation: tab-pop 0.32s ease-out; }
-
-/* 10) 紧急求助呼吸（老年端唯一动效：让最重要的按钮被看见） */
-@keyframes sos-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55), 0 6px 20px rgba(220, 38, 38, 0.35); }
-  55%      { box-shadow: 0 0 0 18px rgba(220, 38, 38, 0), 0 6px 20px rgba(220, 38, 38, 0.35); }
-}
-.sos-breathe { animation: sos-breathe 2.4s ease-out infinite; }
-
-/* ---------------- 门户外壳（侧栏品牌 / 玻璃顶栏 / 底部标签栏） ---------------- */
+/* ---------------- 门户外壳（侧栏品牌 / 顶栏 / 底部标签栏） ----------------
+   v2 用半透明 + 毛玻璃；v3 改成**不透明纯色 + 一条分隔线**：
+   在低端安卓与老式平板上更稳，也不会因为滚动内容不同而"透出错色"。 */
 .sider-brand {
   display: flex; align-items: center; gap: 10px;
   padding: 16px 14px; border-bottom: 1px solid var(--border);
 }
-.topbar { background: rgba(255, 255, 255, 0.86) !important; }
-body.dark .topbar { background: rgba(15, 23, 42, 0.86) !important; }
-.tabbar { background: rgba(255, 255, 255, 0.9); }
-body.dark .tabbar { background: rgba(15, 23, 42, 0.9); }
-.tab-item { position: relative; transition: color 0.2s ease; }
+.topbar { background: var(--card-bg) !important; border-bottom: 1px solid var(--border); }
+body.dark .topbar { background: var(--card-bg) !important; }
+.tabbar { background: var(--card-bg); border-top: 1px solid var(--border); }
+body.dark .tabbar { background: var(--card-bg); }
+.tab-item { position: relative; transition: color 0.18s ease; }
 .tab-item::before {
-  content: ''; position: absolute; top: 4px; left: 50%; width: 0; height: 3px;
-  border-radius: 3px; background: var(--primary-gradient);
-  transform: translateX(-50%); transition: width 0.24s ease;
+  content: ''; position: absolute; top: 2px; left: 50%; width: 0; height: 2px;
+  border-radius: 2px; background: var(--primary);
+  transform: translateX(-50%); transition: width 0.18s ease;
 }
-.tab-item.tab-active::before { width: 26px; }
-.tab-item.tab-active .tab-icon { animation: tab-pop 0.32s ease-out; }
-.tab-item:active { transform: scale(0.94); }
+.tab-item.tab-active::before { width: 24px; }
+.tab-item:active { filter: brightness(0.97); }
 
-/* ---------------- 老年端彩色信息面板（带暗色变体，避免暗色下刺眼） ---------------- */
-.panel-warm  { background: linear-gradient(135deg, #FFF7ED, #FFF1E0); border: 1px solid #FED7AA; color: #9A3412; }
-.panel-sky   { background: linear-gradient(135deg, #F0F9FF, #E6F6FF); border: 1px solid #BAE6FD; }
-.panel-lemon { background: linear-gradient(135deg, #FEFCE8, #FEF9C3); border: 1px solid #FDE68A; color: #854D0E; }
-.panel-mint  { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); border: 1px solid #86EFAC; }
-body.dark .panel-warm  { background: linear-gradient(135deg, #2A2410, #3A2E12); border-color: #A16207; color: #FDE68A; }
-body.dark .panel-sky   { background: linear-gradient(135deg, #10202E, #14304A); border-color: #1E3A5F; }
-body.dark .panel-lemon { background: linear-gradient(135deg, #2A2410, #3A3410); border-color: #A16207; color: #FDE68A; }
-body.dark .panel-mint  { background: linear-gradient(135deg, #12241B, #16311F); border-color: #15803D; }
+/* ---------------- 信息面板（v3：纯色淡底，不用渐变） ----------------
+   四个面板各代表一类信息（暖=关怀/提醒 · 天=天气 · 黄=待办 · 绿=完成），
+   底色是同一个色系家族的低饱和淡色，避免"每个卡片一个颜色"。 */
+.panel-warm  { background: #FAF3EA; border: 1px solid #E8D5BC; color: #7A3E12; }
+.panel-sky   { background: #EFF5F8; border: 1px solid #C9DDE7; }
+.panel-lemon { background: #FBF6E4; border: 1px solid #E6D9A8; color: #6F5300; }
+.panel-mint  { background: #EDF5F1; border: 1px solid #C4DED3; color: #0F5A44; }
+body.dark .panel-warm  { background: #2A231A; border-color: #7A5A2E; color: #E8C88A; }
+body.dark .panel-sky   { background: #16242A; border-color: #2E5566; }
+body.dark .panel-lemon { background: #2A2410; border-color: #7A6A1E; color: #E8C88A; }
+body.dark .panel-mint  { background: #16241E; border-color: #2E5A48; color: #9EDCC3; }
 
 /* 面板内高亮文字：亮色面板用深色高亮，暗色面板必须换成亮色高亮（否则深底深字，实测 2.3:1） */
-.panel-hi { color: #075985; }
-body.dark .panel-hi { color: #7DD3FC; }                                  /* 天空面板 → 亮蓝 */
-body.dark .panel-warm .panel-hi, body.dark .panel-lemon .panel-hi { color: #FDE68A; }  /* 暖/黄面板 → 暖黄 */
+.panel-hi { color: #14505F; }
+body.dark .panel-hi { color: #A9D6E5; }
+body.dark .panel-warm .panel-hi, body.dark .panel-lemon .panel-hi { color: #E8C88A; }
 
 /* ---------------- 路由级过渡（登录 ↔ 门户，仅顶层切换） ---------------- */
-.page-fade-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
-.page-fade-leave-active { transition: opacity 0.14s ease; }
-.page-fade-enter-from { opacity: 0; transform: translateY(8px); }
+.page-fade-enter-active { transition: opacity 0.18s ease; }
+.page-fade-leave-active { transition: opacity 0.12s ease; }
+.page-fade-enter-from { opacity: 0; }
 .page-fade-leave-to { opacity: 0; }
 
 /* ---------------- 无障碍：尊重系统「减少动态」 ----------------
-   开启后关闭所有循环/位移动效，仅保留必要的即时状态变化 */
+   v3 已经没有任何循环动效，这里仍然保留：过渡也一并关掉，对前庭敏感用户最友好。 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -590,9 +441,4 @@ body.dark .panel-warm .panel-hi, body.dark .panel-lemon .panel-hi { color: #FDE6
 /* 页面不可见（切到别的标签/最小化）时暂停所有动画：挂墙大屏与低端机不必为空转消耗 GPU */
 body.anim-paused *, body.anim-paused *::before, body.anim-paused *::after {
   animation-play-state: paused !important;
-}
-
-/* 小屏降低毛玻璃成本：backdrop-filter 在低端安卓上很贵，视觉收益却很小 */
-@media (max-width: 768px) {
-  .glass, .topbar, .tabbar { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 }

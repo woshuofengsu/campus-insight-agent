@@ -78,14 +78,14 @@ async function deleteAccount() {
 
 <template>
   <div class="page">
-    <!-- 个人信息 -->
-    <div class="card" style="display:flex;align-items:center;gap:16px;background:var(--primary-gradient);color:#fff;border:none;">
-      <div style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:1.8rem;">
+    <!-- 个人信息（v3：纯品牌色底 + 白字 6.4:1，不再渐变） -->
+    <div class="card" style="display:flex;align-items:center;gap:16px;background:var(--primary);color:#fff;border:none;">
+      <div style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;font-size:1.8rem;">
         {{ (store.user?.name || '居')[0] }}
       </div>
       <div>
         <div style="font-size:1.2rem;font-weight:800;">{{ store.user?.name || '居民' }}</div>
-        <div style="font-size:0.85rem;opacity:0.9;margin-top:2px;">
+        <div style="font-size:0.88rem;opacity:0.94;margin-top:2px;">
           {{ store.user?.role === 'resident' ? '居民' : store.user?.role }} · {{ maskPhone(store.user?.phone) }}
           <span v-if="store.user?.community"> · {{ store.user.community }}</span>
         </div>

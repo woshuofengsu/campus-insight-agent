@@ -53,50 +53,49 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
 
 <template>
   <div class="page">
-    <!-- 欢迎横幅（渐变流动 + 问候 + 天气胶囊） -->
-    <div class="grad-flow fade-up"
-         style="background:var(--primary-gradient-2);border-radius:22px;padding:26px 24px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden;box-shadow:var(--shadow-primary);">
-      <div style="position:absolute;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.10);top:-90px;right:-60px;"></div>
+    <!-- 欢迎横幅（v3：纯品牌色，不再渐变/流光；白字对比 6.4:1） -->
+    <div
+         style="background:var(--primary);border-radius:var(--r-card);padding:24px 22px;color:#fff;margin-bottom:14px;position:relative;">
       <div style="position:relative;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <div>
           <div style="font-size:1.5rem;font-weight:800;letter-spacing:0.01em;">
             {{ greet }}，{{ store.user?.name || '居民' }}
           </div>
-          <div style="font-size:0.86rem;opacity:0.86;margin-top:5px;">
+          <div style="font-size:0.88rem;opacity:0.92;margin-top:5px;">
             社区先知 · 知 · 报 · 议 · 督，有事随时找小助手
           </div>
         </div>
-        <div v-if="w" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.24);border-radius:14px;padding:10px 14px;">
-          <span class="bob" style="display:inline-flex;"><EIcon :name="weatherIcon(w.condition, w.emoji)" :size="30" weight="1.8" /></span>
+        <div v-if="w" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);border-radius:var(--r-xs);padding:10px 14px;">
+          <span style="display:inline-flex;"><EIcon :name="weatherIcon(w.condition, w.emoji)" :size="30" weight="1.8" /></span>
           <div>
             <div style="font-size:1.35rem;font-weight:800;line-height:1.1;">{{ w.temp_high }}°C</div>
-            <div style="font-size:0.76rem;opacity:0.9;">{{ w.condition }} · {{ w.temp_low }}°~{{ w.temp_high }}°</div>
+            <div style="font-size:0.78rem;opacity:0.92;">{{ w.condition }} · {{ w.temp_low }}°~{{ w.temp_high }}°</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 天气提示 / 预警 -->
-    <div v-if="w?.note" class="card fade-up-d1" style="background:#fef2f2;border:1px solid #fca5a5;color:var(--ink-danger);font-weight:600;">
+    <div v-if="w?.note" class="card" style="background:#fef2f2;border:1px solid #fca5a5;color:var(--ink-danger);font-weight:600;">
       <EIcon name="alert" :size="18" /> {{ w.note }}
     </div>
 
-    <!-- 未读通知（红点呼吸提醒） -->
-    <div v-if="unread() > 0" class="card fade-up-d1 entry-tile" style="background:#f0fdf4;border:1px solid #86efac;display:flex;align-items:center;justify-content:space-between;"
+    <!-- 未读通知 -->
+    <div v-if="unread() > 0" class="card entry-tile" style="background:#f0fdf4;border:1px solid #86efac;display:flex;align-items:center;justify-content:space-between;"
          @click="router.push('/resident/notices')">
       <div style="display:flex;align-items:center;gap:9px;">
-        <!-- 白字红底徽标：用 --danger-solid(#DC2626=4.83:1)；#ef4444 只有 3.76:1 不达 AA -->
-        <span class="pulse-danger" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--danger-solid);color:#fff;font-size:0.78rem;font-weight:700;line-height:1;">{{ unread() }}</span>
+        <!-- 白字红底徽标：用 --danger-solid(#B4392F=5.9:1)；#ef4444 只有 3.76:1 不达 AA -->
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--danger-solid);color:#fff;font-size:0.8rem;font-weight:700;line-height:1;">{{ unread() }}</span>
         <b>您有 {{ unread() }} 条未读通知</b>
       </div>
       <n-button size="small" type="success" ghost>查看 ›</n-button>
     </div>
 
-    <!-- 社区小助手（AI 入口，品牌渐变头 + 可收起） -->
-    <div class="card fade-up-d2 hero-card" style="padding:0;">
-      <div class="grad-flow" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--primary-gradient);color:#fff;">
+    <!-- 社区小助手（v3：纯品牌色表头，白字 6.4:1；不再渐变/呼吸） -->
+    <div class="card hero-card" style="padding:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--primary);color:#fff;">
         <b style="display:flex;align-items:center;gap:8px;">
-          <span class="pulse-primary" style="display:inline-flex;width:26px;height:26px;border-radius:9px;background:rgba(255,255,255,0.20);align-items:center;justify-content:center;"><EIcon name="robot" :size="18" /> </span>
+          <span style="display:inline-flex;width:26px;height:26px;border-radius:var(--r-xs);background:rgba(255,255,255,0.18);align-items:center;justify-content:center;"><EIcon name="robot" :size="18" /> </span>
           社区小助手
         </b>
         <n-button size="tiny" text style="color:#fff;" @click="agentOpen = !agentOpen">{{ agentOpen ? '收起 ▲' : '展开 ▼' }}</n-button>
@@ -104,11 +103,11 @@ const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '�
       <AgentChat v-if="agentOpen" role="resident" />
     </div>
 
-    <!-- 彩色快捷入口 6 宫格 -->
-    <div class="section-title fade-up-d3">常用服务</div>
-    <div class="wave" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;">
+    <!-- 快捷入口 6 宫格（v3：去掉波浪入场与图标弹跳，只保留边框反馈） -->
+    <div class="section-title">常用服务</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;">
       <div v-for="e in entries" :key="e.to" class="entry-tile card"
-           style="margin:0;text-align:center;padding:18px 12px;border-radius:18px;"
+           style="margin:0;text-align:center;padding:18px 12px;border-radius:var(--r-card);"
            @click="router.push(e.to)">
         <div class="entry-icon" style="display:flex;justify-content:center;"><EIcon :name="e.icon" :size="30" /></div>
         <div style="font-weight:700;margin-top:8px;font-size:1.02rem;">{{ e.label }}</div>

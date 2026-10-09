@@ -93,12 +93,15 @@ const themeOverrides = computed(() => theme.isDark
         colorInfo: T.lightInfoFill, colorHoverInfo: T.lightInfoFillHover,
         colorPressedInfo: T.lightInfoFillPressed,
       },
-      Card: { borderRadius: '16px' },
-      Input: { borderRadius: '10px', placeholderColor: '#66738A' },
-      Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: '#66738A' } } },
-      Modal: { borderRadius: '20px' },
+      Card: { borderRadius: '12px' },
+      // 占位符/空态文字：v3 起统一用 LIGHT.muted（#5C6B73 = 白底 5.6:1）。
+      // 注意：原来写死 #66738A 只有 **4.41:1**，`ui_audit` 在居民端「暂无健康内容」上实测抓到
+      // （低于 12–14px 文字要求的 4.5:1）；v3 换配色时顺手改成令牌，避免同类漏网。
+      Input: { borderRadius: '10px', placeholderColor: LIGHT.muted },
+      Select: { peers: { InternalSelection: { borderRadius: '10px', placeholderColor: LIGHT.muted } } },
+      Modal: { borderRadius: '12px' },
       Divider: { textColor: LIGHT.muted },
-      Empty: { textColor: '#66738A', iconColor: '#CBD5E1' },
+      Empty: { textColor: LIGHT.muted, iconColor: '#CBD5E1' },
       // Tag 文字色：Naive 默认直接用 warning/error 的亮色作文字（实测 1.96:1），改为深色变体
       Tag: {
         textColorSuccess: '#0A6B39', textColorWarning: '#92400E', textColorError: LIGHT.inkDanger,

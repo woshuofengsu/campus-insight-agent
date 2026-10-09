@@ -91,7 +91,7 @@ def test_app_theme_uses_tokens_not_raw_hex():
 def test_gate_actually_detects_drift():
     """**门禁自检**：把 tokens.js 里一个值改掉，核对逻辑必须报错（证明它不是摆设）。"""
     src = io.open(TOKENS, encoding="utf-8").read()
-    broken = src.replace("primary: ['--primary', '#2D5BFF']", "primary: ['--primary', '#123456']")
+    broken = src.replace("primary: ['--primary', '#1B6B5A']", "primary: ['--primary', '#123456']")
     assert broken != src, "自检失效：tokens.js 里的主色写法变了，请同步更新本用例"
     css = _css_block(io.open(CSS, encoding="utf-8").read(), ":root")
     # 复现核对逻辑（不落盘改文件）
@@ -157,9 +157,6 @@ def test_ink_gate_would_catch_the_old_style():
 # 不能为了这条去改它（那会把别处改坏），所以单独给一个浅蓝底专用深色。
 # ---------------------------------------------------------------------------
 
-_PRIMARY_LIGHT_INK_PAIRS = [(":root", "#E8EDFF"), ("body.dark", "#1E3A8A")]
-
-
 def _rel_lum(hexcolor: str) -> float:
     h = hexcolor.lstrip("#")
     parts = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
@@ -175,17 +172,26 @@ def _ratio(a: str, b: str) -> float:
 
 
 def test_primary_light_panel_text_meets_contrast_in_both_themes():
-    """浅蓝底（--primary-light）上的专用文字色，**亮/暗两侧都要 ≥4.5:1**。"""
+    """浅绿底（--primary-light）上的专用文字色，**亮/暗两侧都要 ≥4.5:1**。
+
+    ⚠️ 2026-10-06 改成**从 style.css 读底色**，不再硬编码：
+    原来这里写死 `[(":root", "#E8EDFF"), ("body.dark", "#1E3A8A")]`——
+    v3 换配色后 `--primary-light` 变成 #E7F1EE/#123B31，而这条用例还在拿**旧底色**算对比度，
+    于是它变成"对着一个不存在的背景量尺寸"：**看着是绿的，其实什么都没验**。
+    现在底色直接取自样式表，两边永远同一份真值。
+    """
     css = io.open(CSS, encoding="utf-8").read()
-    for selector, bg in _PRIMARY_LIGHT_INK_PAIRS:
+    for selector in (":root", "body.dark"):
         tokens = _css_block(css, selector)
         ink = tokens.get("--primary-light-ink")
-        assert ink, f"{selector} 缺少 --primary-light-ink（浅蓝底上的文字专用色）"
+        bg = tokens.get("--primary-light")
+        assert ink, f"{selector} 缺少 --primary-light-ink（浅底上的文字专用色）"
+        assert bg, f"{selector} 缺少 --primary-light（底色真值）"
         r = _ratio(ink, bg)
         assert r >= 4.5, (
-            f"{selector} 的 --primary-light-ink {ink} 铺在 {bg} 上只有 {r}:1，低于 4.5:1"
-            "（这条提示只在有草稿时出现，靠页面审计抓不到）")
-    # 反向自检：把旧写法（--ink-info 铺浅蓝底）算一遍，必须**不达标**，
+            f"{selector} 的 --primary-light-ink {ink} 铺在 --primary-light {bg} 上只有 {r}:1，"
+            "低于 4.5:1（这条提示只在有草稿时出现，靠页面审计抓不到）")
+    # 反向自检：把历史缺陷组合（--ink-info #2563EB 铺旧浅蓝底 #E8EDFF）算一遍，必须**不达标**，
     # 否则说明这段对比度计算根本没在算（门禁退化成永远绿）。
     assert _ratio("#2563EB", "#E8EDFF") < 4.5, "自检失效：历史缺陷组合竟然被判达标"
 

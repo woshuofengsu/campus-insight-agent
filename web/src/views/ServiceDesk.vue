@@ -152,7 +152,10 @@
     </div>
 
     <!-- ④ 完成：编号 + 下一步 + 明确"编号不用他记" -->
-    <div v-if="step === 3" class="card" data-desk-done style="background:var(--panel-lemon);">
+    <!-- 注意：原来写的是 `background:var(--panel-lemon)` —— **那个变量根本不存在**
+         （`.panel-lemon` 是 class，不是变量），于是"已登记"卡片一直没有底色。
+         2026-10-06 由 scripts/ui_style_audit.py 的"未定义变量"判据抓出来。 -->
+    <div v-if="step === 3" class="card panel-mint" data-desk-done style="background:var(--teal-light);">
       <div style="font-weight:700;font-size:1.15rem;">
         <EIcon name="checkCircle" :size="18" /> 已登记
         <span v-if="done.issue_code">（事项编号 {{ done.issue_code }}）</span>
