@@ -40,7 +40,10 @@ def _enc_phone(phone: str) -> str:
     try:
         from utils.crypto import get_crypto
         return get_crypto().encrypt(phone)
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        # ⚠️ 2026-10-06 修：docstring 一直写着"并记日志"，实现里其实是**静默吞掉**
+        # → 密钥缺失/不匹配时手机号无声消失（工单照建，但谁也联系不上报修人，且无痕迹）。
+        _log.warning("手机号加密失败，该字段将落空串（不阻断提交）：%s", e)
         return ""
 
 
@@ -557,6 +560,12 @@ def close_issue(issue_id: int, reason: str, actor: str = "负责人") -> tuple[b
         if row is None:
             return False, "工单不存在"
         old = row["status"]
+        # ⚠️ 2026-10-06 修：原来看都不看状态就改+发通知。
+        # 批量关闭（`/api/web/batch/close`）与界面上的重复点击会走这里，
+        # 于是**每被点一次，居民就再收到一条"工单已关闭"通知**（同一件事刷屏），
+        # 而 batch 路由的注释却写着"跳过状态不允许的"——注释与实现不符。
+        if old == "已关闭":
+            return False, "该工单已经是「已关闭」，未重复关闭、未重复通知居民"
         conn.execute("UPDATE community_issues SET status='已关闭' WHERE id=?", (issue_id,))
         conn.commit()
     log_activity(actor, "关闭工单", "issue", issue_id, module=MODULE,
@@ -810,38 +819,69 @@ def get_issues(status: str | None = None, issue_type: str | None = None,
         return [_decrypt_row_phones(dict(r)) for r in rows]
 
 
-def get_safety_reminders(limit: int = 100) -> list[dict]:
-    """安全提醒记录（负责人端查看，spec 四：安全隐患强制提示+生成记录）。"""
+def get_safety_reminders(limit: int = 100, tenant: str | None = None) -> list[dict]:
+    """安全提醒记录（负责人端查看，spec 四：安全隐患强制提示+生成记录）。
+
+    多租户（2026-10-06 修）：`safety_reminders` 表**没有 tenant_id 列**（v54 结构，不改表），
+    所以按**上报人所在社区**（`user_profile.community`）过滤——
+    原来直接返回全表，任何社区的网格员都能读到别社区的"疑似燃气泄漏"描述 + 具体地址 + 上报人 uid。
+    `tenant` 为空/非法 → 返回空集（fail-closed：宁可看不到，也不跨社区暴露）。
+    """
+    args: list = []
+    tc = tenant_clause(tenant, args, self_scoped=False, column="u.community")
+    if tc is None:
+        return []
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM safety_reminders ORDER BY id DESC LIMIT ?", (limit,)
+            "SELECT s.* FROM safety_reminders s "
+            "LEFT JOIN user_profile u ON u.id = s.user_id "
+            "WHERE 1=1" + tc + " ORDER BY s.id DESC LIMIT ?",
+            (*args, limit),
         ).fetchall()
         return [dict(r) for r in rows]
 
 
 def find_duplicate_issue(location: str, description: str, days: int = 7,
-                         exclude_id: int | None = None) -> dict | None:
+                         exclude_id: int | None = None,
+                         tenant: str | None = None) -> dict | None:
     """重复上报检测（P2-02）：7 天内、同楼栋（地址前 5 字）、关键词重合 ≥2 的同类工单。
 
     返回原工单 dict（含 reporter 信息），无则 None。exclude_id 排除自身（创建后检测用）。
     降级：地址空或描述过短不检测。
+
+    多租户（2026-10-06 修）：**必须只在同一个社区内比对**。
+    原来没有任何租户条件，而地址前 5 字（"3号楼""小区广场"）在各社区高度重合 →
+    会把 A 社区的新报修判成与 B 社区某单重复：给**别社区居民**发通知、
+    并把**别社区工单号**回显给本社区居民（还骗他说"已合并处理"，其实自己那张单是独立工单）。
+    取不到合法社区 → 不判定（返回 None），绝不跨社区比对。
     """
     loc = (location or "").strip()
     desc = (description or "").strip()
     if not loc or len(desc) < 4:
         return None
+    # 先判定租户（fail-closed：取不到合法社区就**不判定重复**，绝不跨社区比对）。
+    # ⚠️ 参数顺序必须与 SQL 里的 `?` 顺序一致：租户参数排最后，
+    #    否则会把 exclude_id 当成租户值（本轮实测踩到：自己的新测试没覆盖 exclude_id 分支，
+    #    是既有用例 `test_duplicate_issue_merge` 报红才发现的）。
+    probe: list = []
+    tc = tenant_clause(tenant, probe, self_scoped=False)
+    if tc is None:
+        return None
+    args: list = [f"-{days}", loc]
     try:
         with get_db() as conn:
             q = ("SELECT * FROM community_issues WHERE status NOT IN ('已关闭', '已撤回', '已转出') "
                  "AND reported_at >= datetime('now', ? || ' days') "
                  "AND substr(location, 1, 5) = substr(?, 1, 5)")
-            args: list = [f"-{days}", loc]
             if exclude_id:
                 q += " AND id != ?"
                 args.append(exclude_id)
+            q += tc
+            args.extend(probe)
             q += " ORDER BY reported_at DESC LIMIT 20"
             rows = conn.execute(q, args).fetchall()
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        _log.warning("重复上报检测失败（按无重复处理）：%s", e)
         return None
     def _bigrams(s):
         return {s[i:i + 2] for i in range(max(0, len(s) - 1))}

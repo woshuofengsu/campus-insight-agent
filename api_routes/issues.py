@@ -118,8 +118,12 @@ def issue_create(req: IssueCreate, request: Request):
     dup = None
     try:
         from data.db_repair import find_duplicate_issue
-        dup = find_duplicate_issue(req.location, req.description, exclude_id=iid)
-    except Exception:
+        # 多租户（2026-10-06 修）：只在**本社区内**比对重复，否则会把别社区工单当成"重复"，
+        # 给别社区居民发通知、并把别社区工单号回显给本社区居民。
+        dup = find_duplicate_issue(req.location, req.description, exclude_id=iid,
+                                   tenant=_tenant(request))
+    except Exception as e:  # noqa: BLE001
+        _log.warning("重复上报检测跳过（不影响建单）：%s", e)
         dup = None
     if dup:
         try:
@@ -173,7 +177,9 @@ def issue_safety_reminders(request: Request, limit: int = 100):
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_repair import get_safety_reminders
-    return _ok(get_safety_reminders(limit=limit))
+    # 多租户（2026-10-06 修）：该表无 tenant_id 列 → 数据层按上报人社区过滤；
+    # 不传 tenant 就会把别社区的安全隐患（含地址、描述）全量返给本社区网格员。
+    return _ok(get_safety_reminders(limit=limit, tenant=_tenant(request)))
 
 
 # ---- 工单知识（v52 沉淀：字段来源 + 同类处置画像；第 7 阶段：人工修正对照）----
@@ -261,7 +267,11 @@ def issue_draft_delete(did: int, request: Request):
     d = get_draft(did)
     if not d:
         return _fail(1004, "草稿不存在")
-    if u.get("role") != "grid" and d.get("user_id") != u.get("uid"):
+    # 归属校验（2026-10-06 修）：原写法是 `role != "grid" and d.user_id != uid`，
+    # 网格员身份会把整个条件**短路掉** → 任何网格员都能按自增 id 删掉别人的草稿
+    # （草稿含地址/描述/加密手机号，还能用 1004 与成功区分 id 是否存在）。
+    # 草稿只属于创建者本人；需要代办的走服务台（`/service-desk` 有授权依据与留痕）。
+    if d.get("user_id") != u.get("uid"):
         return _fail(1003, "无权限删除该草稿")
     delete_draft(did)
     return _ok({"deleted": did}, "已删除")

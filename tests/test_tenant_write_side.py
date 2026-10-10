@@ -90,24 +90,118 @@ def _insert_sites():
     return sites
 
 
-def test_every_tenant_insert_is_stamped():
-    """凡插入租户表，必须盖章（或已登记豁免并写明理由）。"""
-    missing = []
-    for _d, fn, fname, table, body in _insert_sites():
-        if "stamp_tenant(" in body or "stamp_tenant_value(" in body:
+@functools.lru_cache(maxsize=1)
+def _uncovered_inserts():
+    """[(目录, 文件, 函数名, 表名, 源码片段, [(行号, 表名)…])] —— 第 6 项是**没被盖章覆盖**的 INSERT。
+
+    逐条判据（2026-10-06 加固）：
+      - INSERT 的那段字符串里**显式写了 tenant_id** → 自带覆盖；
+      - 否则要求同一函数内存在 `stamp_tenant(...)` / `stamp_tenant_value(...)`，
+        且它的**行号不早于**该 INSERT（盖章必须发生在这条插入之后）。
+    """
+    out = []
+    for _d, fn, path in _source_files():
+        try:
+            src = open(path, encoding="utf-8").read()
+            tree = ast.parse(src)
+        except (OSError, SyntaxError):
             continue
-        if f"tenant_id" in body and _INSERT_RE.search(body or ""):
-            # INSERT 列清单里显式写了 tenant_id 的，也算已覆盖
-            ins = body[body.find("INSERT INTO"):body.find("INSERT INTO") + 400]
-            if "tenant_id" in ins:
+        for fname, inserts, uncovered, body in _scan_functions(tree, src):
+            if not inserts:
                 continue
+            for _ln, t, _lit in inserts:
+                out.append((_d, fn, fname, t, body, uncovered))
+    return out
+
+
+def _scan_functions(tree, src):
+    """从 AST 抽出每个函数的三样东西：INSERT 列表 / 未覆盖清单 / 源码片段。
+
+    抽成独立函数是为了能用**合成源码**单测这套判据本身（见 `test_scanner_flags_second_insert`）。
+    """
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        inserts, stamps = [], []
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                for table in _INSERT_RE.findall(sub.value):
+                    if table in TENANT_TABLES:
+                        inserts.append((sub.lineno, table, sub.value))
+            elif isinstance(sub, ast.Call):
+                fname_ = getattr(sub.func, "id", None) or getattr(sub.func, "attr", None)
+                if fname_ in ("stamp_tenant", "stamp_tenant_value"):
+                    stamps.append(sub.lineno)
+        uncovered = [(ln, t) for ln, t, lit in inserts
+                     if "tenant_id" not in lit and not any(s >= ln for s in stamps)]
+        out.append((node.name, inserts, uncovered, ast.get_source_segment(src, node) or ""))
+    return out
+
+
+def test_every_tenant_insert_is_stamped():
+    """凡插入租户表，**每一条 INSERT 都必须盖章**（或已登记豁免并写明理由）。
+
+    ⚠️ 2026-10-06 加固：原来是**函数级**判断（函数体里出现过 `stamp_tenant(` 就算过），
+    于是"一个函数里两条 INSERT、只给其中一条盖章"永远绿灯 ——
+    `db_policy.ask_question` 就是这样：RAG 分支盖了、**主路径没盖**，
+    导致"被自动回答"的提问租户为空 → 居民点"没帮到我"转人工后网格端**谁都不看见**。
+    现在改成**按 INSERT 出现的位置**逐条判（同函数内、该 INSERT 之后必须有盖章调用），
+    只有"INSERT 里显式写了 tenant_id"才算自带覆盖。
+    """
+    missing = []
+    for _d, fn, fname, table, body, uncovered in _uncovered_inserts():
+        if not uncovered:
+            continue
         if (fn, fname) in _EXEMPT and _EXEMPT[(fn, fname)]:
             continue
-        missing.append(f"{fn}::{fname}  插入 {table}")
+        missing.append(f"{fn}::{fname}  第 {uncovered[0][0]} 行插入 {table}")
     assert not missing, (
-        "以下插入点没有给租户表盖章，也没有豁免理由：\n  " + "\n  ".join(sorted(set(missing)))
+        "以下 INSERT 之后没有给租户表盖章，也没有豁免理由：\n  " + "\n  ".join(sorted(set(missing)))
         + "\n（多租户：写入侧必须调 stamp_tenant/stamp_tenant_value，否则新行租户为空，"
           "读取侧 fail-closed 会让它**谁都看不见**——包括本该看到的人）")
+
+
+def test_per_insert_check_is_not_vacuous():
+    """闸门自身的栅栏：逐条判必须真的能扫到"位置"信息（防止又退化成永远绿）。"""
+    sites = _uncovered_inserts()
+    assert sites, "没扫到任何租户表插入点，加固后的扫描逻辑疑似失效"
+    assert any(lits for *_rest, lits in sites), "没扫到 INSERT 的行号信息"
+
+
+_SYNTHETIC = '''
+def two_inserts_one_stamp(user_id):
+    with get_db() as conn:
+        cur = conn.execute("INSERT INTO policy_questions (user_id) VALUES (?)", (user_id,))
+        qid = cur.lastrowid
+        stamp_tenant(conn, "policy_questions", qid, user_id)
+        cur2 = conn.execute("INSERT INTO policy_questions (user_id) VALUES (?)", (user_id,))
+        qid2 = cur2.lastrowid
+        conn.commit()
+    return qid, qid2
+'''
+
+
+def test_scanner_flags_second_insert():
+    """**这条是闸门自己的回归网**：一个函数里两条 INSERT、只给第一条盖章 → 必须报出第二条。
+
+    加固前的那版（函数级字符串匹配）在这里会**放过**——`db_policy.ask_question` 线上就是这么漏的。
+    """
+    with_tenant = _SYNTHETIC.replace(
+        "INSERT INTO policy_questions (user_id)",
+        "INSERT INTO policy_questions (user_id, tenant_id)")
+    funcs = _scan_functions(ast.parse(_SYNTHETIC), _SYNTHETIC)
+    assert len(funcs) == 1
+    _name, inserts, uncovered, _body = funcs[0]
+    assert len(inserts) == 2, f"应该扫到 2 条 INSERT，实际 {len(inserts)}"
+    assert len(uncovered) == 1, f"应该报出 1 条未盖章，实际 {uncovered}"
+    assert uncovered[0][1] == "policy_questions"
+    # 两条都盖章 → 干净；显式写 tenant_id → 也算覆盖
+    assert not _scan_functions(ast.parse(_SYNTHETIC.replace("qid2 = cur2.lastrowid",
+                                                           "stamp_tenant(conn, 'policy_questions', "
+                                                           "cur2.lastrowid, user_id)\n        qid2 = cur2.lastrowid")),
+                               _SYNTHETIC)[0][2]
+    assert not _scan_functions(ast.parse(with_tenant), with_tenant)[0][2]
 
 
 def test_insert_sites_are_actually_found():

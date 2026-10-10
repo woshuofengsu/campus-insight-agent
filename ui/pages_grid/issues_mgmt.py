@@ -223,8 +223,12 @@ def _render_detail(issue: dict):
         if st.session_state.get(f"_phone_confirm_{iid}") and not st.session_state.get(f"_phone_shown_{iid}"):
             st.caption(f"将记录留痕：{_actor} 查看工单 #{iid} 的报修人完整号码。")
             if st.button("✅ 二次确认并查看", key=f"m_phone_ok_{iid}"):
+                # ⚠️ 2026-10-06 修：留痕**不能写号码本身**（AGENTS 数据安全约定：
+                # activity_log.detail 不得含完整手机号）。这条 detail 会被主服务
+                # GET /api/web/issues/{id} 的时间线原样返回 → 任何本社区网格员都能看到全号，
+                # 等于把"二次确认"这道隐私控制自己绕过去了。只记"谁在什么时候看了谁的号"。
                 log_activity(_actor, "查看完整手机号", "issue", iid,
-                             module="报修", detail=f"查看工单 #{iid} 报修人完整号码 {phone}")
+                             module="报修", detail="二次确认后查看报修人完整号码（号码不入留痕）")
                 st.session_state[f"_phone_shown_{iid}"] = True
                 st.rerun()
         if st.session_state.get(f"_phone_shown_{iid}"):

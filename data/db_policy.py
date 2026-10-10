@@ -1166,6 +1166,12 @@ def ask_question(user_id: int, question: str, source: str = "居民端",
             (user_id, q, summary, q_type, source, auto_answer, best["id"]),
         )
         qid = cur.lastrowid
+        # 多租户（v48）：提问落问到提问人的社区。
+        # ⚠️ 2026-10-06 修：**这条主路径原来漏了盖章**（只有上面 RAG 兜底分支盖了），
+        # 于是"被自动回答"的提问 tenant_id 为空 → 读取侧 fail-closed →
+        # 居民随后点"没帮到我"转人工，网格端**列表、详情、回复全部看不到**
+        # （B6 那类"自己人也看不见"，且因为启动时 _m48 会按归属人回填，重启就自愈、极难发现）。
+        stamp_tenant(conn, "policy_questions", qid, user_id)
         conn.execute("UPDATE knowledge_base SET cite_count = cite_count + 1 WHERE id=?",
                      (best["id"],))
         conn.commit()

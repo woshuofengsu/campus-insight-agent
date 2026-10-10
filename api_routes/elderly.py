@@ -716,12 +716,17 @@ def web_emergency_trigger(request: Request):
     _touch(_resolve_elder_uid(request) or u.get("uid"))
     profile = get_user_by_id(u.get("uid")) or {}
     # 家属绑定模式：禁止家属代替老人触发
+    # 授权判断必须 fail-closed（安全/隐私类校验一律如此）。
+    # ⚠️ 2026-10-06 修：原来 `except Exception: pass` —— 查库异常时**直接放行**，
+    # 而且日志里查不到任何痕迹（既违反 fail-closed，也违反"禁止静默吞异常"）。
     try:
         bound = get_bound_elderly(u.get("uid"))
-        if bound and bound.get("id") != u.get("uid"):
-            return _fail(1003, "家属不能代替老人触发紧急求助")
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        _log.warning("家属绑定关系解析失败，拒绝代触发紧急求助（fail-closed）：uid=%s err=%s",
+                     u.get("uid"), e)
+        return _fail(2001, "暂时无法确认您的身份，请稍后再试")
+    if bound and bound.get("id") != u.get("uid"):
+        return _fail(1003, "家属不能代替老人触发紧急求助")
     cid, msg = trigger_sos(u.get("uid"), actor=profile.get("name") or "老人")
     if cid <= 0:
         return _fail(2001, msg or "触发失败")

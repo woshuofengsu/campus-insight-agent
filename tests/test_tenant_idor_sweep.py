@@ -305,7 +305,7 @@ def test_resident_self_scope_still_denied_for_others():
 
 # 豁免白名单：按 id 但**不需要** `_same_tenant` 的路由 → 必须写明理由（空理由视为未豁免）
 _ID_ROUTE_EXEMPT = {
-    ("issues.py", "issue_draft_delete"): "草稿表非租户表，且按本人 reporter_id 校验（他人草稿取不到）",
+    ("issues.py", "issue_draft_delete"): "草稿表非租户表，且**按创建者本人校验**（2026-10-06 修：原来写成 role!='grid' and …，网格员身份把归属校验短路掉了，已改为纯归属校验）",
     ("proposals.py", "proposal_draft_delete"): "同上：草稿按本人校验",
     ("messages.py", "web_message_read"): "站内信按收件人 uid 自身范围校验（messages 非租户表）",
     ("health.py", "web_health_article_action"): "健康内容为全局知识库（health_contents 非租户表）",

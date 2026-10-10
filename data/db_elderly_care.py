@@ -1124,12 +1124,17 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
     address = elder.get("address") or ""
     phone = ""
     try:
-        from data.db_user import get_user_by_id
+        from data.db_user import get_user_by_id, get_user_phone
         u = get_user_by_id(user_id) or {}
-        phone = u.get("phone") or ""
+        # ⚠️ 2026-10-06 修：原来读 `u.get("phone")` —— 那是**按约定恒为空**的明文列
+        # （手机号只落密文列），于是 SOS 通知里的"电话"永远是空的，
+        # 网格员收到最高优先级的求助却**没有回电号码**。正确入口是 get_user_phone()（内部解密），
+        # 且通知里只给**掩码**（站内消息不需要全号）。
+        phone = _mask_phone(get_user_phone(user_id) or "")
         address = address or f"{u.get('community') or ''}{u.get('building') or ''}{u.get('unit') or ''}"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        _log.warning("SOS 通知取老人电话/住址失败（通知仍发出，联系人列表不受影响）："
+                     "user_id=%s err=%s", user_id, e)
     content = (f"老人姓名：{actor}，电话：{phone}，住址：{address}；"
                f"紧急联系人：{names}；触发时间：{datetime.now().strftime('%H:%M')}；状态：紧急求助中。")
     _notify_grids(f"⚠️ 紧急求助：{actor}", content, call_id,
