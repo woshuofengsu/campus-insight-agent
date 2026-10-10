@@ -145,9 +145,17 @@ elderly:  demo_elderly（免登录）
   新增任何"演示专用行为"时：默认值写成 `"true" if DEMO_MODE else "false"`，
   并在 `deploy/.env.production.example` 里**显式写出**（`tests/test_prod_empty_init.py` 会核对模板）。
   生产空库不灌种子后，"第一个账号"走 `python scripts/bootstrap_admin.py`（见 `docs/deploy/生产部署手册.md` §4）。
-- **观察期（打完 `pilot-v1` 之后）跑 `python scripts/freeze_check.py`**：它对着冻结标签逐字比对
-  老年端界面（页面/布局/语音与 SOS/图标/样式表），改了就是红。要动界面 → 回退、或打新标签重新冻结、
+- **观察期（打完 `pilot-ui-v1` 之后）跑 `python scripts/freeze_check.py`**：它对着冻结标签逐字比对
+  老年端界面（页面/布局/语音与 SOS/图标/样式表/全局样式），改了就是红。要动界面 → 回退、或打新标签重新冻结、
   或在它的 `ALLOW` 里登记理由（**不要**用 ALLOW 长期豁免整目录，那等于把门禁关掉）。
+  **`pilot-v1` → `pilot-ui-v1` 的切换**（2026-10-06）：界面重设计必然改老年端界面，而观察**尚未开始**，
+  所以按脚本给的路径第 ② 条"打新标签重新冻结"，把 `FREEZE_REF` 换成 `pilot-ui-v1`。
+- **视觉系统 v3「社区服务站」**（见 `docs/ui/UI重设计-交付说明.md` + dev-log 六十九）：
+  渐变/发光/无限动画/keyframes **全部为 0**，`scripts/ui_style_audit.py` 以棘轮守着（只减不增）；
+  新增任何"演示专用"特效前先想清楚——**审美要求已经变成可复算的数字**，加回去会直接红。
+  ⚠️ 还有一个**血的教训**：删 `style.css` 里的 CSS 变量前，先跑 `ui_style_audit.py`
+  看有没有页面还在 `var(--它)`——`.vue` 里的 `background:var(--x)` 在变量被删后会**整条失效**
+  （表现是白字白底），而 `ui_audit` 的对比度检查**遇到祖先有渐变就跳过**，以前这类缺陷是被渐变挡住的。
 - **改完 `web/src` 必须先 `cd web && npm run build` 再审计/演示**（复审 F4）：`web/dist` 不进 git，
   改完不 build 的话 `ui_audit`/`mobile_audit`/演示测的都是**旧包**，会得出"修了但没生效/没修也报绿"的假结论。
   两个审计脚本已内置 dist 新鲜度闸：落后于源码直接红字退出。
@@ -202,7 +210,7 @@ elderly:  demo_elderly（免登录）
 | `scripts/backup_db.py` · `scripts/restore_drill.py` | 备份（快照 + sha256/表行数清单）与**恢复演练**（恢复到临时目录后 6 项校验；实测 0.02 秒） |
 | `scripts/empty_db_drill.py` | **空库初始化演练**（生产红线）：三种姿态各建一套空库 → 生产姿态必须 0 演示账号/0 数据、缺密钥必须拒绝启动、**演示库文件不得被改动** |
 | `scripts/bootstrap_admin.py` | **首个负责人账号引导**（空库不灌种子后怎么登进去）：强制 ≥12 位密码 · 拒绝 `demo` 前缀 · 社区名（租户键）必填 |
-| `scripts/freeze_check.py` | **观察期界面冻结校验**：把老年端界面与冻结标签 `pilot-v1` 逐字比对，改了就是红（"观察期间不改界面"不能只靠记性） |
+| `scripts/freeze_check.py` | **观察期界面冻结校验**：把老年端界面与冻结标签（现为 **`pilot-ui-v1`**）逐字比对，改了就是红（"观察期间不改界面"不能只靠记性） |
 | `scripts/sync_schema_numbers.py` | 加迁移后**一键同步**各份材料里的 `schema vN / N 个迁移`（历史基线块内不动）|
 | `scripts/seed_category_demo.py` | 对照清单的**演示数据**准备（走真实链路造 + `--mark-existing` 补 `is_demo`；脚本自称"是演示数据"）|
 | `web/public/device-check.html` | **真机自查页**：在真机上打开即测出浏览器/语音/播报/拨号能力并生成可粘贴报告（配合 `docs/eval/真机验证记录.md`）|
@@ -212,7 +220,10 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 六十八 节**：空库演练抓到的生产安全洞 + 冻结校验 / 六十七：服务台接上页面 + 旅程第 9 条）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 六十九 节**：前端「社区服务站」重设计 / 六十八：空库演练抓到的生产安全洞）|
+| `docs/ui/UI重设计-交付说明.md` | **视觉系统 v3 交付说明**：令牌变更表 · 各端改了什么 · 多宽度检查结果 · 已知问题 · `pilot-ui-v1` 冻结说明 |
+| `scripts/ui_style_audit.py` | **「AI 展示感」客观审计**（棘轮只减不增）：渐变/发光/无限动画/keyframes/内联 hex/**未定义 CSS 变量**/老年端技术术语 |
+| `scripts/ui_baseline_capture.py` | **UI 基线/对照截图**（`--out` 换目录）：25 页 × 5 档宽度 + 老年端确认卡，并记录路由/导航/按钮文字/溢出 |
 | `scripts/journey_check.py` | **浏览器旅程**（发布门槛，9 条 / 89 项：v2 §14 八条 + 服务台代录一条）：页面真点击 + 接口 + 库内事实三处对账 |
 | `scripts/grid_gov_check.py` | **治理侧两项对账**（29 项）：情景模拟器 + 人工修正对照清单，页面/接口/库内三处同一个数 |
 | `data/db_governance_sim.py` | **治理情景模拟器**（只读）：样本量×增长率 → 工时 → 折算人手；**算不出来就明说**（不给人手数、不拿默认值硬算）|
@@ -290,4 +301,14 @@ elderly:  demo_elderly（免登录）
   **观察期界面冻结校验** `scripts/freeze_check.py`（对着 `pilot-v1` 逐字比老年端界面）·
   **真机自查页门禁** `tests/test_device_check_page.py` · 静态资源目录（`web/public`）纳入 emoji 与文案门禁
 
-详见 `docs/spec/dev-log.md`（最新 **六十八** 节）。
+- **前端「社区服务站」重设计（v3，见 dev-log 六十九 + `docs/ui/UI重设计-交付说明.md`）**：
+  三端 + 登录页 + 大屏按任务书重做视觉与信息层级：品牌色换稳重蓝绿（`#2D5BFF`→`#1B6B5A`）·
+  圆角 12px 封顶 · **整层删除 v2 动效**（渐变/发光/星光粒子/呼吸环/毛玻璃/波浪入场/渐变流动/图标弹跳）·
+  老年端首页三层 + 确认卡六件事优先（技术细节折叠）+ 进度页改事项编号 ·
+  居民端首页「我要办事/查看进度/问社区问题」+ 问答结论优先与依据折叠 ·
+  网格端第一层「待研判/待处理/待回访/已完成」+ 展开区左信息右操作 + 分析详情折叠 ·
+  登录页与问答去内部技术名词 · 删掉无人使用的 `components/CountUp.vue` ·
+  新增 `scripts/ui_style_audit.py`（棘轮）与 `scripts/ui_baseline_capture.py`（基线/对照截图）·
+  冻结标签 **`pilot-ui-v1`**（观察必须在本版上进行）
+
+详见 `docs/spec/dev-log.md`（最新 **六十九** 节）。
