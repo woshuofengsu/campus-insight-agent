@@ -137,6 +137,25 @@ def test_icon_component_is_monochrome_and_sized():
     assert "aria-hidden" in src, "图标没有 aria-hidden（读屏会把图形念出来，标签文字才是内容）"
 
 
+def test_icon_component_reads_the_shared_icon_table():
+    """**这条是 2026-10-06 补的**：EIcon 必须真的从 `config/icons.js` 取图标表。
+
+    为什么必须单独守：原来 EIcon 只用**自带 9 个**路径、其余一律回落成"更多"图标，
+    而全站模板里写的是 `config/icons.js` 那套名字（122 个）——
+    于是**紧急求助 / 保存 / 天气 / 麦克风 全站都画成同一个"更多"图形**（431 处引用静默画错）。
+    原来的门禁只查"名字在 icons.js 里有"，**没人查 EIcon 是否读了那张表**；
+    `ui_audit`/`mobile_audit` 测对比度与热区，也测不出"图形画错"。
+    判据：必须 import `ICON_PATHS`（可以再叠本地覆盖），且字面上真的用了它。
+    """
+    src = io.open(os.path.join(WEB, "components", "EIcon.vue"), encoding="utf-8").read()
+    assert "from '../config/icons'" in src, \
+        "EIcon 没有 import `config/icons.js`——模板里那 122 个名字会全部回落成同一个图标（审计测不出）"
+    assert "ICON_PATHS" in src, "import 了但没用：图标表必须真的参与解析"
+    # 名称解析表必须是"共享表 + 本地覆盖"，不能只有一个 9 项的小表
+    assert "...ICON_PATHS" in src or "ICON_PATHS[" in src, \
+        "没有把共享图标表铺进解析表（只留本地小表 = 老问题复现）"
+
+
 # ---------------------------------------------------------------- 4. 扫描器自检
 
 def test_scanner_self_check():

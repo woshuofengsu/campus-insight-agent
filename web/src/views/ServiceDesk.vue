@@ -18,8 +18,9 @@
       </div>
     </div>
     <div class="muted desk-tip">
-      这是一台<b>共享设备</b>：办理完请点「结束本次办理」，下一位开始前请确认屏幕已回到起始页。
-      本机不长期保存登录状态（关闭标签页即失效）。
+      这是一台<b>共享设备</b>：办理完请点「结束本次办理」，它会清掉<b>本次办理</b>的全部痕迹（服务端会话 + 本机草稿/服务点）。
+      注意：<b>服务台账号的登录态会保留在这台设备上</b>（刷新或重开浏览器仍以该账号进入），
+      便于连续接待；若这台设备会交给居民自己操作，请先点右上角「退出登录」。
     </div>
 
     <!-- 步骤提示：**不用 `n-steps`** —— 它未到达步骤的默认灰只有 1.67:1（亮）/ 3.56:1（暗），
@@ -186,6 +187,7 @@ import EIcon from '../components/EIcon.vue'
 import { newToken } from '../utils/idemToken'
 
 const message = useMessage()
+
 const step = ref(0)
 const URGENCY = ['一般', '中等', '紧急', '普通'].map((v) => ({ label: v, value: v }))
 const STEP_TITLES = ['选择办理方式与授权情况', '确认当事人', '记录问题内容', '已登记']
@@ -318,13 +320,19 @@ async function resetDevice() {
     message.error(`本机临时数据未清理干净：${e.message}`)
     return
   }
-  // 浏览器侧：清掉本次办理的一切痕迹
+  // 浏览器侧：清掉本次办理的一切痕迹。
+  // 注意（2026-10-06 修，口径诚实化）：原来这里只清 sessionStorage，而 `ci_token`/`ci_user` 存在
+  // **localStorage**（见 stores/user.js）——所以页面上"本机不长期保存登录状态（关闭标签页即失效）"
+  // 这句是**不成立的**。现在的处理：
+  //   ① 保留服务台账号的登录态（服务台是"工作人员连续接待"的场景，每次办理都退登录并不现实）；
+  //   ② 把页面文案改成**如实说明**（见上方 desk-tip），并指出"设备会经手居民本人时请先退出登录"；
+  //   ③ 残余风险的处置写进 `docs/eval/试点-运营规则确认单.md` 第 6 条（由社区决定设备怎么用）。
   try {
     sessionStorage.removeItem('ci_desk_station')
     sessionStorage.clear()
   } catch { /* 忽略 */ }
   startNew()
-  message.success('本次办理已结束，可以接待下一位')
+  message.success('本次办理已结束，本机残留的本次办理痕迹已清空')
 }
 </script>
 
