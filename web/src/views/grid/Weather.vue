@@ -64,17 +64,33 @@ const seniorIds = ref([])
 const seniorCandidates = ref([])
 const seniorScope = ref('')
 const savingSenior = ref(false)
+// 注意（2026-10-06 修）：读名单失败时 `seniorIds` 会保持 `[]`，而"保存"按钮原来不判断
+// "到底读没读到过" —— 网格员点一次就把**超时升级名单清空**（后端把空名单当合法配置，
+// fail-closed 拦不住），后果是检查任务 3 小时未确认**再也升级不到第 2 层人员**，
+// 留痕只写"0 人"，事后极难归因。所以：读到之前**不许保存**，且失败要在页面上说清。
+const seniorLoaded = ref(false)
+const seniorError = ref('')
 
 async function loadSenior() {
+  seniorError.value = ''
   try {
     const r = (await weather.seniorManagers()) || {}
     seniorIds.value = r.ids || []
     seniorCandidates.value = r.candidates || []
     seniorScope.value = r.scope || ''
-  } catch { /* 读不到就不显示候选，保存仍会被后端 fail-closed 拦住 */ }
+    seniorLoaded.value = true
+  } catch (e) {
+    seniorLoaded.value = false
+    seniorError.value = `名单读取失败（${e.message}）——已禁止保存，避免把现有名单覆盖成空`
+  }
 }
 
 async function saveSenior() {
+  if (!seniorLoaded.value) {
+    message.error('还没成功读到现有名单，不能保存（避免把名单清空）')
+    return
+  }
+  if (seniorIds.value.length === 0 && !window.confirm('名单为空：超时后将无法升级到第 2 层人员。确定保存空名单吗？')) return
   savingSenior.value = true
   try {
     const r = (await weather.setSeniorManagers(seniorIds.value)) || {}
@@ -150,8 +166,12 @@ function remainingText(t) {
             检查任务 3 小时未确认时，先通知本社区负责人；仍无人处理时再通知这里的名单。
             名单<b>按本社区保存</b>，候选人只列本社区负责人（跨社区的 id 会被拒绝）。
           </div>
-          <div v-if="seniorCandidates.length === 0" class="muted" style="font-size:0.85rem;">
-            暂时读不到本社区负责人名单（可能是负责人未登记所属社区）。
+          <div v-if="seniorError" style="border:1px solid var(--danger-solid);border-radius:var(--r-card);padding:8px;margin-bottom:8px;" data-senior-error>
+            <div style="color:var(--ink-danger);font-size:0.85rem;"><EIcon name="alert" :size="18" /> {{ seniorError }}</div>
+            <n-button size="small" style="margin-top:6px;" @click="loadSenior">重试读取</n-button>
+          </div>
+          <div v-else-if="seniorCandidates.length === 0" class="muted" style="font-size:0.85rem;">
+            本社区暂无可加入名单的负责人（候选人列表为空）。若确有负责人，请先确认其个人资料里登记了所属社区。
           </div>
           <!-- 手机端专项核对（2026-09-29）：n-checkbox 默认只有 22px 高，手指点不准
                → 每个候选人做成一行、行高 ≥44px（含整行可点，不只是那个小方块） -->
@@ -164,7 +184,7 @@ function remainingText(t) {
             </div>
           </n-checkbox-group>
           <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <n-button type="primary" :loading="savingSenior" @click="saveSenior">
+            <n-button type="primary" :loading="savingSenior" :disabled="!seniorLoaded" @click="saveSenior">
               <EIcon name="save" :size="18" /> 保存名单
             </n-button>
             <span class="muted" style="font-size:0.82rem;" data-senior-scope>

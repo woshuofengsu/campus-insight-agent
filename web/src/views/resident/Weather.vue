@@ -13,7 +13,13 @@ onMounted(async () => {
   try { alerts.value = (await weather.alerts()) || [] } catch { /* 忽略 */ }
 })
 
-const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
+// 注意（2026-10-06 修）：原来写死 hex 当**文字色**（#eab308 黄色预警在亮色底上只有约 1.7:1，
+// 最需要看清的预警等级反而读不出来）。改成亮/暗成对令牌，两种模式都达标。
+const LEVEL_COLOR = {
+  黄色: { fg: 'var(--st-pending-ink)', bg: 'var(--st-pending-bg, var(--bg))' },
+  橙色: { fg: 'var(--st-feedback-ink)', bg: 'var(--st-feedback-bg, var(--bg))' },
+  红色: { fg: 'var(--ink-danger)', bg: 'var(--danger-light, var(--bg))' },
+}
 </script>
 
 <template>
@@ -48,7 +54,8 @@ const LEVEL_COLOR = { 黄色: '#eab308', 橙色: '#f97316', 红色: '#dc2626' }
     <div v-if="alerts.length" class="card" style="background:#fef2f2;border:1px solid #fca5a5;">
       <div style="font-weight:700;color:var(--ink-danger);"><EIcon name="siren" :size="18" /> 极端天气预警</div>
       <div v-for="a in alerts" :key="a.id" style="margin-top:8px;">
-        <span class="status-pill" :style="{ background: (LEVEL_COLOR[a.level] || '#eab308') + '22', color: LEVEL_COLOR[a.level] || '#eab308', border: '1px solid ' + (LEVEL_COLOR[a.level] || '#eab308') }">
+        <span class="status-pill"
+              :style="{ background: (LEVEL_COLOR[a.level] || LEVEL_COLOR.黄色).bg, color: (LEVEL_COLOR[a.level] || LEVEL_COLOR.黄色).fg, border: '1px solid currentColor' }">
           {{ a.alert_type }}{{ a.level }}预警
         </span>
         <span class="muted" style="margin-left:8px;font-size:0.85rem;">生效 {{ (a.effective_time || '').slice(0, 16) }}</span>

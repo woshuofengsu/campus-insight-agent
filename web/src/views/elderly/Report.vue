@@ -446,14 +446,14 @@ async function checkSubmitted() {
       <div style="margin-top:6px;">
         <EIcon name="pin" :size="18" /> 位置：
         <b v-if="draft.fields.location">{{ draft.fields.location }}</b>
-        <span v-else style="color:var(--danger,#c00);">还缺，请在下面补充</span>
+        <span v-else style="color:var(--ink-danger);">还缺，请在下面补充</span>
         <span class="muted" style="font-size:1.25rem;">（{{ srcTip(draft.sources.location) }}）</span>
       </div>
       <div style="margin-top:6px;">
         <EIcon name="home" :size="18" /> 责任范围：
         <b v-if="draft.fields.issue_type === '室内'">您家里（自己家的事）</b>
         <b v-else-if="draft.fields.issue_type === '室外'">公共地方（楼道/电梯等）</b>
-        <span v-else style="color:var(--danger,#c00);">还没定，请选一下</span>
+        <span v-else style="color:var(--ink-danger);">还没定，请选一下</span>
       </div>
       <div style="margin-top:6px;"><EIcon name="clock" :size="18" />  紧急程度：{{ draft.fields.urgency }}</div>
 
@@ -462,7 +462,7 @@ async function checkSubmitted() {
         <b><EIcon name="question" :size="18" /> {{ draft.ask }}</b>
         <!-- 补充值不够用时说明原因（不能默默不理会老人答的话） -->
         <div v-if="draft.reject_hint" data-reject-hint
-             style="color:var(--danger,#c00);font-weight:700;margin-top:6px;font-size:1.15rem;">
+             style="color:var(--ink-danger);font-weight:700;margin-top:6px;font-size:1.25rem;">
           <EIcon name="alert" :size="18" /> {{ draft.reject_hint }}
         </div>
         <!-- 系统已经能猜出位置时，给一个"就是它"的大按钮：老人点一下就行，不用打字 -->
@@ -487,7 +487,7 @@ async function checkSubmitted() {
 
       <template v-else>
         <div style="margin-top:12px;">
-          <div class="muted" style="font-size:1.05rem;">紧急程度可以改（不急就选「一般」）：</div>
+          <div class="muted" style="font-size:1.25rem;">紧急程度可以改（不急就选「一般」）：</div>
           <div style="display:flex;gap:8px;margin-top:6px;">
             <n-button v-for="u in ['一般', '中等', '紧急']" :key="u" size="large"
                       style="flex:1;min-height:56px;font-size:1.25rem;"

@@ -38,9 +38,17 @@ const ttsOk = ref(cap.hasTTS)
 const welcomeText = ref('')        // 首屏要念的话（改由"点一下听"触发）
 const urgentText = ref('')         // 紧急通知要念的话
 
-onMounted(async () => {
-  try {
-    home.value = await elderly.home()
+const loadError = ref(false)   // 注意：取数失败**不能**画成"您最近没有在办的事"
+
+/** 首页数据加载：四个请求**并行**（原来串行，最长 20s×4 都停在白屏），
+ *  失败必须让老人看见（假空态会让老人以为自己没报过事，也不再重试）。 */
+async function loadHome() {
+  loadError.value = false
+  const [h, c, o, n] = await Promise.allSettled([
+    elderly.home(), elderly.contacts(), elderly.orders(), notices.list(),
+  ])
+  if (h.status === 'fulfilled') {
+    home.value = h.value
     // M1：时段问候 + 今日一句关怀 + 语速
     rate.value = home.value?.speech_rate || 0.9
     greetText.value = home.value?.greeting ? `${home.value.greeting}，${home.value.name || '您好'}` : ''
@@ -50,22 +58,21 @@ onMounted(async () => {
     welcomeText.value = careLine.value
       ? (greetText.value ? `${greetText.value}。${careLine.value}` : careLine.value)
       : ''
-  } catch { /* 忽略 */ }
-  try { contacts.value = (await elderly.contacts()) || [] } catch { /* 忽略 */ }
-  // 最近办理（只取最近一条；失败不影响首页其它内容）
-  try {
-    const os = (await elderly.orders()) || []
-    latest.value = os[0] || null
-  } catch { /* 忽略 */ }
+  } else {
+    loadError.value = true
+  }
+  if (c.status === 'fulfilled') contacts.value = c.value || []
+  // 最近办理（只取最近一条）。**取不到就不许说"没有在办的事"** → 转成 loadError
+  if (o.status === 'fulfilled') latest.value = (o.value || [])[0] || null
+  else loadError.value = true
   // 紧急通知：仍然弹窗（必须让老人看见），但播报改为**用户点一下**（同上，自动播在 iOS 不响）
-  try {
-    const nl = (await notices.list()) || []
-    const urgent = nl.find((n) => n.is_urgent && !n.is_read)
+  if (n.status === 'fulfilled') {
+    const urgent = (n.value || []).find((x) => x.is_urgent && !x.is_read)
     if (urgent) {
       urgentNotice.value = urgent
       urgentText.value = `紧急通知：${urgent.elderly_summary || urgent.title}`
     }
-  } catch { /* 忽略 */ }
+  }
   if (home.value?.due_medications > 0 && !careLine.value) {
     welcomeText.value = `今天有 ${home.value.due_medications} 次药要吃，我会到点提醒您。`
   }
@@ -73,7 +80,9 @@ onMounted(async () => {
     const tags = home.value.weather.alert_tags.map((a) => `${a.type}${a.level}`).join('、')
     welcomeText.value = `注意！当前有极端天气预警：${tags}，请尽量减少外出。`
   }
-})
+}
+
+onMounted(loadHome)
 
 /** 点一下听（用户手势触发，iOS 才会真的响）；播不出来就说明原因并保留大字。 */
 async function playWelcome() {
@@ -262,6 +271,14 @@ function cancelCall() {
         <n-button block size="large" style="margin-top:10px;min-height:64px;font-size:1.25rem;"
                   @click="router.push('/elderly/orders')">
           <EIcon name="clipboard" :size="22" /> 看看完整进度
+        </n-button>
+      </template>
+      <template v-else-if="loadError">
+        <div style="font-size:1.25rem;color:var(--ink-danger);">暂时没连上社区服务，没法确认您的事办到哪了。</div>
+        <div class="muted" style="font-size:1.25rem;margin-top:4px;">不是"没有在办的事"——请稍等一下再点重试。</div>
+        <n-button block size="large" style="margin-top:10px;min-height:64px;font-size:1.25rem;"
+                  @click="loadHome">
+          <EIcon name="refresh" :size="22" /> 重新加载
         </n-button>
       </template>
       <template v-else>

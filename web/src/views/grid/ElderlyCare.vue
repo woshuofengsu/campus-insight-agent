@@ -16,15 +16,27 @@ const vitalUid = ref(null)
 const vitals = ref([])
 const auditOp = ref({}) // 审核意见
 const replyOp = ref({}) // SOS 处理备注
+const loadError = ref('')   // 注意：取数失败必须看得见，否则"暂无求助记录"会骗人
 
 onMounted(load)
 
 async function load() {
-  try { meds.value = (await elderly.manageMeds()) || [] } catch { /* 忽略 */ }
-  try { contacts.value = (await elderly.manageContacts()) || [] } catch { /* 忽略 */ }
-  try { sosList.value = (await elderly.manageSos()) || [] } catch { /* 忽略 */ }
-  try { inactive.value = (await elderly.manageInactive({ days: 1 })) || [] } catch { /* 忽略 */ }
-  try { elders.value = (await elderly.manageElders()) || [] } catch { /* 忽略 */ }
+  // 注意（2026-10-06 修）：原来五个请求全是空 catch，页面用确定的"暂无求助记录"兜底 ——
+  // 网格员会据此判断"今天没有老人求助"，而真相是**取数失败**。
+  // 现在：任何一个失败都置 loadError（页面顶部显示红条 + 重试），
+  // 并且把该列表的"空"与"没取到"区分开（下面的 v-if 判据都用 loadError 兜住）。
+  loadError.value = ''
+  const [m, c, s, i, e] = await Promise.allSettled([
+    elderly.manageMeds(), elderly.manageContacts(), elderly.manageSos(),
+    elderly.manageInactive({ days: 1 }), elderly.manageElders(),
+  ])
+  const failed = []
+  if (m.status === 'fulfilled') meds.value = m.value || []; else failed.push('用药提醒')
+  if (c.status === 'fulfilled') contacts.value = c.value || []; else failed.push('紧急联系人')
+  if (s.status === 'fulfilled') sosList.value = s.value || []; else failed.push('求助记录')
+  if (i.status === 'fulfilled') inactive.value = i.value || []; else failed.push('久未互动')
+  if (e.status === 'fulfilled') elders.value = e.value || []; else failed.push('老人名单')
+  if (failed.length) loadError.value = `${failed.join('、')}读取失败——下面的"暂无"不代表真的没有，请点重试`
 }
 
 // P4：健康记录（只做记录与提醒，页面不出现任何医学结论——文案全部来自后端）
@@ -69,6 +81,15 @@ async function sosAction(s, action) {
   <div class="page">
     <h2 class="page-title"><EIcon name="users" :size="18" /> 老年关怀管理</h2>
     <p class="page-sub">用药提醒审核 · 紧急联系人审核 · 紧急求助处理</p>
+
+    <!-- 注意（2026-10-06 修）：取数失败必须在这里显形。
+         原来五个请求全空 catch，页面用确定的"暂无求助记录"兜底 →
+         网格员会据此判断"今天没有老人求助"，而真相是**取数失败**。 -->
+    <div v-if="loadError" data-load-error
+         style="border:2px solid var(--danger-solid);border-radius:var(--r-card);padding:10px;margin-bottom:10px;">
+      <div style="color:var(--ink-danger);font-size:0.95rem;"><EIcon name="alert" :size="18" /> {{ loadError }}</div>
+      <n-button size="small" style="margin-top:8px;" @click="load">重试</n-button>
+    </div>
 
     <n-tabs v-model:value="tab" type="line">
       <!-- P4 健康记录：选老人 → 看血压/血糖与分级（只提醒，不下结论） -->

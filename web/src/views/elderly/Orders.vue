@@ -86,7 +86,7 @@ async function act(id, data, okMsg) {
         <div v-for="(s, si) in (i.progress?.steps || [])" :key="s"
              :style="`flex:1;text-align:center;font-size:1.25rem;padding:6px 2px;border-radius:8px;` +
                      (si < (i.progress?.step_index || 0)
-                       ? 'background:var(--success-light,#dcfce7);color:var(--ink-success);font-weight:700;'
+                       ? 'background:var(--primary-light);color:var(--primary-light-ink);font-weight:700;'
                        : 'background:var(--bg);color:var(--muted);')">
           <EIcon v-if="si < (i.progress?.step_index || 0)" name="checkCircle" :size="22" />{{ s }}
         </div>

@@ -9,7 +9,7 @@ import { useSpeech, speechCapability, reasonText } from '../../composables/useSp
 import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
-const { recognize, speak } = useSpeech()
+const { recognize, speak, stopListening } = useSpeech()
 
 const msgs = ref([])
 const listening = ref(false)
@@ -78,6 +78,10 @@ async function startListen() {
 function stopListen() {
   clearInterval(timer)
   listening.value = false
+  // 注意（2026-10-06 修）：原来只改标志位 —— 按钮写着"松开结束"，但**麦克风仍在收音**，
+  // 录音指示不灭、转写稍后突然弹出；再按一次还会起第二个识别会话（可能被判成"不支持语音"）。
+  // 必须真的停掉识别（`useSpeech` 的 stopListening 会 abort 当前会话）。
+  try { stopListening() } catch { /* 组件不支持时忽略（按钮文案已随之降级） */ }
 }
 
 function confirmText() {
@@ -191,10 +195,15 @@ function sendOption(o) {
       <n-button type="primary" size="large" style="min-height:56px;font-size:1.25rem;" :loading="busy" @click="send()">发送</n-button>
     </div>
 
-    <!-- 底部紧急求助（长按 3 秒） -->
+    <!-- 去首页找"紧急求助"（**不是** SOS 按钮本身）
+         注意（2026-10-06 修）：这里原来是一个深红大按钮写着"紧急求助（长按 3 秒）"、配 siren 图标，
+         但只绑了 `@click` —— **长按没有任何反应**（老人以为在求救，实际只是回首页），
+         而同屏顶部还有一枚真的 SOS，两者同色同图标、极易混淆。
+         按"要么接真机状态机、要么不冒充 SOS"的原则：这里**降级为普通导航入口**，
+         去掉红色与 siren（SOS 只保留首页那一处真的好用的长按）。 -->
     <div style="margin-top:16px;">
-      <n-button type="error" block size="large" style="min-height:70px;font-size:1.4rem;background:#dc2626;"
-                @click="$router.push('/elderly/home')"><EIcon name="siren" :size="18" /> 紧急求助（长按 3 秒，去首页）</n-button>
+      <n-button block size="large" style="min-height:70px;font-size:1.4rem;"
+                @click="$router.push('/elderly/home')"><EIcon name="home" :size="22" /> 回首页（紧急求助在首页长按）</n-button>
     </div>
   </div>
 </template>

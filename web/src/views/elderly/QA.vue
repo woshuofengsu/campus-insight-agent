@@ -14,7 +14,7 @@ import { useSpeech, speechCapability, reasonText } from '../../composables/useSp
 import EIcon from '../../components/EIcon.vue'
 
 const message = useMessage()
-const { recognize, speak } = useSpeech()
+const { recognize, speak, stopListening } = useSpeech()
 
 const question = ref('')
 const asking = ref(false)
@@ -60,9 +60,11 @@ async function startListen() {
   handleResult(r)
 }
 
-/** 松开手指/鼠标：结束本轮识别（识别结果仍会正常走到待确认）。 */
+/** 松开手指/鼠标：**真的结束**本轮识别（识别结果仍会正常走到待确认）。 */
 function stopListen() {
   listening.value = false
+  // 注意（2026-10-06 修）：原来只改标志位，按钮写着"松开结束"但麦克风还在收音。
+  try { stopListening() } catch { /* 不支持时忽略 */ }
 }
 
 function handleResult(r) {
