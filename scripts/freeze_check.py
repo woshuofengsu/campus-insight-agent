@@ -159,7 +159,7 @@ def main() -> int:
     print("  ① 回退这些改动（观察结束前不动界面）；")
     print("  ② 观察已结束 → 打新标签并重新冻结：`python scripts/freeze_check.py --ref <新标签>`；")
     print("  ③ 确有必要（如修一个会让老人用不下去的缺陷）→ 在 scripts/freeze_check.py 的 "
-          "ALLOW 里登记该文件**并写明理由**，同时在 docs/eval/pilot-v1-基线.md 的变更登记里补一行。")
+          "ALLOW 里登记该文件**并写明理由**，同时在 docs/eval/pilot-冻结清单.md 的变更登记里补一行。")
     return 1
 
 

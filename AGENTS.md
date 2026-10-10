@@ -6,7 +6,7 @@
 
 「社区先知 CommunityInsight」——基层治理·网格化多智能体系统，接诉即办平台。三端分离：居民端 `/resident`、网格员端 `/grid`、老年端 `/elderly`。
 
-**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1165 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
+**核心价值主张**（答辩/评审最在意）：多智能体有**真实消息队列协作**（非伪多智能体）+ 双层防线（Verifier 校验 + Arbiter 仲裁留痕）+ **可验证**（评测集、成本记账、1169 项测试 + UI 客观审计 + 演示前自检，全部可现场复算）。
 
 ## 架构总览
 
@@ -35,7 +35,7 @@ app.py  = Streamlit 备线（旧版演示，非主路线）
 ## 常用命令
 
 ```bash
-# 后端测试（可运行 1165 项：1164 通过 + 1 需外部服务跳过，全绿基线）
+# 后端测试（可运行 1169 项：1168 通过 + 1 需外部服务跳过，全绿基线）
 python -m pytest tests/ -q
 
 # 启动主服务（最终代码；DEMO_MODE=true 可用演示账号登录）
@@ -77,7 +77,7 @@ elderly:  demo_elderly（免登录）
 
 ## 约束与陷阱
 
-- **不要破坏这 1165 项测试**（1164 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 38 个路由页 / 62 个页面视口 UI 客观审计）。
+- **不要破坏这 1169 项测试**（1168 通过 + 1 需外部服务跳过）：每次改完跑 `python -m pytest tests/ -q`，必须全绿才提交；另跑 `python scripts/demo_preflight.py --fast`（9 项自检）与 `python scripts/ui_audit.py`（全站 38 个路由页 / 62 个页面视口 UI 客观审计）。
 - ⚠️ **跑全量 `pytest tests/` 前先停掉本机服务**（2026-09-24 实测踩到）：`uvicorn api_web:app` 正在运行时，
   `tests/e2e/test_demo_scenarios.py` 有 2 个用例会因数据库状态冲突报 `no such table: community_issues`
   （表现为"单跑过、全量挂"）；停掉服务后同一套代码 **660 全绿**。反之 **UI 审计脚本（`ui_audit`/`mobile_audit`）需要服务在跑**。
@@ -211,6 +211,10 @@ elderly:  demo_elderly（免登录）
 | `scripts/empty_db_drill.py` | **空库初始化演练**（生产红线）：三种姿态各建一套空库 → 生产姿态必须 0 演示账号/0 数据、缺密钥必须拒绝启动、**演示库文件不得被改动** |
 | `scripts/bootstrap_admin.py` | **首个负责人账号引导**（空库不灌种子后怎么登进去）：强制 ≥12 位密码 · 拒绝 `demo` 前缀 · 社区名（租户键）必填 |
 | `scripts/freeze_check.py` | **观察期界面冻结校验**：把老年端界面与冻结标签（现为 **`pilot-ui-v1`**）逐字比对，改了就是红（"观察期间不改界面"不能只靠记性） |
+| `scripts/pilot_freeze_check.py` | **试点冻结门禁**：路由 / 各端页面 / Agent 角色 / 表 / schema / 路由模块 + **老年端 6 个入口、3 个主要动作、2 个求助入口** 全都不许变（多一个少一个都红）——"不再加功能"由机器守 |
+| `scripts/staging_drill.py` | **staging 环境演练**（本机真跑）：独立库 + 独立密钥 + 独立账号 + 独立端口；验「演示账号在预发登不上」「写进去只落预发」「跨密钥解不开」 |
+| `docs/eval/pilot-冻结清单.md` | **试点冻结清单**：冻了什么 / 怎么验 / **唯一合法解冻路径** / 还没做的（真人项） |
+| `docs/eval/试点-运营规则确认单.md` | **试点前必须与社区填完的 9 条运营规则**（谁接单 / 谁关单 / 响应时限 / 通知失败怎么办 / 谁代办 / 哪些转人工 / 数据保存多久 / 谁能看完整手机号）——每条都标了"系统在哪配" |
 | `scripts/sync_schema_numbers.py` | 加迁移后**一键同步**各份材料里的 `schema vN / N 个迁移`（历史基线块内不动）|
 | `scripts/seed_category_demo.py` | 对照清单的**演示数据**准备（走真实链路造 + `--mark-existing` 补 `is_demo`；脚本自称"是演示数据"）|
 | `web/public/device-check.html` | **真机自查页**：在真机上打开即测出浏览器/语音/播报/拨号能力并生成可粘贴报告（配合 `docs/eval/真机验证记录.md`）|
@@ -220,7 +224,7 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 六十九 节**：前端「社区服务站」重设计 / 六十八：空库演练抓到的生产安全洞）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 七十 节**：试点冻结 + 环境真演练 / 六十九：前端「社区服务站」重设计）|
 | `docs/ui/UI重设计-交付说明.md` | **视觉系统 v3 交付说明**：令牌变更表 · 各端改了什么 · 多宽度检查结果 · 已知问题 · `pilot-ui-v1` 冻结说明 |
 | `scripts/ui_style_audit.py` | **「AI 展示感」客观审计**（棘轮只减不增）：渐变/发光/无限动画/keyframes/内联 hex/**未定义 CSS 变量**/老年端技术术语 |
 | `scripts/ui_baseline_capture.py` | **UI 基线/对照截图**（`--out` 换目录）：25 页 × 5 档宽度 + 老年端确认卡，并记录路由/导航/按钮文字/溢出 |
@@ -311,4 +315,14 @@ elderly:  demo_elderly（免登录）
   新增 `scripts/ui_style_audit.py`（棘轮）与 `scripts/ui_baseline_capture.py`（基线/对照截图）·
   冻结标签 **`pilot-ui-v1`**（观察必须在本版上进行）
 
-详见 `docs/spec/dev-log.md`（最新 **六十九** 节）。
+- **试点期纪律（2026-10-06 起，见 dev-log 七十）**：**不再加功能**——路由/页面/Agent/表/schema
+  由 `scripts/pilot_freeze_check.py` 与 `tests/test_pilot_freeze.py` 守着（多一个少一个都红）；
+  界面由 `scripts/freeze_check.py` 对着 `pilot-ui-v1` 守着。
+  改任何东西都要走 `docs/eval/pilot-冻结清单.md` 的**唯一合法解冻路径**（写理由 → 跑齐门禁 → **重新打标签**，
+  观察数据只与同一标签内部可比）。环境侧的"预发与演示分离"由 `scripts/staging_drill.py` 真跑验证（15 项）。
+  与社区一起填的 9 条运营规则在 `docs/eval/试点-运营规则确认单.md`——**没填完不开试点**。
+  ⚠️ 数字口径：`docs/eval/pilot-v1-基线.md` 是 **`pilot-v1` 时代的历史基线**（数字用
+  `baseline:historical` 标记夹着，保留当时事实不再更新），**当前值只看 `docs/eval/pilot-冻结清单.md`**；
+  写材料时别把两份里的用例数/页数混用。
+
+详见 `docs/spec/dev-log.md`（最新 **七十** 节）。

@@ -86,6 +86,29 @@ def _role_count() -> int:
     return len(AGENT_CLASSES)
 
 
+def _portal_page_counts() -> dict:
+    """三端各自的**页面数**（材料里到处写「居民 14 页 / 网格 9 页 / 老年 8 页」）。
+
+    ⚠️ 2026-10-06 补：这三个数**长期漂移**——代码里实际是 14 / 10 / 10，
+    而 PRODUCT.md、交付说明、技术实现报告、创意说明书都还写着 14 / 9 / 8
+    （网格端后来加了「消息中心/健康」，老年端加了「健康/用药」，文档没人跟着改）。
+    check_claims 以前只核对 schema/路由/表数这类"总账"，**分端页数没人管**，所以就漂了。
+
+    判据：数**被路由引用的视图文件**（去重）——不能数 `path:`，因为路由表是嵌套的
+    （`/resident` 下面是相对路径 `home`/`qa`…），数路径只会数到父级那一条。
+    """
+    import io as _io
+    import re as _re
+    src = _io.open(os.path.join(_PROJ, "web", "src", "router", "index.js"),
+                   encoding="utf-8").read()
+    out = {"elderly": set(), "resident": set(), "grid": set()}
+    for portal, file in _re.findall(
+            r"import\('\.\./views/(elderly|resident|grid)/([^']+)'\)", src):
+        out[portal].add(file)
+    return {"resident": len(out["resident"]), "grid": len(out["grid"]),
+            "elderly": len(out["elderly"])}
+
+
 def _table_count() -> int:
     import sqlite3
 
@@ -134,7 +157,8 @@ def main():
     passed = max(0, runnable - 1)
     struct = {"schema": _schema_version(), "routes": _route_count(),
               "roles": _role_count(), "tables": _table_count(),
-              "migrations": _migration_count(), **_audit_counts()}
+              "migrations": _migration_count(), **_audit_counts(),
+              **{f"pages_{k}": v for k, v in _portal_page_counts().items()}}
     print("社区先知 CommunityInsight —— 当前代码库事实数字：")
     if runnable > 0:
         print(f"  pytest 可运行用例数  : {runnable}（= {passed} 通过 + 1 需外部服务默认跳过）")
@@ -358,6 +382,13 @@ def _cross_check(collected: int, struct: dict | None = None) -> int:
             "migrations": (r"(\d{2,})\s*个(?:版本化)?迁移", struct.get("migrations"), "迁移条数"),
             "viewports": (r"(\d{2,})\s*(?:页|个)视口", struct.get("viewports"), "UI 审计视口数"),
             "mobile_pages": (r"(\d{2,})\s*页移动(?:端)?审计", struct.get("mobile_pages"), "移动审计页数"),
+            # 2026-10-06 补：三端各自的页面数（实测长期漂移 14/9/8 → 其实是 14/10/10）
+            "pages_resident": (r"居民(?:端)?\s*\*{0,2}(\d{1,2})\s*页", struct.get("pages_resident"),
+                               "居民端页面数"),
+            "pages_grid": (r"网格(?:员|端)?\s*\*{0,2}(\d{1,2})\s*页", struct.get("pages_grid"),
+                           "网格端页面数"),
+            "pages_elderly": (r"老年(?:端)?\s*\*{0,2}(\d{1,2})\s*页", struct.get("pages_elderly"),
+                              "老年端页面数"),
         }
         for doc in CURRENT_DOCS + SNAPSHOT_DOCS:
             if doc in COUNT_EXEMPT or doc in STRUCTURE_EXEMPT:
