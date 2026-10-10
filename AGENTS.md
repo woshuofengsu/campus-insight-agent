@@ -224,7 +224,7 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 七十 节**：试点冻结 + 环境真演练 / 六十九：前端「社区服务站」重设计）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 七十一 节**：两项范围决策——试点期不做 PG / 真机走查不必等备案 / 七十：试点冻结 + 环境真演练 / 六十九：前端「社区服务站」重设计）|
 | `docs/ui/UI重设计-交付说明.md` | **视觉系统 v3 交付说明**：令牌变更表 · 各端改了什么 · 多宽度检查结果 · 已知问题 · `pilot-ui-v1` 冻结说明 |
 | `scripts/ui_style_audit.py` | **「AI 展示感」客观审计**（棘轮只减不增）：渐变/发光/无限动画/keyframes/内联 hex/**未定义 CSS 变量**/老年端技术术语 |
 | `scripts/ui_baseline_capture.py` | **UI 基线/对照截图**（`--out` 换目录）：25 页 × 5 档宽度 + 老年端确认卡，并记录路由/导航/按钮文字/溢出 |
@@ -324,5 +324,11 @@ elderly:  demo_elderly（免登录）
   ⚠️ 数字口径：`docs/eval/pilot-v1-基线.md` 是 **`pilot-v1` 时代的历史基线**（数字用
   `baseline:historical` 标记夹着，保留当时事实不再更新），**当前值只看 `docs/eval/pilot-冻结清单.md`**；
   写材料时别把两份里的用例数/页数混用。
+  ⛔ **试点期不做 PostgreSQL 迁移**（2026-10-06 用户决策，选"A"）：数据层保持 SQLite，
+  **不要"顺手"做方言收敛 / 连接层抽象 / `DB_BACKEND=postgres`**——那要动 141+188 处、属结构性改动。
+  环境不是障碍（`pip install pgserver` 能在本机起真 PG，已验证有 `cp312-win_amd64` 包），障碍是"冻结期不动数据层"。
+  要做得先走 `pilot-冻结清单.md` 的解冻路径（写理由 → 跑齐门禁 → 打新标签），施工图见
+  `docs/spec/升级方案/PG迁移盘点与计划.md` §0（触发条件：多社区/多副本/多进程，或实测到锁等待与 P95 劣化）。
+  材料口径只能写「**仅有迁移方案与路径，未实施**」。
 
-详见 `docs/spec/dev-log.md`（最新 **七十** 节）。
+详见 `docs/spec/dev-log.md`（最新 **七十一** 节）。

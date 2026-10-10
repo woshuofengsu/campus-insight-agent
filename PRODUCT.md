@@ -45,7 +45,7 @@ web（FastAPI 主服务 `:8000` 托管 Vue3 三端；另有 `api.py` 扣子插�
 
 **约束：**
 - **单进程形态**：黑板 / 限流 / WebSocket 均在进程内，多 worker 需 Redis（见 `docs/scaling.md`）
-- SQLite（WAL，schema v54）；PostgreSQL 迁移路径已写、比赛期不做大重构
+- SQLite（WAL，schema v54）；PostgreSQL **仅有迁移方案与路径，未实施**（2026-10-06 决策：试点期不做，见 `docs/spec/升级方案/PG迁移盘点与计划.md` §0）
 - **无 service worker**：不宣称离线能力，业务强依赖后端实时数据
 - 多租户**已做真隔离**（B5–B7）：写入侧落租户、读取侧 fail-closed、按-id 过闸门、配置按社区分键
 - DeepSeek（对话）+ 百炼 text-embedding-v3（向量）双模型依赖
