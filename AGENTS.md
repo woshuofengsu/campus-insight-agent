@@ -145,11 +145,18 @@ elderly:  demo_elderly（免登录）
   新增任何"演示专用行为"时：默认值写成 `"true" if DEMO_MODE else "false"`，
   并在 `deploy/.env.production.example` 里**显式写出**（`tests/test_prod_empty_init.py` 会核对模板）。
   生产空库不灌种子后，"第一个账号"走 `python scripts/bootstrap_admin.py`（见 `docs/deploy/生产部署手册.md` §4）。
-- **观察期（打完 `pilot-ui-v1` 之后）跑 `python scripts/freeze_check.py`**：它对着冻结标签逐字比对
+- **观察期（打完 `pilot-ui-v2` 之后）跑 `python scripts/freeze_check.py`**：它对着冻结标签逐字比对
   老年端界面（页面/布局/语音与 SOS/图标/样式表/全局样式），改了就是红。要动界面 → 回退、或打新标签重新冻结、
   或在它的 `ALLOW` 里登记理由（**不要**用 ALLOW 长期豁免整目录，那等于把门禁关掉）。
-  **`pilot-v1` → `pilot-ui-v1` 的切换**（2026-10-06）：界面重设计必然改老年端界面，而观察**尚未开始**，
-  所以按脚本给的路径第 ② 条"打新标签重新冻结"，把 `FREEZE_REF` 换成 `pilot-ui-v1`。
+  **两次换点记录**（都是"观察尚未开始 + 走脚本给的路径第 ② 条"，不是顺手改）：
+  ① `pilot-v1` → **`pilot-ui-v1`**（2026-10-06）：界面重设计必然改老年端界面；
+  ② `pilot-ui-v1` → **`pilot-ui-v2`**（2026-10-06）：修 HIGH —— `EIcon.vue` 没读共享图标表
+  （`config/icons.js` 122 个名字），全站 431 处图标静默画成同一个"更多"。**标签只增不改，旧标签保留可复算。**
+- **图标组件只有一条正确写法**：`EIcon` 必须从 `config/icons.js` 取路径表（本地形状作覆盖），
+  `tests/test_no_emoji_ui.py::test_icon_component_reads_the_shared_icon_table` 守着。
+  ⚠️ 这条教训值得记住：**"名字在图标表里"不等于"图标画对了"**——门禁当时只查前者，
+  于是 431 处引用全画错、而 `ui_audit`/`mobile_audit`（测对比度与热区）一个都测不出来。
+  同类盲区提醒：任何"组件 + 配置表"的结构，都要有一条"组件真的读了那张表"的判据。
 - **视觉系统 v3「社区服务站」**（见 `docs/ui/UI重设计-交付说明.md` + dev-log 六十九）：
   渐变/发光/无限动画/keyframes **全部为 0**，`scripts/ui_style_audit.py` 以棘轮守着（只减不增）；
   新增任何"演示专用"特效前先想清楚——**审美要求已经变成可复算的数字**，加回去会直接红。
@@ -210,7 +217,7 @@ elderly:  demo_elderly（免登录）
 | `scripts/backup_db.py` · `scripts/restore_drill.py` | 备份（快照 + sha256/表行数清单）与**恢复演练**（恢复到临时目录后 6 项校验；实测 0.02 秒） |
 | `scripts/empty_db_drill.py` | **空库初始化演练**（生产红线）：三种姿态各建一套空库 → 生产姿态必须 0 演示账号/0 数据、缺密钥必须拒绝启动、**演示库文件不得被改动** |
 | `scripts/bootstrap_admin.py` | **首个负责人账号引导**（空库不灌种子后怎么登进去）：强制 ≥12 位密码 · 拒绝 `demo` 前缀 · 社区名（租户键）必填 |
-| `scripts/freeze_check.py` | **观察期界面冻结校验**：把老年端界面与冻结标签（现为 **`pilot-ui-v1`**）逐字比对，改了就是红（"观察期间不改界面"不能只靠记性） |
+| `scripts/freeze_check.py` | **观察期界面冻结校验**：把老年端界面与冻结标签（现为 **`pilot-ui-v2`**）逐字比对，改了就是红（"观察期间不改界面"不能只靠记性） |
 | `scripts/pilot_freeze_check.py` | **试点冻结门禁**：路由 / 各端页面 / Agent 角色 / 表 / schema / 路由模块 + **老年端 6 个入口、3 个主要动作、2 个求助入口** 全都不许变（多一个少一个都红）——"不再加功能"由机器守 |
 | `scripts/staging_drill.py` | **staging 环境演练**（本机真跑）：独立库 + 独立密钥 + 独立账号 + 独立端口；验「演示账号在预发登不上」「写进去只落预发」「跨密钥解不开」 |
 | `docs/eval/pilot-冻结清单.md` | **试点冻结清单**：冻了什么 / 怎么验 / **唯一合法解冻路径** / 还没做的（真人项）+ 冻结期每一次改动的变更登记 |
@@ -225,7 +232,7 @@ elderly:  demo_elderly（免登录）
 | `scripts/probe_public.py` | **公网入口端到端探测**（健康/登录页/PWA/三角色/智能体对话，8 项；含 DNS 绕行）|
 | `scripts/net_probe.py` | DNS 兜底：UDP/53 问公共 DNS + 本进程改写解析 + IP/SNI 直连校验（校园 DNS 会对新隧道域名返回 NXDOMAIN）|
 | `docs/演示常开-本机方案.md` | 0 成本公网演示方案：命令、自启、6 个已知坑、安全口径、成本对照 |
-| `docs/spec/dev-log.md` | 开发日志（**最新 七十二 节**：一次独立审查后修 7 条真缺陷 + 门禁盲区加固 / 七十一：两项范围决策 / 七十：试点冻结 + 环境真演练 / 六十九：前端「社区服务站」重设计）|
+| `docs/spec/dev-log.md` | 开发日志（**最新 七十三 节**：前端审查批——全站图标画错 + 第一次走完解冻路径 / 七十二：三路审查修 7 条真缺陷 / 七十一：两项范围决策 / 七十：试点冻结 + 环境真演练 / 六十九：前端「社区服务站」重设计）|
 | `docs/ui/UI重设计-交付说明.md` | **视觉系统 v3 交付说明**：令牌变更表 · 各端改了什么 · 多宽度检查结果 · 已知问题 · `pilot-ui-v1` 冻结说明 |
 | `scripts/ui_style_audit.py` | **「AI 展示感」客观审计**（棘轮只减不增）：渐变/发光/无限动画/keyframes/内联 hex/**未定义 CSS 变量**/老年端技术术语 |
 | `scripts/ui_baseline_capture.py` | **UI 基线/对照截图**（`--out` 换目录）：25 页 × 5 档宽度 + 老年端确认卡，并记录路由/导航/按钮文字/溢出 |
@@ -314,11 +321,11 @@ elderly:  demo_elderly（免登录）
   网格端第一层「待研判/待处理/待回访/已完成」+ 展开区左信息右操作 + 分析详情折叠 ·
   登录页与问答去内部技术名词 · 删掉无人使用的 `components/CountUp.vue` ·
   新增 `scripts/ui_style_audit.py`（棘轮）与 `scripts/ui_baseline_capture.py`（基线/对照截图）·
-  冻结标签 **`pilot-ui-v1`**（观察必须在本版上进行）
+  冻结标签 **`pilot-ui-v1` → `pilot-ui-v2`**（观察必须在本版上进行；v2 修的是"全站图标画错"那个 HIGH）
 
 - **试点期纪律（2026-10-06 起，见 dev-log 七十）**：**不再加功能**——路由/页面/Agent/表/schema
   由 `scripts/pilot_freeze_check.py` 与 `tests/test_pilot_freeze.py` 守着（多一个少一个都红）；
-  界面由 `scripts/freeze_check.py` 对着 `pilot-ui-v1` 守着。
+  界面由 `scripts/freeze_check.py` 对着 **`pilot-ui-v2`** 守着。
   改任何东西都要走 `docs/eval/pilot-冻结清单.md` 的**唯一合法解冻路径**（写理由 → 跑齐门禁 → **重新打标签**，
   观察数据只与同一标签内部可比）。环境侧的"预发与演示分离"由 `scripts/staging_drill.py` 真跑验证（15 项）。
   与社区一起填的 9 条运营规则在 `docs/eval/试点-运营规则确认单.md`——**没填完不开试点**。
@@ -332,4 +339,4 @@ elderly:  demo_elderly（免登录）
   `docs/spec/升级方案/PG迁移盘点与计划.md` §0（触发条件：多社区/多副本/多进程，或实测到锁等待与 P95 劣化）。
   材料口径只能写「**仅有迁移方案与路径，未实施**」。
 
-详见 `docs/spec/dev-log.md`（最新 **七十一** 节）。
+详见 `docs/spec/dev-log.md`（最新 **七十三** 节）。
