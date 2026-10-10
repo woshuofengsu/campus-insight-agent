@@ -115,7 +115,12 @@ async function submitConfirm() {
 
 function remainingText(t) {
   try {
-    const created = new Date((t.created_at || '').replace(' ', 'T'))
+    // 注意（2026-10-06 修）：后端 `created_at` 是 **UTC**（SQLite CURRENT_TIMESTAMP 口径），
+    // 而 `new Date('2026-10-10T12:00:00')` 按 ES 规范会被当成**本地时间**解析 →
+    // 东八区下新建任务立刻显示"已超时"（后端算的是对的，两端口径不一致）。
+    // 补 `Z` 明确按 UTC 解析，前端与后端同一口径。
+    const raw = String(t.created_at || '').replace(' ', 'T')
+    const created = new Date(/[Zz]|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + 'Z')
     const remain = 3 - (Date.now() - created.getTime()) / 3600000
     if (remain < 0) return { text: '已超时', cls: 'background:#fef2f2;color:var(--ink-danger);' }
     if (remain < 1) return { text: `${remain.toFixed(1)}h 内需确认`, cls: 'background:#fef2f2;color:var(--ink-danger);' }

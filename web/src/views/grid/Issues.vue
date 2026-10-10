@@ -307,7 +307,9 @@ async function batchClose() {
       </n-tab-pane>
     </n-tabs>
 
-    <n-drawer v-model:show="detailOpen" placement="right" :width="420">
+    <!-- 注意（2026-10-06 修）：原来是固定 `:width="420"` —— 抽屉是 fixed 面板、不受 flex 收缩约束，
+         375px 手机上左边缘约 45px 出屏且无法横向滚动，正文每行开头被裁。改成随视口收缩。 -->
+    <n-drawer v-model:show="detailOpen" placement="right" :width="'min(420px, 100vw)'">
       <n-drawer-content v-if="detailIssue" :title="'工单 #' + detailIssue.id + ' 详情'" :native-scrollbar="false">
         <div class="detail-status">
           <span class="status-pill">{{ detailIssue.status }}</span>
