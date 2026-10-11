@@ -23,6 +23,9 @@ const form = ref({
 })
 const publishMode = ref('now') // now | schedule
 const creating = ref(false)
+let refreshTimer = null
+let urgentTimer = null
+let disposed = false
 // 筛选
 const typeFilter = ref('全部')
 const statusFilter = ref('全部')
@@ -43,10 +46,11 @@ async function load() {
   finally { loading.value = false }
 }
 onMounted(() => {
+  disposed = false
   load()
   // 已发布 30 秒 / 紧急 10 秒自动刷新（兜底；理想是 WebSocket 实时推送替代）
-  setInterval(load, 30000)
-  setInterval(() => {
+  refreshTimer = setInterval(load, 30000)
+  urgentTimer = setInterval(() => {
     if (list.value.some((n) => n.is_urgent)) load()
   }, 10000)
   connectWS()
@@ -67,11 +71,16 @@ function connectWS() {
         if (m.type === 'ready' || m.type === 'notify') load()
       } catch { /* 忽略非 JSON */ }
     }
-    ws.onclose = () => { wsRetry = setTimeout(connectWS, 5000) }  // 断线重连
+    ws.onclose = () => {
+      if (!disposed) wsRetry = setTimeout(connectWS, 5000)
+    }  // 断线重连
     ws.onerror = () => { try { ws.close() } catch { /* 忽略 */ } }
   } catch { /* ws 不可用则靠轮询兜底 */ }
 }
 onUnmounted(() => {
+  disposed = true
+  if (refreshTimer) clearInterval(refreshTimer)
+  if (urgentTimer) clearInterval(urgentTimer)
   if (wsRetry) clearTimeout(wsRetry)
   if (ws) try { ws.close() } catch { /* 忽略 */ }
 })

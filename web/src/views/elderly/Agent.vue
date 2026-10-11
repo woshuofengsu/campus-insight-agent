@@ -136,7 +136,7 @@ function sendOption(o) {
       <EIcon name="speaker-off" :size="18" /> {{ banner }}
     </div>
     <!-- 播报失败必须可见（v3 复核 B3）：不能假装老人听到了 -->
-    <div v-if="lastSpoken && !ttsOk" class="card muted" style="font-size:1.15rem;margin:8px 0;">
+    <div v-if="lastSpoken && !ttsOk" class="card muted" style="font-size:1.25rem;margin:8px 0;">
       <EIcon name="speaker-off" :size="18" /> 这台手机的语音念不出来，请看屏幕上的大字（内容是一样的）
     </div>
     <n-button v-else-if="lastSpoken" block size="large" style="margin:8px 0;min-height:56px;font-size:1.25rem;"
@@ -144,7 +144,7 @@ function sendOption(o) {
 
     <!-- 语音按钮（至少 80px 高） -->
     <div style="margin:8px 0;">
-      <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:80px;font-size:1.4rem;" :loading="listening" @mousedown="startListen" @mouseup="stopListen" @touchstart="startListen" @touchend="stopListen">
+      <n-button v-if="!asrBlocked" type="primary" block size="large" class="elderly-voice-button" style="min-height:80px;font-size:1.4rem;" :loading="listening" @mousedown="startListen" @mouseup="stopListen" @touchstart="startListen" @touchend="stopListen">
         <EIcon name="mic" :size="18" /> {{ listening ? `正在聆听…（${remain} 秒）` : '按住说话（最多 60 秒）' }}
       </n-button>
       <div v-else style="font-size:1.3rem;font-weight:700;text-align:center;">

@@ -141,7 +141,7 @@ async function doTransfer() {
            style="border-radius:12px;padding:10px;margin-bottom:10px;font-size:1.3rem;">
         <EIcon name="speaker-off" :size="18" /> {{ banner }}
       </div>
-      <n-button v-if="!asrBlocked" type="error" block size="large" style="min-height:64px;font-size:1.3rem;"
+      <n-button v-if="!asrBlocked" type="primary" block size="large" class="elderly-voice-button" style="min-height:64px;font-size:1.3rem;"
                 :loading="listening" @pointerdown="startListen" @pointerup="stopListen"
                 @pointerleave="stopListen" @touchstart.prevent="startListen" @touchend="stopListen">
         <EIcon name="mic" :size="18" /> {{ listening ? '正在聆听…（松开结束，最多 60 秒）' : '按住说话提问' }}
@@ -174,7 +174,7 @@ async function doTransfer() {
       <template v-if="result.matched">
         <div style="font-weight:700;color:#2E7D32;"><EIcon name="checkCircle" :size="18" /> 已回答</div>
         <!-- 属地可解释性（三端口径一致）：大字告知这条政策适用于哪里 -->
-        <div v-if="result.applicable_area" style="margin-top:6px;font-size:1.15rem;">
+        <div v-if="result.applicable_area" style="margin-top:6px;font-size:1.25rem;">
           <EIcon name="pin" :size="18" /> 适用地区：<b>{{ result.applicable_area }}</b>
         </div>
         <div v-if="result.knowledge" class="elderly-evidence" data-evidence-card>

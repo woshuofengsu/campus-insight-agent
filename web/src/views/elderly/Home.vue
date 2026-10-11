@@ -211,10 +211,10 @@ function cancelCall() {
 </script>
 
 <template>
-  <div class="elderly-page">
+  <div class="elderly-page elderly-home">
     <!-- ═══════════ 第一层：我是谁 · 今天想办理什么 · 三个主要动作 ═══════════
          v3 重设计（任务书 §四.1）：进门第一眼是"能办什么"，不是"系统在干什么"。 -->
-    <div class="elderly-title">{{ greetText || ('您好，' + (home?.name || '大爷/阿姨')) }}</div>
+    <div class="elderly-title elderly-home-title">{{ greetText || ('您好，' + (home?.name || '大爷/阿姨')) }}</div>
     <div style="font-size:1.3rem;color:var(--muted);margin-bottom:14px;">
       今天想办理什么？说一声、点一下都行。
     </div>
@@ -229,8 +229,8 @@ function cancelCall() {
          data-quick-actions：给基线脚本一个**精确锚点**——页面上还有另外两处三列栅格
          （第三层入口、联系家人），按 `.elderly-grid-3` 数会把它们一起数进来，
          "快捷动作 3 个不变"就变成了假数字（实测：重设计后那样数出来是 7 个）。 -->
-    <div class="elderly-grid-3" data-quick-actions style="margin-bottom:8px;">
-      <n-button v-for="q in quick" :key="q.to" size="large" type="primary" ghost class="elderly-btn"
+    <div class="elderly-grid-3 elderly-primary-actions" data-quick-actions style="margin-bottom:8px;">
+      <n-button v-for="q in quick" :key="q.to" size="large" type="primary" ghost class="elderly-btn elderly-action-card"
                 @click="router.push(q.to)">
         <EIcon :name="q.icon" :size="30" />{{ q.label }}
       </n-button>
@@ -353,19 +353,19 @@ function cancelCall() {
     </div>
 
     <!-- ═══════════ 紧急（独立显示、深红克制：整页只有这一块是红的） ═══════════ -->
-    <div style="margin-top:16px;">
-      <n-button size="large" type="error" block class="elderly-btn" data-longpress
+    <div class="elderly-emergency-panel">
+      <n-button size="large" type="error" block class="elderly-btn elderly-sos-main" data-longpress
                 style="min-height:92px;font-size:1.7rem;background:var(--danger-solid);border-color:var(--danger-solid);border-radius:var(--r-card);"
                 @pointerdown="pressStart" @pointerup="pressCancel" @pointerleave="pressCancel"
                 @touchstart.prevent="pressStart" @touchend="pressCancel">
         <EIcon name="siren" :size="18" /> 紧急求助（长按 3 秒）
       </n-button>
-      <div class="muted" style="text-align:center;margin-top:6px;font-size:1.25rem;">按住 3 秒后确认呼叫</div>
+      <div class="elderly-sos-help">按住 3 秒后确认呼叫</div>
     </div>
 
     <!-- 拨打 120 红色大按钮 -->
-    <div style="margin-top:14px;">
-      <n-button size="large" type="error" block class="elderly-btn"
+    <div class="elderly-ambulance-panel">
+      <n-button size="large" type="error" block class="elderly-btn elderly-ambulance"
                 style="min-height:76px;font-size:1.45rem;background:var(--danger-solid);border-color:var(--danger-solid);border-radius:var(--r-card);"
                 tag="a" href="tel:120"><EIcon name="siren" :size="18" /> 拨打 120（急救）</n-button>
     </div>
@@ -386,7 +386,7 @@ function cancelCall() {
     </div>
 
     <!-- 紧急求助确认弹窗 -->
-    <n-modal v-model:show="sosConfirm" preset="dialog" type="error" title="确认紧急求助？"
+    <n-modal v-model:show="sosConfirm" preset="dialog" type="error" title="确认紧急求助？" class="elderly-sos-dialog"
              positive-text="确认求助" negative-text="取消"
              @positive-click="confirmSos" @negative-click="sos.cancelConfirm">
       <template #default>

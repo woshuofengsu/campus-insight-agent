@@ -387,7 +387,7 @@ async function checkSubmitted() {
     </div>
 
     <div class="card" style="font-size:1.3rem;">
-      <n-button v-if="!asrBlocked" type="error" block size="large"
+      <n-button v-if="!asrBlocked" type="primary" block size="large" class="elderly-voice-button"
                 style="min-height:72px;font-size:1.4rem;" :loading="listening" @click="startListen">
         <EIcon name="mic" :size="18" /> {{ listening ? '正在聆听…（最多 60 秒）' : '点一下开始说话' }}
       </n-button>
@@ -405,7 +405,7 @@ async function checkSubmitted() {
 
       <!-- 预置短语（v3 §7.1）：语音不是唯一入口，说不出来也能办成同一件事 -->
       <div style="margin-top:12px;">
-        <n-button block size="large" quaternary style="min-height:52px;font-size:1.15rem;"
+        <n-button block size="large" quaternary style="min-height:64px;font-size:1.25rem;"
                   @click="showPhrases = !showPhrases">
           <EIcon name="chat-dots" :size="18" /> {{ showPhrases ? '收起常见说法' : '说不出来？点一个常见说法' }}
         </n-button>

@@ -9,6 +9,8 @@ const message = useMessage()
 const kb = ref([])
 const questions = ref([])
 const stats = ref(null)
+const statsLoading = ref(false)
+const statsError = ref('')
 const threshold = ref(0.6)
 const tab = ref('kb')
 const replyMap = ref({}) // qid -> reply
@@ -30,8 +32,8 @@ onMounted(async () => {
   try { kb.value = (await knowledge.list()) || [] } catch { /* 忽略 */ }
   try { questions.value = (await qa.questions()) || [] } catch { /* 忽略 */ }
   try {
-    stats.value = await loadStats()
-  } catch { /* 忽略 */ }
+    await loadStats()
+  } catch { /* 错误已显示在统计页 */ }
   try {
     const t = await qa.getThreshold()
     if (t && t.threshold != null) threshold.value = Number(t.threshold)
@@ -63,7 +65,19 @@ async function reply(q) {
 }
 
 async function loadStats() {
-  return (await qa.stats({ days: statsDays.value })) || null
+  statsLoading.value = true
+  statsError.value = ''
+  try {
+    const result = (await qa.stats({ days: statsDays.value })) || null
+    if (!result) throw new Error('统计数据为空，请重试')
+    stats.value = result
+    return result
+  } catch (e) {
+    statsError.value = e?.message || '统计数据加载失败，请重试'
+    throw e
+  } finally {
+    statsLoading.value = false
+  }
 }
 
 async function saveThreshold() {
@@ -502,31 +516,38 @@ async function kgSearch() {
 
       <n-tab-pane name="stats" tab="统计与阈值">
         <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <n-radio-group v-model:value="statsDays" @update:value="async () => { stats.value = await loadStats() }">
+          <n-radio-group v-model:value="statsDays" @update:value="async () => { try { await loadStats() } catch {} }">
             <n-radio :value="0">全部</n-radio>
             <n-radio :value="7">近 7 天</n-radio>
             <n-radio :value="30">近 30 天</n-radio>
           </n-radio-group>
         </div>
+        <n-spin :show="statsLoading">
+        <n-alert v-if="statsError" type="error" :show-icon="false" style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span>{{ statsError }}</span>
+            <n-button size="small" @click="loadStats">重新加载</n-button>
+          </div>
+        </n-alert>
         <div v-if="stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
           <div class="card" style="text-align:center;">
             <div style="font-size:1.6rem;font-weight:800;">{{ stats.total_questions }}</div>
             <div class="muted" style="font-size:0.85rem;">累计提问</div>
           </div>
           <div class="card" style="text-align:center;">
-            <div style="font-size:1.6rem;font-weight:800;color:#4caf50;">{{ stats.auto_success }}</div>
+            <div style="font-size:1.6rem;font-weight:800;color:var(--ink-success);">{{ stats.auto_success }}</div>
             <div class="muted" style="font-size:0.85rem;">自动回答成功</div>
           </div>
           <div class="card" style="text-align:center;">
-            <div style="font-size:1.6rem;font-weight:800;color:#f59e0b;">{{ stats.transferred }}</div>
+            <div style="font-size:1.6rem;font-weight:800;color:var(--ink-warning);">{{ stats.transferred }}</div>
             <div class="muted" style="font-size:0.85rem;">转人工</div>
           </div>
           <div class="card" style="text-align:center;">
-            <div style="font-size:1.6rem;font-weight:800;color:#ef4444;">{{ stats.match_failed }}</div>
+            <div style="font-size:1.6rem;font-weight:800;color:var(--ink-danger);">{{ stats.match_failed }}</div>
             <div class="muted" style="font-size:0.85rem;">匹配失败</div>
           </div>
           <div class="card" style="text-align:center;">
-            <div style="font-size:1.6rem;font-weight:800;color:#ef4444;">{{ stats.unhelpful }}</div>
+            <div style="font-size:1.6rem;font-weight:800;color:var(--ink-danger);">{{ stats.unhelpful }}</div>
             <div class="muted" style="font-size:0.85rem;">居民点无帮助</div>
           </div>
           <div class="card" style="text-align:center;">
@@ -539,9 +560,9 @@ async function kgSearch() {
           <div style="font-weight:700;margin-bottom:8px;"><EIcon name="chart-line" :size="18" /> 近 8 天提问趋势</div>
           <div style="display:flex;align-items:flex-end;gap:8px;height:120px;padding-top:8px;">
             <div v-for="p in stats.trend" :key="p.day" style="flex:1;text-align:center;">
-              <div style="font-size:0.8rem;color:#888;">{{ p.count }}</div>
-              <div :style="{ height: Math.max(4, p.count * 18) + 'px', background: '#4caf50', borderRadius: '4px 4px 0 0' }"></div>
-              <div style="font-size:0.7rem;color:#999;margin-top:4px;">{{ p.day.slice(5) }}</div>
+              <div style="font-size:0.8rem;color:var(--muted);">{{ p.count }}</div>
+              <div :style="{ height: Math.max(4, p.count * 18) + 'px', background: 'var(--primary)', borderRadius: '4px 4px 0 0' }"></div>
+              <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">{{ p.day.slice(5) }}</div>
             </div>
           </div>
         </div>
@@ -580,7 +601,8 @@ async function kgSearch() {
           <div class="muted" style="font-size:0.8rem;margin-top:6px;">数值越高要求越严格（相似度不足时自动回答判为失败并留痕转人工）。</div>
         </div>
 
-        <n-empty v-if="!stats" description="暂无统计数据" />
+        <n-empty v-if="!stats && !statsError && !statsLoading" description="暂无统计数据" />
+        </n-spin>
       </n-tab-pane>
     </n-tabs>
 

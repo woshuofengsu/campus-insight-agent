@@ -68,13 +68,24 @@ async function saveSimCfg() {
 const drillOpen = ref(false)
 const drill = ref({ summary: { satisfied: 0, dissatisfied: 0, total: 0, rate: 0 }, items: [] })
 const drillTitle = ref('')
+const drillError = ref('')
+const drillQuery = ref({ category: '', assignee: '', satisfaction: '' })
 
 async function openDrilldown(category = '', assignee = '', satisfaction = '', title = '满意度下钻') {
   drillTitle.value = title
+  drillQuery.value = { category, assignee, satisfaction }
+  drillError.value = ''
   try {
     drill.value = (await agent.satisfactionDrilldown({ category, assignee, satisfaction })) || drill.value
-  } catch { /* 下钻失败不阻塞 */ }
+  } catch (e) {
+    drillError.value = e?.message || '下钻数据加载失败，请重试'
+  }
   drillOpen.value = true
+}
+
+async function retryDrilldown() {
+  const q = drillQuery.value
+  await openDrilldown(q.category, q.assignee, q.satisfaction, drillTitle.value)
 }
 
 onMounted(async () => {
@@ -390,6 +401,12 @@ const cards = computed(() => [
 
     <n-drawer v-model:show="drillOpen" placement="right" :width="360">
       <n-drawer-content :title="drillTitle" :native-scrollbar="false">
+        <n-alert v-if="drillError" type="error" :show-icon="false" style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span>{{ drillError }}</span>
+            <n-button size="small" @click="retryDrilldown">重新加载</n-button>
+          </div>
+        </n-alert>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
           <div class="card" style="text-align:center;margin:0;">
             <div style="font-size:1.4rem;font-weight:800;color:var(--ink-success);">{{ drill.summary.satisfied }}</div>

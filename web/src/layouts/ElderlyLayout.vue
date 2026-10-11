@@ -42,27 +42,29 @@ const navs = [
 </script>
 
 <template>
-  <div style="min-height:100vh;background:var(--bg);">
-    <div style="padding-top:calc(14px + env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-bottom:14px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <div style="font-size:1.3rem;font-weight:800;display:flex;align-items:center;gap:8px;">
-        <EIcon name="community" :size="30" />社区服务
+  <div class="elderly-shell">
+    <div class="elderly-header">
+      <div class="elderly-brand">
+        <span class="elderly-brand-mark"><EIcon name="community" :size="30" /></span>
+        <span>社区服务</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div class="elderly-header-actions">
         <!-- 独立紧急求助：任何页面都能一键到达（长按 3 秒仍然防误触）
              v3：静态深红 + 足够大，不再用呼吸光圈动画引人注意 -->
-        <n-button size="large" type="error" data-longpress
-                  style="color:#fff;font-size:1.3rem;min-height:56px;font-weight:800;background:var(--danger-solid);border-color:var(--danger-solid);"
+        <n-button size="large" type="error" data-longpress class="elderly-sos-top"
                   @pointerdown="sos.pressStart" @pointerup="sos.pressCancel" @pointerleave="sos.pressCancel"
                   @touchstart.prevent="sos.pressStart" @touchend="sos.pressCancel">
-          <EIcon name="alert" :size="28" />紧急求助
+          <EIcon name="alert" :size="28" />
+          <span class="elderly-sos-top-label">紧急求助</span>
+          <span class="elderly-sos-top-hint">长按 3 秒</span>
         </n-button>
-        <n-button size="large" text style="color:#fff;font-size:1.25rem;min-height:48px;" @click="store.logout(); router.replace('/login')">退出</n-button>
+        <n-button size="large" text class="elderly-logout" @click="store.logout(); router.replace('/login')">退出</n-button>
       </div>
     </div>
-    <div class="elderly-nav" style="display:flex;gap:10px;padding:12px 14px;background:var(--primary-light);flex-wrap:wrap;">
+    <div class="elderly-nav">
       <n-button v-for="n in navs" :key="n.key" size="large"
                 :type="route.path.startsWith(n.key) ? 'primary' : 'default'"
-                @click="router.push(n.key)" style="min-height:64px;font-size:1.25rem;font-weight:700;padding:0 20px;border-radius:var(--r-card);">
+                @click="router.push(n.key)" class="elderly-nav-button">
         <span style="display:inline-flex;align-items:center;gap:10px;">
           <EIcon :name="n.icon" :size="28" /><span>{{ n.label }}</span>
         </span>
@@ -71,17 +73,17 @@ const navs = [
     <router-view />
 
     <!-- 紧急求助确认弹窗（与首页同一个状态机：10 秒未确认自动取消） -->
-    <n-modal v-model:show="sos.sosConfirm.value" preset="dialog" type="error" title="确认紧急求助？"
+    <n-modal v-model:show="sos.sosConfirm.value" preset="dialog" type="error" title="确认紧急求助？" class="elderly-sos-dialog"
              positive-text="确认求助" negative-text="取消"
              @positive-click="sos.confirmSos" @negative-click="sos.cancelConfirm">
       <template #default>
-        <div style="text-align:center;font-size:1.3rem;">
+        <div class="elderly-sos-dialog-copy">
           将通知社区负责人{{ sos.contactNames.value ? `，以及紧急联系人：${sos.contactNames.value}` : '' }}。
         </div>
-        <div style="text-align:center;font-size:2.1rem;font-weight:800;color:var(--ink-danger);margin-top:8px;">
+        <div class="elderly-sos-countdown">
           {{ sos.sosCountdown.value }} 秒后自动取消
         </div>
-        <div v-if="!sosHint" class="muted" style="text-align:center;margin-top:8px;font-size:1.25rem;">
+        <div v-if="!sosHint" class="muted elderly-sos-dialog-note">
           需要打 120 请回到首页（那里有红色「拨打 120」按钮）
         </div>
       </template>

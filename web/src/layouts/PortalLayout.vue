@@ -47,7 +47,7 @@ const active = computed(() => {
 
 const activeTab = computed(() => {
   const p = route.path
-  if (p.includes('/work-orders') || p.includes('/proposals/') || p.includes('/proposals/new')) {
+  if (p.includes('/work-orders') || p === '/resident/proposals' || p.includes('/proposals/') || p.includes('/proposals/new')) {
     const seg = p.includes('/proposals') ? 'proposals' : 'work-orders'
     return '/resident/' + seg
   }

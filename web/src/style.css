@@ -22,6 +22,11 @@
   --primary: #1B6B5A;
   --primary-deep: #12503F;
   --primary-light: #E7F1EE;
+  /* —— 老年端专用层次：温暖底色 + 清楚边界，避免"科技展示页"观感 —— */
+  --elderly-bg: #F8F6F2;
+  --elderly-card: #FFFDFC;
+  --elderly-border: #D7DFDB;
+  --elderly-sos-deep: #9E2B23;
   /* —— 辅助色（温暖但不刺眼的陶土色，只用在"需要注意"）—— */
   --accent: #B4622A;
   --accent-light: #FAF0E7;
@@ -92,6 +97,10 @@ body.dark {
   --disabled: #7A8681;
   --border: #2C3833;
   --primary-light: #123B31;
+  --elderly-bg: #151B18;
+  --elderly-card: #1D2723;
+  --elderly-border: #3A4841;
+  --elderly-sos-deep: #F0A6A0;
   --accent-light: #2A231A;
   --teal-light: #123B31;
   --dark-bg: #0B100E;
@@ -331,6 +340,260 @@ body.dark [style*="color: rgb(31, 41, 55)"], body.dark [style*="color: rgb(26, 2
 .elderly-page .n-badge-sup .n-base-slot-machine,
 .elderly-page .n-badge-sup .n-base-slot-machine-current-number,
 .elderly-page .n-badge-sup .n-base-slot-machine-current-number__inner { font-size: 1.25rem; line-height: 1.2; }
+
+/* ---------------- 老年端二次视觉收敛：更暖、更清楚、更像服务台 ----------------
+   只改视觉层，不改变 6 个导航入口、3 个主要动作、两处 SOS 长按入口。
+   红色只留给真正的紧急动作；普通操作使用深蓝绿和白底，减少误触。 */
+.elderly-shell {
+  min-height: 100vh;
+  background: var(--elderly-bg);
+  color: var(--text);
+}
+.elderly-header {
+  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+  padding-bottom: 16px;
+  background: var(--primary-deep);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 4px solid var(--primary);
+}
+.elderly-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.elderly-brand-mark {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255,255,255,0.78);
+  border-radius: 10px;
+}
+.elderly-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.elderly-sos-top {
+  min-height: 72px !important;
+  min-width: 220px;
+  padding: 8px 16px !important;
+  background: var(--danger-solid) !important;
+  border-color: var(--danger-solid) !important;
+  color: #fff !important;
+  border-radius: 10px !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 0 var(--elderly-sos-deep);
+}
+.elderly-sos-top .n-button__content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.elderly-sos-top-label { white-space: nowrap; }
+.elderly-sos-top-hint {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.elderly-logout {
+  min-height: 56px !important;
+  padding: 0 10px !important;
+  color: #fff !important;
+  font-size: 1.25rem !important;
+}
+.elderly-nav {
+  display: flex;
+  gap: 10px;
+  padding: 14px max(16px, env(safe-area-inset-left)) 14px max(16px, env(safe-area-inset-right));
+  background: var(--elderly-card);
+  border-bottom: 1px solid var(--elderly-border);
+  flex-wrap: wrap;
+}
+.elderly-nav-button {
+  min-height: 68px !important;
+  padding: 0 20px !important;
+  border-radius: 10px !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  border-width: 2px !important;
+}
+.elderly-page {
+  padding: 24px 20px 36px;
+  max-width: 760px;
+  background: var(--elderly-bg);
+}
+.elderly-title {
+  color: var(--primary-deep);
+  font-size: 2rem;
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+.elderly-page .card {
+  background: var(--elderly-card);
+  border: 1px solid var(--elderly-border);
+  box-shadow: var(--shadow-1);
+}
+.elderly-home-title::after {
+  content: '  社区服务站';
+  color: var(--muted);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.elderly-primary-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.elderly-primary-actions .elderly-action-card {
+  min-height: 112px !important;
+  border-width: 2px !important;
+  background: var(--elderly-card) !important;
+  color: var(--primary-deep) !important;
+}
+.elderly-primary-actions .elderly-action-card:hover {
+  background: var(--primary-light) !important;
+}
+.elderly-emergency-panel,
+.elderly-ambulance-panel {
+  margin-top: 16px;
+}
+.elderly-sos-main,
+.elderly-ambulance {
+  color: #fff !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em;
+  box-shadow: 0 3px 0 var(--elderly-sos-deep);
+}
+.elderly-sos-help {
+  color: var(--ink-danger);
+  text-align: center;
+  margin-top: 8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.elderly-sos-dialog-copy,
+.elderly-sos-dialog-note {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 1.3rem;
+  line-height: 1.7;
+}
+.elderly-sos-countdown {
+  text-align: center;
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: var(--ink-danger);
+  margin-top: 8px;
+}
+body.role-elderly .elderly-sos-dialog .n-dialog {
+  border: 2px solid var(--danger-solid);
+}
+body.role-elderly .elderly-sos-dialog .n-dialog__title {
+  color: var(--ink-danger);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+/* 所有老年端页面的统一适老兜底：按钮、输入、卡片和焦点状态一致。
+   这样低频页（联系人、用药、健康、通知、问答）不会各自退回小字和窄热区。 */
+.elderly-page .n-button {
+  min-height: 64px !important;
+  font-size: 1.25rem !important;
+  border-radius: 10px;
+}
+.elderly-page .n-button__content {
+  min-height: 32px;
+  line-height: 1.45;
+}
+.elderly-page .n-input,
+.elderly-page .n-input-wrapper,
+.elderly-page .n-select,
+.elderly-page .n-base-selection {
+  min-height: 64px;
+  border-radius: 10px;
+}
+.elderly-page .n-input__input-el,
+.elderly-page .n-input__textarea-el,
+.elderly-page .n-input__placeholder,
+.elderly-page .n-base-selection-label {
+  font-size: 1.25rem !important;
+  line-height: 1.6;
+}
+.elderly-page textarea {
+  min-height: 112px;
+}
+.elderly-page .card {
+  padding: 18px;
+  border-radius: 12px;
+}
+.elderly-page .section-title {
+  color: var(--primary-deep);
+  font-weight: 800;
+}
+.elderly-page .elderly-voice-button {
+  min-height: 80px !important;
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+}
+.elderly-page button:focus-visible,
+.elderly-page [role="button"]:focus-visible,
+.elderly-nav-button:focus-visible,
+.elderly-sos-top:focus-visible {
+  outline: 4px solid var(--accent);
+  outline-offset: 3px;
+}
+.elderly-page [style*="font-size:1.15rem"],
+.elderly-page [style*="font-size: 1.15rem"],
+.elderly-page [style*="font-size:1.1rem"],
+.elderly-page [style*="font-size: 1.1rem"],
+.elderly-page [style*="font-size:1.05rem"],
+.elderly-page [style*="font-size: 1.05rem"] {
+  font-size: 1.25rem !important;
+}
+body.role-elderly .n-dialog .n-button {
+  min-height: 64px;
+}
+@media (max-width: 560px) {
+  .elderly-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .elderly-header-actions {
+    justify-content: space-between;
+  }
+  .elderly-sos-top {
+    flex: 1;
+  }
+  .elderly-primary-actions {
+    grid-template-columns: 1fr;
+  }
+  .elderly-primary-actions .elderly-action-card {
+    min-height: 92px !important;
+  }
+  .elderly-nav-button {
+    flex: 1 1 calc(50% - 10px);
+  }
+}
+@media (max-width: 359px) {
+  .elderly-nav-button {
+    flex-basis: 100%;
+  }
+}
 
 /* ---------------- 手机端适配 ---------------- */
 @media (max-width: 768px) {
