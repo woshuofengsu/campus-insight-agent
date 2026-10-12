@@ -86,7 +86,10 @@ def batch_dispatch(req: BatchDispatch, request: Request):
 
 @router.post("/close")
 def batch_close(req: BatchClose, request: Request):
-    """批量关闭：一组工单关闭（跳过状态不允许的）。"""
+    """批量关闭：一组工单关闭。
+    注意（2026-10-12：注释与实现对齐）：**已经是"已关闭"的会被拒绝并计入 failed**，
+    不会重复改状态、也不会让居民重复收到"工单已关闭"（幂等判据在 `data.db_repair.close_issue`）。
+    """
     if _require_role(request, "grid"):
         return _require_role(request, "grid")
     from data.db_repair import close_issue

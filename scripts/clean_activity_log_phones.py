@@ -31,6 +31,13 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+# Windows 控制台默认不是 UTF-8：不设的话中文/符号会乱码（门禁 test_no_emoji_ui 会红）
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001
+    pass
+
 #: 11 位手机号（前后不能再是数字，避免把订单号里的 11 位数字误伤）
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 

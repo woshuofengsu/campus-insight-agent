@@ -89,13 +89,24 @@ function deadlineText(i) {
   return `剩余 ${i.remaining_hours.toFixed(1)}h`
 }
 
+// 防连点（2026-10-12 补）：这个页面有 13 个写按钮，原来**一个 `:loading` 都没有**，
+// 也没有 in-flight 守卫 —— 连点两下就会发两次（批量派单发两次、审核/派单/关闭各来一遍）。
+// 两层保护：① 这里的状态守卫（挡住所有按钮的重复提交）；② 按钮上的 `:loading`（naive-ui 在
+// loading 时会丢弃点击，且让工作人员看得见"正在提交"）。
+const actingId = ref(0)          // 正在提交的工单 id（0 = 空闲）
+const batching = ref('')         // '' | 'dispatch' | 'close'
+
 async function act(i, data, okMsg) {
+  if (actingId.value) return          // 已有操作在飞 → 直接忽略（不排队、不重复提交）
+  actingId.value = i.id
   try {
     await issues.action(i.id, data)
     message.success(okMsg || '操作成功')
     load()
   } catch (e) {
     message.error(e.message)
+  } finally {
+    actingId.value = 0
   }
 }
 
@@ -126,24 +137,28 @@ function toggleAll() {
   selected.value = selected.value.length === filtered.value.length ? [] : filtered.value.map((i) => i.id)
 }
 async function batchDispatch() {
+  if (batching.value) return
   if (!selected.value.length) return message.warning('请先勾选工单')
   if (!batchAssignee.value.trim()) return message.warning('请填写维修人员姓名')
+  batching.value = 'dispatch'
   try {
     const out = await batch.dispatch(selected.value, batchAssignee.value.trim(), batchPhone.value.trim())
     message.success(`批量派单完成：成功 ${out.success}，失败 ${out.failed}`)
     selected.value = []
     load()
-  } catch (e) { message.error(e.message) }
+  } catch (e) { message.error(e.message) } finally { batching.value = '' }
 }
 async function batchClose() {
+  if (batching.value) return
   if (!selected.value.length) return message.warning('请先勾选工单')
   if (!batchCloseReason.value.trim()) return message.warning('请填写关闭原因')
+  batching.value = 'close'
   try {
     const out = await batch.close(selected.value, batchCloseReason.value.trim())
     message.success(`批量关闭完成：成功 ${out.success}，失败 ${out.failed}`)
     selected.value = []
     load()
-  } catch (e) { message.error(e.message) }
+  } catch (e) { message.error(e.message) } finally { batching.value = '' }
 }
 </script>
 
@@ -168,9 +183,9 @@ async function batchClose() {
           <n-checkbox :checked="selected.length === filtered.length && filtered.length > 0" @update:checked="toggleAll">全选（{{ selected.length }}）</n-checkbox>
           <n-input v-model:value="batchAssignee" placeholder="批量派单：维修人员姓名" size="small" style="width:180px;" />
           <n-input v-model:value="batchPhone" placeholder="电话" size="small" style="width:130px;" />
-          <n-button size="small" type="info" @click="batchDispatch"><EIcon name="wrench" :size="18" /> 批量派单</n-button>
+          <n-button size="small" type="info" :loading="batching === 'dispatch'" @click="batchDispatch"><EIcon name="wrench" :size="18" /> 批量派单</n-button>
           <n-input v-model:value="batchCloseReason" placeholder="批量关闭原因" size="small" style="width:160px;" />
-          <n-button size="small" quaternary type="error" @click="batchClose"><EIcon name="ban" :size="18" /> 批量关闭</n-button>
+          <n-button size="small" quaternary type="error" :loading="batching === 'close'" @click="batchClose"><EIcon name="ban" :size="18" /> 批量关闭</n-button>
         </div>
 
         <n-spin :show="loading">
@@ -236,7 +251,7 @@ async function batchClose() {
                 <template v-if="['待审核', '退回补充信息'].includes(i.status)">
                   <n-input v-model:value="opOf(i).opinion" placeholder="审核意见（退回必填）" size="small" style="margin-bottom:8px;" />
                   <div style="display:flex;gap:8px;">
-                    <n-button size="small" type="success" @click="act(i, { action: 'audit', approve: true, opinion: opOf(i).opinion || '同意' }, '已审核通过')"><EIcon name="checkCircle" :size="18" /> 审核通过</n-button>
+                    <n-button size="small" type="success" :loading="actingId === i.id" @click="act(i, { action: 'audit', approve: true, opinion: opOf(i).opinion || '同意' }, '已审核通过')"><EIcon name="checkCircle" :size="18" /> 审核通过</n-button>
                     <n-button size="small" type="warning" @click="requireValue(i, 'opinion', '退回必须填写审核意见') && act(i, { action: 'audit', approve: false, opinion: opOf(i).opinion }, '已退回')"><EIcon name="arrowLeft" :size="18" />  退回补充</n-button>
                   </div>
                 </template>
@@ -246,7 +261,7 @@ async function batchClose() {
                     <n-input v-model:value="opOf(i).assignee" placeholder="维修人员姓名（必填）" size="small" />
                     <n-input v-model:value="opOf(i).phone" placeholder="电话（必填）" size="small" />
                   </div>
-                  <n-button size="small" type="info" @click="requireValue(i, 'assignee', '请填写维修人员姓名') && requireValue(i, 'phone', '请填写维修人员电话') && act(i, { action: 'dispatch', assignee_name: opOf(i).assignee, assignee_phone: opOf(i).phone }, '已派单')"><EIcon name="wrench" :size="18" /> 派单</n-button>
+                  <n-button size="small" type="info" :loading="actingId === i.id" @click="requireValue(i, 'assignee', '请填写维修人员姓名') && requireValue(i, 'phone', '请填写维修人员电话') && act(i, { action: 'dispatch', assignee_name: opOf(i).assignee, assignee_phone: opOf(i).phone }, '已派单')"><EIcon name="wrench" :size="18" /> 派单</n-button>
                 </template>
                 <!-- 开始处理（已派单 / 待协商均可推进） -->
                 <n-button v-if="['已派单', '待协商'].includes(i.status)" size="small" type="success" style="margin-top:8px;" @click="act(i, { action: 'start' }, '已开始处理')"><EIcon name="hammer" :size="18" /> 开始处理</n-button>
@@ -254,7 +269,7 @@ async function batchClose() {
                 <template v-if="i.status === '处理中'">
                   <n-input v-model:value="opOf(i).note" placeholder="处理结果（必填）" size="small" style="margin-bottom:8px;" />
                   <n-input v-model:value="opOf(i).noPhoto" placeholder="未上传照片原因（选填）" size="small" style="margin-bottom:8px;" />
-                  <n-button size="small" type="primary" @click="requireValue(i, 'note', '请填写处理结果') && act(i, { action: 'resolve', note: opOf(i).note, reason: opOf(i).noPhoto || '' }, '已提交处理结果')"><EIcon name="checkCircle" :size="18" /> 提交处理结果</n-button>
+                  <n-button size="small" type="primary" :loading="actingId === i.id" @click="requireValue(i, 'note', '请填写处理结果') && act(i, { action: 'resolve', note: opOf(i).note, reason: opOf(i).noPhoto || '' }, '已提交处理结果')"><EIcon name="checkCircle" :size="18" /> 提交处理结果</n-button>
                 </template>
                 <!-- 确认补充信息 -->
                 <template v-if="i.supplement_pending">
@@ -284,7 +299,7 @@ async function batchClose() {
                 <template v-if="['待审核', '处理中'].includes(i.status)">
                   <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                     <n-input v-model:value="opOf(i).reason" placeholder="关闭原因（必填）" size="small" style="max-width:240px;" />
-                    <n-button size="small" quaternary type="error" @click="requireValue(i, 'reason', '请填写关闭原因') && act(i, { action: 'close', reason: opOf(i).reason }, '已关闭')"><EIcon name="ban" :size="18" /> 关闭</n-button>
+                    <n-button size="small" quaternary type="error" :loading="actingId === i.id" @click="requireValue(i, 'reason', '请填写关闭原因') && act(i, { action: 'close', reason: opOf(i).reason }, '已关闭')"><EIcon name="ban" :size="18" /> 关闭</n-button>
                   </div>
                 </template>
                 </div>
