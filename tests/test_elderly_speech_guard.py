@@ -46,19 +46,33 @@ def test_pages_that_recognize_explain_reason():
         assert "没听清，请再说一次或直接打字" not in src, f"{name} 又把失败原因一律当成没听清"
 
 
+def _load_path_body(src: str, label: str) -> str:
+    """取出"挂载时执行的代码"——兼容两种写法，别让重构把门禁变成永远绿/永远红。
+
+    ① `onMounted(async () => { … })`（原写法）
+    ② `onMounted(loadXxx)` + `async function loadXxx() { … }`（2026-10-06 首页改成并行加载后的写法）
+    """
+    m = re.search(r"onMounted\(async \(\) => \{(.*?)\n\}\)", src, re.S)
+    if m:
+        return m.group(1)
+    m2 = re.search(r"onMounted\(\s*(\w+)\s*\)", src)
+    assert m2, f"{label}: onMounted 结构变了（既不是 async 箭头函数、也不是具名函数），请同步本测试"
+    name = m2.group(1)
+    m3 = re.search(r"(?:async\s+)?function\s+" + re.escape(name) + r"\s*\([^)]*\)\s*\{(.*?)\n\}", src, re.S)
+    assert m3, f"{label}: 找不到 onMounted({name}) 指向的函数体，请同步本测试"
+    return m3.group(1)
+
+
 def test_info_bearing_speech_is_not_auto_played():
     """承载信息的自动播报必须改成用户手势触发（iOS 静默失败的根因）。"""
     home = _read(os.path.join(ELDERLY, "Home.vue"))
-    m = re.search(r"onMounted\(async \(\) => \{(.*?)\n\}\)", home, re.S)
-    assert m, "Home.vue 的 onMounted 结构变了，请同步本测试"
-    body = m.group(1)
-    assert "speak(" not in body, "首页 onMounted 里不许再自动播报（iOS 需用户手势）"
+    body = _load_path_body(home, "Home.vue")
+    assert "speak(" not in body, "首页挂载路径里不许再自动播报（iOS 需用户手势）"
     assert "playWelcome" in home and "playUrgent" in home, "首页应提供「点一下听」的入口"
 
     notices = _read(os.path.join(ELDERLY, "Notices.vue"))
-    m2 = re.search(r"onMounted\(async \(\) => \{(.*?)\n\}\)", notices, re.S)
-    assert m2, "Notices.vue 的 onMounted 结构变了，请同步本测试"
-    assert "speak(" not in m2.group(1), "通知页不许挂载即播报"
+    body2 = _load_path_body(notices, "Notices.vue")
+    assert "speak(" not in body2, "通知页不许挂载即播报"
     assert "readUrgent" in notices, "通知页应提供点一下听紧急通知的入口"
 
 
