@@ -191,6 +191,37 @@ def test_draft_delete_requires_ownership_even_for_grid():
     assert get_draft(did) is None, "本人删除应当生效"
 
 
+# ---------------- 8. 留痕里的存量完整手机号：脱敏脚本本身可复算 ----------------
+
+def test_activity_log_phone_masking_script():
+    """`scripts/clean_activity_log_phones.py` 的判据：
+    ① 只动 detail 一个字段、把 11 位号码脱敏；② 幂等（跑第二遍不再命中）；
+    ③ 不该误伤"其它 11 位数字"（订单号/编号里连续 11 位数字不能被当成手机号）。
+
+    为什么需要它：留痕不许含完整手机号是硬约定，2026-10-06 修的是**写入侧**，
+    历史行得靠这个脚本清理 —— "改了写入侧不等于旧数据就干净了"。
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
+    import clean_activity_log_phones as clp
+    # 纯函数：脱敏 + 不误伤
+    assert clp.mask_text("报修人完整号码 13800001111") == "报修人完整号码 138****1111"
+    assert clp.mask_text("单号 A2610006123456789 与 13800001111") == "单号 A2610006123456789 与 138****1111"
+    assert clp.mask_text("没有号码") == "没有号码"
+    # 真跑一遍：临时库里的那一行被脱敏，第二遍不再命中
+    with db_core.get_db() as conn:
+        conn.execute("INSERT INTO activity_log (actor, action, target_type, target_id, detail) "
+                     "VALUES (?,?,?,?,?)",
+                     ("测试", "查看完整手机号", "issue", 0, "工单 #1 完整号码 13900002222"))
+        conn.commit()
+    hits = clp.scan(db_core.get_db)
+    assert any("13900002222" in old for _i, old, _new in hits), "应命中刚写进去的那一行"
+    with db_core.get_db() as conn:
+        for i, _old, new in hits:
+            conn.execute("UPDATE activity_log SET detail=? WHERE id=?", (new, i))
+        conn.commit()
+    assert clp.scan(db_core.get_db) == [], "脱敏后再跑必须 0 命中（幂等）"
+
+
 # ---------------- 7. 居民端报修：同一个编号只建一张单 ----------------
 
 def test_resident_issue_create_is_idempotent():
