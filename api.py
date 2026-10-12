@@ -45,6 +45,39 @@ def _server_error(e: Exception) -> HTTPException:
 _auth_warned = False
 
 
+#: 插件入口的"服务身份"（2026-10-12 补）
+#:
+#: **为什么必须有它**：插件入口没有登录态，而 `data.db_user.get_current_user()` 在
+#: "没人声明当前用户"时会**静默回落 id=1** —— 于是插件建的工单会被记到 1 号用户名下，
+#: 并按 **1 号用户的社区**盖章（跨社区时等于投进别人的队列，居民在自己的列表里看不到自己报的事）。
+#: 主服务不受影响（`/agent/chat` 按 JWT 显式传 uid），受影响的是这个插件入口与备线。
+#:
+#: 口径：身份**必须显式**给出，不许靠回落 ——
+#:   ① 环境变量 `PLUGIN_AGENT_USER`（用户名，推荐：给插件单独建一个账号）；
+#:   ② 没配就取 `config.DEFAULT_COMMUNITY` 里第一个在用的网格员（本机演示/比赛场景）；
+#:   ③ 两个都取不到 → **明确失败**（写操作直接 500 并说明怎么配），绝不静默用 id=1。
+def _resolve_plugin_uid() -> int:
+    """解析插件入口的服务身份；取不到返回 0（调用方必须据此失败）。"""
+    try:
+        from data.db_user import list_users
+        import config as _cfg
+        want = (os.environ.get("PLUGIN_AGENT_USER") or "").strip()
+        if want:
+            for u in list_users():
+                if (u.get("username") or "") == want and u.get("is_active", 1):
+                    return int(u.get("id") or 0)
+            _log.warning("PLUGIN_AGENT_USER=%s 找不到对应的在用账号", want)
+            return 0
+        community = getattr(_cfg, "DEFAULT_COMMUNITY", "") or ""
+        for u in (list_users(role="grid", community=community) or []):
+            if u.get("id"):
+                return int(u["id"])
+        return 0
+    except Exception as e:  # noqa: BLE001  解析不出来 → 交由调用方失败（fail-closed）
+        _log.warning("插件身份解析失败：%s", e)
+        return 0
+
+
 def _warn_no_auth():
     """API 在无密钥开放模式下运行时，只提醒一次。"""
     global _auth_warned
@@ -100,6 +133,30 @@ app.add_middleware(
 
 # 公开端点（不需要鉴权）
 _PUBLIC_PATHS = {"/api/health", "/docs", "/redoc", "/openapi.json", "/"}
+
+#: 写方法（需要"有身份"才允许落库）
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def _bind_plugin_identity(request: Request, call_next):
+    """给插件入口绑定**显式身份**（见 `_resolve_plugin_uid` 的说明）。
+
+    写操作取不到身份 → 直接 500 并说明怎么配。**fail-closed**：宁可不办，
+    也不把工单记到 1 号用户名下、按 1 号用户的社区盖章（那会让真正的居民看不到自己报的事）。
+    """
+    if request.method in _WRITE_METHODS and request.url.path not in _PUBLIC_PATHS:
+        uid = _resolve_plugin_uid()
+        if not uid:
+            _log.warning("插件入口写操作被拒绝：没有可用的服务身份（path=%s）", request.url.path)
+            return JSONResponse(status_code=500, content={
+                "success": False,
+                "message": "插件入口未配置服务账号：请设置 PLUGIN_AGENT_USER（或用 "
+                           "scripts/bootstrap_admin.py 建一个账号），否则写入会归属错误的人与社区。",
+            })
+        from data.db_user import set_active_user_id
+        set_active_user_id(uid)
+    return await call_next(request)
 
 
 @app.middleware("http")

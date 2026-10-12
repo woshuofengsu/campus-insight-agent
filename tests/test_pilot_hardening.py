@@ -191,6 +191,30 @@ def test_draft_delete_requires_ownership_even_for_grid():
     assert get_draft(did) is None, "本人删除应当生效"
 
 
+# ---------------- 9. 插件入口必须有"显式身份"（不许静默用 id=1） ----------------
+
+def test_plugin_identity_is_explicit_never_falls_back_to_id1(monkeypatch):
+    """插件入口没有登录态，而 `data.db_user.get_current_user()` 在**没人声明当前用户**时
+    会静默回落 **id=1** —— 插件建的工单于是被记到 1 号用户名下，并按 **1 号用户的社区**盖章
+    （跨社区时就是投进别人的队列，居民在自己列表里看不到自己报的事）。
+
+    判据（`api._resolve_plugin_uid`）：
+      ① 配了 `PLUGIN_AGENT_USER` → 用它；
+      ② 没配 → 用默认社区里第一个在用网格员；
+      ③ 都取不到 → **返回 0**（调用方 fail-closed，写操作直接 500），**绝不给 1**。
+    """
+    import api as plugin_api
+    # ① 显式配置优先（用户名口径）
+    monkeypatch.setenv("PLUGIN_AGENT_USER", f"u{GRID_A}")
+    assert plugin_api._resolve_plugin_uid() == GRID_A
+    # ② 没配 → 默认社区的第一个网格员（本 fixture 里 A == 海淀小区 == config.DEFAULT_COMMUNITY）
+    monkeypatch.delenv("PLUGIN_AGENT_USER", raising=False)
+    assert plugin_api._resolve_plugin_uid() == GRID_A
+    # ③ 配了个不存在的账号 → 0（不给 1，也不给别的任何人）
+    monkeypatch.setenv("PLUGIN_AGENT_USER", "no-such-user-xyz")
+    assert plugin_api._resolve_plugin_uid() == 0, "取不到身份必须返回 0，让调用方 fail-closed"
+
+
 # ---------------- 8. 留痕里的存量完整手机号：脱敏脚本本身可复算 ----------------
 
 def test_activity_log_phone_masking_script():
