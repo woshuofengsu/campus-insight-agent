@@ -211,6 +211,63 @@ def _script_sources() -> list[tuple[str, str]]:
     return out
 
 
+#: 通知标题会**原样显示在界面上**（网格端消息中心 / 居民端通知 / 老年端通知），
+#: 但本文件其它用例只扫 `web/src` —— 后端拼出来的标题里带 emoji 就一路直出到页面。
+#: 2026-10-12 实测修掉 7 处（"⚠️ SOS 紧急求助"、"🚨 紧急求助升级"、"✅ 负责人已响应…"、
+#: "💬 您的健康咨询已回复" 等）。这里把这几条链路钉住，别再漏。
+_NOTIFY_BACKEND_FILES = (
+    "db_notifications.py", "db_elderly.py", "db_elderly_care.py", "db_health_content.py",
+)
+
+
+def _code_only(text: str) -> str:
+    """去掉注释与文档字符串（emoji 出现在注释里**不渲染**，不该被这条门禁逼着改）。
+
+    近似实现：成对三引号之间的行整段丢掉；行首注释与行内 `#` 之后的部分丢掉。
+    """
+    out, in_doc = [], False
+    for ln in text.splitlines():
+        n = ln.count('"""') + ln.count("'''")
+        if in_doc:
+            if n % 2 == 1:
+                in_doc = False
+            out.append("")
+            continue
+        if n % 2 == 1:
+            in_doc = True
+            out.append("")
+            continue
+        out.append(ln.split("#", 1)[0])
+    return "\n".join(out)
+
+
+#: 有意保留的例外 → 必须写明理由（沿用本仓库"豁免要写理由"的规矩）
+_NOTIFY_EMOJI_ALLOW = {
+    # 备线（Streamlit）用的"生活服务"卡片数据：字段名是 icon、值是 emoji。
+    # 已核实：三端 Vue 的老年端页面**不消费**这个字段（`web/src/views/elderly/*` 用的是
+    # `EIcon` 语义图标名）。若以后把它接进三端，必须换成图标名，而不是继续传 emoji。
+    "db_elderly.py": "生活服务卡片 icon 字段只服务 Streamlit 备线，三端未消费",
+}
+
+
+def test_notification_titles_have_no_emoji():
+    """后端生成的通知标题不许带 emoji（它会原样显示到界面，而前端门禁扫不到）。
+
+    注释里的 emoji 不算（不渲染）；上面 `_NOTIFY_EMOJI_ALLOW` 登记的例外要写明理由。
+    """
+    bad_all = []
+    for name in _NOTIFY_BACKEND_FILES:
+        p = os.path.join(ROOT, "data", name)
+        if not os.path.isfile(p):
+            continue
+        if name in _NOTIFY_EMOJI_ALLOW:
+            continue
+        found = EMOJI.findall(_code_only(io.open(p, encoding="utf-8").read()))
+        if found:
+            bad_all.append(f"data/{name}: {found}")
+    assert not bad_all, "通知标题里还有 emoji（会原样显示到界面）：\n  " + "\n  ".join(bad_all)
+
+
 def test_scripts_printing_emoji_set_stdout_encoding():
     """脚本**打印** emoji 时，必须显式设 stdout 编码；否则管道/中文控制台下会崩。"""
     bad = []

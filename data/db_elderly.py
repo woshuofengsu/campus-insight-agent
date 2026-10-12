@@ -167,7 +167,7 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
             for g in grids_for_elder:
                 create_notification(
                     g["id"], "elderly_safety",
-                    f"👴 老人安全留意：{elder.get('name', '')}",
+                    f"老人安全留意：{elder.get('name', '')}",
                     body,
                     related_id=uid,
                 )
@@ -176,7 +176,7 @@ def notify_inactive_elders(hours: int = INACTIVE_HOURS) -> int:
             for guardian in list_guardians_of(uid):
                 create_notification(
                     guardian["id"], "elderly_safety",
-                    f"👴 关心一下：{elder.get('name', '')}",
+                    f"关心一下：{elder.get('name', '')}",
                     f"已经 {hours} 小时没有互动了，方便的话打个电话问问。"
                     "（社区网格员也收到了这条提醒）",
                     related_id=uid,
@@ -259,7 +259,7 @@ def notify_sos_targeted(user_name: str, sos_id: int, tenant: str = "") -> int | 
             target = grids[0]
         create_notification(
             target["id"], "sos",
-            f"⚠️ SOS 紧急求助：{user_name}",
+            f"SOS 紧急求助：{user_name}",
             "老年关怀版用户发出紧急求助，请立即联系/上门查看。",
             related_id=sos_id,
         )

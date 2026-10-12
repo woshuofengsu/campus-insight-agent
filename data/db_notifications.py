@@ -114,13 +114,13 @@ def notify_issue_status_change(issue_id: int, new_status: str,
             return  # 找不到上报人，跳过通知
 
         status_cn = {
-            "处理中": ("🔄 处理中", f"你上报的「{issue_title}」已被受理，正在处理中。"),
-            "已解决": ("✅ 已解决", f"你上报的「{issue_title}」已解决！感谢你的反馈。"),
-            "待处理": ("🔄 重新打开", f"你上报的「{issue_title}」已被重新打开，将再次处理。"),
+            "处理中": ("处理中", f"你上报的「{issue_title}」已被受理，正在处理中。"),
+            "已解决": ("已解决", f"你上报的「{issue_title}」已解决！感谢你的反馈。"),
+            "待处理": ("重新打开", f"你上报的「{issue_title}」已被重新打开，将再次处理。"),
         }
         notify_title, notify_content = status_cn.get(
             new_status,
-            (f"📋 状态更新", f"你上报的「{issue_title}」状态已更新为「{new_status}」。"),
+            ("状态更新", f"你上报的「{issue_title}」状态已更新为「{new_status}」。"),
         )
 
         create_notification(
@@ -163,23 +163,23 @@ def notify_proposal_status_change(proposal_id: int, new_status: str,
 
         status_config = {
             "已回应": (
-                "💬 收到回复",
+                "收到回复",
                 f"你的提案「{prop_title}」收到了网格员回复"
                 + (f"：{response_text[:100]}" if response_text else "。"),
             ),
             "已采纳": (
-                "✅ 已被采纳",
+                "已被采纳",
                 f"你的提案「{prop_title}」已被社区采纳！"
                 + (f" 回复：{response_text[:100]}" if response_text else ""),
             ),
             "已实施": (
-                "🎉 已实施",
+                "已实施",
                 f"你的提案「{prop_title}」已经落地实施！感谢你的建言。",
             ),
         }
         notify_title, notify_content = status_config.get(
             new_status,
-            (f"📋 状态更新", f"你的提案「{prop_title}」状态已更新为「{new_status}」。"),
+            ("状态更新", f"你的提案「{prop_title}」状态已更新为「{new_status}」。"),
         )
 
         create_notification(

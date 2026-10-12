@@ -527,7 +527,7 @@ def expire_contents() -> list[dict]:
             log_activity("系统", "疫苗内容到期自动下架", "health_content", r["id"],
                          r["title"], module=MODULE, before_value="已发布", after_value="已下架",
                          detail="信息有效期已到，自动下架并提醒负责人")
-            _notify_managers(f"💉 疫苗提醒内容已到期下架：{r['title']}",
+            _notify_managers(f"疫苗提醒内容已到期下架：{r['title']}",
                              "该疫苗接种提醒内容已过信息有效期，已自动下架，请确认是否需要更新后重新发布。",
                              related_id=r["id"])
         except Exception as e:  # noqa: BLE001
@@ -538,7 +538,7 @@ def expire_contents() -> list[dict]:
                 log_exception(MODULE, f"疫苗内容自动下架失败 content#{r['id']}: {e}")
             except Exception:
                 pass
-            _notify_managers(f"⚠️ 疫苗提醒内容自动下架失败：{r['title']}",
+            _notify_managers(f"疫苗提醒内容自动下架失败：{r['title']}",
                              "系统自动下架失败，请手动下架（下架需二次确认）。",
                              related_id=r["id"])
     return results
@@ -697,7 +697,7 @@ def submit_consult(user_id: int, name: str, phone: str, consult_type: str,
                  target_title=f"咨询{code}", module=MODULE, after_value="待回复",
                  detail=f"类型：{consult_type}")
     _notify_managers(
-        f"🩺 新健康咨询（{consult_type}）",
+        f"新健康咨询（{consult_type}）",
         f"咨询编号 {code}，请尽量在{REPLY_HOURS}小时内回复。",
         related_id=consult_id,
         tenant=tenant_of_user(user_id),   # 卡4：只通知咨询人所在社区的网格员
@@ -829,7 +829,7 @@ def reply_consult(consult_id: int, reply: str, actor: str = "",
     log_activity(actor or "负责人", "回复健康咨询", "health_consult", consult_id,
                  module=MODULE, before_value=old, after_value="已回复",
                  detail=reply_display + (f"；就医指引：{doctor_guide}" if doctor_guide else ""))
-    _notify_resident(row["user_id"], "💬 您的健康咨询已回复",
+    _notify_resident(row["user_id"], "您的健康咨询已回复",
                      reply_display[:200] or "负责人已回复您的健康咨询，请查看。",
                      related_id=consult_id)
     return True, "ok"
@@ -862,7 +862,7 @@ def feedback_consult(consult_id: int, user_id: int, solved: bool,
                  consult_id, module=MODULE, before_value=old, after_value=new_status,
                  detail=reason.strip() or "")
     if not solved:
-        _notify_managers(f"🔄 健康咨询待继续回复（{get_consult_code(consult_id)}）",
+        _notify_managers(f"健康咨询待继续回复（{get_consult_code(consult_id)}）",
                          "居民反馈未解决，请继续回复（重新开始24小时回复时限）。",
                          related_id=consult_id,
                          tenant=tenant_of_user(row["user_id"]))
@@ -914,7 +914,7 @@ def mark_overdue_consults() -> list[dict]:
                      target_title=code, module=MODULE,
                      before_value="待回复/继续回复", after_value="超时未回复",
                      detail=f"超过{REPLY_HOURS}小时未回复，超时时长{hours}小时，再次提醒负责人")
-        _notify_managers(f"⏰ 健康咨询超时未回复：{code}",
+        _notify_managers(f"健康咨询超时未回复：{code}",
                          f"咨询（{r['consult_type']}）已超{REPLY_HOURS}小时未回复（超时{hours}小时），请尽快处理。",
                          related_id=r["id"],
                          tenant=tenant_of_user(r["user_id"]))
@@ -1227,7 +1227,7 @@ def trigger_weather_linkage(weather_event: dict, actor: str = "系统",
             _log_once("联动内容缺失", f"联动键「{key}」无已发布且未过期的匹配内容，无法触发联动")
             result["notified_missing"] = True
             _notify_managers(
-                f"⚠️ 天气联动内容缺失：{key}",
+                f"天气联动内容缺失：{key}",
                 "触发联动前校验未通过：无已发布且未过期的匹配内容，请补充内容后重新触发。",
                 tenant=tenant,   # 卡4：只提醒该社区（调度器逐社区调用本函数）
             )

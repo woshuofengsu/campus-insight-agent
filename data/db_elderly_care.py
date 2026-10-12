@@ -418,11 +418,11 @@ def audit_medication(reminder_id: int, approve: bool, opinion: str = "",
     # 通过后通知设置人开始生效；不通过通知修改重新提交
     target_uid = row["setter_id"] or row["user_id"]
     if approve:
-        _notify_user(target_uid, "medication_audit", "✅ 用药提醒审核通过",
+        _notify_user(target_uid, "medication_audit", "用药提醒审核通过",
                      f"{row['patient_name']}的「{row['drug_name']}」提醒已生效，将按时语音提醒。",
                      related_id=reminder_id)
     else:
-        _notify_user(target_uid, "medication_audit", "❌ 用药提醒审核不通过",
+        _notify_user(target_uid, "medication_audit", "用药提醒审核不通过",
                      f"「{row['drug_name']}」提醒未通过：{opinion}，可修改后重新提交。",
                      related_id=reminder_id)
     return True, ""
@@ -624,7 +624,7 @@ def get_due_medications(user_id: int | None = None, now: datetime | None = None,
                 )
                 conn.commit()
                 _notify_user(r["setter_id"] or r["user_id"], "medication_audit",
-                             "⏰ 用药提醒已到期自动停止",
+                             "用药提醒已到期自动停止",
                              f"{r['patient_name']}的「{r['drug_name']}」提醒已结束。",
                              related_id=r["id"])
                 log_activity("系统", "用药提醒到期自动停止", "medication_reminder", r["id"],
@@ -841,7 +841,7 @@ def remind_unreviewed_medications() -> list[dict]:
                                  item["id"])
                 for u in managers_of(_tenant):
                     create_notification(u["id"], "medication",
-                                        "⏰ 用药提醒待审核超时",
+                                        "用药提醒待审核超时",
                                         f"「{item['drug']}」用药提醒待审核已超过 24 小时，请尽快处理。")
             except Exception as e:  # noqa: BLE001 — 不静默：记日志
                 _log.warning("用药审核超时提醒投递失败 reminder=%s：%s", item["id"], e)
@@ -926,11 +926,11 @@ def audit_emergency_contact(contact_id: int, approve: bool, opinion: str = "",
                  "emergency_contact", contact_id, f"{row['relation']} - {row['name']}",
                  module=MODULE, before_value="待审核", after_value=new_status, detail=opinion)
     if approve:
-        _notify_user(row["user_id"], "emergency_contact", "✅ 紧急联系人已审核通过",
+        _notify_user(row["user_id"], "emergency_contact", "紧急联系人已审核通过",
                      f"{row['name']}（{row['relation']}）已生效，可用于紧急求助拨打。",
                      related_id=contact_id)
     else:
-        _notify_user(row["user_id"], "emergency_contact", "❌ 紧急联系人审核不通过",
+        _notify_user(row["user_id"], "emergency_contact", "紧急联系人审核不通过",
                      f"{row['name']}（{row['relation']}）：{opinion}，可修改后重新提交。",
                      related_id=contact_id)
     return True, ""
@@ -970,7 +970,7 @@ def modify_emergency_contact(contact_id: int, name: str, phone: str, relation: s
                  before_value=old, after_value=f"{relation} {name} {phone[:3]}****{phone[-4:]}",
                  detail="修改后需重新审核；修改前信息：{}".format(old))
     _notify_user(row["user_id"], "emergency_contact",
-                 "📝 紧急联系人已修改，待重新审核",
+                 "紧急联系人已修改，待重新审核",
                  f"{name}（{relation}）修改已提交，负责人审核通过后生效。",
                  related_id=contact_id)
     return True, ""
@@ -997,7 +997,7 @@ def delete_emergency_contact(contact_id: int, actor: str = "") -> tuple[bool, st
                  f"{row['relation']} - {row['name']}", module=MODULE,
                  before_value=row["status"], after_value="已删除",
                  detail=f"电话：{row['phone'][:3]}****{row['phone'][-4:]}")
-    _notify_user(row["user_id"], "emergency_contact", "📋 紧急联系人已删除",
+    _notify_user(row["user_id"], "emergency_contact", "紧急联系人已删除",
                  f"{row['name']}（{row['relation']}）已删除。", related_id=contact_id)
     return True, ""
 
@@ -1137,7 +1137,7 @@ def trigger_sos(user_id: int, actor: str = "") -> tuple[int, str]:
                      "user_id=%s err=%s", user_id, e)
     content = (f"老人姓名：{actor}，电话：{phone}，住址：{address}；"
                f"紧急联系人：{names}；触发时间：{datetime.now().strftime('%H:%M')}；状态：紧急求助中。")
-    _notify_grids(f"⚠️ 紧急求助：{actor}", content, call_id,
+    _notify_grids(f"紧急求助：{actor}", content, call_id,
                   tenant=tenant_of_user(user_id))  # 卡4：只提醒老人所在社区（无网格员则回退全体）
     return call_id, ""
 
@@ -1159,7 +1159,7 @@ def respond_sos(call_id: int, actor: str = "负责人") -> tuple[bool, str]:
         conn.commit()
     log_activity(actor, "确认响应紧急求助", "emergency_call", call_id, "紧急求助",
                  module=MODULE, before_value="求助中", after_value="已响应")
-    _notify_user(row["user_id"], "sos", "✅ 负责人已响应您的紧急求助",
+    _notify_user(row["user_id"], "sos", "负责人已响应您的紧急求助",
                  "请保持电话畅通，工作人员正在赶来。", related_id=call_id)
     return True, ""
 
@@ -1186,7 +1186,7 @@ def end_sos(call_id: int, handle_note: str, actor: str = "负责人") -> tuple[b
         conn.commit()
     log_activity(actor, "结束紧急求助", "emergency_call", call_id, "紧急求助",
                  module=MODULE, before_value=old, after_value="已结束", detail=handle_note)
-    _notify_user(row["user_id"], "sos", "✅ 您的紧急求助已处理",
+    _notify_user(row["user_id"], "sos", "您的紧急求助已处理",
                  f"处理结果：{handle_note}", related_id=call_id)
     return True, ""
 
@@ -1229,7 +1229,7 @@ def escalate_sos(call_id: int, actor: str = "系统", minutes: int | None = None
             "UPDATE emergency_calls SET result=? WHERE id=?", (new_result, call_id)
         )
         conn.commit()
-    _notify_grids(f"🚨 紧急求助升级（{count}次）：尚未响应",
+    _notify_grids(f"紧急求助升级（{count}次）：尚未响应",
                   f"紧急求助已 {minutes} 分钟无人确认响应，请立即处理。", call_id,
                   tenant=tenant_of_user(row["user_id"]))  # 卡4：按求助老人的社区投递
     log_activity(actor, "紧急求助升级通知", "emergency_call", call_id, "紧急求助",
