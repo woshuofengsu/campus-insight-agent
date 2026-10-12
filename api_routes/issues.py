@@ -26,6 +26,10 @@ class IssueCreate(BaseModel):
     agent_name: str = Field(default="")
     agent_phone: str = Field(default="")
     agent_relation: str = Field(default="")
+    # 幂等键（2026-10-12 补，与老人端/通知/服务台口径一致）：
+    # 居民端原来**没有**幂等保护 —— 提交超时后用户再点一次就建出**两张单**
+    # （前端 loading 只挡同一帧连点，挡不住"报错后再点一次"）。
+    client_token: str = Field(default="", max_length=64)
 
 
 class IssueDraft(BaseModel):
@@ -103,6 +107,27 @@ def _mask_phone(v: dict) -> dict:
 @router.post("")
 def issue_create(req: IssueCreate, request: Request):
     u = _user(request)
+    # 幂等（与老人端 `elderly_report` 同一套实现与顺序）：
+    # ① 先原子占位 → ② 命中 done 直接回上次结果 → ③ pending 只等前一次的结果 →
+    # ④ unknown **fail-closed 不办**（占位写不进去时，最需要保护的正是"别建第二张单"）。
+    reserved = False
+    if req.client_token:
+        from data.db_idempotency import begin, release, remember, wait_result
+        state, prev = begin("web_issue", req.client_token, u.get("uid"))
+        if state == "done":
+            _log.info("居民报修重复提交（幂等命中）：uid=%s token=%s → 工单 #%s",
+                      u.get("uid"), req.client_token, prev.get("issue_id"))
+            return _ok({**prev, "duplicate": True},
+                       f"这条报修已经提交过了，工单号 {prev.get('issue_id')}")
+        if state == "pending":
+            prev = wait_result("web_issue", req.client_token, u.get("uid"), timeout=8)
+            if prev is not None:
+                return _ok({**prev, "duplicate": True},
+                           f"这条报修已经提交过了，工单号 {prev.get('issue_id')}")
+            return _fail(2003, "这条报修正在提交中，请稍等几秒后到「我的报修」核对结果，不要重复提交。")
+        if state == "unknown":
+            return _fail(2003, "提交状态暂时无法确认（系统繁忙）。请到「我的报修」核对，不要重复提交。")
+        reserved = True
     iid, hint = _db_submit_issue(
         title=req.title, category=req.category, issue_type=req.issue_type,
         location=req.location, description=req.description or req.title,
@@ -113,7 +138,12 @@ def issue_create(req: IssueCreate, request: Request):
         agent_phone=req.agent_phone, agent_relation=req.agent_relation,
     )
     if iid <= 0:
+        if reserved:
+            release("web_issue", req.client_token, u.get("uid"))
         return _fail(2001, hint or "提交失败")
+    if reserved:
+        remember("web_issue", req.client_token, u.get("uid"),
+                 {"issue_id": iid, "hint": hint})
     # 重复上报检测（P2-02）：7 天内同楼栋同类问题 → 合并提示 + 通知双方（原工单不动）
     dup = None
     try:

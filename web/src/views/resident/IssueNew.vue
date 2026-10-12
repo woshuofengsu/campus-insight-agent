@@ -1,10 +1,11 @@
 <script setup>
 // 提交报修（含现场照片上传 + 代报 + 草稿恢复）
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { issues, upload } from '../../api'
 import EIcon from '../../components/EIcon.vue'
+import { newToken } from '../../utils/idemToken'
 
 const router = useRouter()
 const message = useMessage()
@@ -26,6 +27,12 @@ const files = ref([]) // 上传的文件列表（n-upload）
 const drafts = ref([])
 // 特殊情况提示（安全隐患/第三方施工/违规）
 const special = ref(null) // { type: 'safety'|'third_party'|'violation' }
+// 幂等键：同一件事只用一个编号；**内容一改就是另一件事**，立刻换编号
+// （否则"上一件已经提交过"会被当成本件的结果返回，用户会看到别人的工单号）。
+const clientToken = ref('')
+watch(() => [form.value.title, form.value.location, form.value.description], () => {
+  if (!loading.value) clientToken.value = ''
+})
 
 onMounted(async () => {
   try { drafts.value = (await issues.drafts()) || [] } catch { /* 忽略 */ }
@@ -63,6 +70,10 @@ const submit = async () => {
   }
   loading.value = true
   special.value = null
+  // 幂等键（2026-10-12 补）：**同一件事只生成一次**，提交失败后重试用的是同一个编号 →
+  // 服务端认出"这是同一件事"，不会因为超时重试建出两张工单（老人端早就有这个保护，居民端漏了）。
+  // 只有在"这件事办完了（成功/被拒）"之后才换新编号（见 finally 里的 resetToken）。
+  if (!clientToken.value) clientToken.value = newToken()
   try {
     // 先传照片（最多3张，≤5MB），再提交工单
     if (files.value.length) {
@@ -73,6 +84,7 @@ const submit = async () => {
     const data = await issues.create({
       ...form.value,
       is_agent_report: form.value.is_agent_report ? 1 : 0,
+      client_token: clientToken.value,
     })
     // 特殊情况处理（spec 四）
     if (data.hint === 'safety') {

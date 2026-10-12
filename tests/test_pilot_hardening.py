@@ -191,6 +191,29 @@ def test_draft_delete_requires_ownership_even_for_grid():
     assert get_draft(did) is None, "本人删除应当生效"
 
 
+# ---------------- 7. 居民端报修：同一个编号只建一张单 ----------------
+
+def test_resident_issue_create_is_idempotent():
+    """居民端原来**没有**幂等键（老人端/通知/服务台都有）：
+    提交超时后用户再点一次 → 建出**两张**待审核工单（前端 loading 只挡同一帧连点）。
+    现在两个请求带同一个 client_token，第二次必须直接返回第一次的结果，库里只有一张单。"""
+    from api_routes import issues as issues_mod
+    req = issues_mod.IssueCreate(
+        title="楼道灯不亮了", location="3号楼1单元-幂等", description="楼道灯坏了不亮需要维修",
+        reporter_phone="13800000031", client_token="tok-resident-dup-1",
+    )
+    r1 = issues_mod.issue_create(req, _req(UID_A, "resident", A))
+    r2 = issues_mod.issue_create(req, _req(UID_A, "resident", A))
+    assert isinstance(r1, dict) and r1.get("success"), r1
+    assert isinstance(r2, dict) and r2.get("success"), r2
+    assert r1["data"]["issue_id"] == r2["data"]["issue_id"], "同一个编号必须回同一张单"
+    assert r2["data"].get("duplicate") is True, "第二次应明确标记为重复提交"
+    with db_core.get_db() as conn:
+        n = conn.execute("SELECT COUNT(*) AS n FROM community_issues WHERE location=?",
+                         ("3号楼1单元-幂等",)).fetchone()["n"]
+    assert n == 1, f"同一件事被建了 {n} 张单（幂等失效）"
+
+
 # ---------------- 5. SOS 通知：有号码，而且是掩码 ----------------
 
 def test_sos_notification_carries_masked_phone(monkeypatch):
